@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.22.0
+
+- Resource tplinkeasysmart_system (device description) and data source tplinkeasysmart_config_backup (size, SHA-256, optional content read over ESCP with fragment reassembly); settings table updated.
+
 ## 0.21.0
 
 - Resource tplinkeasysmart_vlan_port_based_group (port-based VLAN groups; mode stays read-only) with the port-in-use guard.

@@ -422,3 +422,51 @@ func TestLivePortBasedVLAN2(t *testing.T) {
 	}
 	t.Logf("with VLAN 2: %+v", now.VLANs)
 }
+
+// Device description (hostname). Approved by the owner on 2026-10-09. The
+// request re-sends the current IP configuration, so these tests verify that
+// the address, mask, gateway and DHCP flag are unchanged afterwards.
+func TestLiveHostnameSameValueWrite(t *testing.T) {
+	c, ctx := liveClient(t), context.Background()
+	before, err := c.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("before: hostname=%s ip=%s dhcp=%v", before.Hostname, before.IP, before.DHCP)
+	if err := c.SetHostname(ctx, before.Hostname); err != nil {
+		t.Fatalf("same-value write rejected: %v", err)
+	}
+	after, err := c.Info(ctx)
+	if err != nil || after != before {
+		t.Fatalf("state changed by same-value write: %+v vs %+v err=%v", after, before, err)
+	}
+}
+
+func TestLiveHostnameRename(t *testing.T) {
+	c, ctx := liveClient(t), context.Background()
+	before, err := c.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := c.SetHostname(ctx, before.Hostname); err != nil {
+			t.Errorf("RESTORE FAILED: %v", err)
+		}
+		if now, _ := c.Info(ctx); now != before {
+			t.Errorf("not restored: %+v vs %+v", now, before)
+		}
+	}()
+	temp := before.Hostname + "-t"
+	if err := c.SetHostname(ctx, temp); err != nil {
+		t.Fatal(err)
+	}
+	after, err := c.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := before
+	want.Hostname = temp
+	if after != want {
+		t.Fatalf("after rename: %+v, want %+v (only the hostname may differ)", after, want)
+	}
+}

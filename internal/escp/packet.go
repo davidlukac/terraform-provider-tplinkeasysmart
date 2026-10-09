@@ -27,6 +27,7 @@ const (
 	TLVDHCP           = 9
 	TLVLED            = 12
 	TLVFactoryDefault = 14
+	TLVConfigFile     = 768 // configuration backup (read through an authenticated SET)
 	TLVUsername       = 512
 	TLVPassword       = 514
 	TLVRSAKey         = 528
@@ -52,6 +53,8 @@ type header struct {
 	Seq       uint16
 	ErrCode   int32
 	Length    uint16
+	// Fragment is non-zero when more packets of the same reply follow.
+	Fragment uint16
 }
 
 func marshal(h header, tlvs []TLV) []byte {
@@ -69,6 +72,7 @@ func marshal(h header, tlvs []TLV) []byte {
 	binary.BigEndian.PutUint16(b[14:], h.Seq)
 	binary.BigEndian.PutUint32(b[16:], uint32(h.ErrCode))
 	binary.BigEndian.PutUint16(b[20:], uint16(headerLen+len(payload)))
+	binary.BigEndian.PutUint16(b[22:], h.Fragment)
 	return append(b, payload...)
 }
 
@@ -89,6 +93,7 @@ func unmarshal(b []byte) (header, []TLV, error) {
 	h.Seq = binary.BigEndian.Uint16(b[14:])
 	h.ErrCode = int32(binary.BigEndian.Uint32(b[16:]))
 	h.Length = binary.BigEndian.Uint16(b[20:])
+	h.Fragment = binary.BigEndian.Uint16(b[22:])
 	var tlvs []TLV
 	p := b[headerLen:]
 	for len(p) >= 4 {

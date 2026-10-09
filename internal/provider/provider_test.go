@@ -32,6 +32,9 @@ type fakeClient struct {
 }
 
 func (f *fakeClient) Info(context.Context) (escp.Info, error) {
+	if info, handled, err := f.extra().info(); handled {
+		return info, err
+	}
 	return escp.Info{Model: "TL-SG108E", Hostname: "TL-SG108E-01", MAC: "00:00:5e:00:53:01",
 		Firmware: "1.0.0 Build 20230218 Rel.50633", Hardware: "TL-SG108E 6.0",
 		IP: "192.0.2.120", Netmask: "255.255.255.0", Gateway: "192.0.2.1", DHCP: true}, nil

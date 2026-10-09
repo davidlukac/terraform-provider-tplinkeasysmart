@@ -20,6 +20,8 @@ Write support exists only where it cannot cut management access, and per-port or
 | `tplinkeasysmart_port_mirror` | resource | Monitoring > Port Mirror | destination port in use / LAG member |
 | `tplinkeasysmart_lag` | resource | Switching > Port Trunk | old and new member ports |
 | `tplinkeasysmart_vlan_port_based_group` | resource | VLAN > Port Based VLAN | old and new member ports (membership is exclusive) |
+| `tplinkeasysmart_system` | resource | System > System Info (device description) | none; the IP config is re-sent unchanged and verified; write skipped if unchanged |
+| `data.tplinkeasysmart_config_backup` | data | System > System Tools > Backup Config | read-only; content is optional and sensitive |
 | `data.tplinkeasysmart_system_info` | data | System Info / IP Setting | read-only |
 | `data.tplinkeasysmart_ports` | data | Switching > Port Setting | read-only |
 | `data.tplinkeasysmart_port_statistics` | data | Monitoring > Port Statistics | read-only |
@@ -32,7 +34,7 @@ Write support exists only where it cannot cut management access, and per-port or
 | `data.tplinkeasysmart_bandwidth_control` | data | QoS > Bandwidth Control | read-only |
 | `data.tplinkeasysmart_storm_control` | data | QoS > Storm Control | read-only |
 
-Deliberately **not** writable: management IP / DHCP, VLAN mode switches (MTU, port-based, 802.1Q), 802.1Q VLANs and PVIDs, user account, config backup/restore, reboot, factory reset, firmware upgrade, cable diagnostics. The device description (hostname) write exists in the client (`SetHostname`) but is not live-verified and has no resource: it re-sends the management IP configuration and its live test was blocked by the permission classifier.
+Deliberately **not** writable: management IP / DHCP, VLAN mode switches (MTU, port-based, 802.1Q), 802.1Q VLANs and PVIDs, user account, config restore, reboot, factory reset, firmware upgrade, cable diagnostics. The device description (hostname) is writable through `tplinkeasysmart_system` (letters, digits and hyphens only).
 
 ## Provider configuration
 

@@ -110,9 +110,9 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 }
 
 func (p *tplinkProvider) Resources(context.Context) []func() resource.Resource {
-	return []func() resource.Resource{NewLEDResource, NewIGMPSnoopingResource, NewLoopPreventionResource, NewPortResource, NewQoSResource, NewBandwidthLimitResource, NewStormLimitResource, NewPortMirrorResource, NewLAGResource, NewVLANPortBasedGroupResource}
+	return []func() resource.Resource{NewLEDResource, NewIGMPSnoopingResource, NewLoopPreventionResource, NewPortResource, NewQoSResource, NewBandwidthLimitResource, NewStormLimitResource, NewPortMirrorResource, NewLAGResource, NewVLANPortBasedGroupResource, NewSystemResource}
 }
 
 func (p *tplinkProvider) DataSources(context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{NewSystemInfoDataSource, NewPortsDataSource, NewPortStatisticsDataSource, NewLAGsDataSource, NewPortMirrorDataSource, NewVLANMTUDataSource, NewVLANPortBasedDataSource, NewVLAN8021QDataSource, NewQoSDataSource, NewBandwidthControlDataSource, NewStormControlDataSource}
+	return []func() datasource.DataSource{NewSystemInfoDataSource, NewPortsDataSource, NewPortStatisticsDataSource, NewLAGsDataSource, NewPortMirrorDataSource, NewVLANMTUDataSource, NewVLANPortBasedDataSource, NewVLAN8021QDataSource, NewQoSDataSource, NewBandwidthControlDataSource, NewStormControlDataSource, NewConfigBackupDataSource}
 }

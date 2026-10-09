@@ -1,0 +1,76 @@
+package provider
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+var (
+	_ datasource.DataSource              = &configBackupDataSource{}
+	_ datasource.DataSourceWithConfigure = &configBackupDataSource{}
+)
+
+// NewConfigBackupDataSource returns the tplinkeasysmart_config_backup data source.
+func NewConfigBackupDataSource() datasource.DataSource { return &configBackupDataSource{} }
+
+type configBackupDataSource struct{ client SwitchClient }
+
+type configBackupModel struct {
+	ID             types.String `tfsdk:"id"`
+	IncludeContent types.Bool   `tfsdk:"include_content"`
+	Size           types.Int64  `tfsdk:"size"`
+	SHA256         types.String `tfsdk:"sha256"`
+	ContentBase64  types.String `tfsdk:"content_base64"`
+}
+
+func (d *configBackupDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_config_backup"
+}
+
+func (d *configBackupDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "The switch's binary configuration file (System > System Tools > Backup Config), read over the management protocol. Read-only: nothing on the switch changes. " +
+			"By default only size and SHA-256 are returned, which is enough to detect configuration changes made outside Terraform. " +
+			"The file contains an obfuscated credential block; set `include_content` only if you need the bytes, and treat the state as secret.",
+		Attributes: map[string]schema.Attribute{
+			"id":              schema.StringAttribute{Computed: true, Description: "Always `config_backup`."},
+			"include_content": schema.BoolAttribute{Optional: true, Description: "Also return the file as base64 in `content_base64`. Defaults to false."},
+			"size":            schema.Int64Attribute{Computed: true, Description: "File size in bytes."},
+			"sha256":          schema.StringAttribute{Computed: true, Description: "Hex SHA-256 of the file."},
+			"content_base64":  schema.StringAttribute{Computed: true, Sensitive: true, Description: "The file, base64 encoded; null unless `include_content` is true."},
+		},
+	}
+}
+
+func (d *configBackupDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+}
+
+func (d *configBackupDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var cfg configBackupModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
+	if resp.Diagnostics.HasError() { // coverage: ignore - the framework validated the config against the schema before Read is called
+		return
+	}
+	data, err := d.client.ConfigBackup(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError("Reading the configuration backup failed", err.Error())
+		return
+	}
+	sum := sha256.Sum256(data)
+	state := configBackupModel{
+		ID: types.StringValue("config_backup"), IncludeContent: cfg.IncludeContent,
+		Size: types.Int64Value(int64(len(data))), SHA256: types.StringValue(hex.EncodeToString(sum[:])),
+		ContentBase64: types.StringNull(),
+	}
+	if cfg.IncludeContent.ValueBool() {
+		state.ContentBase64 = types.StringValue(base64.StdEncoding.EncodeToString(data))
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
