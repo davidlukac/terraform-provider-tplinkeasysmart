@@ -40,6 +40,7 @@ resource "tplinkeasysmart_storm_limit" "unused" {
 - `broadcast` (Boolean) Limit broadcast traffic.
 - `multicast` (Boolean) Limit multicast traffic.
 - `rate_kbps` (Number) Rate in kbps (multiple of 64, 64..1000000) when a traffic type is selected, otherwise 0.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
 - `unknown_unicast` (Boolean) Limit unknown unicast traffic.
 
 ## Import
@@ -50,3 +51,5 @@ Import is supported using the following syntax:
 # The import id is the port number.
 terraform import tplinkeasysmart_storm_limit.unused 7
 ```
+
+For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`).

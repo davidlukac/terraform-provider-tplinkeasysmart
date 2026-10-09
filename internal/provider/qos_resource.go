@@ -30,7 +30,11 @@ var (
 // NewQoSResource returns the tplinkeasysmart_qos resource.
 func NewQoSResource() resource.Resource { return &qosResource{} }
 
-type qosResource struct{ client qosClient }
+type qosResource struct {
+	src    switchSource
+	client qosClient    // set on the per-call copy made by bound()
+	sw     types.String // the switch that copy is bound to, for ids
+}
 
 // qosClient is the part of the switch API this resource needs.
 type qosClient interface {
@@ -39,7 +43,13 @@ type qosClient interface {
 	SetQoSMode(ctx context.Context, mode int) error
 }
 
+// bound returns a copy of the resource wired to the client of the named switch.
+func (r *qosResource) bound(add func(string, string), name types.String) *qosResource {
+	return bindSwitch(add, r.src, name, r, func(b *qosResource, c qosClient, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type qosResourceModel struct {
+	Switch     types.String `tfsdk:"switch"`
 	ID         types.String `tfsdk:"id"`
 	Mode       types.String `tfsdk:"mode"`
 	Priorities types.Map    `tfsdk:"port_priorities"`
@@ -54,6 +64,7 @@ func (r *qosResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Description: "QoS basic settings (QoS > QoS Basic). Singleton; import with id `qos`. Changing QoS only reorders queues under congestion and cannot cut connectivity. " +
 			"Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch: resourceSwitchAttribute(),
 			"id": schema.StringAttribute{Computed: true, Description: "Always `qos`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"mode": schema.StringAttribute{Required: true, Validators: []validator.String{validQoSMode()}, Description: "port-based, 802.1p or dscp-802.1p."},
@@ -66,7 +77,7 @@ func (r *qosResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 }
 
 func (r *qosResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom[qosClient](req.ProviderData, &resp.Diagnostics)
+	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
 func modeCode(name string) (int, bool) {
@@ -79,7 +90,7 @@ func modeCode(name string) (int, bool) {
 }
 
 // qosState builds the model from the switch, keeping only the priority keys we manage.
-func qosState(q escp.QoS, managed map[string]struct{}) qosResourceModel {
+func qosState(sw types.String, q escp.QoS, managed map[string]struct{}) qosResourceModel {
 	vals := map[string]attr.Value{}
 	for _, p := range q.Priorities {
 		k := strconv.Itoa(p.Port)
@@ -88,11 +99,17 @@ func qosState(q escp.QoS, managed map[string]struct{}) qosResourceModel {
 		}
 	}
 	// every element is an Int64 value, so the map cannot violate its element type
-	return qosResourceModel{ID: types.StringValue(qosID), Mode: types.StringValue(q.ModeName),
+	return qosResourceModel{ID: qualifiedID(sw, qosID), Mode: types.StringValue(q.ModeName),
 		Priorities: types.MapValueMust(types.Int64Type, vals)}
 }
 
+// apply binds the resource to the switch the plan selects, then applies it.
 func (r *qosResource) apply(ctx context.Context, plan *qosResourceModel, add func(string, string)) bool {
+	b := r.bound(add, plan.Switch)
+	return b != nil && b.applyBound(ctx, plan, add)
+}
+
+func (r *qosResource) applyBound(ctx context.Context, plan *qosResourceModel, add func(string, string)) bool {
 	code, ok := modeCode(plan.Mode.ValueString())
 	if !ok {
 		add("Invalid QoS mode", fmt.Sprintf("%q is not one of port-based, 802.1p, dscp-802.1p", plan.Mode.ValueString()))
@@ -138,7 +155,7 @@ func (r *qosResource) apply(ctx context.Context, plan *qosResourceModel, add fun
 			return false
 		}
 	}
-	*plan = qosState(got, managed)
+	*plan = qosState(plan.Switch, got, managed)
 	return true
 }
 
@@ -150,7 +167,16 @@ func (r *qosResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
+// Read binds the resource to the switch recorded in state, then reads it.
 func (r *qosResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	sw := switchOf(ctx, req.State, &resp.Diagnostics)
+	if b := r.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (r *qosResource) readBound(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state qosResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -165,7 +191,7 @@ func (r *qosResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		resp.Diagnostics.AddError("Reading QoS failed", err.Error())
 		return
 	}
-	m := qosState(q, managed)
+	m := qosState(r.sw, q, managed)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
 
@@ -185,3 +211,10 @@ func (r *qosResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 }
 
 var _ resource.ResourceWithValidateConfig = &qosResource{}
+
+// ModifyPlan refuses, while planning, a switch that cannot be resolved.
+func (r *qosResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+}
+
+var _ resource.ResourceWithModifyPlan = &qosResource{}

@@ -18,11 +18,20 @@ var (
 // NewPortsDataSource returns the tplinkeasysmart_ports data source.
 func NewPortsDataSource() datasource.DataSource { return &portsDataSource{} }
 
-type portsDataSource struct{ client portsReader }
+type portsDataSource struct {
+	src    switchSource
+	client portsReader  // set on the per-call copy made by bound()
+	sw     types.String // the switch that copy is bound to, for ids
+}
 
 // portsReader is the part of the switch API this data source reads.
 type portsReader interface {
 	Ports(ctx context.Context) ([]escp.Port, error)
+}
+
+// bound returns a copy of the data source wired to the client of the named switch.
+func (d *portsDataSource) bound(add func(string, string), name types.String) *portsDataSource {
+	return bindSwitch(add, d.src, name, d, func(b *portsDataSource, c portsReader, sw types.String) { b.client, b.sw = c, sw })
 }
 
 type portModel struct {
@@ -36,8 +45,9 @@ type portModel struct {
 }
 
 type portsModel struct {
-	ID    types.String `tfsdk:"id"`
-	Ports []portModel  `tfsdk:"ports"`
+	Switch types.String `tfsdk:"switch"`
+	ID     types.String `tfsdk:"id"`
+	Ports  []portModel  `tfsdk:"ports"`
 }
 
 func (d *portsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -48,7 +58,8 @@ func (d *portsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		Description: "Port settings and link state (Switching > Port Setting in the web UI). Read-only.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{Computed: true, Description: "Always `ports`."},
+			attrSwitch: dataSourceSwitchAttribute(),
+			"id":       schema.StringAttribute{Computed: true, Description: "Always `ports`."},
 			"ports": schema.ListNestedAttribute{
 				Computed:    true,
 				Description: "One entry per physical port.",
@@ -67,16 +78,25 @@ func (d *portsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 }
 
 func (d *portsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom[portsReader](req.ProviderData, &resp.Diagnostics)
+	d.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func (d *portsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
+// Read binds the data source to the switch selected in the configuration, then reads it.
+func (d *portsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	sw := switchOf(ctx, req.Config, &resp.Diagnostics)
+	if b := d.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (d *portsDataSource) readBound(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
 	ports, err := d.client.Ports(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading ports failed", err.Error())
 		return
 	}
-	state := portsModel{ID: types.StringValue("ports"), Ports: make([]portModel, 0, len(ports))}
+	state := portsModel{ID: qualifiedID(d.sw, "ports"), Ports: make([]portModel, 0, len(ports))}
 	for _, p := range ports {
 		state.Ports = append(state.Ports, portModel{
 			ID: types.Int64Value(int64(p.ID)), Enabled: types.BoolValue(p.Enabled), LAG: types.Int64Value(int64(p.LAG)),

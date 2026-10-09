@@ -16,7 +16,7 @@ import (
 // supply the safe default instead of leaving it null.
 func TestPortMirrorReadDefaultsAllowDisruptiveToFalse(t *testing.T) {
 	ctx := context.Background()
-	r := &portMirrorResource{client: newFaulty(&fakeClient{ports: testPorts(), mirror: &escp.Mirror{}})}
+	r := &portMirrorResource{src: &switchRegistry{def: newFaulty(&fakeClient{ports: testPorts(), mirror: &escp.Mirror{}})}}
 	var sch resource.SchemaResponse
 	r.Schema(ctx, resource.SchemaRequest{}, &sch)
 	objType := sch.Schema.Type().TerraformType(ctx).(tftypes.Object)
@@ -27,6 +27,7 @@ func TestPortMirrorReadDefaultsAllowDisruptiveToFalse(t *testing.T) {
 		"ingress_ports":    tftypes.NewValue(objType.AttributeTypes["ingress_ports"], []tftypes.Value{}),
 		"egress_ports":     tftypes.NewValue(objType.AttributeTypes["egress_ports"], []tftypes.Value{}),
 		"allow_disruptive": tftypes.NewValue(tftypes.Bool, nil),
+		"switch":           tftypes.NewValue(tftypes.String, nil),
 	})
 	resp := resource.ReadResponse{State: tfsdk.State{Schema: sch.Schema, Raw: raw}}
 	r.Read(ctx, resource.ReadRequest{State: tfsdk.State{Schema: sch.Schema, Raw: raw}}, &resp)

@@ -18,11 +18,20 @@ var (
 // NewPortStatisticsDataSource returns the tplinkeasysmart_port_statistics data source.
 func NewPortStatisticsDataSource() datasource.DataSource { return &portStatisticsDataSource{} }
 
-type portStatisticsDataSource struct{ client portStatisticsReader }
+type portStatisticsDataSource struct {
+	src    switchSource
+	client portStatisticsReader // set on the per-call copy made by bound()
+	sw     types.String         // the switch that copy is bound to, for ids
+}
 
 // portStatisticsReader is the part of the switch API this data source reads.
 type portStatisticsReader interface {
 	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
+}
+
+// bound returns a copy of the data source wired to the client of the named switch.
+func (d *portStatisticsDataSource) bound(add func(string, string), name types.String) *portStatisticsDataSource {
+	return bindSwitch(add, d.src, name, d, func(b *portStatisticsDataSource, c portStatisticsReader, sw types.String) { b.client, b.sw = c, sw })
 }
 
 type portStatsModel struct {
@@ -36,8 +45,9 @@ type portStatsModel struct {
 }
 
 type portStatisticsModel struct {
-	ID    types.String     `tfsdk:"id"`
-	Ports []portStatsModel `tfsdk:"ports"`
+	Switch types.String     `tfsdk:"switch"`
+	ID     types.String     `tfsdk:"id"`
+	Ports  []portStatsModel `tfsdk:"ports"`
 }
 
 func (d *portStatisticsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -51,7 +61,8 @@ func (d *portStatisticsDataSource) Schema(_ context.Context, _ datasource.Schema
 	resp.Schema = schema.Schema{
 		Description: "Per-port traffic counters (Monitoring > Port Statistics). Read-only; values change on every read, so do not use them in resource arguments. Counters are 32-bit and wrap.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{Computed: true, Description: "Always `port_statistics`."},
+			attrSwitch: dataSourceSwitchAttribute(),
+			"id":       schema.StringAttribute{Computed: true, Description: "Always `port_statistics`."},
 			"ports": schema.ListNestedAttribute{Computed: true, NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
 				"id":              i("Port number (1-based)."),
 				"enabled":         schema.BoolAttribute{Computed: true, Description: "Administrative state."},
@@ -66,16 +77,25 @@ func (d *portStatisticsDataSource) Schema(_ context.Context, _ datasource.Schema
 }
 
 func (d *portStatisticsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom[portStatisticsReader](req.ProviderData, &resp.Diagnostics)
+	d.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func (d *portStatisticsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
+// Read binds the data source to the switch selected in the configuration, then reads it.
+func (d *portStatisticsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	sw := switchOf(ctx, req.Config, &resp.Diagnostics)
+	if b := d.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (d *portStatisticsDataSource) readBound(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
 	rows, err := d.client.PortStatistics(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading port statistics failed", err.Error())
 		return
 	}
-	state := portStatisticsModel{ID: types.StringValue("port_statistics"), Ports: make([]portStatsModel, 0, len(rows))}
+	state := portStatisticsModel{ID: qualifiedID(d.sw, "port_statistics"), Ports: make([]portStatsModel, 0, len(rows))}
 	for _, r := range rows {
 		state.Ports = append(state.Ports, portStatsModel{
 			ID: types.Int64Value(int64(r.ID)), Enabled: types.BoolValue(r.Enabled), Link: types.StringValue(r.Link),

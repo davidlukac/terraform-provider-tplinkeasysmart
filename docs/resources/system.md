@@ -26,6 +26,10 @@ resource "tplinkeasysmart_system" "this" {
 
 - `hostname` (String) Device description: 1-32 letters, digits and hyphens, not starting or ending with a hyphen (dots and underscores are rejected by the switch).
 
+### Optional
+
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
+
 ### Read-Only
 
 - `id` (String) Always `system`.
@@ -37,3 +41,5 @@ Import is supported using the following syntax:
 ```shell
 terraform import tplinkeasysmart_system.this system
 ```
+
+For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`).

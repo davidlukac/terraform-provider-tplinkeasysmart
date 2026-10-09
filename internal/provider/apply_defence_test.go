@@ -23,7 +23,7 @@ func (c *collected) add(summary, detail string) {
 
 func TestLAGApplyRefusesAnEmptyMemberList(t *testing.T) {
 	f := pvFakes()
-	r := &lagResource{client: f}
+	r := &lagResource{src: &switchRegistry{def: f}}
 	var got collected
 	m := lagResourceModel{Group: types.Int64Value(2), Ports: types.SetValueMust(types.Int64Type, []attr.Value{}), AllowDisruptive: types.BoolValue(true)}
 	if r.apply(context.Background(), &m, got.add) {
@@ -39,7 +39,7 @@ func TestLAGApplyRefusesAnEmptyMemberList(t *testing.T) {
 
 func TestVLANGroupApplyRefusesAnEmptyMemberList(t *testing.T) {
 	f := pvFakes()
-	r := &portVLANResource{client: f}
+	r := &portVLANResource{src: &switchRegistry{def: f}}
 	var got collected
 	m := portVLANResourceModel{VLAN: types.Int64Value(2), Ports: types.SetValueMust(types.Int64Type, []attr.Value{}), AllowDisruptive: types.BoolValue(true)}
 	if r.apply(context.Background(), &m, got.add) {
@@ -70,7 +70,7 @@ func TestQoSApplyRefusesWhatTheSwitchWouldIgnoreOrMisread(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := pvFakes()
-			r := &qosResource{client: f}
+			r := &qosResource{src: &switchRegistry{def: f}}
 			var got collected
 			m := qosResourceModel{Mode: types.StringValue(tc.mode), Priorities: tc.prios}
 			if r.apply(context.Background(), &m, got.add) {

@@ -27,7 +27,11 @@ var (
 // NewStormLimitResource returns the tplinkeasysmart_storm_limit resource.
 func NewStormLimitResource() resource.Resource { return &stormLimitResource{} }
 
-type stormLimitResource struct{ client stormLimitClient }
+type stormLimitResource struct {
+	src    switchSource
+	client stormLimitClient // set on the per-call copy made by bound()
+	sw     types.String     // the switch that copy is bound to, for ids
+}
 
 // stormLimitClient is the part of the switch API this resource needs.
 type stormLimitClient interface {
@@ -36,13 +40,19 @@ type stormLimitClient interface {
 	StormControl(ctx context.Context) ([]escp.PortStorm, error)
 }
 
+// bound returns a copy of the resource wired to the client of the named switch.
+func (r *stormLimitResource) bound(add func(string, string), name types.String) *stormLimitResource {
+	return bindSwitch(add, r.src, name, r, func(b *stormLimitResource, c stormLimitClient, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type stormLimitModel struct {
-	Port            types.Int64 `tfsdk:"port"`
-	UnknownUnicast  types.Bool  `tfsdk:"unknown_unicast"`
-	Multicast       types.Bool  `tfsdk:"multicast"`
-	Broadcast       types.Bool  `tfsdk:"broadcast"`
-	RateKbps        types.Int64 `tfsdk:"rate_kbps"`
-	AllowDisruptive types.Bool  `tfsdk:"allow_disruptive"`
+	Switch          types.String `tfsdk:"switch"`
+	Port            types.Int64  `tfsdk:"port"`
+	UnknownUnicast  types.Bool   `tfsdk:"unknown_unicast"`
+	Multicast       types.Bool   `tfsdk:"multicast"`
+	Broadcast       types.Bool   `tfsdk:"broadcast"`
+	RateKbps        types.Int64  `tfsdk:"rate_kbps"`
+	AllowDisruptive types.Bool   `tfsdk:"allow_disruptive"`
 }
 
 func (r *stormLimitResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -54,6 +64,7 @@ func (r *stormLimitResource) Schema(_ context.Context, _ resource.SchemaRequest,
 		Description: "Storm control of one port (QoS > Storm Control). Selecting traffic types requires a rate (64..1000000 kbps, multiple of 64); selecting none disables it with rate 0. Import with the port number. **Safety:** a rate drops excess traffic of the chosen types, so by default " +
 			"the provider refuses to change a port that has a link up or is in a LAG; set `allow_disruptive = true` to override. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch: resourceSwitchAttribute(),
 			"port": schema.Int64Attribute{Required: true, Description: "Port number (1-based).",
 				Validators:    []validator.Int64{validPortNumber()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
@@ -68,7 +79,7 @@ func (r *stormLimitResource) Schema(_ context.Context, _ resource.SchemaRequest,
 }
 
 func (r *stormLimitResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom[stormLimitClient](req.ProviderData, &resp.Diagnostics)
+	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
 func (r *stormLimitResource) find(ctx context.Context, port int) (escp.PortStorm, bool, error) {
@@ -84,7 +95,13 @@ func (r *stormLimitResource) find(ctx context.Context, port int) (escp.PortStorm
 	return escp.PortStorm{}, false, nil
 }
 
+// apply binds the resource to the switch the plan selects, then applies it.
 func (r *stormLimitResource) apply(ctx context.Context, m *stormLimitModel, add func(string, string)) bool {
+	b := r.bound(add, m.Switch)
+	return b != nil && b.applyBound(ctx, m, add)
+}
+
+func (r *stormLimitResource) applyBound(ctx context.Context, m *stormLimitModel, add func(string, string)) bool {
 	port := int(m.Port.ValueInt64())
 	uu, mc, bc, rate := m.UnknownUnicast.ValueBool(), m.Multicast.ValueBool(), m.Broadcast.ValueBool(), int(m.RateKbps.ValueInt64())
 	if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), port); err != nil {
@@ -111,7 +128,16 @@ func (r *stormLimitResource) Update(ctx context.Context, req resource.UpdateRequ
 	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
+// Read binds the resource to the switch recorded in state, then reads it.
 func (r *stormLimitResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	sw := switchOf(ctx, req.State, &resp.Diagnostics)
+	if b := r.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (r *stormLimitResource) readBound(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state stormLimitModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -151,3 +177,10 @@ func (r *stormLimitResource) ValidateConfig(ctx context.Context, req resource.Va
 }
 
 var _ resource.ResourceWithValidateConfig = &stormLimitResource{}
+
+// ModifyPlan refuses, while planning, a switch that cannot be resolved.
+func (r *stormLimitResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+}
+
+var _ resource.ResourceWithModifyPlan = &stormLimitResource{}

@@ -32,7 +32,11 @@ var (
 // NewPortMirrorResource returns the tplinkeasysmart_port_mirror resource.
 func NewPortMirrorResource() resource.Resource { return &portMirrorResource{} }
 
-type portMirrorResource struct{ client portMirrorClient }
+type portMirrorResource struct {
+	src    switchSource
+	client portMirrorClient // set on the per-call copy made by bound()
+	sw     types.String     // the switch that copy is bound to, for ids
+}
 
 // portMirrorClient is the part of the switch API this resource needs.
 type portMirrorClient interface {
@@ -41,7 +45,13 @@ type portMirrorClient interface {
 	SetPortMirror(ctx context.Context, m escp.Mirror) error
 }
 
+// bound returns a copy of the resource wired to the client of the named switch.
+func (r *portMirrorResource) bound(add func(string, string), name types.String) *portMirrorResource {
+	return bindSwitch(add, r.src, name, r, func(b *portMirrorResource, c portMirrorClient, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type portMirrorResourceModel struct {
+	Switch          types.String `tfsdk:"switch"`
 	ID              types.String `tfsdk:"id"`
 	Enabled         types.Bool   `tfsdk:"enabled"`
 	MirrorPort      types.Int64  `tfsdk:"mirror_port"`
@@ -61,6 +71,7 @@ func (r *portMirrorResource) Schema(_ context.Context, _ resource.SchemaRequest,
 		Description: "Port mirroring (Monitoring > Port Mirror). Singleton; import with id `port_mirror`. **Safety:** the destination port stops carrying normal traffic, " +
 			"so by default the provider refuses a destination that has a link up or is in a LAG; set `allow_disruptive = true` to override. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch: resourceSwitchAttribute(),
 			"id": schema.StringAttribute{Computed: true, Description: "Always `port_mirror`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"enabled":     schema.BoolAttribute{Required: true, Description: "Whether mirroring is enabled. When false, no other port setting may be given."},
@@ -75,7 +86,7 @@ func (r *portMirrorResource) Schema(_ context.Context, _ resource.SchemaRequest,
 }
 
 func (r *portMirrorResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom[portMirrorClient](req.ProviderData, &resp.Diagnostics)
+	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
 func setToInts(ctx context.Context, s types.Set) ([]int, error) {
@@ -99,7 +110,13 @@ func intsToSet(in []int) types.Set {
 	return types.SetValueMust(types.Int64Type, vals)
 }
 
+// apply binds the resource to the switch the plan selects, then applies it.
 func (r *portMirrorResource) apply(ctx context.Context, m *portMirrorResourceModel, add func(string, string)) bool {
+	b := r.bound(add, m.Switch)
+	return b != nil && b.applyBound(ctx, m, add)
+}
+
+func (r *portMirrorResource) applyBound(ctx context.Context, m *portMirrorResourceModel, add func(string, string)) bool {
 	in, err1 := setToInts(ctx, m.IngressPorts)
 	eg, err2 := setToInts(ctx, m.EgressPorts)
 	if err1 != nil || err2 != nil {
@@ -129,7 +146,7 @@ func (r *portMirrorResource) apply(ctx context.Context, m *portMirrorResourceMod
 		add("Port mirror did not change as requested", fmt.Sprintf("requested %+v, switch reports %+v", want, got))
 		return false
 	}
-	m.ID = types.StringValue(portMirrorID)
+	m.ID = qualifiedID(r.sw, portMirrorID)
 	return true
 }
 
@@ -141,7 +158,16 @@ func (r *portMirrorResource) Update(ctx context.Context, req resource.UpdateRequ
 	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
+// Read binds the resource to the switch recorded in state, then reads it.
 func (r *portMirrorResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	sw := switchOf(ctx, req.State, &resp.Diagnostics)
+	if b := r.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (r *portMirrorResource) readBound(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state portMirrorResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -152,7 +178,7 @@ func (r *portMirrorResource) Read(ctx context.Context, req resource.ReadRequest,
 		resp.Diagnostics.AddError("Reading port mirror failed", err.Error())
 		return
 	}
-	state.ID = types.StringValue(portMirrorID)
+	state.ID = qualifiedID(r.sw, portMirrorID)
 	state.Enabled, state.MirrorPort = types.BoolValue(got.Enabled), types.Int64Value(int64(got.MirrorPort))
 	state.IngressPorts, state.EgressPorts = intsToSet(got.IngressPorts), intsToSet(got.EgressPorts)
 	if state.AllowDisruptive.IsNull() {
@@ -185,3 +211,10 @@ func (r *portMirrorResource) ValidateConfig(ctx context.Context, req resource.Va
 }
 
 var _ resource.ResourceWithValidateConfig = &portMirrorResource{}
+
+// ModifyPlan refuses, while planning, a switch that cannot be resolved.
+func (r *portMirrorResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+}
+
+var _ resource.ResourceWithModifyPlan = &portMirrorResource{}

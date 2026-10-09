@@ -34,6 +34,7 @@ resource "tplinkeasysmart_vlan_port_based_group" "lab" {
 ### Optional
 
 - `allow_disruptive` (Boolean) Allow touching ports that have a link up or belong to a LAG. Defaults to false.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
 
 ## Import
 
@@ -43,3 +44,5 @@ Import is supported using the following syntax:
 # The import id is the VLAN id.
 terraform import tplinkeasysmart_vlan_port_based_group.lab 2
 ```
+
+For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`).

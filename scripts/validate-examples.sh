@@ -16,7 +16,7 @@ provider_installation {
 }
 CLIEOF
 fail=0
-for dir in examples/provider examples/resources/* examples/data-sources/*; do
+for dir in examples/provider examples/multi-switch examples/resources/* examples/data-sources/*; do
   tf=$(ls "$dir"/*.tf 2>/dev/null | head -1) || continue
   [ -n "$tf" ] || continue
   d="$WORK/$(echo "$dir" | tr / _)"

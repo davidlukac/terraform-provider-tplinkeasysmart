@@ -18,14 +18,24 @@ var (
 // NewPortMirrorDataSource returns the tplinkeasysmart_port_mirror data source.
 func NewPortMirrorDataSource() datasource.DataSource { return &portMirrorDataSource{} }
 
-type portMirrorDataSource struct{ client portMirrorReader }
+type portMirrorDataSource struct {
+	src    switchSource
+	client portMirrorReader // set on the per-call copy made by bound()
+	sw     types.String     // the switch that copy is bound to, for ids
+}
 
 // portMirrorReader is the part of the switch API this data source reads.
 type portMirrorReader interface {
 	PortMirror(ctx context.Context) (escp.Mirror, error)
 }
 
+// bound returns a copy of the data source wired to the client of the named switch.
+func (d *portMirrorDataSource) bound(add func(string, string), name types.String) *portMirrorDataSource {
+	return bindSwitch(add, d.src, name, d, func(b *portMirrorDataSource, c portMirrorReader, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type portMirrorModel struct {
+	Switch       types.String `tfsdk:"switch"`
 	ID           types.String `tfsdk:"id"`
 	Enabled      types.Bool   `tfsdk:"enabled"`
 	MirrorPort   types.Int64  `tfsdk:"mirror_port"`
@@ -44,6 +54,7 @@ func (d *portMirrorDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 	resp.Schema = schema.Schema{
 		Description: "Port mirroring (Monitoring > Port Mirror). Read-only: enabling mirroring turns the destination port into a monitor port and can cut its normal traffic.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch:      dataSourceSwitchAttribute(),
 			"id":            schema.StringAttribute{Computed: true, Description: "Always `port_mirror`."},
 			"enabled":       schema.BoolAttribute{Computed: true, Description: "Whether mirroring is enabled."},
 			"mirror_port":   schema.Int64Attribute{Computed: true, Description: "Destination (monitoring) port; 0 when disabled."},
@@ -54,7 +65,7 @@ func (d *portMirrorDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 }
 
 func (d *portMirrorDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom[portMirrorReader](req.ProviderData, &resp.Diagnostics)
+	d.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
 func toInt64s(in []int) []int64 {
@@ -65,13 +76,22 @@ func toInt64s(in []int) []int64 {
 	return out
 }
 
-func (d *portMirrorDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
+// Read binds the data source to the switch selected in the configuration, then reads it.
+func (d *portMirrorDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	sw := switchOf(ctx, req.Config, &resp.Diagnostics)
+	if b := d.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (d *portMirrorDataSource) readBound(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
 	m, err := d.client.PortMirror(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading port mirror failed", err.Error())
 		return
 	}
-	state := portMirrorModel{ID: types.StringValue("port_mirror"), Enabled: types.BoolValue(m.Enabled),
+	state := portMirrorModel{ID: qualifiedID(d.sw, "port_mirror"), Enabled: types.BoolValue(m.Enabled),
 		MirrorPort: types.Int64Value(int64(m.MirrorPort)), IngressPorts: toInt64s(m.IngressPorts), EgressPorts: toInt64s(m.EgressPorts)}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

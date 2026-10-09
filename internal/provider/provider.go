@@ -2,9 +2,14 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
+
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -45,6 +50,15 @@ type providerModel struct {
 	Username       types.String `tfsdk:"username"`
 	Password       types.String `tfsdk:"password"`
 	TimeoutSeconds types.Int64  `tfsdk:"timeout_seconds"`
+	Switches       types.Map    `tfsdk:"switches"`
+}
+
+// switchModel is one entry of the `switches` map.
+type switchModel struct {
+	Host           types.String `tfsdk:"host"`
+	Username       types.String `tfsdk:"username"`
+	Password       types.String `tfsdk:"password"`
+	TimeoutSeconds types.Int64  `tfsdk:"timeout_seconds"`
 }
 
 func (p *tplinkProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -55,8 +69,9 @@ func (p *tplinkProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages TP-Link Easy Smart switches (TL-SG108E v6) over their native UDP management protocol. " +
-			"The provider must run on the same layer-2 network as the switch. Use one provider alias per switch; " +
-			"do not run two clients against the same switch at once.",
+			"The provider must run on the same layer-2 network as the switches. Configure one switch with `host`, `username` and `password` " +
+			"(use a provider alias per switch), or any number with the `switches` map and select one per resource with `switch`. " +
+			"Do not run two clients against the same switch at once.",
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
 				Optional:    true,
@@ -76,6 +91,19 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				Validators:  []validator.Int64{int64validator.AtLeast(1)},
 				Description: "Seconds to wait for a reply before retrying a request. Defaults to 3.",
 			},
+			"switches": schema.MapNestedAttribute{
+				Optional: true,
+				Description: "Switches managed by this provider, by name. Select one on a resource or data source with `switch = \"<name>\"`. " +
+					"May be combined with `host`, which then names the default switch used when `switch` is omitted.",
+				Validators: []validator.Map{mapvalidator.KeysAre(validSwitchName()...)},
+				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+					"host":     schema.StringAttribute{Required: true, Description: "IPv4 address or hostname of the switch."},
+					"username": schema.StringAttribute{Required: true, Description: "Admin user name."},
+					"password": schema.StringAttribute{Required: true, Sensitive: true, Description: "Admin password."},
+					"timeout_seconds": schema.Int64Attribute{Optional: true, Validators: []validator.Int64{int64validator.AtLeast(1)},
+						Description: "Seconds to wait for a reply before retrying a request. Defaults to the provider-level `timeout_seconds`, then 3."},
+				}},
+			},
 		},
 	}
 }
@@ -87,6 +115,20 @@ func envOr(v types.String, env string) string {
 	return os.Getenv(env)
 }
 
+// defaultTimeout is the per-request timeout when none is configured.
+const defaultTimeout = 3 * time.Second
+
+func timeoutOr(configured types.Int64, fallback time.Duration) time.Duration {
+	if !configured.IsNull() && configured.ValueInt64() > 0 {
+		return time.Duration(configured.ValueInt64()) * time.Second
+	}
+	return fallback
+}
+
+// Configure builds the registry of switches: the provider's own switch (host,
+// username, password, with environment fallbacks) as the default, and every
+// entry of the `switches` map by name. Clients are created lazily; nothing
+// touches the network here.
 func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	var cfg providerModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
@@ -94,13 +136,13 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 	// A value that is only known after apply (for example taken from another
-	// resource) cannot be used to build the client during planning. Without a
+	// resource) cannot be used to build a client during planning. Without a
 	// client every resource and data source would dereference nil, so fail
 	// with an explanation instead.
 	for _, attr := range []struct {
 		name  string
-		value types.String
-	}{{"host", cfg.Host}, {"username", cfg.Username}, {"password", cfg.Password}} {
+		value attr.Value
+	}{{"host", cfg.Host}, {"username", cfg.Username}, {"password", cfg.Password}, {"switches", cfg.Switches}} {
 		if attr.value.IsUnknown() {
 			resp.Diagnostics.AddAttributeError(pathRoot(attr.name), "Unknown switch "+attr.name,
 				"The provider cannot create the switch client because `"+attr.name+"` is not known yet. Apply the resource that provides it first "+
@@ -110,29 +152,79 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	var entries map[string]switchModel
+	resp.Diagnostics.Append(cfg.Switches.ElementsAs(ctx, &entries, false)...)
+	for name, e := range entries {
+		for _, f := range []struct {
+			attr  string
+			value attr.Value
+		}{{"host", e.Host}, {"username", e.Username}, {"password", e.Password}} {
+			if f.value.IsUnknown() {
+				resp.Diagnostics.AddAttributeError(pathRoot("switches").AtMapKey(name).AtName(f.attr), "Unknown switch "+f.attr,
+					"The provider cannot create the client for switch "+name+" because `"+f.attr+"` is not known yet; set it statically or apply the resource that provides it first.")
+			}
+		}
+	}
 	host := envOr(cfg.Host, envHost)
 	user := envOr(cfg.Username, envUsername)
 	pass := envOr(cfg.Password, envPassword)
-	if host == "" {
-		resp.Diagnostics.AddAttributeError(pathRoot("host"), "Missing switch host", "Set `host` or TPLINK_EASYSMART_HOST.")
+	hasDefault := host != "" || len(entries) == 0
+	if hasDefault && host == "" {
+		resp.Diagnostics.AddAttributeError(pathRoot("host"), "Missing switch host", "Set `host` or TPLINK_EASYSMART_HOST, or define switches with `switches`.")
 	}
-	if user == "" || pass == "" {
+	if hasDefault && (user == "" || pass == "") {
 		resp.Diagnostics.AddError("Missing credentials", "Set `username`/`password` or TPLINK_EASYSMART_USERNAME/TPLINK_EASYSMART_PASSWORD.")
 	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	timeout := 3 * time.Second
-	if !cfg.TimeoutSeconds.IsNull() && cfg.TimeoutSeconds.ValueInt64() > 0 {
-		timeout = time.Duration(cfg.TimeoutSeconds.ValueInt64()) * time.Second
+	providerTimeout := timeoutOr(cfg.TimeoutSeconds, defaultTimeout)
+	reg := &switchRegistry{named: map[string]SwitchClient{}}
+	hosts := map[string]string{} // host -> switch, so one device is never configured twice
+	build := func(name, h, u, pw string, timeout time.Duration) {
+		label := name
+		if label == "" {
+			label = "the provider's own switch"
+		}
+		if other, dup := hosts[h]; dup {
+			resp.Diagnostics.AddError("Same switch configured twice", fmt.Sprintf("%s and %s have the same host %q; two clients on one switch would compete for it.", other, label, h))
+			return
+		}
+		hosts[h] = label
+		c, err := p.newClient(escp.Config{Host: h, Username: u, Password: pw, Timeout: timeout})
+		if err != nil {
+			resp.Diagnostics.AddError("Cannot configure switch client", fmt.Sprintf("%s: %s", label, err))
+			return
+		}
+		if name == "" {
+			reg.def = c
+			return
+		}
+		reg.named[name] = c
 	}
-	c, err := p.newClient(escp.Config{Host: host, Username: user, Password: pass, Timeout: timeout})
-	if err != nil {
-		resp.Diagnostics.AddError("Cannot configure switch client", err.Error())
+	if hasDefault {
+		build("", host, user, pass, providerTimeout)
+	}
+	for _, name := range sortedKeys(entries) {
+		e := entries[name]
+		build(name, e.Host.ValueString(), e.Username.ValueString(), e.Password.ValueString(), timeoutOr(e.TimeoutSeconds, providerTimeout))
+	}
+	if resp.Diagnostics.HasError() {
 		return
 	}
-	resp.ResourceData = c
-	resp.DataSourceData = c
+	resp.ResourceData = reg
+	resp.DataSourceData = reg
+}
+
+// sortedKeys returns the map's keys in a stable order, so diagnostics and
+// client creation do not depend on map iteration order.
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // Resources lists the resources the provider manages.

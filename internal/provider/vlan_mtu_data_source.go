@@ -18,14 +18,24 @@ var (
 // NewVLANMTUDataSource returns the tplinkeasysmart_vlan_mtu data source.
 func NewVLANMTUDataSource() datasource.DataSource { return &vlanMTUDataSource{} }
 
-type vlanMTUDataSource struct{ client vlanMTUReader }
+type vlanMTUDataSource struct {
+	src    switchSource
+	client vlanMTUReader // set on the per-call copy made by bound()
+	sw     types.String  // the switch that copy is bound to, for ids
+}
 
 // vlanMTUReader is the part of the switch API this data source reads.
 type vlanMTUReader interface {
 	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
 }
 
+// bound returns a copy of the data source wired to the client of the named switch.
+func (d *vlanMTUDataSource) bound(add func(string, string), name types.String) *vlanMTUDataSource {
+	return bindSwitch(add, d.src, name, d, func(b *vlanMTUDataSource, c vlanMTUReader, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type vlanMTUModel struct {
+	Switch     types.String `tfsdk:"switch"`
 	ID         types.String `tfsdk:"id"`
 	Enabled    types.Bool   `tfsdk:"enabled"`
 	UplinkPort types.Int64  `tfsdk:"uplink_port"`
@@ -39,6 +49,7 @@ func (d *vlanMTUDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 	resp.Schema = schema.Schema{
 		Description: "MTU VLAN mode (VLAN > MTU VLAN). Read-only. When enabled, all ports are isolated from each other and only reach the uplink port.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch:    dataSourceSwitchAttribute(),
 			"id":          schema.StringAttribute{Computed: true, Description: "Always `vlan_mtu`."},
 			"enabled":     schema.BoolAttribute{Computed: true, Description: "Whether MTU VLAN mode is active."},
 			"uplink_port": schema.Int64Attribute{Computed: true, Description: "Uplink port (1 when the mode is disabled)."},
@@ -47,15 +58,24 @@ func (d *vlanMTUDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 }
 
 func (d *vlanMTUDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom[vlanMTUReader](req.ProviderData, &resp.Diagnostics)
+	d.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func (d *vlanMTUDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
+// Read binds the data source to the switch selected in the configuration, then reads it.
+func (d *vlanMTUDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	sw := switchOf(ctx, req.Config, &resp.Diagnostics)
+	if b := d.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (d *vlanMTUDataSource) readBound(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
 	m, err := d.client.MTUVLAN(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading MTU VLAN failed", err.Error())
 		return
 	}
-	state := vlanMTUModel{ID: types.StringValue("vlan_mtu"), Enabled: types.BoolValue(m.Enabled), UplinkPort: types.Int64Value(int64(m.UplinkPort))}
+	state := vlanMTUModel{ID: qualifiedID(d.sw, "vlan_mtu"), Enabled: types.BoolValue(m.Enabled), UplinkPort: types.Int64Value(int64(m.UplinkPort))}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

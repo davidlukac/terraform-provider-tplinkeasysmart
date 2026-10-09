@@ -18,7 +18,11 @@ var (
 // NewSystemInfoDataSource returns the tplinkeasysmart_system_info data source.
 func NewSystemInfoDataSource() datasource.DataSource { return &systemInfoDataSource{} }
 
-type systemInfoDataSource struct{ client systemInfoReader }
+type systemInfoDataSource struct {
+	src    switchSource
+	client systemInfoReader // set on the per-call copy made by bound()
+	sw     types.String     // the switch that copy is bound to, for ids
+}
 
 // systemInfoReader is the part of the switch API this data source reads.
 type systemInfoReader interface {
@@ -26,7 +30,13 @@ type systemInfoReader interface {
 	System(ctx context.Context) (escp.System, error)
 }
 
+// bound returns a copy of the data source wired to the client of the named switch.
+func (d *systemInfoDataSource) bound(add func(string, string), name types.String) *systemInfoDataSource {
+	return bindSwitch(add, d.src, name, d, func(b *systemInfoDataSource, c systemInfoReader, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type systemInfoModel struct {
+	Switch   types.String `tfsdk:"switch"`
 	ID       types.String `tfsdk:"id"`
 	Model    types.String `tfsdk:"model"`
 	Hostname types.String `tfsdk:"hostname"`
@@ -54,6 +64,7 @@ func (d *systemInfoDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 		Description: "Identity and network settings of the switch, read through unauthenticated discovery. " +
 			"Also serves as a connectivity check.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch:         dataSourceSwitchAttribute(),
 			"id":               str("The switch MAC address."),
 			"model":            str("Model, e.g. TL-SG108E."),
 			"hostname":         str("Device description."),
@@ -72,10 +83,19 @@ func (d *systemInfoDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 }
 
 func (d *systemInfoDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom[systemInfoReader](req.ProviderData, &resp.Diagnostics)
+	d.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func (d *systemInfoDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
+// Read binds the data source to the switch selected in the configuration, then reads it.
+func (d *systemInfoDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	sw := switchOf(ctx, req.Config, &resp.Diagnostics)
+	if b := d.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (d *systemInfoDataSource) readBound(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
 	info, err := d.client.Info(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading switch info failed", err.Error())

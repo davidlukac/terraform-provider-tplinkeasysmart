@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.26.0
+
+- Several switches in one provider: switches map and per-object switch argument
+
+## 0.26.0
+
+- Several switches in one provider: a `switches` map (name to host and credentials) plus an optional `switch` argument on every resource and data source; provider aliases keep working and can be mixed in. Ids and import ids of a named switch are prefixed (`sw02:led`, `sw02:7`); the provider's own switch keeps the plain ids. Changing `switch` replaces the object; duplicate hosts are rejected. Client deadline race fixed. See ADR-0005 and `examples/multi-switch`.
+
 ## 0.25.0
 
 - Several switches at once: the client binds the reply port with address/port sharing (SO_REUSEADDR + SO_REUSEPORT; Windows SO_REUSEADDR), so provider aliases and concurrent processes coexist and each keeps the replies from its own switch. Verified with two switches and two processes; one timing-sensitive test made deterministic.
