@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- Data source tplinkeasysmart_ports (port state, LAG, configured/actual speed, flow control); client is now lazy.
+
 ## 0.1.0
 
 - Native ESCP (UDP 29808/29809) client: discovery, RSA session-key exchange, login, LED get/set, request retry, session recovery.

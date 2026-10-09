@@ -60,7 +60,8 @@ type Client struct {
 	session        []byte
 }
 
-// Dial prepares a client and binds the local UDP port. No packet is sent yet.
+// Dial prepares a client. The local UDP port is bound on first use, so merely
+// configuring a provider (e.g. `terraform validate`) never touches the network.
 func Dial(cfg Config) (*Client, error) {
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 3 * time.Second
@@ -81,11 +82,7 @@ func Dial(cfg Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("escp: resolving %q: %w", cfg.Host, err)
 	}
-	conn, err := net.ListenUDP("udp4", &net.UDPAddr{Port: cfg.HostPort})
-	if err != nil {
-		return nil, fmt.Errorf("escp: binding UDP port %d (is another Easy Smart client or Terraform run active?): %w", cfg.HostPort, err)
-	}
-	c := &Client{cfg: cfg, conn: conn, dest: &net.UDPAddr{IP: ip.IP, Port: cfg.SwitchPort}}
+	c := &Client{cfg: cfg, dest: &net.UDPAddr{IP: ip.IP, Port: cfg.SwitchPort}}
 	c.hostMAC = localMAC(ip.IP)
 	var n [2]byte
 	_, _ = rand.Read(n[:])
@@ -94,8 +91,29 @@ func Dial(cfg Config) (*Client, error) {
 	return c, nil
 }
 
-// Close releases the UDP socket.
-func (c *Client) Close() error { return c.conn.Close() }
+// Close releases the UDP socket, if it was opened.
+func (c *Client) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.conn == nil {
+		return nil
+	}
+	err := c.conn.Close()
+	c.conn = nil
+	return err
+}
+
+func (c *Client) open() error {
+	if c.conn != nil {
+		return nil
+	}
+	conn, err := net.ListenUDP("udp4", &net.UDPAddr{Port: c.cfg.HostPort})
+	if err != nil {
+		return fmt.Errorf("escp: binding UDP port %d (is another Easy Smart client or Terraform run active?): %w", c.cfg.HostPort, err)
+	}
+	c.conn = conn
+	return nil
+}
 
 // localMAC returns the MAC of the interface used to reach dst, or zero.
 func localMAC(dst net.IP) (mac [6]byte) {
@@ -153,6 +171,9 @@ func (c *Client) decrypt(b []byte) []byte {
 // exchange sends one packet and waits for the reply with the same sequence
 // number from the switch, retrying on silence. Callers hold c.mu.
 func (c *Client) exchange(ctx context.Context, op byte, tlvs []TLV, static bool, to []*net.UDPAddr) (reply, error) {
+	if err := c.open(); err != nil {
+		return reply{}, err
+	}
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
 		c.seq = (c.seq + 1) % 1000
 		pkt := c.encrypt(marshal(header{Op: op, SwitchMAC: c.swMAC, HostMAC: c.hostMAC, Seq: c.seq}, tlvs), static)
@@ -316,4 +337,28 @@ func (c *Client) SetLED(ctx context.Context, on bool) error {
 		}
 		return nil
 	})
+}
+
+// getTLVs reads one or more setting types with an authenticated session and
+// returns every TLV of the reply. It never writes.
+func (c *Client) getTLVs(ctx context.Context, types ...int16) ([]TLV, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var out []TLV
+	err := c.withSession(ctx, func() error {
+		req := make([]TLV, len(types))
+		for i, t := range types {
+			req[i] = TLV{Type: t}
+		}
+		r, err := c.exchange(ctx, OpGet, req, false, []*net.UDPAddr{c.dest})
+		if err != nil {
+			return err
+		}
+		if r.err != 0 {
+			return fmt.Errorf("escp: switch answered error code %d for TLV types %v", r.err, types)
+		}
+		out = r.tlvs
+		return nil
+	})
+	return out, err
 }

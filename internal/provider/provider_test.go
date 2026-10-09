@@ -27,6 +27,13 @@ func (f *fakeClient) Info(context.Context) (escp.Info, error) {
 		IP: "192.0.2.120", Netmask: "255.255.255.0", Gateway: "192.0.2.1", DHCP: true}, nil
 }
 
+func (f *fakeClient) Ports(context.Context) ([]escp.Port, error) {
+	return []escp.Port{
+		{ID: 1, Enabled: true, LAG: 1, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
+		{ID: 3, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
+	}, nil
+}
+
 func (f *fakeClient) GetLED(context.Context) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -50,7 +57,7 @@ func factories(f SwitchClient) map[string]func() (tfprotov6.ProviderServer, erro
 	return map[string]func() (tfprotov6.ProviderServer, error){
 		"tplinkeasysmart": providerserver.NewProtocol6WithError(&tplinkProvider{
 			version:   "test",
-			newClient: func(escp.Config) SwitchClient { return f },
+			newClient: func(escp.Config) (SwitchClient, error) { return f, nil },
 		}),
 	}
 }
@@ -146,6 +153,22 @@ func TestAccMissingCredentials(t *testing.T) {
 		Steps: []resource.TestStep{{
 			Config:      `provider "tplinkeasysmart" {}` + "\n" + `data "tplinkeasysmart_system_info" "this" {}`,
 			ExpectError: regexp.MustCompile(`Missing switch host`),
+		}},
+	})
+}
+
+func TestAccPortsDataSource(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(&fakeClient{}),
+		Steps: []resource.TestStep{{
+			Config: providerBlock + `data "tplinkeasysmart_ports" "this" {}`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_ports.this", "ports.#", "2"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_ports.this", "ports.0.id", "1"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_ports.this", "ports.0.lag", "1"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_ports.this", "ports.0.actual_speed", "1000Mbps-full"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_ports.this", "ports.1.actual_speed", "link-down"),
+			),
 		}},
 	})
 }
