@@ -114,5 +114,5 @@ func (p *tplinkProvider) Resources(context.Context) []func() resource.Resource {
 }
 
 func (p *tplinkProvider) DataSources(context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{NewSystemInfoDataSource, NewPortsDataSource, NewPortStatisticsDataSource, NewLAGsDataSource}
+	return []func() datasource.DataSource{NewSystemInfoDataSource, NewPortsDataSource, NewPortStatisticsDataSource, NewLAGsDataSource, NewPortMirrorDataSource}
 }

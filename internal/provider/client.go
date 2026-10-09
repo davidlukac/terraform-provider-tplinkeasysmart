@@ -19,4 +19,5 @@ type SwitchClient interface {
 	SetIGMP(ctx context.Context, enabled, suppression bool) error
 	LoopPrevention(ctx context.Context) (bool, error)
 	SetLoopPrevention(ctx context.Context, on bool) error
+	PortMirror(ctx context.Context) (escp.Mirror, error)
 }

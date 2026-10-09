@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0
+
+- Data source tplinkeasysmart_port_mirror (read-only).
+
 ## 0.6.0
 
 - Resource tplinkeasysmart_loop_prevention.
