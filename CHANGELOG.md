@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.0
+
+- Resource tplinkeasysmart_port_mirror with the destination-port guard.
+
 ## 0.18.0
 
 - Resource tplinkeasysmart_storm_limit (per-port storm control) with the port-in-use guard.
