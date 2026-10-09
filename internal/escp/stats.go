@@ -6,6 +6,7 @@ import (
 	"fmt"
 )
 
+// TLVPortStats is Monitoring > Port Statistics: one 19-byte TLV per port.
 const TLVPortStats = 16384
 
 // PortStats is one row of Monitoring > Port Statistics. Counters are the

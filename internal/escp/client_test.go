@@ -65,7 +65,7 @@ func TestBadPassword(t *testing.T) {
 
 func TestRetryOnLostPacket(t *testing.T) {
 	f := startFakeSwitch(t)
-	f.dropNth = 1 // lose the very first datagram
+	f.dropNthPacket(1) // lose the very first datagram
 	c := dialFake(t, f, "secret")
 	if _, err := c.Info(context.Background()); err != nil {
 		t.Fatalf("expected retry to recover: %v", err)
@@ -74,7 +74,7 @@ func TestRetryOnLostPacket(t *testing.T) {
 
 func TestNoReply(t *testing.T) {
 	f := startFakeSwitch(t)
-	f.mute = true
+	f.goSilent()
 	c := dialFake(t, f, "secret")
 	c.cfg.Retries = 1
 	if _, err := c.Info(context.Background()); !errors.Is(err, ErrNoReply) {

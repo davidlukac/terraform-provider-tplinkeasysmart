@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// TLVLAG is Switching > Port Trunk: one TLV per group, group id (1 byte) and member port mask (4 bytes).
 const TLVLAG = 4608
 
 // LAG is one link aggregation group (Switching > Port Trunk).

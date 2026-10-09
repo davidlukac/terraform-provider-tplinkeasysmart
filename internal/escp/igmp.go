@@ -6,10 +6,11 @@ import (
 	"net"
 )
 
+// TLV types of Switching > IGMP Snooping.
 const (
-	TLVIGMPEnabled     = 4352
-	TLVIGMPGroups      = 4353
-	TLVIGMPSuppression = 4354
+	TLVIGMPEnabled     = 4352 // snooping enabled (1 byte)
+	TLVIGMPGroups      = 4353 // learned groups, repeated 10-byte entries
+	TLVIGMPSuppression = 4354 // report message suppression (1 byte)
 )
 
 // IGMPGroup is one learned multicast group.

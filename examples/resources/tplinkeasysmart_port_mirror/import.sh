@@ -1,0 +1,1 @@
+terraform import tplinkeasysmart_port_mirror.this port_mirror

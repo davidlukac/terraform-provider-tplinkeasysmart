@@ -124,7 +124,7 @@ func localMAC(dst net.IP) (mac [6]byte) {
 	if err != nil {
 		return
 	}
-	defer probe.Close()
+	defer func() { _ = probe.Close() }() // best-effort: the probe socket only reveals the local address
 	local := probe.LocalAddr().(*net.UDPAddr).IP
 	ifs, _ := net.Interfaces()
 	for _, ifc := range ifs {

@@ -1,0 +1,62 @@
+version: "2"
+
+run:
+  timeout: 5m
+  build-tags: []
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - errorlint
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - unused
+    - gosec
+  settings:
+    revive:
+      rules:
+        - name: exported
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: if-return
+        - name: var-naming
+        - name: package-comments
+          disabled: true
+        - name: unused-parameter
+          disabled: true
+    gosec:
+      excludes:
+        # Weak primitives are the device's own protocol (RC4, 64-bit RSA,
+        # TEA, math/big) and are documented as such in docs/escp-protocol.md.
+        - G401
+        - G501
+        - G505
+  exclusions:
+    rules:
+      # G115 (integer conversion overflow): the protocol is a fixed-width binary
+      # format. Conversions are either bit-level masking/shifting by design or
+      # operate on values range-checked beforehand (ports 1-32, rates up to
+      # 1,000,000 kbps, TLV lengths bounded by the packet buffer).
+      - path: internal/escp/
+        text: "G115"
+        linters:
+          - gosec
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - revive
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/local-infra/terraform-provider-tplinkeasysmart
