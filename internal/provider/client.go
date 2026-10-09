@@ -28,6 +28,7 @@ type SwitchClient interface {
 	SetQoSMode(ctx context.Context, mode int) error
 	SetPortPriorities(ctx context.Context, changes map[int]int) error
 	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
+	SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps int) error
 	StormControl(ctx context.Context) ([]escp.PortStorm, error)
 	System(ctx context.Context) (escp.System, error)
 }

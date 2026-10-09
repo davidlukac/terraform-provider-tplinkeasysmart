@@ -18,7 +18,8 @@ type fakeSwitch struct {
 
 	mu       sync.Mutex
 	hostname string
-	lastSet  []TLV // settings TLVs (credentials stripped) of the most recent accepted SET
+	history  [][]TLV // every accepted SET, in order
+	lastSet  []TLV   // settings TLVs (credentials stripped) of the most recent accepted SET
 	port7    []byte
 	setIP    []byte
 	led      bool
@@ -48,6 +49,12 @@ func startFakeSwitch(t *testing.T) *fakeSwitch {
 }
 
 func (f *fakeSwitch) port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
+
+func (f *fakeSwitch) allSets() [][]TLV {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([][]TLV(nil), f.history...)
+}
 
 func (f *fakeSwitch) set() []TLV {
 	f.mu.Lock()
@@ -160,6 +167,7 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 				f.lastSet = append(f.lastSet, TLV{Type: t.Type, Value: append([]byte(nil), t.Value...)})
 			}
 		}
+		f.history = append(f.history, append([]TLV(nil), f.lastSet...))
 		f.mu.Unlock()
 		if v, ok := find(TLVPorts); ok && len(v) == 7 && v[0] == 7 {
 			f.mu.Lock()
