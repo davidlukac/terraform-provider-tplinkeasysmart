@@ -23,4 +23,5 @@ type SwitchClient interface {
 	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
 	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
+	QoS(ctx context.Context) (escp.QoS, error)
 }
