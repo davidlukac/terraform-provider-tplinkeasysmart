@@ -40,3 +40,18 @@ func TestLiveIGMPSameValueWrite(t *testing.T) {
 		t.Fatalf("state changed by same-value write: %+v err=%v", after, err)
 	}
 }
+
+func TestLiveLoopPreventionSameValueWrite(t *testing.T) {
+	c, ctx := liveClient(t), context.Background()
+	before, err := c.LoopPrevention(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("before: %v", before)
+	if err := c.SetLoopPrevention(ctx, before); err != nil {
+		t.Fatalf("same-value write rejected: %v", err)
+	}
+	if after, err := c.LoopPrevention(ctx); err != nil || after != before {
+		t.Fatalf("state changed: %v err=%v", after, err)
+	}
+}

@@ -17,4 +17,6 @@ type SwitchClient interface {
 	LAGs(ctx context.Context) ([]escp.LAG, error)
 	IGMP(ctx context.Context) (escp.IGMP, error)
 	SetIGMP(ctx context.Context, enabled, suppression bool) error
+	LoopPrevention(ctx context.Context) (bool, error)
+	SetLoopPrevention(ctx context.Context, on bool) error
 }
