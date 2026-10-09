@@ -18,6 +18,7 @@ import (
 type fakeClient struct {
 	mu      sync.Mutex
 	igmp    escp.IGMP
+	loop    bool
 	led     bool
 	sets    int
 	failSet error
@@ -56,6 +57,19 @@ func (f *fakeClient) SetIGMP(_ context.Context, enabled, suppression bool) error
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.igmp = escp.IGMP{Enabled: enabled, ReportSuppression: suppression}
+	return nil
+}
+
+func (f *fakeClient) LoopPrevention(context.Context) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.loop, nil
+}
+
+func (f *fakeClient) SetLoopPrevention(_ context.Context, on bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.loop = on
 	return nil
 }
 
@@ -256,6 +270,28 @@ func TestAccIGMPSnoopingLifecycle(t *testing.T) {
 				return nil
 			}},
 			{ResourceName: "tplinkeasysmart_igmp_snooping.this", ImportState: true, ImportStateId: "igmp_snooping", ImportStateVerify: true},
+		},
+	})
+}
+
+func TestAccLoopPreventionLifecycle(t *testing.T) {
+	f := &fakeClient{loop: true}
+	cfg := func(v string) string {
+		return providerBlock + `resource "tplinkeasysmart_loop_prevention" "this" { enabled = ` + v + ` }`
+	}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: cfg("true"), Check: resource.TestCheckResourceAttr("tplinkeasysmart_loop_prevention.this", "enabled", "true")},
+			{Config: cfg("false"), Check: func(*terraformState) error {
+				f.mu.Lock()
+				defer f.mu.Unlock()
+				if f.loop {
+					return fmt.Errorf("loop prevention still on")
+				}
+				return nil
+			}},
+			{ResourceName: "tplinkeasysmart_loop_prevention.this", ImportState: true, ImportStateId: "loop_prevention", ImportStateVerify: true},
 		},
 	})
 }
