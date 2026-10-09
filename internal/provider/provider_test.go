@@ -81,6 +81,10 @@ func (f *fakeClient) MTUVLAN(context.Context) (escp.MTUVLAN, error) {
 	return escp.MTUVLAN{Enabled: true, UplinkPort: 8}, nil
 }
 
+func (f *fakeClient) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) {
+	return escp.PortBasedVLAN{Enabled: true, MaxVLAN: 8, VLANs: []escp.PortVLAN{{ID: 1, Ports: []int{1, 2, 3}}}}, nil
+}
+
 func (f *fakeClient) GetLED(context.Context) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -326,6 +330,20 @@ func TestAccVLANMTUDataSource(t *testing.T) {
 			Check: resource.ComposeAggregateTestCheckFunc(
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_mtu.this", "enabled", "true"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_mtu.this", "uplink_port", "8"),
+			),
+		}},
+	})
+}
+
+func TestAccVLANPortBasedDataSource(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(&fakeClient{}),
+		Steps: []resource.TestStep{{
+			Config: providerBlock + `data "tplinkeasysmart_vlan_port_based" "this" {}`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_port_based.this", "enabled", "true"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_port_based.this", "max_vlans", "8"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_port_based.this", "vlans.0.ports.#", "3"),
 			),
 		}},
 	})

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0
+
+- Data source tplinkeasysmart_vlan_port_based (read-only).
+
 ## 0.8.0
 
 - Data source tplinkeasysmart_vlan_mtu (read-only).
