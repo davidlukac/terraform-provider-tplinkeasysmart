@@ -19,13 +19,13 @@ var _ provider.Provider = &tplinkProvider{}
 type tplinkProvider struct {
 	version string
 	// newClient builds the transport; tests replace it with a fake.
-	newClient func(escp.Config) SwitchClient
+	newClient func(escp.Config) (SwitchClient, error)
 }
 
 // New returns the provider factory used by main.
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
-		return &tplinkProvider{version: version, newClient: func(c escp.Config) SwitchClient { return &lazyClient{cfg: c} }}
+		return &tplinkProvider{version: version, newClient: func(c escp.Config) (SwitchClient, error) { return escp.Dial(c) }}
 	}
 }
 
@@ -100,7 +100,11 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if !cfg.TimeoutSeconds.IsNull() && cfg.TimeoutSeconds.ValueInt64() > 0 {
 		timeout = time.Duration(cfg.TimeoutSeconds.ValueInt64()) * time.Second
 	}
-	c := p.newClient(escp.Config{Host: host, Username: user, Password: pass, Timeout: timeout})
+	c, err := p.newClient(escp.Config{Host: host, Username: user, Password: pass, Timeout: timeout})
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot configure switch client", err.Error())
+		return
+	}
 	resp.ResourceData = c
 	resp.DataSourceData = c
 }
@@ -110,5 +114,5 @@ func (p *tplinkProvider) Resources(context.Context) []func() resource.Resource {
 }
 
 func (p *tplinkProvider) DataSources(context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{NewSystemInfoDataSource}
+	return []func() datasource.DataSource{NewSystemInfoDataSource, NewPortsDataSource}
 }
