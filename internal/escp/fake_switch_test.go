@@ -16,19 +16,21 @@ type fakeSwitch struct {
 	user     string
 	password string
 
-	mu       sync.Mutex
-	hostname string
-	history  [][]TLV // every accepted SET, in order
-	lastSet  []TLV   // settings TLVs (credentials stripped) of the most recent accepted SET
-	port7    []byte
-	setIP    []byte
-	led      bool
-	session  []byte
-	gets     int
-	sets     int
-	dropNth  int // drop the nth received packet (1-based) to test retries
-	recv     int
-	mute     bool // swallow everything (switch gone)
+	mu         sync.Mutex
+	hostname   string
+	history    [][]TLV // every accepted SET, in order
+	noIP       bool    // discovery reply carries no IP configuration
+	backupMode string  // "", "badmagic", "short", "dropsecond", "dropfirst", "silent"
+	lastSet    []TLV   // settings TLVs (credentials stripped) of the most recent accepted SET
+	port7      []byte
+	setIP      []byte
+	led        bool
+	session    []byte
+	gets       int
+	sets       int
+	dropNth    int // drop the nth received packet (1-based) to test retries
+	recv       int
+	mute       bool // swallow everything (switch gone)
 }
 
 var (
@@ -63,6 +65,18 @@ func (f *fakeSwitch) goSilent() {
 }
 
 func (f *fakeSwitch) port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
+
+func (f *fakeSwitch) setNoIP(v bool) {
+	f.mu.Lock()
+	f.noIP = v
+	f.mu.Unlock()
+}
+
+func (f *fakeSwitch) setBackupMode(mode string) {
+	f.mu.Lock()
+	f.backupMode = mode
+	f.mu.Unlock()
+}
 
 func (f *fakeSwitch) allSets() [][]TLV {
 	f.mu.Lock()
@@ -127,6 +141,16 @@ func (f *fakeSwitch) serve() {
 	}
 }
 
+// fakeConfig is a 2258-byte stand-in for the switch's configuration file.
+func fakeConfig() []byte {
+	b := make([]byte, 2258)
+	copy(b, ConfigMagic)
+	for i := 4; i < len(b); i++ {
+		b[i] = byte(i * 7)
+	}
+	return b
+}
+
 func (f *fakeSwitch) send(to *net.UDPAddr, op byte, req header, errCode int32, tlvs []TLV, useSession bool) {
 	req.Op, req.ErrCode = op, errCode
 	req.SwitchMAC = [6]byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}
@@ -153,14 +177,58 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 	}
 	switch h.Op {
 	case OpDiscovery:
-		f.send(from, OpReply, h, 0, []TLV{
+		f.mu.Lock()
+		noIP := f.noIP
+		f.mu.Unlock()
+		reply := []TLV{
 			{TLVModel, []byte("TL-SG108E\x00")}, {TLVHostname, []byte("TL-SG108E-fake\x00")},
 			{TLVMAC, []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}, {TLVIP, []byte{127, 0, 0, 1}},
 			{TLVNetmask, []byte{255, 255, 255, 0}}, {TLVGateway, []byte{127, 0, 0, 254}},
 			{TLVFirmware, []byte("1.0.0 Build 20230218 Rel.50633\x00")}, {TLVHardware, []byte("TL-SG108E 6.0\x00")},
 			{TLVDHCP, []byte{1}}, {TLVFactoryDefault, []byte{1}},
-		}, false)
+		}
+		if noIP {
+			reply = reply[:3]
+		}
+		f.send(from, OpReply, h, 0, reply, false)
 	case OpSet:
+		if _, ok := find(TLVConfigFile); ok && len(tlvs) == 3 {
+			u, _ := find(TLVUsername)
+			p, _ := find(TLVPassword)
+			if cstring(u) != f.user || cstring(p) != f.password {
+				f.send(from, OpSetReply, h, 5, nil, true)
+				return
+			}
+			f.mu.Lock()
+			mode := f.backupMode
+			f.mu.Unlock()
+			if mode == "silent" {
+				return
+			}
+			cfg := fakeConfig()
+			switch mode {
+			case "badmagic":
+				cfg[0] = 0
+			case "short":
+				cfg = cfg[:4]
+			}
+			first, second := cfg, []byte(nil)
+			if len(cfg) > 1400 {
+				first, second = cfg[:1400], cfg[1400:]
+			}
+			h1 := h
+			h1.Fragment = 1
+			if second == nil {
+				h1.Fragment = 0
+			}
+			if mode != "dropfirst" {
+				f.send(from, OpSetReply, h1, 0, []TLV{{TLVConfigFile, first}}, true)
+			}
+			if second != nil && mode != "dropsecond" {
+				f.send(from, OpSetReply, h, 0, []TLV{{TLVConfigFile, second}}, true)
+			}
+			return
+		}
 		if v, ok := find(TLVRSAKey); ok {
 			f.mu.Lock()
 			f.session = f.decryptSessionKey(v)

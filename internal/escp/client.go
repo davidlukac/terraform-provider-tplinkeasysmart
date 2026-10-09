@@ -171,6 +171,53 @@ func (c *Client) decrypt(b []byte) []byte {
 	return rc4Static(b)
 }
 
+// recv reads packets until one is a valid reply to the current request (right
+// sender, decryptable, matching sequence number) or the deadline passes.
+func (c *Client) recv(deadline time.Time) (header, []TLV, bool) {
+	buf := make([]byte, 4096)
+	for time.Now().Before(deadline) {
+		_ = c.conn.SetReadDeadline(deadline)
+		n, from, err := c.conn.ReadFromUDP(buf)
+		if err != nil {
+			return header{}, nil, false
+		}
+		if !from.IP.Equal(c.dest.IP) {
+			continue
+		}
+		h, t, err := unmarshal(c.decrypt(buf[:n]))
+		if err != nil || h.Seq != c.seq || h.Op == OpDiscovery {
+			continue
+		}
+		if !c.haveSwMAC {
+			c.swMAC, c.haveSwMAC = h.SwitchMAC, true
+		}
+		return h, t, true
+	}
+	return header{}, nil, false
+}
+
+// attemptDeadline is the end of the current attempt: the per-attempt timeout,
+// capped by the context deadline.
+func (c *Client) attemptDeadline(ctx context.Context) time.Time {
+	deadline := time.Now().Add(c.cfg.Timeout)
+	if dl, ok := ctx.Deadline(); ok && dl.Before(deadline) {
+		return dl
+	}
+	return deadline
+}
+
+// send transmits one request with a fresh sequence number.
+func (c *Client) send(op byte, tlvs []TLV, static bool, to []*net.UDPAddr) error {
+	c.seq = (c.seq + 1) % 1000
+	pkt := c.encrypt(marshal(header{Op: op, SwitchMAC: c.swMAC, HostMAC: c.hostMAC, Seq: c.seq}, tlvs), static)
+	for _, d := range to {
+		if _, err := c.conn.WriteToUDP(pkt, d); err != nil {
+			return fmt.Errorf("escp: send: %w", err)
+		}
+	}
+	return nil
+}
+
 // exchange sends one packet and waits for the reply with the same sequence
 // number from the switch, retrying on silence. Callers hold c.mu.
 func (c *Client) exchange(ctx context.Context, op byte, tlvs []TLV, static bool, to []*net.UDPAddr) (reply, error) {
@@ -178,34 +225,10 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []TLV, static bool,
 		return reply{}, err
 	}
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
-		c.seq = (c.seq + 1) % 1000
-		pkt := c.encrypt(marshal(header{Op: op, SwitchMAC: c.swMAC, HostMAC: c.hostMAC, Seq: c.seq}, tlvs), static)
-		for _, d := range to {
-			if _, err := c.conn.WriteToUDP(pkt, d); err != nil {
-				return reply{}, fmt.Errorf("escp: send: %w", err)
-			}
+		if err := c.send(op, tlvs, static, to); err != nil {
+			return reply{}, err
 		}
-		deadline := time.Now().Add(c.cfg.Timeout)
-		if dl, ok := ctx.Deadline(); ok && dl.Before(deadline) {
-			deadline = dl
-		}
-		buf := make([]byte, 4096)
-		for time.Now().Before(deadline) {
-			_ = c.conn.SetReadDeadline(deadline)
-			n, from, err := c.conn.ReadFromUDP(buf)
-			if err != nil {
-				break
-			}
-			if !from.IP.Equal(c.dest.IP) {
-				continue
-			}
-			h, t, err := unmarshal(c.decrypt(buf[:n]))
-			if err != nil || h.Seq != c.seq || h.Op == OpDiscovery {
-				continue
-			}
-			if !c.haveSwMAC {
-				c.swMAC, c.haveSwMAC = h.SwitchMAC, true
-			}
+		if h, t, ok := c.recv(c.attemptDeadline(ctx)); ok {
 			return reply{op: h.Op, err: h.ErrCode, tlvs: t}, nil
 		}
 		if err := ctx.Err(); err != nil {
@@ -213,6 +236,40 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []TLV, static bool,
 		}
 	}
 	return reply{}, ErrNoReply
+}
+
+// exchangeFragments is exchange for replies that span several packets: it
+// concatenates the values of every TLV of the given type until a packet
+// without the fragment flag arrives. A missing fragment restarts the request.
+func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []TLV, typ int16) ([]byte, error) {
+	// Callers hold c.mu and run inside withSession, so the socket is open.
+	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
+		if err := c.send(op, tlvs, false, []*net.UDPAddr{c.dest}); err != nil {
+			return nil, err
+		}
+		var out []byte
+		for {
+			h, t, ok := c.recv(c.attemptDeadline(ctx))
+			if !ok {
+				break
+			}
+			if h.ErrCode != 0 {
+				return nil, fmt.Errorf("escp: switch answered error code %d", h.ErrCode)
+			}
+			for _, x := range t {
+				if x.Type == typ {
+					out = append(out, x.Value...)
+				}
+			}
+			if h.Fragment == 0 {
+				return out, nil
+			}
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+	}
+	return nil, ErrNoReply
 }
 
 func (c *Client) discoverTargets() []*net.UDPAddr {

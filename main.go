@@ -13,7 +13,7 @@ import (
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name tplinkeasysmart --rendered-provider-name "TP-Link Easy Smart"
 
 // version is set by the release build (-ldflags "-X main.version=...").
-var version = "0.21.0"
+var version = "0.22.0"
 
 func main() {
 	var debug bool
