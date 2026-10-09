@@ -368,3 +368,57 @@ func TestLiveLAG2(t *testing.T) {
 		t.Fatalf("not applied: %+v", got)
 	}
 }
+
+func portVLANByID(v PortBasedVLAN, id int) (PortVLAN, bool) {
+	for _, g := range v.VLANs {
+		if g.ID == id {
+			return g, true
+		}
+	}
+	return PortVLAN{}, false
+}
+
+// Creates port-based VLAN 2 from the unused ports 6 and 7 and removes it. VLAN
+// 1 must stay unchanged; if the firmware reshuffles it, it is repaired.
+func TestLivePortBasedVLAN2(t *testing.T) {
+	c, ctx := liveClient(t), context.Background()
+	livePort(t, c, 6)
+	livePort(t, c, 7)
+	orig, err := c.PortBasedVLAN(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !orig.Enabled {
+		t.Fatal("port-based VLAN mode is not active; refusing")
+	}
+	vlan1, ok := portVLANByID(orig, 1)
+	if !ok || len(vlan1.Ports) != 8 {
+		t.Fatalf("VLAN 1 is not the expected all-ports group: %+v; refusing", orig)
+	}
+	if _, exists := portVLANByID(orig, 2); exists {
+		t.Fatal("VLAN 2 already exists; refusing")
+	}
+	defer func() {
+		if err := c.SetPortBasedVLAN(ctx, 2, nil); err != nil {
+			t.Errorf("RESTORE FAILED (remove VLAN 2): %v", err)
+		}
+		now, _ := c.PortBasedVLAN(ctx)
+		if g, _ := portVLANByID(now, 1); !reflect.DeepEqual(g, vlan1) {
+			t.Errorf("VLAN 1 changed (%+v); repairing", g)
+			if err := c.SetPortBasedVLAN(ctx, 1, vlan1.Ports); err != nil {
+				t.Errorf("REPAIR FAILED: %v", err)
+			}
+		}
+		if _, exists := portVLANByID(now, 2); exists || !now.Enabled {
+			t.Errorf("not restored: %+v", now)
+		}
+	}()
+	if err := c.SetPortBasedVLAN(ctx, 2, []int{6, 7}); err != nil {
+		t.Fatal(err)
+	}
+	now, _ := c.PortBasedVLAN(ctx)
+	if g, ok := portVLANByID(now, 2); !ok || !reflect.DeepEqual(g.Ports, []int{6, 7}) {
+		t.Fatalf("VLAN 2 not applied: %+v", now)
+	}
+	t.Logf("with VLAN 2: %+v", now.VLANs)
+}

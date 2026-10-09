@@ -110,7 +110,7 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 }
 
 func (p *tplinkProvider) Resources(context.Context) []func() resource.Resource {
-	return []func() resource.Resource{NewLEDResource, NewIGMPSnoopingResource, NewLoopPreventionResource, NewPortResource, NewQoSResource, NewBandwidthLimitResource, NewStormLimitResource, NewPortMirrorResource, NewLAGResource}
+	return []func() resource.Resource{NewLEDResource, NewIGMPSnoopingResource, NewLoopPreventionResource, NewPortResource, NewQoSResource, NewBandwidthLimitResource, NewStormLimitResource, NewPortMirrorResource, NewLAGResource, NewVLANPortBasedGroupResource}
 }
 
 func (p *tplinkProvider) DataSources(context.Context) []func() datasource.DataSource {
