@@ -103,6 +103,10 @@ func (f *fakeClient) StormControl(context.Context) ([]escp.PortStorm, error) {
 	return []escp.PortStorm{{Port: 1}, {Port: 2, Broadcast: true, RateKbps: 5000, Enabled: true}}, nil
 }
 
+func (f *fakeClient) System(context.Context) (escp.System, error) {
+	return escp.System{PortCount: 8, AutoSave: true}, nil
+}
+
 func (f *fakeClient) GetLED(context.Context) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -211,6 +215,9 @@ func TestAccSystemInfoDataSource(t *testing.T) {
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_system_info.this", "mac_address", "00:00:5e:00:53:01"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_system_info.this", "hardware_version", "TL-SG108E 6.0"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_system_info.this", "dhcp", "true"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_system_info.this", "port_count", "8"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_system_info.this", "auto_save", "true"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_system_info.this", "factory_default", "false"),
 			),
 		}},
 	})

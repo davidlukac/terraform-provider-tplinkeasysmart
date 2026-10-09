@@ -30,6 +30,9 @@ type systemInfoModel struct {
 	Netmask  types.String `tfsdk:"netmask"`
 	Gateway  types.String `tfsdk:"gateway"`
 	DHCP     types.Bool   `tfsdk:"dhcp"`
+	Factory  types.Bool   `tfsdk:"factory_default"`
+	Ports    types.Int64  `tfsdk:"port_count"`
+	AutoSave types.Bool   `tfsdk:"auto_save"`
 }
 
 func (d *systemInfoDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -54,6 +57,9 @@ func (d *systemInfoDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 			"netmask":          str("Management subnet mask."),
 			"gateway":          str("Default gateway."),
 			"dhcp":             schema.BoolAttribute{Computed: true, Description: "Whether the management IP comes from DHCP."},
+			"factory_default":  schema.BoolAttribute{Computed: true, Description: "The switch reports it has never been configured (factory credentials still apply)."},
+			"port_count":       schema.Int64Attribute{Computed: true, Description: "Number of physical ports."},
+			"auto_save":        schema.BoolAttribute{Computed: true, Description: "Whether configuration changes are saved to flash automatically."},
 		},
 	}
 }
@@ -76,11 +82,17 @@ func (d *systemInfoDataSource) Read(ctx context.Context, _ datasource.ReadReques
 		resp.Diagnostics.AddError("Reading switch info failed", err.Error())
 		return
 	}
+	sys, err := d.client.System(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError("Reading switch system settings failed", err.Error())
+		return
+	}
 	state := systemInfoModel{
 		ID: types.StringValue(info.MAC), Model: types.StringValue(info.Model), Hostname: types.StringValue(info.Hostname),
 		MAC: types.StringValue(info.MAC), Firmware: types.StringValue(info.Firmware), Hardware: types.StringValue(info.Hardware),
 		IP: types.StringValue(info.IP), Netmask: types.StringValue(info.Netmask), Gateway: types.StringValue(info.Gateway),
-		DHCP: types.BoolValue(info.DHCP),
+		DHCP: types.BoolValue(info.DHCP), Factory: types.BoolValue(info.FactoryDefault),
+		Ports: types.Int64Value(int64(sys.PortCount)), AutoSave: types.BoolValue(sys.AutoSave),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

@@ -16,19 +16,20 @@ const (
 
 // TLV types used by this client.
 const (
-	TLVModel    = 1
-	TLVHostname = 2
-	TLVMAC      = 3
-	TLVIP       = 4
-	TLVNetmask  = 5
-	TLVGateway  = 6
-	TLVFirmware = 7
-	TLVHardware = 8
-	TLVDHCP     = 9
-	TLVLED      = 12
-	TLVUsername = 512
-	TLVPassword = 514
-	TLVRSAKey   = 528
+	TLVModel          = 1
+	TLVHostname       = 2
+	TLVMAC            = 3
+	TLVIP             = 4
+	TLVNetmask        = 5
+	TLVGateway        = 6
+	TLVFirmware       = 7
+	TLVHardware       = 8
+	TLVDHCP           = 9
+	TLVLED            = 12
+	TLVFactoryDefault = 14
+	TLVUsername       = 512
+	TLVPassword       = 514
+	TLVRSAKey         = 528
 )
 
 // ErrCodeKeyAccepted is returned in the reply to a successful RSA key exchange.

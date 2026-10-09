@@ -44,6 +44,9 @@ type Info struct {
 	Model, Hostname, MAC, Firmware, Hardware string
 	IP, Netmask, Gateway                     string
 	DHCP                                     bool
+	// FactoryDefault is discovery TLV 14: the switch has never been configured
+	// (still on factory credentials).
+	FactoryDefault bool
 }
 
 // Client talks ESCP to one switch. It is safe for concurrent use; requests
@@ -242,6 +245,9 @@ func (c *Client) discover(ctx context.Context) (Info, error) {
 	}
 	if v, ok := r.tlv(TLVDHCP); ok && len(v) == 1 {
 		info.DHCP = v[0] != 0
+	}
+	if v, ok := r.tlv(TLVFactoryDefault); ok && len(v) == 1 {
+		info.FactoryDefault = v[0] != 0
 	}
 	return info, nil
 }

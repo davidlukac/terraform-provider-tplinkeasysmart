@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.0
+
+- System info now also reports port count, auto-save and the factory-default flag; README lists all covered settings.
+
 ## 0.13.0
 
 - Data source tplinkeasysmart_storm_control (per-port storm control; read-only).
