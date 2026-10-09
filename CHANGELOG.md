@@ -1,0 +1,7 @@
+# Changelog
+
+## 0.1.0
+
+- Native ESCP (UDP 29808/29809) client: discovery, RSA session-key exchange, login, LED get/set, request retry, session recovery.
+- Resource `tplinkeasysmart_led`; data source `tplinkeasysmart_system_info`.
+- Verified on a TL-SG108E v6 (fw 1.0.0 Build 20230218): import, no-op plan, LED off/on apply cycle, restore.
