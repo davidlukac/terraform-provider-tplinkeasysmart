@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- Data source tplinkeasysmart_lags (link aggregation groups and member ports).
+
 ## 0.3.0
 
 - Data source tplinkeasysmart_port_statistics (per-port traffic counters).
