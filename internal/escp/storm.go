@@ -65,7 +65,7 @@ func (c *Client) StormControl(ctx context.Context) ([]PortStorm, error) {
 // rate must be 0. A rate on a port that carries traffic drops its excess
 // broadcast/multicast; callers must guard against that.
 func (c *Client) SetStormControl(ctx context.Context, port int, unknownUnicast, multicast, broadcast bool, rateKbps int) error {
-	if err := validatePort(port); err != nil {
+	if err := ValidatePort(port); err != nil {
 		return err
 	}
 	any := unknownUnicast || multicast || broadcast

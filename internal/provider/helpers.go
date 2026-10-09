@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Attribute names and diagnostic summaries shared by several resources.
@@ -79,4 +80,34 @@ func importPositiveInt(ctx context.Context, req resource.ImportStateRequest, res
 // resource: importing never opts in to disruptive changes.
 func resetAllowDisruptive(ctx context.Context, resp *resource.ImportStateResponse) {
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(attrAllowDisruptive), false)...)
+}
+
+// defaultFalse and defaultZero read an optional attribute from the raw
+// configuration: an omitted attribute is null there and takes its schema
+// default (false / 0) at plan time. Unknown stays unknown.
+func defaultFalse(b types.Bool) types.Bool {
+	if b.IsNull() {
+		return types.BoolValue(false)
+	}
+	return b
+}
+
+func defaultZero(n types.Int64) types.Int64 {
+	if n.IsNull() {
+		return types.Int64Value(0)
+	}
+	return n
+}
+
+// portsOf reads a configured port set; ok is false while it is not known yet.
+// An omitted set is null and means "no ports".
+func portsOf(ctx context.Context, s types.Set) (ports []int, ok bool) {
+	if s.IsUnknown() {
+		return nil, false
+	}
+	if s.IsNull() {
+		return nil, true
+	}
+	ports, err := setToInts(ctx, s)
+	return ports, err == nil
 }

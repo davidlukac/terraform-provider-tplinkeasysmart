@@ -54,6 +54,10 @@ provider "tplinkeasysmart" {
 - **No real security on the wire.** The protocol's encryption keys are public or trivially breakable (see the protocol doc). Keep the switches on a trusted management network.
 - Only tested on TL-SG108E v6, firmware 20230218. Newer firmware (20250710) and other models are untried.
 
+## Validation
+
+Bad values are refused while Terraform plans, before anything is applied: port numbers (1-32), LAG and VLAN ids (1-255), speeds, QoS modes and priorities (1-4), rate limits (0 or a multiple of 64 up to 1,000,000 kbps), device description (letters, digits, hyphens, up to 32), and cross-field rules (storm control needs a rate if a traffic type is selected, a mirror needs a destination that is not one of its sources, QoS priorities need port-based mode). Values that only become known during apply are validated by Terraform as soon as they resolve, and the client repeats every check before it writes.
+
 ## Develop
 
 ```sh

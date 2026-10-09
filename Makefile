@@ -19,11 +19,15 @@ testacc:
 docs-check: generate
 	git diff --compact-summary --exit-code -- docs
 
+# Validates every documentation example against the schemas (no switch needed).
+validate-examples:
+	scripts/validate-examples.sh
+
 # Local dry-run of the signed release pipeline (no signing, no publishing).
 snapshot:
 	GPG_FINGERPRINT=none goreleaser release --snapshot --clean --skip=sign,publish
 
-.PHONY: generate lint test testacc docs-check snapshot
+.PHONY: generate lint test testacc docs-check validate-examples snapshot
 
 # --- coverage -------------------------------------------------------------
 # `make cover` runs the whole suite with the race detector, writes cover.out

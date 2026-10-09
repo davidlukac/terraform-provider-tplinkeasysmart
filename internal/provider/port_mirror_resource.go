@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -60,10 +64,10 @@ func (r *portMirrorResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"id": schema.StringAttribute{Computed: true, Description: "Always `port_mirror`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"enabled":     schema.BoolAttribute{Required: true, Description: "Whether mirroring is enabled. When false, no other port setting may be given."},
-			"mirror_port": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Description: "Destination (monitoring) port; 0 when disabled."},
-			"ingress_ports": schema.SetAttribute{Optional: true, Computed: true, ElementType: types.Int64Type, Default: setdefault.StaticValue(emptyPortSet()),
+			"mirror_port": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{int64validator.Between(0, escp.MaxPort)}, Description: "Destination (monitoring) port; 0 when disabled."},
+			"ingress_ports": schema.SetAttribute{Optional: true, Computed: true, ElementType: types.Int64Type, Default: setdefault.StaticValue(emptyPortSet()), Validators: []validator.Set{validPortSet()},
 				Description: "Ports whose received traffic is mirrored."},
-			"egress_ports": schema.SetAttribute{Optional: true, Computed: true, ElementType: types.Int64Type, Default: setdefault.StaticValue(emptyPortSet()),
+			"egress_ports": schema.SetAttribute{Optional: true, Computed: true, ElementType: types.Int64Type, Default: setdefault.StaticValue(emptyPortSet()), Validators: []validator.Set{validPortSet()},
 				Description: "Ports whose transmitted traffic is mirrored."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow a destination port that has a link up or is a LAG member. Defaults to false."),
 		},
@@ -165,3 +169,19 @@ func (r *portMirrorResource) ImportState(ctx context.Context, req resource.Impor
 		resetAllowDisruptive(ctx, resp)
 	}
 }
+
+// ValidateConfig rejects, at plan time, a mirror that cannot work.
+func (r *portMirrorResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var m portMirrorResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	ingress, okIn := portsOf(ctx, m.IngressPorts)
+	egress, okEg := portsOf(ctx, m.EgressPorts)
+	if !okIn || !okEg {
+		return // not fully known yet; the client checks again at apply time
+	}
+	if problem := mirrorProblem(m.Enabled, defaultZero(m.MirrorPort), ingress, egress); problem != "" {
+		resp.Diagnostics.AddAttributeError(path.Root("enabled"), "Invalid port mirror configuration", problem)
+	}
+}
+
+var _ resource.ResourceWithValidateConfig = &portMirrorResource{}

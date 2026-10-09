@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -52,10 +54,11 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"because that can cut the uplink or the management path; set `allow_disruptive = true` to override. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
 			"port": schema.Int64Attribute{Required: true, Description: "Port number (1-based).",
+				Validators:    []validator.Int64{validPortNumber()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
 			"enabled": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true), Description: "Administrative state. Defaults to true."},
 			"speed": schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("auto"),
-				Description: "One of: " + joinSpeeds() + ". Defaults to auto."},
+				Validators: []validator.String{validSpeed()}, Description: "One of: " + joinSpeeds() + ". Defaults to auto."},
 			"flow_control":      schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Flow control. Defaults to false."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing a port that has a link up or is a LAG member. Defaults to false."),
 			"actual_speed":      schema.StringAttribute{Computed: true, Description: "Currently negotiated speed, or link-down."},

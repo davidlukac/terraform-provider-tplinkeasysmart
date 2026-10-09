@@ -811,7 +811,7 @@ func TestAccStormLimitGuardAndValidation(t *testing.T) {
 		Steps: []resource.TestStep{
 			{Config: stormConfig(4, "  broadcast = true\n  rate_kbps = 1024\n"), ExpectError: regexp.MustCompile(`has a link up`)},
 			{Config: stormConfig(1, "  multicast = true\n  rate_kbps = 64\n"), ExpectError: regexp.MustCompile(`member of LAG1`)},
-			{Config: stormConfig(7, "  broadcast = true\n"), ExpectError: regexp.MustCompile(`invalid storm control request`)},
+			{Config: stormConfig(7, "  broadcast = true\n"), ExpectError: regexp.MustCompile(`rate_kbps must be`)},
 		},
 	})
 	if f.sets != 0 {

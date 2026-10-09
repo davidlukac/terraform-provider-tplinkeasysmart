@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -53,8 +56,8 @@ func (r *qosResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{Computed: true, Description: "Always `qos`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"mode": schema.StringAttribute{Required: true, Description: "port-based, 802.1p or dscp-802.1p."},
-			"port_priorities": schema.MapAttribute{Optional: true, Computed: true, ElementType: types.Int64Type,
+			"mode": schema.StringAttribute{Required: true, Validators: []validator.String{validQoSMode()}, Description: "port-based, 802.1p or dscp-802.1p."},
+			"port_priorities": schema.MapAttribute{Optional: true, Computed: true, ElementType: types.Int64Type, Validators: validPriorities(),
 				Default: mapdefault.StaticValue(types.MapValueMust(types.Int64Type, map[string]attr.Value{})),
 				Description: "Priority queue per port, keyed by port number (\"7\" = 2), 1 (lowest) to 4 (highest). Only the listed ports are managed. " +
 					"Priorities take effect only when mode is port-based; setting them in another mode is rejected."},
@@ -106,8 +109,8 @@ func (r *qosResource) apply(ctx context.Context, plan *qosResourceModel, add fun
 		want[port] = int(v.(types.Int64).ValueInt64())
 		managed[k] = struct{}{}
 	}
-	if len(want) > 0 && code != 0 {
-		add("Priorities need port-based mode", "per-port priorities only take effect when mode is port-based; remove port_priorities or set mode = \"port-based\"")
+	if problem := qosProblem(plan.Mode, plan.Priorities); problem != "" {
+		add("Priorities need port-based mode", problem)
 		return false
 	}
 	if err := r.client.SetQoSMode(ctx, code); err != nil {
@@ -171,3 +174,14 @@ func (r *qosResource) Delete(context.Context, resource.DeleteRequest, *resource.
 func (r *qosResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	importSingletonID(ctx, req, resp, qosID)
 }
+
+// ValidateConfig rejects, at plan time, per-port priorities outside port-based mode.
+func (r *qosResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var m qosResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if problem := qosProblem(m.Mode, m.Priorities); problem != "" {
+		resp.Diagnostics.AddAttributeError(path.Root("port_priorities"), "Priorities need port-based mode", problem)
+	}
+}
+
+var _ resource.ResourceWithValidateConfig = &qosResource{}

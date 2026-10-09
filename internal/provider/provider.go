@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
@@ -70,6 +73,7 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 			},
 			"timeout_seconds": schema.Int64Attribute{
 				Optional:    true,
+				Validators:  []validator.Int64{int64validator.AtLeast(1)},
 				Description: "Seconds to wait for a reply before retrying a request. Defaults to 3.",
 			},
 		},

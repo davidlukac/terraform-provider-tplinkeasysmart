@@ -50,7 +50,7 @@ func (r *systemResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{Computed: true, Description: "Always `system`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"hostname": schema.StringAttribute{Required: true,
+			"hostname": schema.StringAttribute{Required: true, Validators: validHostname(),
 				Description: "Device description: 1-32 letters, digits and hyphens, not starting or ending with a hyphen (dots and underscores are rejected by the switch)."},
 		},
 	}

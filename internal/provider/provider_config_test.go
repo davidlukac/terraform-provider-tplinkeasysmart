@@ -89,7 +89,8 @@ func TestExplicitProviderAttributesOverrideTheEnvironment(t *testing.T) {
 	}
 }
 
-func TestNonPositiveTimeoutFallsBackToTheDefault(t *testing.T) {
+// timeout_seconds below 1 is rejected while planning, before any client exists.
+func TestNonPositiveTimeoutIsRejectedAtPlanTime(t *testing.T) {
 	clearProviderEnv(t)
 	for _, v := range []string{"0", "-5"} {
 		t.Run(v, func(t *testing.T) {
@@ -104,10 +105,10 @@ func TestNonPositiveTimeoutFallsBackToTheDefault(t *testing.T) {
 ` + infoDataSource
 			resource.UnitTest(t, resource.TestCase{
 				ProtoV6ProviderFactories: capturingFactories(&got, &mu, nil),
-				Steps:                    []resource.TestStep{{Config: cfg}},
+				Steps:                    []resource.TestStep{{Config: cfg, ExpectError: regexp.MustCompile(`(?s)timeout_seconds.*at least 1`)}},
 			})
-			if got.Timeout != 3*time.Second {
-				t.Fatalf("timeout_seconds = %s must fall back to 3s, got %v", v, got.Timeout)
+			if got.Host != "" {
+				t.Fatalf("no client may be built for an invalid configuration, got %+v", got)
 			}
 		})
 	}
