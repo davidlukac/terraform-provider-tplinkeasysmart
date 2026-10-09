@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0
+
+- Resource tplinkeasysmart_lag (link aggregation groups) with a guard on old and new member ports; LAG1 imported with prevent_destroy.
+
 ## 0.19.0
 
 - Resource tplinkeasysmart_port_mirror with the destination-port guard.

@@ -16,6 +16,7 @@ type SwitchClient interface {
 	SetPort(ctx context.Context, id int, enabled bool, speed string, flowControl bool) error
 	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
 	LAGs(ctx context.Context) ([]escp.LAG, error)
+	SetLAG(ctx context.Context, group int, ports []int) error
 	IGMP(ctx context.Context) (escp.IGMP, error)
 	SetIGMP(ctx context.Context, enabled, suppression bool) error
 	LoopPrevention(ctx context.Context) (bool, error)
