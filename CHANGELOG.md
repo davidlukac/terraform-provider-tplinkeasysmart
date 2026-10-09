@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.0
+
+- Data source tplinkeasysmart_storm_control (per-port storm control; read-only).
+
 ## 0.12.0
 
 - Data source tplinkeasysmart_bandwidth_control (per-port ingress/egress limits; read-only).

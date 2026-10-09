@@ -99,6 +99,10 @@ func (f *fakeClient) Bandwidth(context.Context) ([]escp.PortBandwidth, error) {
 	return []escp.PortBandwidth{{Port: 1}, {Port: 2, IngressKbps: 4096, EgressKbps: 8192}}, nil
 }
 
+func (f *fakeClient) StormControl(context.Context) ([]escp.PortStorm, error) {
+	return []escp.PortStorm{{Port: 1}, {Port: 2, Broadcast: true, RateKbps: 5000, Enabled: true}}, nil
+}
+
 func (f *fakeClient) GetLED(context.Context) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -400,6 +404,20 @@ func TestAccBandwidthControlDataSource(t *testing.T) {
 			Check: resource.ComposeAggregateTestCheckFunc(
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_bandwidth_control.this", "ports.0.ingress_kbps", "0"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_bandwidth_control.this", "ports.1.egress_kbps", "8192"),
+			),
+		}},
+	})
+}
+
+func TestAccStormControlDataSource(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(&fakeClient{}),
+		Steps: []resource.TestStep{{
+			Config: providerBlock + `data "tplinkeasysmart_storm_control" "this" {}`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_storm_control.this", "ports.0.enabled", "false"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_storm_control.this", "ports.1.broadcast", "true"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_storm_control.this", "ports.1.rate_kbps", "5000"),
 			),
 		}},
 	})
