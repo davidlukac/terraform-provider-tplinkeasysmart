@@ -29,6 +29,20 @@ type fakeClient struct {
 	led     bool
 	sets    int
 	failSet error
+	// pvlanOff reports the port-based VLAN mode as inactive.
+	pvlanOff bool
+	// rowPorts are the ports returned by Bandwidth and StormControl (default 1, 4, 7).
+	rowPorts []int
+}
+
+// mutate changes the fake's state under its lock (for PreConfig hooks).
+func (f *fakeClient) mutate(fn func(f *fakeClient)) { f.mu.Lock(); fn(f); f.mu.Unlock() }
+
+func (f *fakeClient) rows() []int {
+	if f.rowPorts != nil {
+		return f.rowPorts
+	}
+	return []int{1, 4, 7}
 }
 
 func (f *fakeClient) Info(context.Context) (escp.Info, error) {
@@ -97,6 +111,7 @@ func (f *fakeClient) SetIGMP(_ context.Context, enabled, suppression bool) error
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.igmp = escp.IGMP{Enabled: enabled, ReportSuppression: suppression}
+	f.sets++
 	return nil
 }
 
@@ -110,6 +125,7 @@ func (f *fakeClient) SetLoopPrevention(_ context.Context, on bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.loop = on
+	f.sets++
 	return nil
 }
 
@@ -176,7 +192,7 @@ func (f *fakeClient) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.pvlans != nil {
-		v := escp.PortBasedVLAN{Enabled: true, MaxVLAN: 8}
+		v := escp.PortBasedVLAN{Enabled: !f.pvlanOff, MaxVLAN: 8}
 		for _, id := range []int{1, 2} {
 			if ps, ok := f.pvlans[id]; ok {
 				v.VLANs = append(v.VLANs, escp.PortVLAN{ID: id, Ports: ps})
@@ -197,6 +213,7 @@ func (f *fakeClient) SetQoSMode(_ context.Context, mode int) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.qos.Mode, f.qos.ModeName = mode, escp.QoSModeNames[mode]
+	f.sets++
 	return nil
 }
 
@@ -244,7 +261,7 @@ func (f *fakeClient) Bandwidth(context.Context) ([]escp.PortBandwidth, error) {
 	defer f.mu.Unlock()
 	if f.bw != nil {
 		var rows []escp.PortBandwidth
-		for _, p := range []int{1, 4, 7} {
+		for _, p := range f.rows() {
 			rows = append(rows, escp.PortBandwidth{Port: p, IngressKbps: f.bw[p][0], EgressKbps: f.bw[p][1]})
 		}
 		return rows, nil
@@ -271,7 +288,7 @@ func (f *fakeClient) StormControl(context.Context) ([]escp.PortStorm, error) {
 	defer f.mu.Unlock()
 	if f.storm != nil {
 		var rows []escp.PortStorm
-		for _, p := range []int{1, 4, 7} {
+		for _, p := range f.rows() {
 			r := f.storm[p]
 			r.Port = p
 			rows = append(rows, r)

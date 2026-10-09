@@ -16,27 +16,47 @@ type fakeSwitch struct {
 	user     string
 	password string
 
-	mu         sync.Mutex
-	hostname   string
-	history    [][]TLV // every accepted SET, in order
-	noIP       bool    // discovery reply carries no IP configuration
-	backupMode string  // "", "badmagic", "short", "dropsecond", "dropfirst", "silent"
-	lastSet    []TLV   // settings TLVs (credentials stripped) of the most recent accepted SET
-	port7      []byte
-	setIP      []byte
-	led        bool
-	session    []byte
-	gets       int
-	sets       int
-	dropNth    int // drop the nth received packet (1-based) to test retries
-	recv       int
-	mute       bool // swallow everything (switch gone)
+	mu       sync.Mutex
+	hostname string
+	history  [][]TLV // every accepted SET, in order
+	lastSet  []TLV   // settings TLVs (credentials stripped) of the most recent accepted SET
+	port7    []byte
+	setIP    []byte
+	led      bool
+	session  []byte
+	gets     int
+	sets     int
+	dropNth  int // drop the nth received packet (1-based) to test retries
+	recv     int
+	mute     bool // swallow everything (switch gone)
+
+	backupMode string // config backup misbehaviour: "", "badmagic", "short", "dropsecond", "dropfirst", "silent"
+
+	// Programmable misbehaviour, set through configure().
+	getFn          func(types []int16) (tlvs []TLV, code int32, drop bool) // scripted GET replies
+	rsaDrop        bool                                                    // never answer the key exchange
+	rsaCode        int32                                                   // answer the key exchange with this code instead of ErrCodeKeyAccepted
+	dropSets       bool                                                    // never answer authenticated SETs
+	discoverTLVs   []TLV                                                   // replace the discovery reply (nil: the default TL-SG108E reply)
+	rejectSetsFrom int                                                     // reject the nth and later authenticated SETs (1-based)
 }
 
 var (
 	fakeP = big.NewInt(3443843009)
 	fakeQ = big.NewInt(3765816959)
 )
+
+// freeUDPPort returns a currently unused UDP port so tests never bind the
+// protocol's real client port 29809.
+func freeUDPPort(t *testing.T) int {
+	t.Helper()
+	c, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	return c.LocalAddr().(*net.UDPAddr).Port
+}
 
 func startFakeSwitch(t *testing.T) *fakeSwitch {
 	t.Helper()
@@ -50,27 +70,14 @@ func startFakeSwitch(t *testing.T) *fakeSwitch {
 	return f
 }
 
-// dropNthPacket makes the fake swallow the nth datagram it receives (1-based).
-func (f *fakeSwitch) dropNthPacket(n int) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.dropNth = n
-}
+func (f *fakeSwitch) dropPacket(n int) { f.mu.Lock(); f.dropNth = n; f.mu.Unlock() }
+func (f *fakeSwitch) goMute()          { f.mu.Lock(); f.mute = true; f.mu.Unlock() }
+func (f *fakeSwitch) clearSession()    { f.mu.Lock(); f.session = nil; f.mu.Unlock() }
 
-// goSilent makes the fake swallow every datagram, as if the switch were gone.
-func (f *fakeSwitch) goSilent() {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.mute = true
-}
+// configure changes the fake's behaviour under its lock.
+func (f *fakeSwitch) configure(fn func(f *fakeSwitch)) { f.mu.Lock(); fn(f); f.mu.Unlock() }
 
 func (f *fakeSwitch) port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
-
-func (f *fakeSwitch) setNoIP(v bool) {
-	f.mu.Lock()
-	f.noIP = v
-	f.mu.Unlock()
-}
 
 func (f *fakeSwitch) setBackupMode(mode string) {
 	f.mu.Lock()
@@ -178,19 +185,19 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 	switch h.Op {
 	case OpDiscovery:
 		f.mu.Lock()
-		noIP := f.noIP
+		override := f.discoverTLVs
 		f.mu.Unlock()
-		reply := []TLV{
+		if override != nil {
+			f.send(from, OpReply, h, 0, override, false)
+			return
+		}
+		f.send(from, OpReply, h, 0, []TLV{
 			{TLVModel, []byte("TL-SG108E\x00")}, {TLVHostname, []byte("TL-SG108E-fake\x00")},
 			{TLVMAC, []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}, {TLVIP, []byte{127, 0, 0, 1}},
 			{TLVNetmask, []byte{255, 255, 255, 0}}, {TLVGateway, []byte{127, 0, 0, 254}},
 			{TLVFirmware, []byte("1.0.0 Build 20230218 Rel.50633\x00")}, {TLVHardware, []byte("TL-SG108E 6.0\x00")},
 			{TLVDHCP, []byte{1}}, {TLVFactoryDefault, []byte{1}},
-		}
-		if noIP {
-			reply = reply[:3]
-		}
-		f.send(from, OpReply, h, 0, reply, false)
+		}, false)
 	case OpSet:
 		if _, ok := find(TLVConfigFile); ok && len(tlvs) == 3 {
 			u, _ := find(TLVUsername)
@@ -231,15 +238,34 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 		}
 		if v, ok := find(TLVRSAKey); ok {
 			f.mu.Lock()
-			f.session = f.decryptSessionKey(v)
+			drop, code := f.rsaDrop, f.rsaCode
+			if !drop {
+				f.session = f.decryptSessionKey(v)
+			}
 			f.mu.Unlock()
-			f.send(from, OpSetReply, h, ErrCodeKeyAccepted, nil, true)
+			if drop {
+				return
+			}
+			if code == 0 {
+				code = ErrCodeKeyAccepted
+			}
+			f.send(from, OpSetReply, h, code, nil, true)
+			return
+		}
+		f.mu.Lock()
+		dropSets, rejectFrom, accepted := f.dropSets, f.rejectSetsFrom, len(f.history)
+		f.mu.Unlock()
+		if dropSets {
 			return
 		}
 		u, _ := find(TLVUsername)
 		p, _ := find(TLVPassword)
 		if cstring(u) != f.user || cstring(p) != f.password {
 			f.send(from, OpSetReply, h, 5, nil, true)
+			return
+		}
+		if rejectFrom > 0 && accepted+1 >= rejectFrom {
+			f.send(from, OpSetReply, h, 9, nil, true)
 			return
 		}
 		f.mu.Lock()
@@ -272,6 +298,20 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 		}
 		f.send(from, OpSetReply, h, 0, nil, true)
 	case OpGet:
+		f.mu.Lock()
+		getFn := f.getFn
+		f.mu.Unlock()
+		if getFn != nil {
+			types := make([]int16, len(tlvs))
+			for i, t := range tlvs {
+				types[i] = t.Type
+			}
+			reply, code, drop := getFn(types)
+			if !drop {
+				f.send(from, OpReply, h, code, reply, true)
+			}
+			return
+		}
 		if _, ok := find(TLVQoSMode); ok {
 			f.send(from, OpReply, h, 0, []TLV{{TLVQoSMode, []byte{0}}}, true)
 			return

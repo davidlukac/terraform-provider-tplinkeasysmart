@@ -11,7 +11,9 @@ import (
 
 func TestSetHostnameRefusesUnusableIPConfiguration(t *testing.T) {
 	f := startFakeSwitch(t)
-	f.setNoIP(true)
+	f.configure(func(f *fakeSwitch) {
+		f.discoverTLVs = []TLV{{TLVModel, []byte("TL-SG108E\x00")}, {TLVHostname, []byte("TL-SG108E-fake\x00")}, {TLVMAC, []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
+	})
 	c := dialFake(t, f, "secret")
 	err := c.SetHostname(context.Background(), "sw01")
 	if err == nil || !strings.Contains(err.Error(), "unusable IP configuration") {
@@ -24,7 +26,7 @@ func TestSetHostnameRefusesUnusableIPConfiguration(t *testing.T) {
 
 func TestSetHostnameFailsWhenSwitchIsSilent(t *testing.T) {
 	f := startFakeSwitch(t)
-	f.goSilent()
+	f.goMute()
 	c := dialFake(t, f, "secret")
 	c.cfg.Retries = 0
 	c.cfg.Timeout = 100 * time.Millisecond
@@ -41,7 +43,7 @@ func TestSetHostnameRejectsWrongCredentials(t *testing.T) {
 	}
 }
 
-func TestSendFailureIsReported(t *testing.T) {
+func TestSendFailureOnClosedSocketAffectsReadsAndBackup(t *testing.T) {
 	f := startFakeSwitch(t)
 	c := dialFake(t, f, "secret")
 	if _, err := c.GetLED(context.Background()); err != nil { // opens the socket and establishes the session

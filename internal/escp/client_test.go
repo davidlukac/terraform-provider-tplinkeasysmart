@@ -10,7 +10,20 @@ import (
 func dialFake(t *testing.T, f *fakeSwitch, pass string) *Client {
 	t.Helper()
 	c, err := Dial(Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 300 * time.Millisecond,
-		SwitchPort: f.port(), HostPort: 0, BroadcastAddr: "127.0.0.1"})
+		SwitchPort: f.port(), HostPort: freeUDPPort(t), BroadcastAddr: "127.0.0.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close() })
+	return c
+}
+
+// dialFast is dialFake with short timeouts and a single retry, for tests that
+// deliberately make the switch stay silent.
+func dialFast(t *testing.T, f *fakeSwitch, pass string) *Client {
+	t.Helper()
+	c, err := Dial(Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 80 * time.Millisecond, Retries: 1,
+		SwitchPort: f.port(), HostPort: freeUDPPort(t), BroadcastAddr: "127.0.0.1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +78,7 @@ func TestBadPassword(t *testing.T) {
 
 func TestRetryOnLostPacket(t *testing.T) {
 	f := startFakeSwitch(t)
-	f.dropNthPacket(1) // lose the very first datagram
+	f.dropPacket(1) // lose the very first datagram
 	c := dialFake(t, f, "secret")
 	if _, err := c.Info(context.Background()); err != nil {
 		t.Fatalf("expected retry to recover: %v", err)
@@ -74,7 +87,7 @@ func TestRetryOnLostPacket(t *testing.T) {
 
 func TestNoReply(t *testing.T) {
 	f := startFakeSwitch(t)
-	f.goSilent()
+	f.goMute()
 	c := dialFake(t, f, "secret")
 	c.cfg.Retries = 1
 	if _, err := c.Info(context.Background()); !errors.Is(err, ErrNoReply) {
@@ -89,9 +102,7 @@ func TestSessionRecoversAfterSwitchRestart(t *testing.T) {
 	if _, err := c.GetLED(ctx); err != nil {
 		t.Fatal(err)
 	}
-	f.mu.Lock()
-	f.session = nil // switch forgets the session key
-	f.mu.Unlock()
+	f.clearSession() // the switch forgets the session key
 	if _, err := c.GetLED(ctx); err != nil {
 		t.Fatalf("client should re-establish the session: %v", err)
 	}
