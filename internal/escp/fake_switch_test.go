@@ -16,14 +16,17 @@ type fakeSwitch struct {
 	user     string
 	password string
 
-	mu      sync.Mutex
-	led     bool
-	session []byte
-	gets    int
-	sets    int
-	dropNth int // drop the nth received packet (1-based) to test retries
-	recv    int
-	mute    bool // swallow everything (switch gone)
+	mu       sync.Mutex
+	hostname string
+	port7    []byte
+	setIP    []byte
+	led      bool
+	session  []byte
+	gets     int
+	sets     int
+	dropNth  int // drop the nth received packet (1-based) to test retries
+	recv     int
+	mute     bool // swallow everything (switch gone)
 }
 
 var (
@@ -142,6 +145,19 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 		if cstring(u) != f.user || cstring(p) != f.password {
 			f.send(from, OpSetReply, h, 5, nil, true)
 			return
+		}
+		if v, ok := find(TLVPorts); ok && len(v) == 7 && v[0] == 7 {
+			f.mu.Lock()
+			f.port7 = append([]byte(nil), v...)
+			f.sets++
+			f.mu.Unlock()
+		}
+		if v, ok := find(TLVHostname); ok {
+			f.mu.Lock()
+			f.hostname = cstring(v)
+			f.setIP, _ = find(TLVIP)
+			f.sets++
+			f.mu.Unlock()
 		}
 		if v, ok := find(TLVLED); ok && len(v) == 1 {
 			f.mu.Lock()

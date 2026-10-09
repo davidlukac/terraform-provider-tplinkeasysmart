@@ -13,6 +13,7 @@ type SwitchClient interface {
 	GetLED(ctx context.Context) (bool, error)
 	SetLED(ctx context.Context, on bool) error
 	Ports(ctx context.Context) ([]escp.Port, error)
+	SetPort(ctx context.Context, id int, enabled bool, speed string, flowControl bool) error
 	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
 	LAGs(ctx context.Context) ([]escp.LAG, error)
 	IGMP(ctx context.Context) (escp.IGMP, error)

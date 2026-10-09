@@ -40,3 +40,15 @@ func TestParsePortsShort(t *testing.T) {
 		t.Fatal("expected error for short TLV")
 	}
 }
+
+func TestSpeedCodes(t *testing.T) {
+	for i, n := range SpeedNames {
+		got, err := speedCode(n)
+		if err != nil || int(got) != i+1 || speedName(got) != n {
+			t.Errorf("%s: code %d err %v name %s", n, got, err, speedName(got))
+		}
+	}
+	if _, err := speedCode("warp"); err == nil {
+		t.Error("expected error for unknown speed")
+	}
+}
