@@ -20,4 +20,5 @@ type SwitchClient interface {
 	LoopPrevention(ctx context.Context) (bool, error)
 	SetLoopPrevention(ctx context.Context, on bool) error
 	PortMirror(ctx context.Context) (escp.Mirror, error)
+	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
 }

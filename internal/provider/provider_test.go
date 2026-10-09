@@ -77,6 +77,10 @@ func (f *fakeClient) PortMirror(context.Context) (escp.Mirror, error) {
 	return escp.Mirror{Enabled: true, MirrorPort: 8, IngressPorts: []int{1, 2}, EgressPorts: []int{}}, nil
 }
 
+func (f *fakeClient) MTUVLAN(context.Context) (escp.MTUVLAN, error) {
+	return escp.MTUVLAN{Enabled: true, UplinkPort: 8}, nil
+}
+
 func (f *fakeClient) GetLED(context.Context) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -309,6 +313,19 @@ func TestAccPortMirrorDataSource(t *testing.T) {
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_port_mirror.this", "mirror_port", "8"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_port_mirror.this", "ingress_ports.#", "2"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_port_mirror.this", "egress_ports.#", "0"),
+			),
+		}},
+	})
+}
+
+func TestAccVLANMTUDataSource(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(&fakeClient{}),
+		Steps: []resource.TestStep{{
+			Config: providerBlock + `data "tplinkeasysmart_vlan_mtu" "this" {}`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_mtu.this", "enabled", "true"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_mtu.this", "uplink_port", "8"),
 			),
 		}},
 	})
