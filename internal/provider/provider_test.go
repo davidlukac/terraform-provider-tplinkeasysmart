@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"sync"
 	"testing"
@@ -16,6 +17,7 @@ import (
 // fakeClient is an in-memory switch used instead of the UDP transport.
 type fakeClient struct {
 	mu      sync.Mutex
+	igmp    escp.IGMP
 	led     bool
 	sets    int
 	failSet error
@@ -40,6 +42,21 @@ func (f *fakeClient) PortStatistics(context.Context) ([]escp.PortStats, error) {
 
 func (f *fakeClient) LAGs(context.Context) ([]escp.LAG, error) {
 	return []escp.LAG{{ID: 1, Ports: []int{1, 2}}, {ID: 2, Ports: []int{}}}, nil
+}
+
+func (f *fakeClient) IGMP(context.Context) (escp.IGMP, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	g := f.igmp
+	g.Groups = []escp.IGMPGroup{{IP: "239.255.255.250", VLAN: 1, Ports: []int{1, 4}}}
+	return g, nil
+}
+
+func (f *fakeClient) SetIGMP(_ context.Context, enabled, suppression bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.igmp = escp.IGMP{Enabled: enabled, ReportSuppression: suppression}
+	return nil
 }
 
 func (f *fakeClient) GetLED(context.Context) (bool, error) {
@@ -207,5 +224,38 @@ func TestAccLAGsDataSource(t *testing.T) {
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_lags.this", "lags.1.ports.#", "0"),
 			),
 		}},
+	})
+}
+
+func igmpConfig(enabled string) string {
+	return providerBlock + `
+resource "tplinkeasysmart_igmp_snooping" "this" {
+  enabled = ` + enabled + `
+}
+`
+}
+
+func TestAccIGMPSnoopingLifecycle(t *testing.T) {
+	f := &fakeClient{igmp: escp.IGMP{Enabled: true}}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: igmpConfig("true"), Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("tplinkeasysmart_igmp_snooping.this", "id", "igmp_snooping"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_igmp_snooping.this", "enabled", "true"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_igmp_snooping.this", "report_message_suppression", "false"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_igmp_snooping.this", "multicast_groups.0.ip", "239.255.255.250"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_igmp_snooping.this", "multicast_groups.0.ports.1", "4"),
+			)},
+			{Config: igmpConfig("false"), Check: func(*terraformState) error {
+				f.mu.Lock()
+				defer f.mu.Unlock()
+				if f.igmp.Enabled {
+					return fmt.Errorf("IGMP still enabled on the switch")
+				}
+				return nil
+			}},
+			{ResourceName: "tplinkeasysmart_igmp_snooping.this", ImportState: true, ImportStateId: "igmp_snooping", ImportStateVerify: true},
+		},
 	})
 }

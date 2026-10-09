@@ -317,18 +317,26 @@ func (c *Client) GetLED(ctx context.Context) (bool, error) {
 
 // SetLED switches the LEDs on or off. Credentials accompany every SET.
 func (c *Client) SetLED(ctx context.Context, on bool) error {
+	return c.setTLVs(ctx, TLV{TLVLED, []byte{boolByte(on)}})
+}
+
+func boolByte(b bool) byte {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// setTLVs sends a SET carrying the credentials plus the given settings.
+func (c *Client) setTLVs(ctx context.Context, tlvs ...TLV) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.withSession(ctx, func() error {
-		v := byte(0)
-		if on {
-			v = 1
-		}
-		r, err := c.exchange(ctx, OpSet, []TLV{
+		req := append([]TLV{
 			{TLVUsername, append([]byte(c.cfg.Username), 0)},
 			{TLVPassword, append([]byte(c.cfg.Password), 0)},
-			{TLVLED, []byte{v}},
-		}, false, []*net.UDPAddr{c.dest})
+		}, tlvs...)
+		r, err := c.exchange(ctx, OpSet, req, false, []*net.UDPAddr{c.dest})
 		if err != nil {
 			return err
 		}

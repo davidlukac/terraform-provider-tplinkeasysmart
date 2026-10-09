@@ -15,4 +15,6 @@ type SwitchClient interface {
 	Ports(ctx context.Context) ([]escp.Port, error)
 	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
 	LAGs(ctx context.Context) ([]escp.LAG, error)
+	IGMP(ctx context.Context) (escp.IGMP, error)
+	SetIGMP(ctx context.Context, enabled, suppression bool) error
 }
