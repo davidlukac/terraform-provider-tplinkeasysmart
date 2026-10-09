@@ -85,6 +85,12 @@ func (f *fakeClient) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) 
 	return escp.PortBasedVLAN{Enabled: true, MaxVLAN: 8, VLANs: []escp.PortVLAN{{ID: 1, Ports: []int{1, 2, 3}}}}, nil
 }
 
+func (f *fakeClient) VLAN8021Q(context.Context) (escp.Dot1Q, error) {
+	return escp.Dot1Q{Enabled: true, MaxVLAN: 32,
+		VLANs: []escp.VLAN8021Q{{ID: 10, Name: "iot", Tagged: []int{8}, Untagged: []int{1, 2}}},
+		PVIDs: []escp.PortPVID{{Port: 1, PVID: 10}, {Port: 8, PVID: 1}}}, nil
+}
+
 func (f *fakeClient) GetLED(context.Context) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -344,6 +350,21 @@ func TestAccVLANPortBasedDataSource(t *testing.T) {
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_port_based.this", "enabled", "true"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_port_based.this", "max_vlans", "8"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_port_based.this", "vlans.0.ports.#", "3"),
+			),
+		}},
+	})
+}
+
+func TestAccVLAN8021QDataSource(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(&fakeClient{}),
+		Steps: []resource.TestStep{{
+			Config: providerBlock + `data "tplinkeasysmart_vlan_8021q" "this" {}`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_8021q.this", "max_vlans", "32"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_8021q.this", "vlans.0.name", "iot"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_8021q.this", "vlans.0.tagged_ports.0", "8"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_8021q.this", "pvids.0.pvid", "10"),
 			),
 		}},
 	})

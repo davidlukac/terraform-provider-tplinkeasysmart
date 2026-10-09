@@ -1,0 +1,101 @@
+package escp
+
+import (
+	"context"
+	"fmt"
+)
+
+// TLV types of VLAN > 802.1Q VLAN and 802.1Q PVID.
+const (
+	TLVVLAN8021Q     = 8704 // mode enabled (1 byte)
+	TLVVLAN8021QVLAN = 8705 // one TLV per VLAN: id(2) member mask(4) tagged mask(4) name (NUL terminated)
+	TLVVLAN8021QPVID = 8706 // one TLV per port: port(1) pvid(2)
+	TLVVLAN8021QMax  = 8707 // maximum number of VLANs (1 byte)
+)
+
+// VLAN8021Q is one 802.1Q VLAN with its tagged and untagged members.
+type VLAN8021Q struct {
+	ID       int
+	Name     string
+	Tagged   []int
+	Untagged []int
+}
+
+// PortPVID is the default VLAN of a port.
+type PortPVID struct {
+	Port int
+	PVID int
+}
+
+// Dot1Q is VLAN > 802.1Q VLAN plus PVID settings.
+type Dot1Q struct {
+	Enabled bool
+	MaxVLAN int
+	VLANs   []VLAN8021Q
+	PVIDs   []PortPVID
+}
+
+func subtractPorts(all, minus []int) []int {
+	m := map[int]bool{}
+	for _, p := range minus {
+		m[p] = true
+	}
+	out := []int{}
+	for _, p := range all {
+		if !m[p] {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func parseDot1Q(tlvs []TLV) (Dot1Q, error) {
+	out := Dot1Q{VLANs: []VLAN8021Q{}, PVIDs: []PortPVID{}}
+	seen := false
+	for _, t := range tlvs {
+		v := t.Value
+		switch t.Type {
+		case TLVVLAN8021Q:
+			if len(v) != 1 {
+				return out, fmt.Errorf("escp: 802.1Q state TLV has %d bytes", len(v))
+			}
+			out.Enabled, seen = v[0] == 1, true
+		case TLVVLAN8021QMax:
+			if len(v) == 1 {
+				out.MaxVLAN = int(v[0])
+			}
+		case TLVVLAN8021QVLAN:
+			if len(v) < 10 {
+				return out, fmt.Errorf("escp: 802.1Q VLAN entry has %d bytes, want at least 10", len(v))
+			}
+			// Vendor semantics: member and tagged-mask -> tagged; member only -> untagged.
+			members, taggedMask := portsFromMask(v[2:6]), portsFromMask(v[6:10])
+			untagged := subtractPorts(members, taggedMask)
+			out.VLANs = append(out.VLANs, VLAN8021Q{ID: int(v[0])<<8 | int(v[1]), Name: cstring(v[10:]),
+				Tagged: subtractPorts(members, untagged), Untagged: untagged})
+		case TLVVLAN8021QPVID:
+			if len(v) != 3 {
+				return out, fmt.Errorf("escp: 802.1Q PVID entry has %d bytes, want 3", len(v))
+			}
+			out.PVIDs = append(out.PVIDs, PortPVID{Port: int(v[0]), PVID: int(v[1])<<8 | int(v[2])})
+		}
+	}
+	if !seen {
+		return out, fmt.Errorf("escp: no 802.1Q state in reply")
+	}
+	return out, nil
+}
+
+// VLAN8021Q reads the 802.1Q mode, VLAN table and per-port PVIDs.
+func (c *Client) VLAN8021Q(ctx context.Context) (Dot1Q, error) {
+	// Separate requests, like the vendor utility (combined ones are rejected on some pages).
+	vlans, err := c.getTLVs(ctx, TLVVLAN8021QVLAN)
+	if err != nil {
+		return Dot1Q{}, err
+	}
+	pvids, err := c.getTLVs(ctx, TLVVLAN8021QPVID)
+	if err != nil {
+		return Dot1Q{}, err
+	}
+	return parseDot1Q(append(vlans, pvids...))
+}
