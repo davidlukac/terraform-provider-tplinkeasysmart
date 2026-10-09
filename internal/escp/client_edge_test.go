@@ -234,15 +234,12 @@ func TestSendFailureIsReported(t *testing.T) {
 func TestContextDeadlineBeatsTheConfiguredTimeout(t *testing.T) {
 	f := startFakeSwitch(t)
 	f.goMute()
-	c, err := Dial(Config{Host: "127.0.0.1", Timeout: 5 * time.Second, SwitchPort: f.port(), HostPort: freeUDPPort(t), BroadcastAddr: "127.0.0.1"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	c := newBoundClient(t, Config{Host: "127.0.0.1", Timeout: 5 * time.Second, SwitchPort: f.port(), BroadcastAddr: "127.0.0.1"})
 	defer c.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 	start := time.Now()
-	_, err = c.Info(ctx)
+	_, err := c.Info(ctx)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("want context.DeadlineExceeded, got %v", err)
 	}

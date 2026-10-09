@@ -19,6 +19,10 @@ testacc:
 docs-check: generate
 	git diff --compact-summary --exit-code -- docs
 
+# Known vulnerabilities in the code and its dependencies (needs: go install golang.org/x/vuln/cmd/govulncheck@latest).
+vuln:
+	govulncheck ./...
+
 # Validates every documentation example against the schemas (no switch needed).
 validate-examples:
 	scripts/validate-examples.sh
@@ -27,7 +31,7 @@ validate-examples:
 snapshot:
 	GPG_FINGERPRINT=none goreleaser release --snapshot --clean --skip=sign,publish
 
-.PHONY: generate lint test testacc docs-check validate-examples snapshot
+.PHONY: generate lint test testacc docs-check validate-examples vuln snapshot
 
 # --- coverage -------------------------------------------------------------
 # `make cover` runs the whole suite with the race detector, writes cover.out

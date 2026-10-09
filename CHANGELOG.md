@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.1
+
+- Security: transitive dependencies bumped (govulncheck clean, make vuln and CI step); fuzz tests for the packet and settings parsers; flaky test fixed; backup and drift-check helpers; decision records and runbook.
+
 ## 0.24.0
 
 - Plan-time validation of every argument (ranges, enums, rate steps, hostname rules, cross-field storm/mirror/QoS rules); documentation examples are validated by make validate-examples and in CI; internal cleanup (named protocol layouts, per-consumer client interfaces, shared Create/Update and import helpers).

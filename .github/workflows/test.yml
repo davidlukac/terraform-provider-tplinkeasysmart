@@ -39,6 +39,10 @@ jobs:
             (echo "::error::docs/ is stale. Run 'make generate' and commit the result." && exit 1)
       - name: Documentation examples validate against the schemas
         run: make validate-examples
+      - name: Known vulnerabilities
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
 
   unit:
     name: Unit tests
