@@ -9,11 +9,8 @@ import (
 
 func dialFake(t *testing.T, f *fakeSwitch, pass string) *Client {
 	t.Helper()
-	c, err := Dial(Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 300 * time.Millisecond,
-		SwitchPort: f.port(), HostPort: freeUDPPort(t), BroadcastAddr: "127.0.0.1"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 300 * time.Millisecond,
+		SwitchPort: f.port(), BroadcastAddr: "127.0.0.1"})
 	t.Cleanup(func() { c.Close() })
 	return c
 }
@@ -22,11 +19,8 @@ func dialFake(t *testing.T, f *fakeSwitch, pass string) *Client {
 // deliberately make the switch stay silent.
 func dialFast(t *testing.T, f *fakeSwitch, pass string) *Client {
 	t.Helper()
-	c, err := Dial(Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 80 * time.Millisecond, Retries: 1,
-		SwitchPort: f.port(), HostPort: freeUDPPort(t), BroadcastAddr: "127.0.0.1"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 80 * time.Millisecond, Retries: 1,
+		SwitchPort: f.port(), BroadcastAddr: "127.0.0.1"})
 	t.Cleanup(func() { c.Close() })
 	return c
 }
