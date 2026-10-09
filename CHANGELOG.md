@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+
+- Data source tplinkeasysmart_vlan_8021q (mode, VLAN table, per-port PVIDs; read-only).
+
 ## 0.9.0
 
 - Data source tplinkeasysmart_vlan_port_based (read-only).
