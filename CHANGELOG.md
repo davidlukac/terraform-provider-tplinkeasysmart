@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- Resource tplinkeasysmart_igmp_snooping (enabled, report suppression, learned groups); generic SET helper; live test harness (go test -tags live).
+
 ## 0.4.0
 
 - Data source tplinkeasysmart_lags (link aggregation groups and member ports).
