@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- Data source tplinkeasysmart_port_statistics (per-port traffic counters).
+
 ## 0.2.0
 
 - Data source tplinkeasysmart_ports (port state, LAG, configured/actual speed, flow control); client is now lazy.

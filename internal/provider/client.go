@@ -13,4 +13,5 @@ type SwitchClient interface {
 	GetLED(ctx context.Context) (bool, error)
 	SetLED(ctx context.Context, on bool) error
 	Ports(ctx context.Context) ([]escp.Port, error)
+	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
 }
