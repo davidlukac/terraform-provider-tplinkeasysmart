@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.18.0
+
+- Resource tplinkeasysmart_storm_limit (per-port storm control) with the port-in-use guard.
+
 ## 0.17.0
 
 - Resource tplinkeasysmart_bandwidth_limit (per-port ingress/egress limits) with the port-in-use guard.

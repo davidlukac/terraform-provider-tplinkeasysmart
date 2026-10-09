@@ -18,6 +18,7 @@ import (
 type fakeClient struct {
 	mu      sync.Mutex
 	igmp    escp.IGMP
+	storm   map[int]escp.PortStorm
 	bw      map[int][2]int
 	qos     *escp.QoS
 	ports   []escp.Port
@@ -170,7 +171,32 @@ func (f *fakeClient) Bandwidth(context.Context) ([]escp.PortBandwidth, error) {
 	return []escp.PortBandwidth{{Port: 1}, {Port: 2, IngressKbps: 4096, EgressKbps: 8192}}, nil
 }
 
+func (f *fakeClient) SetStormControl(_ context.Context, port int, uu, mc, bc bool, rate int) error {
+	if (uu || mc || bc) != (rate != 0) || rate%64 != 0 {
+		return fmt.Errorf("invalid storm control request")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.storm == nil {
+		f.storm = map[int]escp.PortStorm{}
+	}
+	f.storm[port] = escp.PortStorm{Port: port, UnknownUnicast: uu, Multicast: mc, Broadcast: bc, RateKbps: rate, Enabled: rate != 0}
+	f.sets++
+	return nil
+}
+
 func (f *fakeClient) StormControl(context.Context) ([]escp.PortStorm, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.storm != nil {
+		var rows []escp.PortStorm
+		for _, p := range []int{1, 4, 7} {
+			r := f.storm[p]
+			r.Port = p
+			rows = append(rows, r)
+		}
+		return rows, nil
+	}
 	return []escp.PortStorm{{Port: 1}, {Port: 2, Broadcast: true, RateKbps: 5000, Enabled: true}}, nil
 }
 
@@ -652,6 +678,42 @@ func TestAccBandwidthLimitGuardAndValidation(t *testing.T) {
 			{Config: bwConfig(4, "  ingress_kbps = 1024\n"), ExpectError: regexp.MustCompile(`has a link up`)},
 			{Config: bwConfig(1, "  egress_kbps = 1024\n"), ExpectError: regexp.MustCompile(`member of LAG1`)},
 			{Config: bwConfig(7, "  ingress_kbps = 100\n"), ExpectError: regexp.MustCompile(`multiple of 64`)},
+		},
+	})
+	if f.sets != 0 {
+		t.Fatalf("no write may happen for blocked or invalid requests, got %d", f.sets)
+	}
+}
+
+func stormConfig(port int, body string) string {
+	return providerBlock + fmt.Sprintf("resource \"tplinkeasysmart_storm_limit\" \"s\" {\n  port = %d\n%s}\n", port, body)
+}
+
+func TestAccStormLimitLifecycle(t *testing.T) {
+	f := &fakeClient{ports: testPorts(), storm: map[int]escp.PortStorm{}}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: stormConfig(7, "  broadcast = true\n  rate_kbps = 1024\n"), Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("tplinkeasysmart_storm_limit.s", "broadcast", "true"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_storm_limit.s", "multicast", "false"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_storm_limit.s", "rate_kbps", "1024"),
+			)},
+			{Config: stormConfig(7, ""), Check: resource.TestCheckResourceAttr("tplinkeasysmart_storm_limit.s", "rate_kbps", "0")},
+			{ResourceName: "tplinkeasysmart_storm_limit.s", ImportState: true, ImportStateId: "7", ImportStateVerify: true,
+				ImportStateVerifyIdentifierAttribute: "port"},
+		},
+	})
+}
+
+func TestAccStormLimitGuardAndValidation(t *testing.T) {
+	f := &fakeClient{ports: testPorts(), storm: map[int]escp.PortStorm{}}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: stormConfig(4, "  broadcast = true\n  rate_kbps = 1024\n"), ExpectError: regexp.MustCompile(`has a link up`)},
+			{Config: stormConfig(1, "  multicast = true\n  rate_kbps = 64\n"), ExpectError: regexp.MustCompile(`member of LAG1`)},
+			{Config: stormConfig(7, "  broadcast = true\n"), ExpectError: regexp.MustCompile(`invalid storm control request`)},
 		},
 	})
 	if f.sets != 0 {

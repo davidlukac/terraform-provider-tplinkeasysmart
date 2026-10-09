@@ -47,3 +47,27 @@ func (c *Client) StormControl(ctx context.Context) ([]PortStorm, error) {
 	}
 	return parseStorm(tlvs)
 }
+
+// SetStormControl configures storm control on one port. Following the vendor
+// utility: selecting any traffic type requires a rate (a multiple of 64 kbps,
+// at least 64, at most MaxBandwidthKbps); selecting none disables it and the
+// rate must be 0. A rate on a port that carries traffic drops its excess
+// broadcast/multicast; callers must guard against that.
+func (c *Client) SetStormControl(ctx context.Context, port int, unknownUnicast, multicast, broadcast bool, rateKbps int) error {
+	if port < 1 || port > 32 {
+		return fmt.Errorf("escp: invalid port %d", port)
+	}
+	any := unknownUnicast || multicast || broadcast
+	switch {
+	case any && (rateKbps < 64 || rateKbps > MaxBandwidthKbps || rateKbps%64 != 0):
+		return fmt.Errorf("escp: storm control on port %d needs a rate that is a multiple of 64 kbps between 64 and %d, got %d", port, MaxBandwidthKbps, rateKbps)
+	case !any && rateKbps != 0:
+		return fmt.Errorf("escp: storm control on port %d has a rate (%d) but no traffic type selected", port, rateKbps)
+	}
+	v := make([]byte, 9)
+	v[0] = byte(port)
+	v[1] = boolByte(any)
+	v[2], v[3], v[4] = boolByte(unknownUnicast), boolByte(multicast), boolByte(broadcast)
+	binary.BigEndian.PutUint32(v[5:], uint32(rateKbps))
+	return c.setTLVs(ctx, TLV{TLVStormControl, v})
+}

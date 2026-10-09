@@ -252,3 +252,46 @@ func mustBandwidth(t *testing.T, c *Client) []PortBandwidth {
 	}
 	return rows
 }
+
+func stormOf(t *testing.T, c *Client, port int) PortStorm {
+	t.Helper()
+	rows, err := c.StormControl(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range rows {
+		if r.Port == port {
+			return r
+		}
+	}
+	t.Fatalf("port %d missing", port)
+	return PortStorm{}
+}
+
+func TestLiveStormControl(t *testing.T) {
+	const id = 7
+	c, ctx := liveClient(t), context.Background()
+	livePort(t, c, id) // abort unless port 7 is unused
+	orig := stormOf(t, c, id)
+	defer func() {
+		if err := c.SetStormControl(ctx, id, orig.UnknownUnicast, orig.Multicast, orig.Broadcast, orig.RateKbps); err != nil {
+			t.Errorf("RESTORE FAILED: %v", err)
+		}
+		if now := stormOf(t, c, id); now != orig {
+			t.Errorf("not restored: %+v vs %+v", now, orig)
+		}
+	}()
+	if err := c.SetStormControl(ctx, id, false, true, true, 1024); err != nil {
+		t.Fatal(err)
+	}
+	got := stormOf(t, c, id)
+	if !got.Enabled || !got.Multicast || !got.Broadcast || got.UnknownUnicast || got.RateKbps != 1024 {
+		t.Fatalf("not applied: %+v", got)
+	}
+	rows, _ := c.StormControl(ctx)
+	for _, r := range rows {
+		if r.Port != id && r.Enabled {
+			t.Fatalf("port %d was affected: %+v", r.Port, r)
+		}
+	}
+}
