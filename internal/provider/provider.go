@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -81,8 +82,22 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if cfg.Host.IsUnknown() || cfg.Username.IsUnknown() || cfg.Password.IsUnknown() {
-		return // values not known yet during planning
+	// A value that is only known after apply (for example taken from another
+	// resource) cannot be used to build the client during planning. Without a
+	// client every resource and data source would dereference nil, so fail
+	// with an explanation instead.
+	for _, attr := range []struct {
+		name  string
+		value types.String
+	}{{"host", cfg.Host}, {"username", cfg.Username}, {"password", cfg.Password}} {
+		if attr.value.IsUnknown() {
+			resp.Diagnostics.AddAttributeError(pathRoot(attr.name), "Unknown switch "+attr.name,
+				"The provider cannot create the switch client because `"+attr.name+"` is not known yet. Apply the resource that provides it first "+
+					"(`terraform apply -target=...`), set the value statically, or use the TPLINK_EASYSMART_"+strings.ToUpper(attr.name)+" environment variable.")
+		}
+	}
+	if resp.Diagnostics.HasError() {
+		return
 	}
 	host := envOr(cfg.Host, "TPLINK_EASYSMART_HOST")
 	user := envOr(cfg.Username, "TPLINK_EASYSMART_USERNAME")
