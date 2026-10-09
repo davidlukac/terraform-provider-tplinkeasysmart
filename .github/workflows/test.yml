@@ -37,6 +37,8 @@ jobs:
           go generate ./...
           git diff --compact-summary --exit-code || \
             (echo "::error::docs/ is stale. Run 'make generate' and commit the result." && exit 1)
+      - name: Documentation examples validate against the schemas
+        run: make validate-examples
 
   unit:
     name: Unit tests

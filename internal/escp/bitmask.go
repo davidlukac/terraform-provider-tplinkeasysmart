@@ -22,7 +22,7 @@ func portsFromMask(v []byte) []int {
 func maskFromPorts(ports []int) ([]byte, error) {
 	var m uint32
 	for _, p := range ports {
-		if err := validatePort(p); err != nil {
+		if err := ValidatePort(p); err != nil {
 			return nil, err
 		}
 		m |= 1 << uint(p-1)

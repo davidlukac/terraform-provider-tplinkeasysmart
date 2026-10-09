@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
@@ -52,8 +55,9 @@ func (r *lagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"The switch itself rejects ports that conflict with mirroring, VLANs, rate limits or storm control.",
 		Attributes: map[string]schema.Attribute{
 			"group": schema.Int64Attribute{Required: true, Description: "Group number (1-based).",
+				Validators:    []validator.Int64{validByteID()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
-			"ports":             schema.SetAttribute{Required: true, ElementType: types.Int64Type, Description: "Member ports."},
+			"ports":             schema.SetAttribute{Required: true, ElementType: types.Int64Type, Validators: []validator.Set{validPortSet(), setvalidator.SizeAtLeast(1)}, Description: "Member ports."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow touching ports that have a link up or belong to a LAG. Defaults to false."),
 		},
 	}

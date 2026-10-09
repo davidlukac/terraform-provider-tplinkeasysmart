@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
 	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -49,10 +51,11 @@ func (r *bandwidthLimitResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"the provider refuses to change a port that has a link up or is in a LAG; set `allow_disruptive = true` to override. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
 			"port": schema.Int64Attribute{Required: true, Description: "Port number (1-based).",
+				Validators:    []validator.Int64{validPortNumber()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
-			"ingress_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0),
+			"ingress_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{rateKbps{}},
 				Description: "Ingress limit in kbps: 0 (unlimited) or a multiple of 64 up to 1000000."},
-			"egress_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0),
+			"egress_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{rateKbps{}},
 				Description: "Egress limit in kbps: 0 (unlimited) or a multiple of 64 up to 1000000."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing a port that has a link up or is a LAG member. Defaults to false."),
 		},

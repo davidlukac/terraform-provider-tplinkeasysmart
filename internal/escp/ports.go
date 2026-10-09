@@ -95,7 +95,7 @@ func (c *Client) SetPort(ctx context.Context, id int, enabled bool, speed string
 	if err != nil {
 		return err
 	}
-	if err := validatePort(id); err != nil {
+	if err := ValidatePort(id); err != nil {
 		return err
 	}
 	entry := make([]byte, portEntryLen)

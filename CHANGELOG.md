@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.0
+
+- Plan-time validation of every argument (ranges, enums, rate steps, hostname rules, cross-field storm/mirror/QoS rules); documentation examples are validated by make validate-examples and in CI; internal cleanup (named protocol layouts, per-consumer client interfaces, shared Create/Update and import helpers).
+
 ## 0.23.0
 
 - Test coverage raised to 100% effective (2 documented main() statements excluded; make cover enforces the policy). Fixes a plugin crash when host, username or password are unknown at configure time: Configure now returns an error naming the attribute.

@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -52,11 +55,12 @@ func (r *stormLimitResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"the provider refuses to change a port that has a link up or is in a LAG; set `allow_disruptive = true` to override. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
 			"port": schema.Int64Attribute{Required: true, Description: "Port number (1-based).",
+				Validators:    []validator.Int64{validPortNumber()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
 			"unknown_unicast": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Limit unknown unicast traffic."},
 			"multicast":       schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Limit multicast traffic."},
 			"broadcast":       schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Limit broadcast traffic."},
-			"rate_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0),
+			"rate_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{rateKbps{}},
 				Description: "Rate in kbps (multiple of 64, 64..1000000) when a traffic type is selected, otherwise 0."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing a port that has a link up or is a LAG member. Defaults to false."),
 		},
@@ -135,3 +139,15 @@ func (r *stormLimitResource) ImportState(ctx context.Context, req resource.Impor
 		resetAllowDisruptive(ctx, resp)
 	}
 }
+
+// ValidateConfig rejects, at plan time, a rate without a traffic type and a traffic type without a rate.
+func (r *stormLimitResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var m stormLimitModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	// Omitted attributes are null here and take their schema defaults (false, 0) at plan time.
+	if problem := stormProblem(defaultFalse(m.UnknownUnicast), defaultFalse(m.Multicast), defaultFalse(m.Broadcast), defaultZero(m.RateKbps)); problem != "" {
+		resp.Diagnostics.AddAttributeError(path.Root("rate_kbps"), "Invalid storm control configuration", problem)
+	}
+}
+
+var _ resource.ResourceWithValidateConfig = &stormLimitResource{}

@@ -17,7 +17,7 @@ import (
 
 func TestQoSResourceRejectsInvalidConfiguration(t *testing.T) {
 	cases := []struct{ name, cfg, want string }{
-		{"unknown mode", qosCfg("  mode = \"turbo\"\n"), `Invalid QoS mode`},
+		{"unknown mode", qosCfg("  mode = \"turbo\"\n"), `must be one of`},
 		{"priority key that is not a port", qosCfg("  mode = \"port-based\"\n  port_priorities = { \"seven\" = 2 }\n"), `Invalid port key`},
 		{"priorities outside port-based mode", qosCfg("  mode = \"802.1p\"\n  port_priorities = { \"7\" = 2 }\n"), `only take effect`},
 	}
@@ -95,7 +95,7 @@ func TestLAGResourceSpecifics(t *testing.T) {
 		inner := newFake()
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),
-			Steps:                    []tfresource.TestStep{{Config: lagConfig(2, "  ports = []\n"), ExpectError: regexp.MustCompile(`needs at least one member`)}},
+			Steps:                    []tfresource.TestStep{{Config: lagConfig(2, "  ports = []\n"), ExpectError: regexp.MustCompile(`at least 1`)}},
 		})
 		if inner.sets != 0 {
 			t.Fatal("nothing may be written")
@@ -193,7 +193,7 @@ func TestVLANGroupResourceSpecifics(t *testing.T) {
 		inner := newFake()
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),
-			Steps:                    []tfresource.TestStep{{Config: vlanGroupConfig(2, "  ports = []\n"), ExpectError: regexp.MustCompile(`needs at least one member`)}},
+			Steps:                    []tfresource.TestStep{{Config: vlanGroupConfig(2, "  ports = []\n"), ExpectError: regexp.MustCompile(`at least 1`)}},
 		})
 		if inner.sets != 0 {
 			t.Fatal("nothing may be written")

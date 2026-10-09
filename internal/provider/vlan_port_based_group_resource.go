@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
@@ -52,8 +55,9 @@ func (r *portVLANResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"management access; set `allow_disruptive = true` to override. Import VLAN 1 (the default group) only together with `lifecycle { prevent_destroy = true }`.",
 		Attributes: map[string]schema.Attribute{
 			"vlan": schema.Int64Attribute{Required: true, Description: "VLAN group id.",
+				Validators:    []validator.Int64{validByteID()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
-			"ports":             schema.SetAttribute{Required: true, ElementType: types.Int64Type, Description: "Member ports (at least one)."},
+			"ports":             schema.SetAttribute{Required: true, ElementType: types.Int64Type, Validators: []validator.Set{validPortSet(), setvalidator.SizeAtLeast(1)}, Description: "Member ports (at least one)."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow touching ports that have a link up or belong to a LAG. Defaults to false."),
 		},
 	}

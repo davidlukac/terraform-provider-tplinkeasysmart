@@ -61,7 +61,7 @@ func (c *Client) PortMirror(ctx context.Context) (Mirror, error) {
 func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
 	v := make([]byte, mirrorEntryLen)
 	if m.Enabled {
-		if err := validatePort(m.MirrorPort); err != nil {
+		if err := ValidatePort(m.MirrorPort); err != nil {
 			return err
 		}
 		if len(m.IngressPorts)+len(m.EgressPorts) == 0 {

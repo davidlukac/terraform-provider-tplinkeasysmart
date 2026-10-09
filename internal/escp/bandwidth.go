@@ -92,7 +92,7 @@ func bandwidthTLV(typ int16, port, kbps int) (TLV, error) {
 // ingress first, then egress. A limit on a port that carries traffic throttles
 // it; callers must guard against that.
 func (c *Client) SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps int) error {
-	if err := validatePort(port); err != nil {
+	if err := ValidatePort(port); err != nil {
 		return err
 	}
 	in, err := bandwidthTLV(TLVBandwidthIngress, port, ingressKbps)

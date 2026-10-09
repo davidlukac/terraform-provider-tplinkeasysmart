@@ -51,7 +51,10 @@ func (c *Client) System(ctx context.Context) (System, error) {
 	return parseSystem(ports, auto)
 }
 
-var hostnameRE = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$`)
+// HostnamePattern is the regular expression a device description must match (besides the length limit).
+const HostnamePattern = `^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$`
+
+var hostnameRE = regexp.MustCompile(HostnamePattern)
 
 // ValidateHostname applies the web UI's rules for the device description.
 func ValidateHostname(name string) error {
