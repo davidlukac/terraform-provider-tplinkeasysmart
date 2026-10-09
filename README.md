@@ -50,7 +50,7 @@ provider "tplinkeasysmart" {
 ## Constraints (read these)
 
 - **Same layer-2 network only.** ESCP is UDP broadcast based; run Terraform on a host in the switch's subnet.
-- **One switch per Terraform process.** The switch always replies to UDP port 29809, so the provider binds that port. Close the vendor Easy Smart utility first, and don't use several `tplinkeasysmart` provider aliases in one run.
+- **Several switches are supported** through provider aliases (one `provider "tplinkeasysmart" { alias = ... }` per switch): the switch broadcasts every reply to UDP port 29809, and the provider binds that port with address/port sharing, so each client keeps the replies from its own switch address. Verified with two switches and two processes at once. Limits: don't run two clients against the *same* switch at once (they would compete for it and could mix up replies), and an old client that binds the port exclusively (for example an old Easy Smart utility) blocks the provider until it is closed.
 - **No real security on the wire.** The protocol's encryption keys are public or trivially breakable (see the protocol doc). Keep the switches on a trusted management network.
 - Only tested on TL-SG108E v6, firmware 20230218. Newer firmware (20250710) and other models are untried.
 

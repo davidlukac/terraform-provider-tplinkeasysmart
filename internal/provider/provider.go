@@ -55,8 +55,8 @@ func (p *tplinkProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages TP-Link Easy Smart switches (TL-SG108E v6) over their native UDP management protocol. " +
-			"The provider must run on the same layer-2 network as the switch, and only one switch per Terraform run is supported " +
-			"(the switch always replies to UDP port 29809).",
+			"The provider must run on the same layer-2 network as the switch. Use one provider alias per switch; " +
+			"do not run two clients against the same switch at once.",
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
 				Optional:    true,

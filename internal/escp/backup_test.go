@@ -78,13 +78,22 @@ func TestConfigBackupNoReply(t *testing.T) {
 	}
 }
 
+// The key exchange completes at once; the backup request is then left
+// unanswered until the context expires, which must end the call with the
+// context's error instead of retrying for the full per-attempt timeout.
 func TestConfigBackupHonoursContext(t *testing.T) {
 	f := startFakeSwitch(t)
 	f.setBackupMode("silent")
-	c := dialFake(t, f, "secret")
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 10 * time.Second,
+		SwitchPort: f.port(), BroadcastAddr: "127.0.0.1"})
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
 	defer cancel()
-	if _, err := c.ConfigBackup(ctx); err == nil {
-		t.Fatal("expected an error when the context expires")
+	start := time.Now()
+	_, err := c.ConfigBackup(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("want context.DeadlineExceeded, got %v", err)
+	}
+	if took := time.Since(start); took > 5*time.Second {
+		t.Fatalf("the call ignored the context deadline and took %v", took)
 	}
 }
