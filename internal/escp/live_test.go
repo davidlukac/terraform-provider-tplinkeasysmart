@@ -5,6 +5,7 @@ package escp
 import (
 	"context"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -144,4 +145,61 @@ func TestLivePortWrites(t *testing.T) {
 			t.Fatalf("step %+v not applied: %+v", step, got)
 		}
 	}
+}
+
+func TestLiveQoS(t *testing.T) {
+	const id = 7
+	c, ctx := liveClient(t), context.Background()
+	livePort(t, c, id) // abort unless port 7 is unused
+	orig, err := c.QoS(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var origPrio int
+	for _, p := range orig.Priorities {
+		if p.Port == id {
+			origPrio = p.Priority
+		}
+	}
+	defer func() {
+		if err := c.SetPortPriorities(ctx, map[int]int{id: origPrio}); err != nil {
+			t.Errorf("RESTORE FAILED: %v", err)
+		}
+		if err := c.SetQoSMode(ctx, orig.Mode); err != nil {
+			t.Errorf("RESTORE MODE FAILED: %v", err)
+		}
+		if now, _ := c.QoS(ctx); !reflect.DeepEqual(now, orig) {
+			t.Errorf("not restored: %+v vs %+v", now, orig)
+		}
+	}()
+	if err := c.SetQoSMode(ctx, orig.Mode); err != nil { // same-value
+		t.Fatalf("same-value mode write rejected: %v", err)
+	}
+	// Per-port priorities only take effect in port-based mode (0). With every
+	// port at priority 1 that is equivalent to the current traffic handling.
+	if err := c.SetQoSMode(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	want := origPrio%4 + 1
+	if err := c.SetPortPriorities(ctx, map[int]int{id: want}); err != nil {
+		t.Fatal(err)
+	}
+	now, _ := c.QoS(ctx)
+	for _, p := range now.Priorities {
+		switch {
+		case p.Port == id && p.Priority != want:
+			t.Fatalf("port %d priority %d, want %d", id, p.Priority, want)
+		case p.Port != id && p.Priority != priorityOf(orig, p.Port):
+			t.Fatalf("port %d changed unexpectedly: %d", p.Port, p.Priority)
+		}
+	}
+}
+
+func priorityOf(q QoS, port int) int {
+	for _, p := range q.Priorities {
+		if p.Port == port {
+			return p.Priority
+		}
+	}
+	return -1
 }
