@@ -60,3 +60,18 @@ func (c *Client) PortBasedVLAN(ctx context.Context) (PortBasedVLAN, error) {
 	}
 	return parsePortBasedVLAN(tlvs)
 }
+
+// SetPortBasedVLAN creates or replaces a port-based VLAN group: TLV 8449 with
+// the VLAN id (1 byte) and the member port mask. An empty port list removes
+// the group. The mode itself (enabled/disabled) is not touched. Changing a
+// group whose ports carry traffic can cut connectivity; callers must guard.
+func (c *Client) SetPortBasedVLAN(ctx context.Context, id int, ports []int) error {
+	if id < 1 || id > 255 {
+		return fmt.Errorf("escp: invalid port-based VLAN id %d", id)
+	}
+	mask, err := maskFromPorts(ports)
+	if err != nil {
+		return err
+	}
+	return c.setTLVs(ctx, TLV{TLVVLANPortBasedVID, append([]byte{byte(id)}, mask...)})
+}

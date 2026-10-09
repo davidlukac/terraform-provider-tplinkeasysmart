@@ -25,6 +25,7 @@ type SwitchClient interface {
 	SetPortMirror(ctx context.Context, m escp.Mirror) error
 	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
+	SetPortBasedVLAN(ctx context.Context, id int, ports []int) error
 	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
 	QoS(ctx context.Context) (escp.QoS, error)
 	SetQoSMode(ctx context.Context, mode int) error

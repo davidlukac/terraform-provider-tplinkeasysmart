@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0
+
+- Resource tplinkeasysmart_vlan_port_based_group (port-based VLAN groups; mode stays read-only) with the port-in-use guard.
+
 ## 0.20.0
 
 - Resource tplinkeasysmart_lag (link aggregation groups) with a guard on old and new member ports; LAG1 imported with prevent_destroy.
