@@ -79,3 +79,7 @@ Common tasks: `make generate` (docs), `make lint`, `make test`, `make testacc`, 
 
 - `internal/escp`: crypto (static RC4, 8-byte-state session RC4, 64-bit RSA), packet codec, UDP client (discovery, key exchange, LED get/set, retry, session recovery).
 - `internal/provider`: provider, `tplinkeasysmart_led`, `tplinkeasysmart_system_info`. Resources talk to the `SwitchClient` interface so a different transport (or the web UI) can be plugged in later.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
