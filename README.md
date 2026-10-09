@@ -6,10 +6,26 @@ Terraform provider for TP-Link **Easy Smart** switches, driving the switch throu
 
 ## Resources and data sources
 
-| Name | What it does |
-|---|---|
-| `tplinkeasysmart_led` | The port LEDs (System > LED On/Off). `enabled` (bool). Import id: `led`. Destroy only forgets it. |
-| `data.tplinkeasysmart_system_info` | Model, hostname, MAC, firmware, hardware, IP settings via unauthenticated discovery. Doubles as connectivity check. |
+Writable resources are limited to settings that cannot cut management access. Everything else is read-only on purpose (see `../CLAUDE.md`). Every read was checked against the web UI on switch 01.
+
+| Name | Kind | Web UI page | Notes |
+|---|---|---|---|
+| `tplinkeasysmart_led` | resource | System > LED On/Off | `enabled`. Import id `led`. |
+| `tplinkeasysmart_igmp_snooping` | resource | Switching > IGMP Snooping | `enabled`, `report_message_suppression`, computed `multicast_groups`. Import id `igmp_snooping`. |
+| `tplinkeasysmart_loop_prevention` | resource | Monitoring > Loop Prevention | `enabled`. Import id `loop_prevention`. |
+| `data.tplinkeasysmart_system_info` | data | System > System Info / IP Setting | model, hostname, MAC, firmware, hardware, IP/mask/gateway, DHCP, port count, auto-save, factory flag |
+| `data.tplinkeasysmart_ports` | data | Switching > Port Setting | state, LAG, configured/actual speed, flow control |
+| `data.tplinkeasysmart_port_statistics` | data | Monitoring > Port Statistics | traffic counters |
+| `data.tplinkeasysmart_lags` | data | Switching > Port Trunk | LAG groups and members |
+| `data.tplinkeasysmart_port_mirror` | data | Monitoring > Port Mirror | mirroring config |
+| `data.tplinkeasysmart_vlan_mtu` | data | VLAN > MTU VLAN | mode and uplink port |
+| `data.tplinkeasysmart_vlan_port_based` | data | VLAN > Port Based VLAN | mode and groups |
+| `data.tplinkeasysmart_vlan_8021q` | data | VLAN > 802.1Q VLAN / PVID | mode, VLAN table, PVIDs |
+| `data.tplinkeasysmart_qos` | data | QoS > QoS Basic | mode and port priorities |
+| `data.tplinkeasysmart_bandwidth_control` | data | QoS > Bandwidth Control | ingress/egress limits |
+| `data.tplinkeasysmart_storm_control` | data | QoS > Storm Control | per-port storm control |
+
+Not covered (deliberately): user account, IP setting writes, config backup/restore, reboot, factory reset, firmware upgrade, cable diagnostics (the test can briefly drop a link).
 
 ## Provider configuration
 

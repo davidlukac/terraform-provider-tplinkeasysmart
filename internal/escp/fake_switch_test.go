@@ -127,7 +127,7 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 			{TLVMAC, []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}, {TLVIP, []byte{127, 0, 0, 1}},
 			{TLVNetmask, []byte{255, 255, 255, 0}}, {TLVGateway, []byte{127, 0, 0, 254}},
 			{TLVFirmware, []byte("1.0.0 Build 20230218 Rel.50633\x00")}, {TLVHardware, []byte("TL-SG108E 6.0\x00")},
-			{TLVDHCP, []byte{1}},
+			{TLVDHCP, []byte{1}}, {TLVFactoryDefault, []byte{1}},
 		}, false)
 	case OpSet:
 		if v, ok := find(TLVRSAKey); ok {
