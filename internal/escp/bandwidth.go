@@ -61,3 +61,41 @@ func (c *Client) Bandwidth(ctx context.Context) ([]PortBandwidth, error) {
 	}
 	return parseBandwidth(append(in, eg...))
 }
+
+// MaxBandwidthKbps is the largest limit the web UI offers.
+const MaxBandwidthKbps = 1000000
+
+func bandwidthTLV(typ int16, port, kbps int) (TLV, error) {
+	if kbps < 0 || kbps > MaxBandwidthKbps || kbps%64 != 0 {
+		return TLV{}, fmt.Errorf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of 64 up to %d", kbps, port, MaxBandwidthKbps)
+	}
+	v := make([]byte, 6)
+	v[0] = byte(port)
+	if kbps != 0 {
+		v[1] = 1
+	}
+	binary.BigEndian.PutUint32(v[2:], uint32(kbps))
+	return TLV{typ, v}, nil
+}
+
+// SetBandwidth sets a port's ingress and egress limits in kbps (0 = unlimited,
+// otherwise a multiple of 64). Like the vendor utility it sends two requests,
+// ingress first, then egress. A limit on a port that carries traffic throttles
+// it; callers must guard against that.
+func (c *Client) SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps int) error {
+	if port < 1 || port > 32 {
+		return fmt.Errorf("escp: invalid port %d", port)
+	}
+	in, err := bandwidthTLV(TLVBandwidthIngress, port, ingressKbps)
+	if err != nil {
+		return err
+	}
+	eg, err := bandwidthTLV(TLVBandwidthEgress, port, egressKbps)
+	if err != nil {
+		return err
+	}
+	if err := c.setTLVs(ctx, in); err != nil {
+		return err
+	}
+	return c.setTLVs(ctx, eg)
+}

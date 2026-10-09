@@ -203,3 +203,52 @@ func priorityOf(q QoS, port int) int {
 	}
 	return -1
 }
+
+func bandwidthOf(t *testing.T, c *Client, port int) PortBandwidth {
+	t.Helper()
+	rows, err := c.Bandwidth(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range rows {
+		if r.Port == port {
+			return r
+		}
+	}
+	t.Fatalf("port %d missing", port)
+	return PortBandwidth{}
+}
+
+func TestLiveBandwidth(t *testing.T) {
+	const id = 7
+	c, ctx := liveClient(t), context.Background()
+	livePort(t, c, id) // abort unless port 7 is unused
+	orig := bandwidthOf(t, c, id)
+	defer func() {
+		if err := c.SetBandwidth(ctx, id, orig.IngressKbps, orig.EgressKbps); err != nil {
+			t.Errorf("RESTORE FAILED: %v", err)
+		}
+		if now := bandwidthOf(t, c, id); now != orig {
+			t.Errorf("not restored: %+v vs %+v", now, orig)
+		}
+	}()
+	if err := c.SetBandwidth(ctx, id, 1024, 2048); err != nil {
+		t.Fatal(err)
+	}
+	if got := bandwidthOf(t, c, id); got.IngressKbps != 1024 || got.EgressKbps != 2048 {
+		t.Fatalf("limits not applied: %+v", got)
+	}
+	for _, r := range mustBandwidth(t, c) {
+		if r.Port != id && (r.IngressKbps != 0 || r.EgressKbps != 0) {
+			t.Fatalf("port %d was affected: %+v", r.Port, r)
+		}
+	}
+}
+
+func mustBandwidth(t *testing.T, c *Client) []PortBandwidth {
+	rows, err := c.Bandwidth(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rows
+}

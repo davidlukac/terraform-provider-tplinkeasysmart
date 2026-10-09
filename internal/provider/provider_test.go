@@ -18,6 +18,7 @@ import (
 type fakeClient struct {
 	mu      sync.Mutex
 	igmp    escp.IGMP
+	bw      map[int][2]int
 	qos     *escp.QoS
 	ports   []escp.Port
 	loop    bool
@@ -142,7 +143,30 @@ func (f *fakeClient) QoS(context.Context) (escp.QoS, error) {
 	return escp.QoS{Mode: 2, ModeName: "dscp-802.1p", Priorities: []escp.PortPriority{{Port: 1, Priority: 1}, {Port: 2, Priority: 4}}}, nil
 }
 
+func (f *fakeClient) SetBandwidth(_ context.Context, port, in, eg int) error {
+	if in%64 != 0 || eg%64 != 0 {
+		return fmt.Errorf("invalid rate: use 0 or a multiple of 64")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.bw == nil {
+		f.bw = map[int][2]int{}
+	}
+	f.bw[port] = [2]int{in, eg}
+	f.sets++
+	return nil
+}
+
 func (f *fakeClient) Bandwidth(context.Context) ([]escp.PortBandwidth, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.bw != nil {
+		var rows []escp.PortBandwidth
+		for _, p := range []int{1, 4, 7} {
+			rows = append(rows, escp.PortBandwidth{Port: p, IngressKbps: f.bw[p][0], EgressKbps: f.bw[p][1]})
+		}
+		return rows, nil
+	}
 	return []escp.PortBandwidth{{Port: 1}, {Port: 2, IngressKbps: 4096, EgressKbps: 8192}}, nil
 }
 
@@ -590,5 +614,47 @@ func TestAccQoSResourceRejectsPrioritiesOutsidePortBased(t *testing.T) {
 	})
 	if f.qos.Mode != 2 {
 		t.Fatal("nothing may be written when the configuration is rejected")
+	}
+}
+
+func bwConfig(port int, body string) string {
+	return providerBlock + fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"b\" {\n  port = %d\n%s}\n", port, body)
+}
+
+func TestAccBandwidthLimitLifecycle(t *testing.T) {
+	f := &fakeClient{ports: testPorts(), bw: map[int][2]int{}}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: bwConfig(7, "  ingress_kbps = 1024\n"), Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("tplinkeasysmart_bandwidth_limit.b", "ingress_kbps", "1024"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_bandwidth_limit.b", "egress_kbps", "0"),
+			)},
+			{Config: bwConfig(7, "  ingress_kbps = 0\n  egress_kbps = 64\n"), Check: func(*terraformState) error {
+				f.mu.Lock()
+				defer f.mu.Unlock()
+				if f.bw[7] != [2]int{0, 64} {
+					return fmt.Errorf("switch has %v", f.bw[7])
+				}
+				return nil
+			}},
+			{ResourceName: "tplinkeasysmart_bandwidth_limit.b", ImportState: true, ImportStateId: "7", ImportStateVerify: true,
+				ImportStateVerifyIdentifierAttribute: "port"},
+		},
+	})
+}
+
+func TestAccBandwidthLimitGuardAndValidation(t *testing.T) {
+	f := &fakeClient{ports: testPorts(), bw: map[int][2]int{}}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: bwConfig(4, "  ingress_kbps = 1024\n"), ExpectError: regexp.MustCompile(`has a link up`)},
+			{Config: bwConfig(1, "  egress_kbps = 1024\n"), ExpectError: regexp.MustCompile(`member of LAG1`)},
+			{Config: bwConfig(7, "  ingress_kbps = 100\n"), ExpectError: regexp.MustCompile(`multiple of 64`)},
+		},
+	})
+	if f.sets != 0 {
+		t.Fatalf("no write may happen for blocked or invalid requests, got %d", f.sets)
 	}
 }
