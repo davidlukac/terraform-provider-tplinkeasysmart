@@ -25,4 +25,5 @@ type SwitchClient interface {
 	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
 	QoS(ctx context.Context) (escp.QoS, error)
 	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
+	StormControl(ctx context.Context) ([]escp.PortStorm, error)
 }
