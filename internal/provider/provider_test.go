@@ -95,6 +95,10 @@ func (f *fakeClient) QoS(context.Context) (escp.QoS, error) {
 	return escp.QoS{Mode: 2, ModeName: "dscp-802.1p", Priorities: []escp.PortPriority{{Port: 1, Priority: 1}, {Port: 2, Priority: 4}}}, nil
 }
 
+func (f *fakeClient) Bandwidth(context.Context) ([]escp.PortBandwidth, error) {
+	return []escp.PortBandwidth{{Port: 1}, {Port: 2, IngressKbps: 4096, EgressKbps: 8192}}, nil
+}
+
 func (f *fakeClient) GetLED(context.Context) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -383,6 +387,19 @@ func TestAccQoSDataSource(t *testing.T) {
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_qos.this", "mode", "2"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_qos.this", "mode_name", "dscp-802.1p"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_qos.this", "port_priorities.1.priority", "4"),
+			),
+		}},
+	})
+}
+
+func TestAccBandwidthControlDataSource(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(&fakeClient{}),
+		Steps: []resource.TestStep{{
+			Config: providerBlock + `data "tplinkeasysmart_bandwidth_control" "this" {}`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_bandwidth_control.this", "ports.0.ingress_kbps", "0"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_bandwidth_control.this", "ports.1.egress_kbps", "8192"),
 			),
 		}},
 	})

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0
+
+- Data source tplinkeasysmart_bandwidth_control (per-port ingress/egress limits; read-only).
+
 ## 0.11.0
 
 - Data source tplinkeasysmart_qos (mode and per-port priorities; read-only).
