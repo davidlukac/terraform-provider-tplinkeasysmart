@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -23,7 +22,13 @@ var (
 // NewLoopPreventionResource returns the tplinkeasysmart_loop_prevention resource.
 func NewLoopPreventionResource() resource.Resource { return &loopPreventionResource{} }
 
-type loopPreventionResource struct{ client SwitchClient }
+type loopPreventionResource struct{ client loopPreventionClient }
+
+// loopPreventionClient is the part of the switch API this resource needs.
+type loopPreventionClient interface {
+	LoopPrevention(ctx context.Context) (bool, error)
+	SetLoopPrevention(ctx context.Context, on bool) error
+}
 
 type loopPreventionModel struct {
 	ID      types.String `tfsdk:"id"`
@@ -47,7 +52,7 @@ func (r *loopPreventionResource) Schema(_ context.Context, _ resource.SchemaRequ
 }
 
 func (r *loopPreventionResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	r.client = clientFrom[loopPreventionClient](req.ProviderData, &resp.Diagnostics)
 }
 
 func (r *loopPreventionResource) apply(ctx context.Context, plan *loopPreventionModel, add func(string, string)) bool {
@@ -70,19 +75,11 @@ func (r *loopPreventionResource) apply(ctx context.Context, plan *loopPrevention
 }
 
 func (r *loopPreventionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan loopPreventionModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *loopPreventionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan loopPreventionModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *loopPreventionResource) Read(ctx context.Context, _ resource.ReadRequest, resp *resource.ReadResponse) {
@@ -99,9 +96,5 @@ func (r *loopPreventionResource) Delete(context.Context, resource.DeleteRequest,
 }
 
 func (r *loopPreventionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	if req.ID != loopPreventionID {
-		resp.Diagnostics.AddError("Invalid import id", fmt.Sprintf("the only valid id is %q, got %q", loopPreventionID, req.ID))
-		return
-	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), loopPreventionID)...)
+	importSingletonID(ctx, req, resp, loopPreventionID)
 }

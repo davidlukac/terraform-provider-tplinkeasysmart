@@ -19,7 +19,12 @@ var (
 // NewConfigBackupDataSource returns the tplinkeasysmart_config_backup data source.
 func NewConfigBackupDataSource() datasource.DataSource { return &configBackupDataSource{} }
 
-type configBackupDataSource struct{ client SwitchClient }
+type configBackupDataSource struct{ client configBackupReader }
+
+// configBackupReader is the part of the switch API this data source reads.
+type configBackupReader interface {
+	ConfigBackup(ctx context.Context) ([]byte, error)
+}
 
 type configBackupModel struct {
 	ID             types.String `tfsdk:"id"`
@@ -49,7 +54,7 @@ func (d *configBackupDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 }
 
 func (d *configBackupDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	d.client = clientFrom[configBackupReader](req.ProviderData, &resp.Diagnostics)
 }
 
 func (d *configBackupDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

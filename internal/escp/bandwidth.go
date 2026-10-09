@@ -26,10 +26,10 @@ func parseBandwidth(tlvs []TLV) ([]PortBandwidth, error) {
 		if t.Type != TLVBandwidthIngress && t.Type != TLVBandwidthEgress {
 			continue
 		}
-		if len(t.Value) != 6 {
-			return nil, fmt.Errorf("escp: bandwidth entry has %d bytes, want 6", len(t.Value))
+		if len(t.Value) != bwEntryLen {
+			return nil, fmt.Errorf("escp: bandwidth entry has %d bytes, want %d", len(t.Value), bwEntryLen)
 		}
-		port, rate := int(t.Value[0]), int(binary.BigEndian.Uint32(t.Value[2:]))
+		port, rate := int(t.Value[bwOffPort]), int(binary.BigEndian.Uint32(t.Value[bwOffRate:]))
 		pb := byPort[port]
 		if pb == nil {
 			pb = &PortBandwidth{Port: port}
@@ -62,19 +62,28 @@ func (c *Client) Bandwidth(ctx context.Context) ([]PortBandwidth, error) {
 	return parseBandwidth(append(in, eg...))
 }
 
+// Layout of a bandwidth entry (TLVs 12544/12545): port (1 byte), enabled flag
+// (1 byte), rate in kbps (4 bytes).
+const (
+	bwOffPort    = 0
+	bwOffEnabled = 1
+	bwOffRate    = 2
+	bwEntryLen   = bwOffRate + 4
+)
+
 // MaxBandwidthKbps is the largest limit the web UI offers.
 const MaxBandwidthKbps = 1000000
 
 func bandwidthTLV(typ int16, port, kbps int) (TLV, error) {
-	if kbps < 0 || kbps > MaxBandwidthKbps || kbps%64 != 0 {
-		return TLV{}, fmt.Errorf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of 64 up to %d", kbps, port, MaxBandwidthKbps)
+	if !validateRateKbps(kbps) {
+		return TLV{}, fmt.Errorf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", kbps, port, RateStepKbps, MaxBandwidthKbps)
 	}
-	v := make([]byte, 6)
-	v[0] = byte(port)
+	v := make([]byte, bwEntryLen)
+	v[bwOffPort] = byte(port)
 	if kbps != 0 {
-		v[1] = 1
+		v[bwOffEnabled] = 1
 	}
-	binary.BigEndian.PutUint32(v[2:], uint32(kbps))
+	binary.BigEndian.PutUint32(v[bwOffRate:], uint32(kbps))
 	return TLV{typ, v}, nil
 }
 
@@ -83,8 +92,8 @@ func bandwidthTLV(typ int16, port, kbps int) (TLV, error) {
 // ingress first, then egress. A limit on a port that carries traffic throttles
 // it; callers must guard against that.
 func (c *Client) SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps int) error {
-	if port < 1 || port > 32 {
-		return fmt.Errorf("escp: invalid port %d", port)
+	if err := validatePort(port); err != nil {
+		return err
 	}
 	in, err := bandwidthTLV(TLVBandwidthIngress, port, ingressKbps)
 	if err != nil {

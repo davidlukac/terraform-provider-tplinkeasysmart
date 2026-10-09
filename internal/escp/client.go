@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+// maxDatagram is the receive buffer size; ESCP packets are well below it.
+const maxDatagram = 4096
+
 // randReader is the entropy source for session keys; tests replace it to
 // provoke the (otherwise unreachable) read failure.
 var randReader io.Reader = rand.Reader
@@ -198,7 +201,7 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 // recv reads packets until one is an acceptable reply to the current request
 // or the deadline passes.
 func (c *Client) recv(deadline time.Time) (reply, bool) {
-	buf := make([]byte, 4096)
+	buf := make([]byte, maxDatagram)
 	for time.Now().Before(deadline) {
 		_ = c.conn.SetReadDeadline(deadline)
 		n, from, err := c.conn.ReadFromUDP(buf)

@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -28,7 +26,13 @@ var (
 // NewIGMPSnoopingResource returns the tplinkeasysmart_igmp_snooping resource.
 func NewIGMPSnoopingResource() resource.Resource { return &igmpResource{} }
 
-type igmpResource struct{ client SwitchClient }
+type igmpResource struct{ client igmpClient }
+
+// igmpClient is the part of the switch API this resource needs.
+type igmpClient interface {
+	IGMP(ctx context.Context) (escp.IGMP, error)
+	SetIGMP(ctx context.Context, enabled, suppression bool) error
+}
 
 type igmpModel struct {
 	ID                types.String `tfsdk:"id"`
@@ -62,7 +66,7 @@ func (r *igmpResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 }
 
 func (r *igmpResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	r.client = clientFrom[igmpClient](req.ProviderData, &resp.Diagnostics)
 }
 
 var igmpGroupType = types.ObjectType{AttrTypes: map[string]attr.Type{
@@ -88,45 +92,32 @@ func igmpToModel(s escp.IGMP) igmpModel {
 		ReportSuppression: types.BoolValue(s.ReportSuppression), Groups: types.ListValueMust(igmpGroupType, groups)}
 }
 
-func (r *igmpResource) write(ctx context.Context, plan igmpModel, diags *diag.Diagnostics) (igmpModel, bool) {
+func (r *igmpResource) apply(ctx context.Context, plan *igmpModel, add func(string, string)) bool {
 	want := escp.IGMP{Enabled: plan.Enabled.ValueBool(), ReportSuppression: plan.ReportSuppression.ValueBool()}
 	if err := r.client.SetIGMP(ctx, want.Enabled, want.ReportSuppression); err != nil {
-		diags.AddError("Setting IGMP snooping failed", err.Error())
-		return igmpModel{}, false
+		add("Setting IGMP snooping failed", err.Error())
+		return false
 	}
 	got, err := r.client.IGMP(ctx)
 	if err != nil {
-		diags.AddError("Reading IGMP snooping back failed", err.Error())
-		return igmpModel{}, false
+		add("Reading IGMP snooping back failed", err.Error())
+		return false
 	}
 	if got.Enabled != want.Enabled || got.ReportSuppression != want.ReportSuppression {
-		diags.AddError("IGMP snooping did not change", fmt.Sprintf("requested enabled=%t suppression=%t, switch reports enabled=%t suppression=%t",
+		add("IGMP snooping did not change", fmt.Sprintf("requested enabled=%t suppression=%t, switch reports enabled=%t suppression=%t",
 			want.Enabled, want.ReportSuppression, got.Enabled, got.ReportSuppression))
-		return igmpModel{}, false
+		return false
 	}
-	return igmpToModel(got), true
+	*plan = igmpToModel(got)
+	return true
 }
 
 func (r *igmpResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan igmpModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if m, ok := r.write(ctx, plan, &resp.Diagnostics); ok {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *igmpResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan igmpModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if m, ok := r.write(ctx, plan, &resp.Diagnostics); ok {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *igmpResource) Read(ctx context.Context, _ resource.ReadRequest, resp *resource.ReadResponse) {
@@ -142,9 +133,5 @@ func (r *igmpResource) Read(ctx context.Context, _ resource.ReadRequest, resp *r
 func (r *igmpResource) Delete(context.Context, resource.DeleteRequest, *resource.DeleteResponse) {}
 
 func (r *igmpResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	if req.ID != igmpID {
-		resp.Diagnostics.AddError("Invalid import id", fmt.Sprintf("the only valid id is %q, got %q", igmpID, req.ID))
-		return
-	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), igmpID)...)
+	importSingletonID(ctx, req, resp, igmpID)
 }

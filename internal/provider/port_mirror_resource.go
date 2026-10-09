@@ -6,10 +6,8 @@ import (
 	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
@@ -30,7 +28,14 @@ var (
 // NewPortMirrorResource returns the tplinkeasysmart_port_mirror resource.
 func NewPortMirrorResource() resource.Resource { return &portMirrorResource{} }
 
-type portMirrorResource struct{ client SwitchClient }
+type portMirrorResource struct{ client portMirrorClient }
+
+// portMirrorClient is the part of the switch API this resource needs.
+type portMirrorClient interface {
+	PortMirror(ctx context.Context) (escp.Mirror, error)
+	Ports(ctx context.Context) ([]escp.Port, error)
+	SetPortMirror(ctx context.Context, m escp.Mirror) error
+}
 
 type portMirrorResourceModel struct {
 	ID              types.String `tfsdk:"id"`
@@ -60,14 +65,13 @@ func (r *portMirrorResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Description: "Ports whose received traffic is mirrored."},
 			"egress_ports": schema.SetAttribute{Optional: true, Computed: true, ElementType: types.Int64Type, Default: setdefault.StaticValue(emptyPortSet()),
 				Description: "Ports whose transmitted traffic is mirrored."},
-			"allow_disruptive": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Allow a destination port that has a link up or is a LAG member. Defaults to false."},
+			attrAllowDisruptive: allowDisruptiveAttribute("Allow a destination port that has a link up or is a LAG member. Defaults to false."),
 		},
 	}
 }
 
 func (r *portMirrorResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	r.client = clientFrom[portMirrorClient](req.ProviderData, &resp.Diagnostics)
 }
 
 func setToInts(ctx context.Context, s types.Set) ([]int, error) {
@@ -121,25 +125,16 @@ func (r *portMirrorResource) apply(ctx context.Context, m *portMirrorResourceMod
 		add("Port mirror did not change as requested", fmt.Sprintf("requested %+v, switch reports %+v", want, got))
 		return false
 	}
+	m.ID = types.StringValue(portMirrorID)
 	return true
 }
 
 func (r *portMirrorResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan portMirrorResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		plan.ID = types.StringValue(portMirrorID)
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *portMirrorResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan portMirrorResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		plan.ID = types.StringValue(portMirrorID)
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *portMirrorResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -166,10 +161,7 @@ func (r *portMirrorResource) Delete(context.Context, resource.DeleteRequest, *re
 }
 
 func (r *portMirrorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	if req.ID != portMirrorID {
-		resp.Diagnostics.AddError("Invalid import id", fmt.Sprintf("the only valid id is %q, got %q", portMirrorID, req.ID))
-		return
+	if importSingletonID(ctx, req, resp, portMirrorID) {
+		resetAllowDisruptive(ctx, resp)
 	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), portMirrorID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("allow_disruptive"), false)...)
 }

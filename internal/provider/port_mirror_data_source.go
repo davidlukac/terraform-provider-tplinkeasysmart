@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,7 +18,12 @@ var (
 // NewPortMirrorDataSource returns the tplinkeasysmart_port_mirror data source.
 func NewPortMirrorDataSource() datasource.DataSource { return &portMirrorDataSource{} }
 
-type portMirrorDataSource struct{ client SwitchClient }
+type portMirrorDataSource struct{ client portMirrorReader }
+
+// portMirrorReader is the part of the switch API this data source reads.
+type portMirrorReader interface {
+	PortMirror(ctx context.Context) (escp.Mirror, error)
+}
 
 type portMirrorModel struct {
 	ID           types.String `tfsdk:"id"`
@@ -47,7 +54,7 @@ func (d *portMirrorDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 }
 
 func (d *portMirrorDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	d.client = clientFrom[portMirrorReader](req.ProviderData, &resp.Diagnostics)
 }
 
 func toInt64s(in []int) []int64 {

@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,7 +18,12 @@ var (
 // NewVLAN8021QDataSource returns the tplinkeasysmart_vlan_8021q data source.
 func NewVLAN8021QDataSource() datasource.DataSource { return &vlan8021QDataSource{} }
 
-type vlan8021QDataSource struct{ client SwitchClient }
+type vlan8021QDataSource struct{ client vlan8021QReader }
+
+// vlan8021QReader is the part of the switch API this data source reads.
+type vlan8021QReader interface {
+	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
+}
 
 type vlan8021QVLANModel struct {
 	ID       types.Int64  `tfsdk:"id"`
@@ -68,7 +75,7 @@ func (d *vlan8021QDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 }
 
 func (d *vlan8021QDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	d.client = clientFrom[vlan8021QReader](req.ProviderData, &resp.Diagnostics)
 }
 
 func (d *vlan8021QDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {

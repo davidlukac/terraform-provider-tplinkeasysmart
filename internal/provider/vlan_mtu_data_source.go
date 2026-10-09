@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,7 +18,12 @@ var (
 // NewVLANMTUDataSource returns the tplinkeasysmart_vlan_mtu data source.
 func NewVLANMTUDataSource() datasource.DataSource { return &vlanMTUDataSource{} }
 
-type vlanMTUDataSource struct{ client SwitchClient }
+type vlanMTUDataSource struct{ client vlanMTUReader }
+
+// vlanMTUReader is the part of the switch API this data source reads.
+type vlanMTUReader interface {
+	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
+}
 
 type vlanMTUModel struct {
 	ID         types.String `tfsdk:"id"`
@@ -40,7 +47,7 @@ func (d *vlanMTUDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 }
 
 func (d *vlanMTUDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	d.client = clientFrom[vlanMTUReader](req.ProviderData, &resp.Diagnostics)
 }
 
 func (d *vlanMTUDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {

@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,7 +18,12 @@ var (
 // NewLAGsDataSource returns the tplinkeasysmart_lags data source.
 func NewLAGsDataSource() datasource.DataSource { return &lagsDataSource{} }
 
-type lagsDataSource struct{ client SwitchClient }
+type lagsDataSource struct{ client lagsReader }
+
+// lagsReader is the part of the switch API this data source reads.
+type lagsReader interface {
+	LAGs(ctx context.Context) ([]escp.LAG, error)
+}
 
 type lagModel struct {
 	ID    types.Int64 `tfsdk:"id"`
@@ -47,7 +54,7 @@ func (d *lagsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 }
 
 func (d *lagsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	d.client = clientFrom[lagsReader](req.ProviderData, &resp.Diagnostics)
 }
 
 func (d *lagsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {

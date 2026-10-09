@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strconv"
 
-	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -24,7 +25,14 @@ var (
 // NewLAGResource returns the tplinkeasysmart_lag resource.
 func NewLAGResource() resource.Resource { return &lagResource{} }
 
-type lagResource struct{ client SwitchClient }
+type lagResource struct{ client lagClient }
+
+// lagClient is the part of the switch API this resource needs.
+type lagClient interface {
+	LAGs(ctx context.Context) ([]escp.LAG, error)
+	Ports(ctx context.Context) ([]escp.Port, error)
+	SetLAG(ctx context.Context, group int, ports []int) error
+}
 
 type lagResourceModel struct {
 	Group           types.Int64 `tfsdk:"group"`
@@ -45,15 +53,14 @@ func (r *lagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Attributes: map[string]schema.Attribute{
 			"group": schema.Int64Attribute{Required: true, Description: "Group number (1-based).",
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
-			"ports": schema.SetAttribute{Required: true, ElementType: types.Int64Type, Description: "Member ports."},
-			"allow_disruptive": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Allow touching ports that have a link up or belong to a LAG. Defaults to false."},
+			"ports":             schema.SetAttribute{Required: true, ElementType: types.Int64Type, Description: "Member ports."},
+			attrAllowDisruptive: allowDisruptiveAttribute("Allow touching ports that have a link up or belong to a LAG. Defaults to false."),
 		},
 	}
 }
 
 func (r *lagResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	r.client = clientFrom[lagClient](req.ProviderData, &resp.Diagnostics)
 }
 
 // guardLAG checks every port of the old and new membership. Ports that are
@@ -61,6 +68,7 @@ func (r *lagResource) Configure(_ context.Context, req resource.ConfigureRequest
 // accepted when allow_disruptive is set or they are about to be added.
 func (r *lagResource) guardLAG(ctx context.Context, group int, allow bool, old, new []int) error {
 	if allow {
+		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped")
 		return nil
 	}
 	all, err := r.client.Ports(ctx)
@@ -137,19 +145,11 @@ func (r *lagResource) apply(ctx context.Context, m *lagResourceModel, add func(s
 }
 
 func (r *lagResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan lagResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *lagResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan lagResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *lagResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -194,11 +194,7 @@ func (r *lagResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 }
 
 func (r *lagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	n, err := strconv.Atoi(req.ID)
-	if err != nil || n < 1 {
-		resp.Diagnostics.AddError("Invalid import id", fmt.Sprintf("expected a LAG group number, got %q", req.ID))
-		return
+	if importPositiveInt(ctx, req, resp, "a LAG group number", "group") {
+		resetAllowDisruptive(ctx, resp)
 	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("group"), int64(n))...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("allow_disruptive"), false)...)
 }

@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapdefault"
@@ -28,7 +27,14 @@ var (
 // NewQoSResource returns the tplinkeasysmart_qos resource.
 func NewQoSResource() resource.Resource { return &qosResource{} }
 
-type qosResource struct{ client SwitchClient }
+type qosResource struct{ client qosClient }
+
+// qosClient is the part of the switch API this resource needs.
+type qosClient interface {
+	QoS(ctx context.Context) (escp.QoS, error)
+	SetPortPriorities(ctx context.Context, changes map[int]int) error
+	SetQoSMode(ctx context.Context, mode int) error
+}
 
 type qosResourceModel struct {
 	ID         types.String `tfsdk:"id"`
@@ -57,7 +63,7 @@ func (r *qosResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 }
 
 func (r *qosResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	r.client = clientFrom[qosClient](req.ProviderData, &resp.Diagnostics)
 }
 
 func modeCode(name string) (int, bool) {
@@ -134,19 +140,11 @@ func (r *qosResource) apply(ctx context.Context, plan *qosResourceModel, add fun
 }
 
 func (r *qosResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan qosResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *qosResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan qosResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *qosResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -171,9 +169,5 @@ func (r *qosResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 func (r *qosResource) Delete(context.Context, resource.DeleteRequest, *resource.DeleteResponse) {}
 
 func (r *qosResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	if req.ID != qosID {
-		resp.Diagnostics.AddError("Invalid import id", fmt.Sprintf("the only valid id is %q, got %q", qosID, req.ID))
-		return
-	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), qosID)...)
+	importSingletonID(ctx, req, resp, qosID)
 }
