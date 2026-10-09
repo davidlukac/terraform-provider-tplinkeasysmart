@@ -1,0 +1,76 @@
+# NOTE: these workflows assume the provider is the ROOT of its own GitHub
+# repository (terraform-provider-tplinkeasysmart). They do nothing useful while
+# the provider lives in a subdirectory of the local-infra repository.
+# Actions are pinned to major versions; pinning to commit SHAs is a follow-up
+# (Dependabot below keeps the majors current).
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, lint and docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go build -v ./...
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+      # tfplugindocs needs the Terraform binary to read the provider schema.
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Generated docs are up to date
+        run: |
+          go generate ./...
+          git diff --compact-summary --exit-code || \
+            (echo "::error::docs/ is stale. Run 'make generate' and commit the result." && exit 1)
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test -race -count=1 -coverprofile=coverage.out ./...
+      - run: go tool cover -func=coverage.out | tail -1
+
+  # Full Terraform plan/apply/import/drift/destroy lifecycles against the in-memory
+  # fake switch (no hardware). Run against every supported Terraform version.
+  acceptance:
+    name: Terraform ${{ matrix.terraform }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        terraform: ["1.4.*", "1.8.*", "latest"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ matrix.terraform }}
+          terraform_wrapper: false
+      - run: go test -race -count=1 ./internal/provider/...
+        env:
+          TF_ACC: "1"

@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// TLVVLANMTU is VLAN > MTU VLAN: 2 bytes (enabled, uplink port).
 const TLVVLANMTU = 8192
 
 // MTUVLAN is VLAN > MTU VLAN: when enabled, every port is isolated from the

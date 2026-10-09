@@ -59,9 +59,9 @@ func (r *igmpResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Description: "Whether IGMP report message suppression is enabled. Defaults to false."},
 			"multicast_groups": schema.ListNestedAttribute{Computed: true, Description: "Multicast groups currently learned (read-only, changes at runtime).",
 				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
-					"ip":    schema.StringAttribute{Computed: true},
-					"vlan":  schema.Int64Attribute{Computed: true},
-					"ports": schema.ListAttribute{Computed: true, ElementType: types.Int64Type},
+					"ip":    schema.StringAttribute{Computed: true, Description: "Multicast group address."},
+					"vlan":  schema.Int64Attribute{Computed: true, Description: "VLAN the group was learned in."},
+					"ports": schema.ListAttribute{Computed: true, ElementType: types.Int64Type, Description: "Ports with subscribers."},
 				}}},
 		},
 	}

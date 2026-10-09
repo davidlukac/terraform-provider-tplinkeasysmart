@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// TLVMirror is Monitoring > Port Mirror: 10 bytes (enabled, destination port, ingress mask, egress mask).
 const TLVMirror = 16640
 
 // Mirror is Monitoring > Port Mirror.

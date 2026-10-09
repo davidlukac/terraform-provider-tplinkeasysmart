@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// TLVLoopPrevention is Monitoring > Loop Prevention: 1 byte, 1 = enabled.
 const TLVLoopPrevention = 17152
 
 // LoopPrevention reports Monitoring > Loop Prevention.

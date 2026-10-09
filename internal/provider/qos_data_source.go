@@ -44,8 +44,8 @@ func (d *qosDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 			"port_priorities": schema.ListNestedAttribute{Computed: true,
 				Description: "Priority queue per port, 1 (lowest) to 4 (highest) as in the web UI. Only effective in port-based mode.",
 				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
-					"port":     schema.Int64Attribute{Computed: true},
-					"priority": schema.Int64Attribute{Computed: true},
+					"port":     schema.Int64Attribute{Computed: true, Description: "Port number."},
+					"priority": schema.Int64Attribute{Computed: true, Description: "Priority queue, 1 (lowest) to 4 (highest)."},
 				}}},
 		},
 	}

@@ -48,6 +48,20 @@ func startFakeSwitch(t *testing.T) *fakeSwitch {
 	return f
 }
 
+// dropNthPacket makes the fake swallow the nth datagram it receives (1-based).
+func (f *fakeSwitch) dropNthPacket(n int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.dropNth = n
+}
+
+// goSilent makes the fake swallow every datagram, as if the switch were gone.
+func (f *fakeSwitch) goSilent() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.mute = true
+}
+
 func (f *fakeSwitch) port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
 
 func (f *fakeSwitch) allSets() [][]TLV {

@@ -1,0 +1,1 @@
+terraform import tplinkeasysmart_igmp_snooping.this igmp_snooping
