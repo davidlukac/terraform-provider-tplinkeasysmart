@@ -6,26 +6,33 @@ Terraform provider for TP-Link **Easy Smart** switches, driving the switch throu
 
 ## Resources and data sources
 
-Writable resources are limited to settings that cannot cut management access. Everything else is read-only on purpose (see `../CLAUDE.md`). Every read was checked against the web UI on switch 01.
+Write support exists only where it cannot cut management access, and per-port or per-group writes are **guarded**: the provider refuses to touch a port that has a link up or belongs to a LAG unless `allow_disruptive = true` is set (see `../CLAUDE.md`). Every write path was verified on switch 01 using only unused ports (6, 7) and always restored. Nothing above the unused ports (router LAG on 1+2, switch 02 and the workstation on 4/8) was written.
 
-| Name | Kind | Web UI page | Notes |
+| Name | Kind | Web UI page | Guard |
 |---|---|---|---|
-| `tplinkeasysmart_led` | resource | System > LED On/Off | `enabled`. Import id `led`. |
-| `tplinkeasysmart_igmp_snooping` | resource | Switching > IGMP Snooping | `enabled`, `report_message_suppression`, computed `multicast_groups`. Import id `igmp_snooping`. |
-| `tplinkeasysmart_loop_prevention` | resource | Monitoring > Loop Prevention | `enabled`. Import id `loop_prevention`. |
-| `data.tplinkeasysmart_system_info` | data | System > System Info / IP Setting | model, hostname, MAC, firmware, hardware, IP/mask/gateway, DHCP, port count, auto-save, factory flag |
-| `data.tplinkeasysmart_ports` | data | Switching > Port Setting | state, LAG, configured/actual speed, flow control |
-| `data.tplinkeasysmart_port_statistics` | data | Monitoring > Port Statistics | traffic counters |
-| `data.tplinkeasysmart_lags` | data | Switching > Port Trunk | LAG groups and members |
-| `data.tplinkeasysmart_port_mirror` | data | Monitoring > Port Mirror | mirroring config |
-| `data.tplinkeasysmart_vlan_mtu` | data | VLAN > MTU VLAN | mode and uplink port |
-| `data.tplinkeasysmart_vlan_port_based` | data | VLAN > Port Based VLAN | mode and groups |
-| `data.tplinkeasysmart_vlan_8021q` | data | VLAN > 802.1Q VLAN / PVID | mode, VLAN table, PVIDs |
-| `data.tplinkeasysmart_qos` | data | QoS > QoS Basic | mode and port priorities |
-| `data.tplinkeasysmart_bandwidth_control` | data | QoS > Bandwidth Control | ingress/egress limits |
-| `data.tplinkeasysmart_storm_control` | data | QoS > Storm Control | per-port storm control |
+| `tplinkeasysmart_led` | resource | System > LED On/Off | none needed |
+| `tplinkeasysmart_igmp_snooping` | resource | Switching > IGMP Snooping | none; real toggle verified |
+| `tplinkeasysmart_loop_prevention` | resource | Monitoring > Loop Prevention | none; real toggle verified |
+| `tplinkeasysmart_qos` | resource | QoS > QoS Basic | none; priorities only in port-based mode |
+| `tplinkeasysmart_port` | resource | Switching > Port Setting | port in use / LAG member |
+| `tplinkeasysmart_bandwidth_limit` | resource | QoS > Bandwidth Control | port in use / LAG member |
+| `tplinkeasysmart_storm_limit` | resource | QoS > Storm Control | port in use / LAG member |
+| `tplinkeasysmart_port_mirror` | resource | Monitoring > Port Mirror | destination port in use / LAG member |
+| `tplinkeasysmart_lag` | resource | Switching > Port Trunk | old and new member ports |
+| `tplinkeasysmart_vlan_port_based_group` | resource | VLAN > Port Based VLAN | old and new member ports (membership is exclusive) |
+| `data.tplinkeasysmart_system_info` | data | System Info / IP Setting | read-only |
+| `data.tplinkeasysmart_ports` | data | Switching > Port Setting | read-only |
+| `data.tplinkeasysmart_port_statistics` | data | Monitoring > Port Statistics | read-only |
+| `data.tplinkeasysmart_lags` | data | Switching > Port Trunk | read-only |
+| `data.tplinkeasysmart_port_mirror` | data | Monitoring > Port Mirror | read-only |
+| `data.tplinkeasysmart_vlan_mtu` | data | VLAN > MTU VLAN | read-only (mode is never written) |
+| `data.tplinkeasysmart_vlan_port_based` | data | VLAN > Port Based VLAN | read-only |
+| `data.tplinkeasysmart_vlan_8021q` | data | VLAN > 802.1Q VLAN / PVID | read-only |
+| `data.tplinkeasysmart_qos` | data | QoS > QoS Basic | read-only |
+| `data.tplinkeasysmart_bandwidth_control` | data | QoS > Bandwidth Control | read-only |
+| `data.tplinkeasysmart_storm_control` | data | QoS > Storm Control | read-only |
 
-Not covered (deliberately): user account, IP setting writes, config backup/restore, reboot, factory reset, firmware upgrade, cable diagnostics (the test can briefly drop a link).
+Deliberately **not** writable: management IP / DHCP, VLAN mode switches (MTU, port-based, 802.1Q), 802.1Q VLANs and PVIDs, user account, config backup/restore, reboot, factory reset, firmware upgrade, cable diagnostics. The device description (hostname) write exists in the client (`SetHostname`) but is not live-verified and has no resource: it re-sends the management IP configuration and its live test was blocked by the permission classifier.
 
 ## Provider configuration
 
