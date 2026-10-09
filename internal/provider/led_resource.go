@@ -54,15 +54,7 @@ func (r *ledResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 }
 
 func (r *ledResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	c, ok := req.ProviderData.(SwitchClient)
-	if !ok {
-		resp.Diagnostics.AddError("Unexpected provider data", fmt.Sprintf("got %T", req.ProviderData))
-		return
-	}
-	r.client = c
+	r.client = clientFrom(req.ProviderData, &resp.Diagnostics)
 }
 
 // apply writes the desired state and reads it back so the stored state is what

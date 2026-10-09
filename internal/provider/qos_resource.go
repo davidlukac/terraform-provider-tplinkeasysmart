@@ -70,7 +70,7 @@ func modeCode(name string) (int, bool) {
 }
 
 // qosState builds the model from the switch, keeping only the priority keys we manage.
-func qosState(ctx context.Context, q escp.QoS, managed map[string]struct{}) (qosResourceModel, error) {
+func qosState(q escp.QoS, managed map[string]struct{}) qosResourceModel {
 	vals := map[string]attr.Value{}
 	for _, p := range q.Priorities {
 		k := strconv.Itoa(p.Port)
@@ -78,11 +78,9 @@ func qosState(ctx context.Context, q escp.QoS, managed map[string]struct{}) (qos
 			vals[k] = types.Int64Value(int64(p.Priority))
 		}
 	}
-	m, d := types.MapValue(types.Int64Type, vals)
-	if d.HasError() {
-		return qosResourceModel{}, fmt.Errorf("%v", d)
-	}
-	return qosResourceModel{ID: types.StringValue(qosID), Mode: types.StringValue(q.ModeName), Priorities: m}, nil
+	// every element is an Int64 value, so the map cannot violate its element type
+	return qosResourceModel{ID: types.StringValue(qosID), Mode: types.StringValue(q.ModeName),
+		Priorities: types.MapValueMust(types.Int64Type, vals)}
 }
 
 func (r *qosResource) apply(ctx context.Context, plan *qosResourceModel, add func(string, string)) bool {
@@ -131,12 +129,7 @@ func (r *qosResource) apply(ctx context.Context, plan *qosResourceModel, add fun
 			return false
 		}
 	}
-	m, err := qosState(ctx, got, managed)
-	if err != nil {
-		add("Building state failed", err.Error())
-		return false
-	}
-	*plan = m
+	*plan = qosState(got, managed)
 	return true
 }
 
@@ -171,11 +164,7 @@ func (r *qosResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		resp.Diagnostics.AddError("Reading QoS failed", err.Error())
 		return
 	}
-	m, err := qosState(ctx, q, managed)
-	if err != nil {
-		resp.Diagnostics.AddError("Building state failed", err.Error())
-		return
-	}
+	m := qosState(q, managed)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
 

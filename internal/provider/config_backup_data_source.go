@@ -55,9 +55,12 @@ func (d *configBackupDataSource) Configure(_ context.Context, req datasource.Con
 func (d *configBackupDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var cfg configBackupModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
-	if resp.Diagnostics.HasError() { // coverage: ignore - the framework validated the config against the schema before Read is called
-		return
+	if !resp.Diagnostics.HasError() {
+		d.read(ctx, cfg, resp)
 	}
+}
+
+func (d *configBackupDataSource) read(ctx context.Context, cfg configBackupModel, resp *datasource.ReadResponse) {
 	data, err := d.client.ConfigBackup(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading the configuration backup failed", err.Error())

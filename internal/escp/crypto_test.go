@@ -3,8 +3,36 @@ package escp
 import (
 	"bytes"
 	"encoding/hex"
+	"strings"
 	"testing"
 )
+
+func TestStaticKeyDerivation(t *testing.T) {
+	key := staticKeyFrom(staticKeyBlob)
+	if len(key) != 256 {
+		t.Fatalf("the static RC4 key is 256 bytes, got %d", len(key))
+	}
+	// the derived key schedule must be a permutation of 0..255
+	seen := map[int]bool{}
+	for _, v := range rc4State(key, 256) {
+		seen[v] = true
+	}
+	if len(seen) != 256 {
+		t.Fatalf("RC4 state is not a permutation: %d distinct values", len(seen))
+	}
+}
+
+func TestStaticKeyFromRejectsInvalidHex(t *testing.T) {
+	defer func() {
+		r := recover()
+		err, ok := r.(error)
+		if !ok || !strings.Contains(err.Error(), "invalid byte") {
+			t.Fatalf("want a panic carrying the hex error, got %v", r)
+		}
+	}()
+	staticKeyFrom("not hex at all")
+	t.Fatal("an invalid constant must not be silently accepted")
+}
 
 // Vectors produced by the Python prototype (tools/escp/escp.py), which was
 // validated against a real TL-SG108E v6.

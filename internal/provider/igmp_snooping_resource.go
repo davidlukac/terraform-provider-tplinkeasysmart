@@ -30,12 +30,6 @@ func NewIGMPSnoopingResource() resource.Resource { return &igmpResource{} }
 
 type igmpResource struct{ client SwitchClient }
 
-type igmpGroupModel struct {
-	IP    types.String `tfsdk:"ip"`
-	VLAN  types.Int64  `tfsdk:"vlan"`
-	Ports []int64      `tfsdk:"ports"`
-}
-
 type igmpModel struct {
 	ID                types.String `tfsdk:"id"`
 	Enabled           types.Bool   `tfsdk:"enabled"`
@@ -75,18 +69,23 @@ var igmpGroupType = types.ObjectType{AttrTypes: map[string]attr.Type{
 	"ip": types.StringType, "vlan": types.Int64Type, "ports": types.ListType{ElemType: types.Int64Type},
 }}
 
-func igmpToModel(ctx context.Context, s escp.IGMP) (igmpModel, diag.Diagnostics) {
-	groups := make([]igmpGroupModel, 0, len(s.Groups))
+// igmpToModel converts the switch state to the Terraform model. The values are
+// built from the group type itself, so they cannot violate it.
+func igmpToModel(s escp.IGMP) igmpModel {
+	groups := make([]attr.Value, 0, len(s.Groups))
 	for _, g := range s.Groups {
-		ports := make([]int64, 0, len(g.Ports))
+		ports := make([]attr.Value, 0, len(g.Ports))
 		for _, p := range g.Ports {
-			ports = append(ports, int64(p))
+			ports = append(ports, types.Int64Value(int64(p)))
 		}
-		groups = append(groups, igmpGroupModel{IP: types.StringValue(g.IP), VLAN: types.Int64Value(int64(g.VLAN)), Ports: ports})
+		groups = append(groups, types.ObjectValueMust(igmpGroupType.AttrTypes, map[string]attr.Value{
+			"ip":    types.StringValue(g.IP),
+			"vlan":  types.Int64Value(int64(g.VLAN)),
+			"ports": types.ListValueMust(types.Int64Type, ports),
+		}))
 	}
-	list, diags := types.ListValueFrom(ctx, igmpGroupType, groups)
 	return igmpModel{ID: types.StringValue(igmpID), Enabled: types.BoolValue(s.Enabled),
-		ReportSuppression: types.BoolValue(s.ReportSuppression), Groups: list}, diags
+		ReportSuppression: types.BoolValue(s.ReportSuppression), Groups: types.ListValueMust(igmpGroupType, groups)}
 }
 
 func (r *igmpResource) write(ctx context.Context, plan igmpModel, diags *diag.Diagnostics) (igmpModel, bool) {
@@ -105,9 +104,7 @@ func (r *igmpResource) write(ctx context.Context, plan igmpModel, diags *diag.Di
 			want.Enabled, want.ReportSuppression, got.Enabled, got.ReportSuppression))
 		return igmpModel{}, false
 	}
-	m, d := igmpToModel(ctx, got)
-	diags.Append(d...)
-	return m, !d.HasError()
+	return igmpToModel(got), true
 }
 
 func (r *igmpResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -138,11 +135,7 @@ func (r *igmpResource) Read(ctx context.Context, _ resource.ReadRequest, resp *r
 		resp.Diagnostics.AddError("Reading IGMP snooping failed", err.Error())
 		return
 	}
-	m, d := igmpToModel(ctx, got)
-	resp.Diagnostics.Append(d...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	m := igmpToModel(got)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
 

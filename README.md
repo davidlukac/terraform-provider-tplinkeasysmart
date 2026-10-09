@@ -68,7 +68,7 @@ Tests do not touch hardware: `internal/escp` runs the client against an in-proce
 
 Release plumbing is in place (`.goreleaser.yml`, `.github/workflows/`, `terraform-registry-manifest.json`, generated `docs/` and `examples/`, `.golangci.yml`, `Makefile`), but nothing is published. Remaining manual steps, in order:
 
-1. **Choose a license** and add `LICENSE` (the Registry needs an OSI-approved one; MPL-2.0 or MIT are typical).
+1. ~~Choose a license~~ done: MIT (`LICENSE`).
 2. **Decide the namespace and extract the repo**: the provider must be the root of a public GitHub repository named `terraform-provider-tplinkeasysmart`. Extract it from `local-infra` with history (for example `git subtree split --prefix=terraform-provider-tplinkeasysmart`), then change the Go module path (`go.mod` and all imports), the address in `main.go`, and the `source` in `examples/` and `docs/` (re-run `make generate`). `.github/workflows/` only works once the provider is the repo root.
 3. **Create a GPG signing key**, add `GPG_PRIVATE_KEY` and `PASSPHRASE` as repository secrets, and add the public key in the Registry (Publish > Provider).
 4. **Register the provider** on registry.terraform.io (sign in with GitHub, Publish > Provider, pick the repository), then push a `vX.Y.Z` tag; the release workflow builds, signs and uploads the assets and the Registry ingests them.
@@ -76,6 +76,20 @@ Release plumbing is in place (`.goreleaser.yml`, `.github/workflows/`, `terrafor
 6. Before the first public release re-verify the Registry requirements against the current publishing docs, run `make snapshot` and `make lint`, and decide whether to stay `0.x` until the schema is stable.
 
 Common tasks: `make generate` (docs), `make lint`, `make test`, `make testacc`, `make docs-check`, `make snapshot`.
+
+### Testing and coverage
+
+```sh
+make cover        # suite with -race, writes cover.out, enforces the coverage policy
+make cover-html   # same, plus coverage.html
+```
+
+Policy: **every statement is covered**, except inside functions whose doc comment contains `// coverage: ignore - <reason>` (the reason is mandatory; `scripts/covercheck.py` fails the build without it, and lists every exclusion). Today the only exclusion is the `main()` shim, because `run` holds the logic and is tested. Do not delete a safety check to raise the number, and do not write tests without assertions: a test must fail when the behaviour it names is broken.
+
+How the failure paths are exercised without hardware:
+
+- `internal/escp`: the fake UDP switch can be scripted per request (`getFn`), can stay silent, reject the key exchange, reject the *n*th SET, or replace its discovery reply.
+- `internal/provider`: `faultyClient` wraps the in-memory fake and fails specific calls of any method (all of them, or only the *n*th), or accepts writes without applying them. `faultScenarios()` drives every resource through the same failure modes (write rejected, read-back fails, write ignored, update fails, refresh fails, bad import id, object vanishes, update succeeds).
 
 ## Layout
 
