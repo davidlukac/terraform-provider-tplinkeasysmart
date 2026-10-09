@@ -295,3 +295,32 @@ func TestLiveStormControl(t *testing.T) {
 		}
 	}
 }
+
+func TestLivePortMirror(t *testing.T) {
+	const dest = 7
+	c, ctx := liveClient(t), context.Background()
+	livePort(t, c, dest) // the destination must be unused
+	orig, err := c.PortMirror(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if orig.Enabled {
+		t.Fatal("mirroring is already enabled; refusing to touch it")
+	}
+	defer func() {
+		if err := c.SetPortMirror(ctx, orig); err != nil {
+			t.Errorf("RESTORE FAILED: %v", err)
+		}
+		if now, _ := c.PortMirror(ctx); !reflect.DeepEqual(now, orig) {
+			t.Errorf("not restored: %+v vs %+v", now, orig)
+		}
+	}()
+	want := Mirror{Enabled: true, MirrorPort: dest, IngressPorts: []int{4}, EgressPorts: []int{}}
+	if err := c.SetPortMirror(ctx, want); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := c.PortMirror(ctx)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("not applied: %+v", got)
+	}
+}

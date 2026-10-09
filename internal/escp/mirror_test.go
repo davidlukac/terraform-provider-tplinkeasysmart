@@ -1,6 +1,7 @@
 package escp
 
 import (
+	"context"
 	"reflect"
 	"testing"
 )
@@ -24,5 +25,38 @@ func TestParseMirror(t *testing.T) {
 	}
 	if _, err := parseMirror([]TLV{{Type: TLVMirror, Value: make([]byte, 3)}}); err == nil {
 		t.Fatal("expected length error")
+	}
+}
+
+func TestSetMirrorWire(t *testing.T) {
+	f := startFakeSwitch(t)
+	c := dialFake(t, f, "secret")
+	ctx := context.Background()
+	if err := c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 7, IngressPorts: []int{4}, EgressPorts: []int{1, 2}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.set(); !reflect.DeepEqual(got[0].Value, []byte{1, 7, 0, 0, 0, 8, 0, 0, 0, 3}) {
+		t.Fatalf("wire %v", got[0].Value)
+	}
+	if err := c.SetPortMirror(ctx, Mirror{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.set(); !reflect.DeepEqual(got[0].Value, make([]byte, 10)) {
+		t.Fatalf("disable wire %v", got[0].Value)
+	}
+	n := len(f.allSets())
+	for _, bad := range []Mirror{
+		{Enabled: true, MirrorPort: 7},
+		{Enabled: true, MirrorPort: 7, IngressPorts: []int{7}},
+		{Enabled: true, MirrorPort: 0, IngressPorts: []int{1}},
+		{Enabled: true, MirrorPort: 7, IngressPorts: []int{40}},
+		{MirrorPort: 7},
+	} {
+		if err := c.SetPortMirror(ctx, bad); err == nil {
+			t.Errorf("%+v must be rejected", bad)
+		}
+	}
+	if len(f.allSets()) != n {
+		t.Fatal("rejected requests must not reach the switch")
 	}
 }

@@ -43,3 +43,48 @@ func (c *Client) PortMirror(ctx context.Context) (Mirror, error) {
 	}
 	return parseMirror(tlvs)
 }
+
+func maskFromPorts(ports []int) ([]byte, error) {
+	var m uint32
+	for _, p := range ports {
+		if p < 1 || p > 32 {
+			return nil, fmt.Errorf("escp: invalid port %d", p)
+		}
+		m |= 1 << uint(p-1)
+	}
+	return []byte{byte(m >> 24), byte(m >> 16), byte(m >> 8), byte(m)}, nil
+}
+
+// SetPortMirror writes the mirroring configuration (10-byte TLV 16640). To
+// disable, pass the zero Mirror. The destination port stops carrying normal
+// traffic; callers must guard against choosing a port that is in use.
+func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
+	v := make([]byte, 10)
+	if m.Enabled {
+		if m.MirrorPort < 1 || m.MirrorPort > 32 {
+			return fmt.Errorf("escp: invalid mirror port %d", m.MirrorPort)
+		}
+		if len(m.IngressPorts)+len(m.EgressPorts) == 0 {
+			return fmt.Errorf("escp: port mirroring needs at least one ingress or egress source port")
+		}
+		for _, p := range append(append([]int{}, m.IngressPorts...), m.EgressPorts...) {
+			if p == m.MirrorPort {
+				return fmt.Errorf("escp: port %d cannot mirror itself", p)
+			}
+		}
+		in, err := maskFromPorts(m.IngressPorts)
+		if err != nil {
+			return err
+		}
+		eg, err := maskFromPorts(m.EgressPorts)
+		if err != nil {
+			return err
+		}
+		v[0], v[1] = 1, byte(m.MirrorPort)
+		copy(v[2:6], in)
+		copy(v[6:10], eg)
+	} else if m.MirrorPort != 0 || len(m.IngressPorts) != 0 || len(m.EgressPorts) != 0 {
+		return fmt.Errorf("escp: a disabled mirror must have no destination or source ports")
+	}
+	return c.setTLVs(ctx, TLV{TLVMirror, v})
+}

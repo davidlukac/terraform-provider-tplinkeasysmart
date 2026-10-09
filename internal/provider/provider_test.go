@@ -18,6 +18,7 @@ import (
 type fakeClient struct {
 	mu      sync.Mutex
 	igmp    escp.IGMP
+	mirror  *escp.Mirror
 	storm   map[int]escp.PortStorm
 	bw      map[int][2]int
 	qos     *escp.QoS
@@ -94,7 +95,30 @@ func (f *fakeClient) SetLoopPrevention(_ context.Context, on bool) error {
 	return nil
 }
 
+func (f *fakeClient) SetPortMirror(_ context.Context, m escp.Mirror) error {
+	if m.Enabled && len(m.IngressPorts)+len(m.EgressPorts) == 0 {
+		return fmt.Errorf("mirroring needs a source port")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.mirror = &m
+	f.sets++
+	return nil
+}
+
 func (f *fakeClient) PortMirror(context.Context) (escp.Mirror, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.mirror != nil {
+		m := *f.mirror
+		if m.IngressPorts == nil {
+			m.IngressPorts = []int{}
+		}
+		if m.EgressPorts == nil {
+			m.EgressPorts = []int{}
+		}
+		return m, nil
+	}
 	return escp.Mirror{Enabled: true, MirrorPort: 8, IngressPorts: []int{1, 2}, EgressPorts: []int{}}, nil
 }
 
@@ -718,5 +742,48 @@ func TestAccStormLimitGuardAndValidation(t *testing.T) {
 	})
 	if f.sets != 0 {
 		t.Fatalf("no write may happen for blocked or invalid requests, got %d", f.sets)
+	}
+}
+
+func mirrorConfig(body string) string {
+	return providerBlock + "resource \"tplinkeasysmart_port_mirror\" \"m\" {\n" + body + "}\n"
+}
+
+func TestAccPortMirrorLifecycle(t *testing.T) {
+	f := &fakeClient{ports: testPorts(), mirror: &escp.Mirror{}}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: mirrorConfig("  enabled = false\n"), Check: resource.TestCheckResourceAttr("tplinkeasysmart_port_mirror.m", "mirror_port", "0")},
+			{Config: mirrorConfig("  enabled = true\n  mirror_port = 7\n  ingress_ports = [4]\n  egress_ports = [1, 2]\n"), Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("tplinkeasysmart_port_mirror.m", "mirror_port", "7"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_port_mirror.m", "ingress_ports.#", "1"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_port_mirror.m", "egress_ports.#", "2"),
+			)},
+			{Config: mirrorConfig("  enabled = false\n"), Check: func(*terraformState) error {
+				f.mu.Lock()
+				defer f.mu.Unlock()
+				if f.mirror.Enabled {
+					return fmt.Errorf("mirroring still enabled on the switch")
+				}
+				return nil
+			}},
+			{ResourceName: "tplinkeasysmart_port_mirror.m", ImportState: true, ImportStateId: "port_mirror", ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{"allow_disruptive"}},
+		},
+	})
+}
+
+func TestAccPortMirrorGuard(t *testing.T) {
+	f := &fakeClient{ports: testPorts(), mirror: &escp.Mirror{}}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [7]\n"), ExpectError: regexp.MustCompile(`has a link up`)},
+			{Config: mirrorConfig("  enabled = true\n  mirror_port = 1\n  ingress_ports = [7]\n"), ExpectError: regexp.MustCompile(`member of LAG1`)},
+		},
+	})
+	if f.sets != 0 {
+		t.Fatalf("guard must prevent any write, got %d", f.sets)
 	}
 }
