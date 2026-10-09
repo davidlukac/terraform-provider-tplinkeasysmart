@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.0
+
+- Resource tplinkeasysmart_qos (mode and per-port priorities; priorities only accepted in port-based mode).
+
 ## 0.15.0
 
 - Resource tplinkeasysmart_port (admin state, speed, flow control) with a guard that refuses ports that have a link up or are in a LAG unless allow_disruptive is set; client SetHostname added but not live-verified (no resource yet); live toggle tests for IGMP snooping and loop prevention.

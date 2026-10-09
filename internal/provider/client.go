@@ -25,6 +25,8 @@ type SwitchClient interface {
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
 	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
 	QoS(ctx context.Context) (escp.QoS, error)
+	SetQoSMode(ctx context.Context, mode int) error
+	SetPortPriorities(ctx context.Context, changes map[int]int) error
 	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
 	StormControl(ctx context.Context) ([]escp.PortStorm, error)
 	System(ctx context.Context) (escp.System, error)

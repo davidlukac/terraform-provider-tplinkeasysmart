@@ -67,3 +67,39 @@ func (c *Client) QoS(ctx context.Context) (QoS, error) {
 	}
 	return parseQoS(append(mode, pri...))
 }
+
+// SetQoSMode selects the QoS mode: 0 port-based, 1 802.1p, 2 DSCP/802.1p.
+func (c *Client) SetQoSMode(ctx context.Context, mode int) error {
+	if _, ok := QoSModeNames[mode]; !ok {
+		return fmt.Errorf("escp: invalid QoS mode %d (valid: 0, 1, 2)", mode)
+	}
+	return c.setTLVs(ctx, TLV{TLVQoSMode, []byte{byte(mode)}})
+}
+
+// SetPortPriorities changes the priority (1 lowest .. 4 highest) of the given
+// ports. As in the vendor utility the request carries the priority of every
+// port, so the other ports are re-sent with their current value.
+func (c *Client) SetPortPriorities(ctx context.Context, changes map[int]int) error {
+	cur, err := c.QoS(ctx)
+	if err != nil {
+		return err
+	}
+	prio := map[int]int{}
+	for _, p := range cur.Priorities {
+		prio[p.Port] = p.Priority
+	}
+	for port, v := range changes {
+		if _, ok := prio[port]; !ok {
+			return fmt.Errorf("escp: port %d does not exist", port)
+		}
+		if v < 1 || v > 4 {
+			return fmt.Errorf("escp: invalid priority %d for port %d (valid: 1-4)", v, port)
+		}
+		prio[port] = v
+	}
+	tlvs := make([]TLV, 0, len(prio))
+	for _, p := range cur.Priorities { // keep the switch's port order
+		tlvs = append(tlvs, TLV{TLVQoSPriority, []byte{byte(p.Port), byte(prio[p.Port] - 1)}})
+	}
+	return c.setTLVs(ctx, tlvs...)
+}

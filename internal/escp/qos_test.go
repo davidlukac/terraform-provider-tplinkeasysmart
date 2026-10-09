@@ -1,6 +1,7 @@
 package escp
 
 import (
+	"context"
 	"reflect"
 	"testing"
 )
@@ -25,5 +26,42 @@ func TestParseQoS(t *testing.T) {
 	}
 	if q, err := parseQoS([]TLV{tlvHex(t, TLVQoSMode, "09")}); err != nil || q.ModeName != "unknown(9)" {
 		t.Fatalf("unknown mode: %+v %v", q, err)
+	}
+}
+
+func TestSetQoSWire(t *testing.T) {
+	f := startFakeSwitch(t)
+	c := dialFake(t, f, "secret")
+	ctx := context.Background()
+	if err := c.SetQoSMode(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.set(); len(got) != 1 || got[0].Type != TLVQoSMode || got[0].Value[0] != 1 {
+		t.Fatalf("mode wire: %+v", got)
+	}
+	if err := c.SetQoSMode(ctx, 7); err == nil {
+		t.Fatal("invalid mode must be rejected")
+	}
+	if err := c.SetPortPriorities(ctx, map[int]int{3: 4}); err != nil {
+		t.Fatal(err)
+	}
+	got := f.set()
+	if len(got) != 8 {
+		t.Fatalf("want all 8 ports re-sent, got %d TLVs", len(got))
+	}
+	for i, tl := range got {
+		want := byte(0)
+		if i == 2 {
+			want = 3 // port 3 -> priority 4 -> raw 3
+		}
+		if tl.Type != TLVQoSPriority || tl.Value[0] != byte(i+1) || tl.Value[1] != want {
+			t.Fatalf("entry %d: %+v", i, tl)
+		}
+	}
+	if err := c.SetPortPriorities(ctx, map[int]int{3: 9}); err == nil {
+		t.Fatal("priority 9 must be rejected")
+	}
+	if err := c.SetPortPriorities(ctx, map[int]int{99: 2}); err == nil {
+		t.Fatal("unknown port must be rejected")
 	}
 }

@@ -18,6 +18,7 @@ import (
 type fakeClient struct {
 	mu      sync.Mutex
 	igmp    escp.IGMP
+	qos     *escp.QoS
 	ports   []escp.Port
 	loop    bool
 	led     bool
@@ -109,7 +110,35 @@ func (f *fakeClient) VLAN8021Q(context.Context) (escp.Dot1Q, error) {
 		PVIDs: []escp.PortPVID{{Port: 1, PVID: 10}, {Port: 8, PVID: 1}}}, nil
 }
 
+func (f *fakeClient) SetQoSMode(_ context.Context, mode int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.qos.Mode, f.qos.ModeName = mode, escp.QoSModeNames[mode]
+	return nil
+}
+
+func (f *fakeClient) SetPortPriorities(_ context.Context, ch map[int]int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.qos.Mode != 0 {
+		return nil // like the real switch: accepted but ignored outside port-based mode
+	}
+	for i := range f.qos.Priorities {
+		if v, ok := ch[f.qos.Priorities[i].Port]; ok {
+			f.qos.Priorities[i].Priority = v
+		}
+	}
+	return nil
+}
+
 func (f *fakeClient) QoS(context.Context) (escp.QoS, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.qos != nil {
+		q := *f.qos
+		q.Priorities = append([]escp.PortPriority(nil), f.qos.Priorities...)
+		return q, nil
+	}
 	return escp.QoS{Mode: 2, ModeName: "dscp-802.1p", Priorities: []escp.PortPriority{{Port: 1, Priority: 1}, {Port: 2, Priority: 4}}}, nil
 }
 
@@ -516,4 +545,50 @@ func TestAccPortGuardOverride(t *testing.T) {
 			Check:  resource.TestCheckResourceAttr("tplinkeasysmart_port.p", "flow_control", "true"),
 		}},
 	})
+}
+
+func newFakeQoS() *fakeClient {
+	q := escp.QoS{Mode: 2, ModeName: "dscp-802.1p"}
+	for p := 1; p <= 8; p++ {
+		q.Priorities = append(q.Priorities, escp.PortPriority{Port: p, Priority: 1})
+	}
+	return &fakeClient{qos: &q}
+}
+
+func TestAccQoSResourceLifecycle(t *testing.T) {
+	f := newFakeQoS()
+	cfg := func(body string) string {
+		return providerBlock + "resource \"tplinkeasysmart_qos\" \"this\" {\n" + body + "}\n"
+	}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: cfg("  mode = \"dscp-802.1p\"\n"), Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("tplinkeasysmart_qos.this", "mode", "dscp-802.1p"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_qos.this", "port_priorities.%", "0"),
+			)},
+			{Config: cfg("  mode = \"port-based\"\n  port_priorities = { \"7\" = 3 }\n"), Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("tplinkeasysmart_qos.this", "mode", "port-based"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_qos.this", "port_priorities.7", "3"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_qos.this", "port_priorities.%", "1"),
+			)},
+			{Config: cfg("  mode = \"port-based\"\n  port_priorities = { \"7\" = 3 }\n"), PlanOnly: true}, // stays clean
+			{ResourceName: "tplinkeasysmart_qos.this", ImportState: true, ImportStateId: "qos", ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{"port_priorities"}},
+		},
+	})
+}
+
+func TestAccQoSResourceRejectsPrioritiesOutsidePortBased(t *testing.T) {
+	f := newFakeQoS()
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{{
+			Config:      providerBlock + "resource \"tplinkeasysmart_qos\" \"this\" {\n  mode = \"802.1p\"\n  port_priorities = { \"7\" = 2 }\n}\n",
+			ExpectError: regexp.MustCompile(`only take effect when mode is port-based`),
+		}},
+	})
+	if f.qos.Mode != 2 {
+		t.Fatal("nothing may be written when the configuration is rejected")
+	}
 }

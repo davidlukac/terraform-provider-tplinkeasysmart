@@ -18,6 +18,7 @@ type fakeSwitch struct {
 
 	mu       sync.Mutex
 	hostname string
+	lastSet  []TLV // settings TLVs (credentials stripped) of the most recent accepted SET
 	port7    []byte
 	setIP    []byte
 	led      bool
@@ -47,6 +48,12 @@ func startFakeSwitch(t *testing.T) *fakeSwitch {
 }
 
 func (f *fakeSwitch) port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
+
+func (f *fakeSwitch) set() []TLV {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]TLV(nil), f.lastSet...)
+}
 
 func (f *fakeSwitch) state() (led bool, gets, sets int) {
 	f.mu.Lock()
@@ -146,6 +153,14 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 			f.send(from, OpSetReply, h, 5, nil, true)
 			return
 		}
+		f.mu.Lock()
+		f.lastSet = nil
+		for _, t := range tlvs {
+			if t.Type != TLVUsername && t.Type != TLVPassword {
+				f.lastSet = append(f.lastSet, TLV{Type: t.Type, Value: append([]byte(nil), t.Value...)})
+			}
+		}
+		f.mu.Unlock()
 		if v, ok := find(TLVPorts); ok && len(v) == 7 && v[0] == 7 {
 			f.mu.Lock()
 			f.port7 = append([]byte(nil), v...)
@@ -167,6 +182,18 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 		}
 		f.send(from, OpSetReply, h, 0, nil, true)
 	case OpGet:
+		if _, ok := find(TLVQoSMode); ok {
+			f.send(from, OpReply, h, 0, []TLV{{TLVQoSMode, []byte{0}}}, true)
+			return
+		}
+		if _, ok := find(TLVQoSPriority); ok {
+			var rows []TLV
+			for p := 1; p <= 8; p++ {
+				rows = append(rows, TLV{TLVQoSPriority, []byte{byte(p), 0}})
+			}
+			f.send(from, OpReply, h, 0, rows, true)
+			return
+		}
 		if _, ok := find(TLVLED); ok {
 			f.mu.Lock()
 			f.gets++
