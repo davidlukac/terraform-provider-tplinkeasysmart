@@ -39,6 +39,7 @@ resource "tplinkeasysmart_port_mirror" "this" {
 - `egress_ports` (Set of Number) Ports whose transmitted traffic is mirrored.
 - `ingress_ports` (Set of Number) Ports whose received traffic is mirrored.
 - `mirror_port` (Number) Destination (monitoring) port; 0 when disabled.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
 
 ### Read-Only
 
@@ -51,3 +52,5 @@ Import is supported using the following syntax:
 ```shell
 terraform import tplinkeasysmart_port_mirror.this port_mirror
 ```
+
+For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`).

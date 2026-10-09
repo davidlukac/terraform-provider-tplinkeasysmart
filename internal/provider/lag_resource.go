@@ -28,7 +28,11 @@ var (
 // NewLAGResource returns the tplinkeasysmart_lag resource.
 func NewLAGResource() resource.Resource { return &lagResource{} }
 
-type lagResource struct{ client lagClient }
+type lagResource struct {
+	src    switchSource
+	client lagClient    // set on the per-call copy made by bound()
+	sw     types.String // the switch that copy is bound to, for ids
+}
 
 // lagClient is the part of the switch API this resource needs.
 type lagClient interface {
@@ -37,10 +41,16 @@ type lagClient interface {
 	SetLAG(ctx context.Context, group int, ports []int) error
 }
 
+// bound returns a copy of the resource wired to the client of the named switch.
+func (r *lagResource) bound(add func(string, string), name types.String) *lagResource {
+	return bindSwitch(add, r.src, name, r, func(b *lagResource, c lagClient, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type lagResourceModel struct {
-	Group           types.Int64 `tfsdk:"group"`
-	Ports           types.Set   `tfsdk:"ports"`
-	AllowDisruptive types.Bool  `tfsdk:"allow_disruptive"`
+	Switch          types.String `tfsdk:"switch"`
+	Group           types.Int64  `tfsdk:"group"`
+	Ports           types.Set    `tfsdk:"ports"`
+	AllowDisruptive types.Bool   `tfsdk:"allow_disruptive"`
 }
 
 func (r *lagResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -54,6 +64,7 @@ func (r *lagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"`allow_disruptive = true` to override. The existing router uplink (usually LAG1) should be imported and protected with `lifecycle { prevent_destroy = true }`. " +
 			"The switch itself rejects ports that conflict with mirroring, VLANs, rate limits or storm control.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch: resourceSwitchAttribute(),
 			"group": schema.Int64Attribute{Required: true, Description: "Group number (1-based).",
 				Validators:    []validator.Int64{validByteID()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
@@ -64,7 +75,7 @@ func (r *lagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 }
 
 func (r *lagResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom[lagClient](req.ProviderData, &resp.Diagnostics)
+	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
 // guardLAG checks every port of the old and new membership. Ports that are
@@ -120,7 +131,13 @@ func (r *lagResource) current(ctx context.Context, group int) ([]int, error) {
 	return nil, fmt.Errorf("LAG%d does not exist on this switch", group)
 }
 
+// apply binds the resource to the switch the plan selects, then applies it.
 func (r *lagResource) apply(ctx context.Context, m *lagResourceModel, add func(string, string)) bool {
+	b := r.bound(add, m.Switch)
+	return b != nil && b.applyBound(ctx, m, add)
+}
+
+func (r *lagResource) applyBound(ctx context.Context, m *lagResourceModel, add func(string, string)) bool {
 	group := int(m.Group.ValueInt64())
 	ports, err := setToInts(ctx, m.Ports)
 	if err != nil || len(ports) == 0 {
@@ -156,7 +173,16 @@ func (r *lagResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
+// Read binds the resource to the switch recorded in state, then reads it.
 func (r *lagResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	sw := switchOf(ctx, req.State, &resp.Diagnostics)
+	if b := r.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (r *lagResource) readBound(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state lagResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -176,7 +202,7 @@ func (r *lagResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 }
 
 // Delete removes the group, under the same guard as every other change.
-func (r *lagResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *lagResource) deleteBound(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state lagResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -197,8 +223,22 @@ func (r *lagResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	}
 }
 
+// Delete binds the resource to the switch recorded in state, then removes it.
+func (r *lagResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	if b := r.bound(resp.Diagnostics.AddError, switchOf(ctx, req.State, &resp.Diagnostics)); b != nil {
+		b.deleteBound(ctx, req, resp)
+	}
+}
+
 func (r *lagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if importPositiveInt(ctx, req, resp, "a LAG group number", "group") {
 		resetAllowDisruptive(ctx, resp)
 	}
 }
+
+// ModifyPlan refuses, while planning, a switch that cannot be resolved.
+func (r *lagResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+}
+
+var _ resource.ResourceWithModifyPlan = &lagResource{}

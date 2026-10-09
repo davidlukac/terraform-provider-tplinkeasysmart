@@ -47,6 +47,32 @@ provider "tplinkeasysmart" {
 }
 ```
 
+### Several switches
+
+Either declare one provider alias per switch, or define them as data and select one per object:
+
+```hcl
+variable "switches" {
+  type      = map(object({ host = string, username = string, password = string }))
+  sensitive = true
+}
+
+provider "tplinkeasysmart" {
+  switches = var.switches
+}
+
+resource "tplinkeasysmart_loop_prevention" "this" {
+  for_each = toset(nonsensitive(keys(var.switches)))  # names are not secret
+  switch   = each.key
+  enabled  = true
+}
+```
+
+- `switch` is optional everywhere. Omitted, it means the provider's own switch (`host`), or the only configured one; with several switches and no default, planning fails and lists the names.
+- Ids and import ids of a named switch are prefixed with its name: `sw02:led`, `sw02:7`. The provider's own switch keeps the plain ids.
+- Changing `switch` replaces the object (it is a different device).
+- The same host cannot appear twice. A complete example is `examples/multi-switch`.
+
 ## Constraints (read these)
 
 - **Same layer-2 network only.** ESCP is UDP broadcast based; run Terraform on a host in the switch's subnet.

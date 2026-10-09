@@ -40,6 +40,7 @@ resource "tplinkeasysmart_port" "unused" {
 - `enabled` (Boolean) Administrative state. Defaults to true.
 - `flow_control` (Boolean) Flow control. Defaults to false.
 - `speed` (String) One of: auto, 10Mbps-half, 10Mbps-full, 100Mbps-half, 100Mbps-full, 1000Mbps-full. Defaults to auto.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
 
 ### Read-Only
 
@@ -53,3 +54,5 @@ Import is supported using the following syntax:
 # The import id is the port number.
 terraform import tplinkeasysmart_port.unused 7
 ```
+
+For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`).

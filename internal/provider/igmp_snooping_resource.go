@@ -26,7 +26,11 @@ var (
 // NewIGMPSnoopingResource returns the tplinkeasysmart_igmp_snooping resource.
 func NewIGMPSnoopingResource() resource.Resource { return &igmpResource{} }
 
-type igmpResource struct{ client igmpClient }
+type igmpResource struct {
+	src    switchSource
+	client igmpClient   // set on the per-call copy made by bound()
+	sw     types.String // the switch that copy is bound to, for ids
+}
 
 // igmpClient is the part of the switch API this resource needs.
 type igmpClient interface {
@@ -34,7 +38,13 @@ type igmpClient interface {
 	SetIGMP(ctx context.Context, enabled, suppression bool) error
 }
 
+// bound returns a copy of the resource wired to the client of the named switch.
+func (r *igmpResource) bound(add func(string, string), name types.String) *igmpResource {
+	return bindSwitch(add, r.src, name, r, func(b *igmpResource, c igmpClient, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type igmpModel struct {
+	Switch            types.String `tfsdk:"switch"`
 	ID                types.String `tfsdk:"id"`
 	Enabled           types.Bool   `tfsdk:"enabled"`
 	ReportSuppression types.Bool   `tfsdk:"report_message_suppression"`
@@ -50,6 +60,7 @@ func (r *igmpResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 		Description: "IGMP snooping (Switching > IGMP Snooping). Singleton; import with id `igmp_snooping`. " +
 			"Destroying only removes it from state. With snooping off, multicast is flooded to all ports.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch: resourceSwitchAttribute(),
 			"id": schema.StringAttribute{Computed: true, Description: "Always `igmp_snooping`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"enabled": schema.BoolAttribute{Required: true, Description: "Whether IGMP snooping is enabled."},
@@ -66,7 +77,7 @@ func (r *igmpResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 }
 
 func (r *igmpResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom[igmpClient](req.ProviderData, &resp.Diagnostics)
+	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
 var igmpGroupType = types.ObjectType{AttrTypes: map[string]attr.Type{
@@ -75,7 +86,7 @@ var igmpGroupType = types.ObjectType{AttrTypes: map[string]attr.Type{
 
 // igmpToModel converts the switch state to the Terraform model. The values are
 // built from the group type itself, so they cannot violate it.
-func igmpToModel(s escp.IGMP) igmpModel {
+func igmpToModel(sw types.String, s escp.IGMP) igmpModel {
 	groups := make([]attr.Value, 0, len(s.Groups))
 	for _, g := range s.Groups {
 		ports := make([]attr.Value, 0, len(g.Ports))
@@ -88,11 +99,17 @@ func igmpToModel(s escp.IGMP) igmpModel {
 			"ports": types.ListValueMust(types.Int64Type, ports),
 		}))
 	}
-	return igmpModel{ID: types.StringValue(igmpID), Enabled: types.BoolValue(s.Enabled),
+	return igmpModel{ID: qualifiedID(sw, igmpID), Enabled: types.BoolValue(s.Enabled),
 		ReportSuppression: types.BoolValue(s.ReportSuppression), Groups: types.ListValueMust(igmpGroupType, groups)}
 }
 
+// apply binds the resource to the switch the plan selects, then applies it.
 func (r *igmpResource) apply(ctx context.Context, plan *igmpModel, add func(string, string)) bool {
+	b := r.bound(add, plan.Switch)
+	return b != nil && b.applyBound(ctx, plan, add)
+}
+
+func (r *igmpResource) applyBound(ctx context.Context, plan *igmpModel, add func(string, string)) bool {
 	want := escp.IGMP{Enabled: plan.Enabled.ValueBool(), ReportSuppression: plan.ReportSuppression.ValueBool()}
 	if err := r.client.SetIGMP(ctx, want.Enabled, want.ReportSuppression); err != nil {
 		add("Setting IGMP snooping failed", err.Error())
@@ -108,7 +125,7 @@ func (r *igmpResource) apply(ctx context.Context, plan *igmpModel, add func(stri
 			want.Enabled, want.ReportSuppression, got.Enabled, got.ReportSuppression))
 		return false
 	}
-	*plan = igmpToModel(got)
+	*plan = igmpToModel(plan.Switch, got)
 	return true
 }
 
@@ -120,13 +137,22 @@ func (r *igmpResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
-func (r *igmpResource) Read(ctx context.Context, _ resource.ReadRequest, resp *resource.ReadResponse) {
+// Read binds the resource to the switch recorded in state, then reads it.
+func (r *igmpResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	sw := switchOf(ctx, req.State, &resp.Diagnostics)
+	if b := r.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (r *igmpResource) readBound(ctx context.Context, _ resource.ReadRequest, resp *resource.ReadResponse) {
 	got, err := r.client.IGMP(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading IGMP snooping failed", err.Error())
 		return
 	}
-	m := igmpToModel(got)
+	m := igmpToModel(r.sw, got)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
 
@@ -135,3 +161,10 @@ func (r *igmpResource) Delete(context.Context, resource.DeleteRequest, *resource
 func (r *igmpResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	importSingletonID(ctx, req, resp, igmpID)
 }
+
+// ModifyPlan refuses, while planning, a switch that cannot be resolved.
+func (r *igmpResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+}
+
+var _ resource.ResourceWithModifyPlan = &igmpResource{}

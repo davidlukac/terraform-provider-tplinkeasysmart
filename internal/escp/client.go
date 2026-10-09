@@ -217,6 +217,20 @@ func (c *Client) recv(deadline time.Time) (reply, bool) {
 	return reply{}, false
 }
 
+// expired reports why the call must stop: the context was cancelled, or its
+// deadline has passed. The socket deadline equals the context deadline and can
+// fire slightly before the context's own timer does, so the deadline is
+// compared directly instead of waiting for ctx.Err() to catch up.
+func expired(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if dl, ok := ctx.Deadline(); ok && !time.Now().Before(dl) {
+		return context.DeadlineExceeded
+	}
+	return nil
+}
+
 // attemptDeadline is the end of the current attempt: the per-attempt timeout,
 // capped by the context deadline.
 func (c *Client) attemptDeadline(ctx context.Context) time.Time {
@@ -252,7 +266,7 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []TLV, static bool,
 		if rep, ok := c.recv(c.attemptDeadline(ctx)); ok {
 			return rep, nil
 		}
-		if err := ctx.Err(); err != nil {
+		if err := expired(ctx); err != nil {
 			return reply{}, err
 		}
 	}
@@ -286,7 +300,7 @@ func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []TLV, typ
 				return out, nil
 			}
 		}
-		if err := ctx.Err(); err != nil {
+		if err := expired(ctx); err != nil {
 			return nil, err
 		}
 	}

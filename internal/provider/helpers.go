@@ -52,28 +52,41 @@ func applyPlan[T any](ctx context.Context, plan tfsdk.Plan, state *tfsdk.State, 
 	}
 }
 
-// importSingletonID accepts only the fixed id of a singleton resource and
-// records it in state. It reports whether the id was valid.
+// importSingletonID accepts the fixed id of a singleton resource, optionally
+// prefixed with a switch name ("sw02:led"), and records id and switch in state.
+// It reports whether the id was valid.
 func importSingletonID(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse, id string) bool {
-	if req.ID != id {
-		resp.Diagnostics.AddError(summaryInvalidImportID, fmt.Sprintf("the only valid id is %q, got %q", id, req.ID))
+	sw, rest := splitImportID(req.ID)
+	if rest != id {
+		resp.Diagnostics.AddError(summaryInvalidImportID, fmt.Sprintf("the only valid id is %q (optionally prefixed with a switch name and %q), got %q", id, idSeparator, req.ID))
 		return false
 	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(attrID), id)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(attrID), req.ID)...)
+	importSwitch(ctx, resp, sw)
 	return true
 }
 
 // importPositiveInt accepts a positive integer id (port number, LAG group,
-// VLAN id), records it under keyAttr, and reports whether it was valid. what
-// describes the expected id in the error ("a port number").
+// VLAN id), optionally prefixed with a switch name ("sw02:7"), records it
+// under keyAttr and the switch under `switch`, and reports whether it was
+// valid. what describes the expected id in the error ("a port number").
 func importPositiveInt(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse, what, keyAttr string) bool {
-	n, err := strconv.Atoi(req.ID)
+	sw, rest := splitImportID(req.ID)
+	n, err := strconv.Atoi(rest)
 	if err != nil || n < 1 {
-		resp.Diagnostics.AddError(summaryInvalidImportID, fmt.Sprintf("expected %s, got %q", what, req.ID))
+		resp.Diagnostics.AddError(summaryInvalidImportID, fmt.Sprintf("expected %s (optionally prefixed with a switch name and %q), got %q", what, idSeparator, req.ID))
 		return false
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(keyAttr), int64(n))...)
+	importSwitch(ctx, resp, sw)
 	return true
+}
+
+// importSwitch records the switch named in an import id, if any.
+func importSwitch(ctx context.Context, resp *resource.ImportStateResponse, sw string) {
+	if sw != "" {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(attrSwitch), sw)...)
+	}
 }
 
 // resetAllowDisruptive sets the guard override to false for an imported

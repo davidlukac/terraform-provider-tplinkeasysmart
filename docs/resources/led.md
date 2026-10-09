@@ -25,6 +25,10 @@ resource "tplinkeasysmart_led" "this" {
 
 - `enabled` (Boolean) Whether the port LEDs are on.
 
+### Optional
+
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
+
 ### Read-Only
 
 - `id` (String) Always `led`.
@@ -36,3 +40,5 @@ Import is supported using the following syntax:
 ```shell
 terraform import tplinkeasysmart_led.this led
 ```
+
+For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`).

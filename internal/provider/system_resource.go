@@ -25,7 +25,11 @@ var (
 // NewSystemResource returns the tplinkeasysmart_system resource.
 func NewSystemResource() resource.Resource { return &systemResource{} }
 
-type systemResource struct{ client systemClient }
+type systemResource struct {
+	src    switchSource
+	client systemClient // set on the per-call copy made by bound()
+	sw     types.String // the switch that copy is bound to, for ids
+}
 
 // systemClient is the part of the switch API this resource needs.
 type systemClient interface {
@@ -33,7 +37,13 @@ type systemClient interface {
 	SetHostname(ctx context.Context, name string) error
 }
 
+// bound returns a copy of the resource wired to the client of the named switch.
+func (r *systemResource) bound(add func(string, string), name types.String) *systemResource {
+	return bindSwitch(add, r.src, name, r, func(b *systemResource, c systemClient, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type systemResourceModel struct {
+	Switch   types.String `tfsdk:"switch"`
 	ID       types.String `tfsdk:"id"`
 	Hostname types.String `tfsdk:"hostname"`
 }
@@ -48,6 +58,7 @@ func (r *systemResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"Only the device description is managed. The management IP, DHCP and gateway are never changed: the request re-sends them as read from the switch. " +
 			"A write is skipped when the description already matches. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch: resourceSwitchAttribute(),
 			"id": schema.StringAttribute{Computed: true, Description: "Always `system`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"hostname": schema.StringAttribute{Required: true, Validators: validHostname(),
@@ -57,10 +68,16 @@ func (r *systemResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 }
 
 func (r *systemResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom[systemClient](req.ProviderData, &resp.Diagnostics)
+	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
+// apply binds the resource to the switch the plan selects, then applies it.
 func (r *systemResource) apply(ctx context.Context, m *systemResourceModel, add func(string, string)) bool {
+	b := r.bound(add, m.Switch)
+	return b != nil && b.applyBound(ctx, m, add)
+}
+
+func (r *systemResource) applyBound(ctx context.Context, m *systemResourceModel, add func(string, string)) bool {
 	want := m.Hostname.ValueString()
 	cur, err := r.client.Info(ctx)
 	if err != nil {
@@ -86,7 +103,7 @@ func (r *systemResource) apply(ctx context.Context, m *systemResourceModel, add 
 			return false
 		}
 	}
-	m.ID = types.StringValue(systemID)
+	m.ID = qualifiedID(r.sw, systemID)
 	return true
 }
 
@@ -98,13 +115,22 @@ func (r *systemResource) Update(ctx context.Context, req resource.UpdateRequest,
 	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
-func (r *systemResource) Read(ctx context.Context, _ resource.ReadRequest, resp *resource.ReadResponse) {
+// Read binds the resource to the switch recorded in state, then reads it.
+func (r *systemResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	sw := switchOf(ctx, req.State, &resp.Diagnostics)
+	if b := r.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (r *systemResource) readBound(ctx context.Context, _ resource.ReadRequest, resp *resource.ReadResponse) {
 	info, err := r.client.Info(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading the switch failed", err.Error())
 		return
 	}
-	m := systemResourceModel{ID: types.StringValue(systemID), Hostname: types.StringValue(info.Hostname)}
+	m := systemResourceModel{ID: qualifiedID(r.sw, systemID), Hostname: types.StringValue(info.Hostname)}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
 
@@ -116,3 +142,10 @@ func (r *systemResource) Delete(ctx context.Context, _ resource.DeleteRequest, _
 func (r *systemResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	importSingletonID(ctx, req, resp, systemID)
 }
+
+// ModifyPlan refuses, while planning, a switch that cannot be resolved.
+func (r *systemResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+}
+
+var _ resource.ResourceWithModifyPlan = &systemResource{}

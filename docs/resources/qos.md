@@ -34,6 +34,7 @@ resource "tplinkeasysmart_qos" "this" {
 ### Optional
 
 - `port_priorities` (Map of Number) Priority queue per port, keyed by port number ("7" = 2), 1 (lowest) to 4 (highest). Only the listed ports are managed. Priorities take effect only when mode is port-based; setting them in another mode is rejected.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
 
 ### Read-Only
 
@@ -46,3 +47,5 @@ Import is supported using the following syntax:
 ```shell
 terraform import tplinkeasysmart_qos.this qos
 ```
+
+For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`).

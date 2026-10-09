@@ -28,7 +28,11 @@ var (
 // NewVLANPortBasedGroupResource returns the tplinkeasysmart_lag resource.
 func NewVLANPortBasedGroupResource() resource.Resource { return &portVLANResource{} }
 
-type portVLANResource struct{ client portVLANClient }
+type portVLANResource struct {
+	src    switchSource
+	client portVLANClient // set on the per-call copy made by bound()
+	sw     types.String   // the switch that copy is bound to, for ids
+}
 
 // portVLANClient is the part of the switch API this resource needs.
 type portVLANClient interface {
@@ -37,10 +41,16 @@ type portVLANClient interface {
 	SetPortBasedVLAN(ctx context.Context, id int, ports []int) error
 }
 
+// bound returns a copy of the resource wired to the client of the named switch.
+func (r *portVLANResource) bound(add func(string, string), name types.String) *portVLANResource {
+	return bindSwitch(add, r.src, name, r, func(b *portVLANResource, c portVLANClient, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type portVLANResourceModel struct {
-	VLAN            types.Int64 `tfsdk:"vlan"`
-	Ports           types.Set   `tfsdk:"ports"`
-	AllowDisruptive types.Bool  `tfsdk:"allow_disruptive"`
+	Switch          types.String `tfsdk:"switch"`
+	VLAN            types.Int64  `tfsdk:"vlan"`
+	Ports           types.Set    `tfsdk:"ports"`
+	AllowDisruptive types.Bool   `tfsdk:"allow_disruptive"`
 }
 
 func (r *portVLANResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -54,6 +64,7 @@ func (r *portVLANResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"create, change or destroy a group when any port involved (old or new members) has a link up or belongs to a LAG, because that can cut connectivity or " +
 			"management access; set `allow_disruptive = true` to override. Import VLAN 1 (the default group) only together with `lifecycle { prevent_destroy = true }`.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch: resourceSwitchAttribute(),
 			"vlan": schema.Int64Attribute{Required: true, Description: "VLAN group id.",
 				Validators:    []validator.Int64{validByteID()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
@@ -64,7 +75,7 @@ func (r *portVLANResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 }
 
 func (r *portVLANResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom[portVLANClient](req.ProviderData, &resp.Diagnostics)
+	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
 // guardVLAN checks every port of the old and new membership: none may have a
@@ -123,7 +134,13 @@ func (r *portVLANResource) current(ctx context.Context, group int) ([]int, error
 	return []int{}, nil // group does not exist yet
 }
 
+// apply binds the resource to the switch the plan selects, then applies it.
 func (r *portVLANResource) apply(ctx context.Context, m *portVLANResourceModel, add func(string, string)) bool {
+	b := r.bound(add, m.Switch)
+	return b != nil && b.applyBound(ctx, m, add)
+}
+
+func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceModel, add func(string, string)) bool {
 	group := int(m.VLAN.ValueInt64())
 	ports, err := setToInts(ctx, m.Ports)
 	if err != nil || len(ports) == 0 {
@@ -159,7 +176,16 @@ func (r *portVLANResource) Update(ctx context.Context, req resource.UpdateReques
 	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
+// Read binds the resource to the switch recorded in state, then reads it.
 func (r *portVLANResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	sw := switchOf(ctx, req.State, &resp.Diagnostics)
+	if b := r.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (r *portVLANResource) readBound(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state portVLANResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -179,7 +205,7 @@ func (r *portVLANResource) Read(ctx context.Context, req resource.ReadRequest, r
 }
 
 // Delete removes the group, under the same guard as every other change.
-func (r *portVLANResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *portVLANResource) deleteBound(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state portVLANResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -200,8 +226,22 @@ func (r *portVLANResource) Delete(ctx context.Context, req resource.DeleteReques
 	}
 }
 
+// Delete binds the resource to the switch recorded in state, then removes it.
+func (r *portVLANResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	if b := r.bound(resp.Diagnostics.AddError, switchOf(ctx, req.State, &resp.Diagnostics)); b != nil {
+		b.deleteBound(ctx, req, resp)
+	}
+}
+
 func (r *portVLANResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if importPositiveInt(ctx, req, resp, "a VLAN id", "vlan") {
 		resetAllowDisruptive(ctx, resp)
 	}
 }
+
+// ModifyPlan refuses, while planning, a switch that cannot be resolved.
+func (r *portVLANResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+}
+
+var _ resource.ResourceWithModifyPlan = &portVLANResource{}

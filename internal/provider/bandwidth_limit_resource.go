@@ -25,7 +25,11 @@ var (
 // NewBandwidthLimitResource returns the tplinkeasysmart_bandwidth_limit resource.
 func NewBandwidthLimitResource() resource.Resource { return &bandwidthLimitResource{} }
 
-type bandwidthLimitResource struct{ client bandwidthLimitClient }
+type bandwidthLimitResource struct {
+	src    switchSource
+	client bandwidthLimitClient // set on the per-call copy made by bound()
+	sw     types.String         // the switch that copy is bound to, for ids
+}
 
 // bandwidthLimitClient is the part of the switch API this resource needs.
 type bandwidthLimitClient interface {
@@ -34,11 +38,17 @@ type bandwidthLimitClient interface {
 	SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps int) error
 }
 
+// bound returns a copy of the resource wired to the client of the named switch.
+func (r *bandwidthLimitResource) bound(add func(string, string), name types.String) *bandwidthLimitResource {
+	return bindSwitch(add, r.src, name, r, func(b *bandwidthLimitResource, c bandwidthLimitClient, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type bandwidthLimitModel struct {
-	Port            types.Int64 `tfsdk:"port"`
-	IngressKbps     types.Int64 `tfsdk:"ingress_kbps"`
-	EgressKbps      types.Int64 `tfsdk:"egress_kbps"`
-	AllowDisruptive types.Bool  `tfsdk:"allow_disruptive"`
+	Switch          types.String `tfsdk:"switch"`
+	Port            types.Int64  `tfsdk:"port"`
+	IngressKbps     types.Int64  `tfsdk:"ingress_kbps"`
+	EgressKbps      types.Int64  `tfsdk:"egress_kbps"`
+	AllowDisruptive types.Bool   `tfsdk:"allow_disruptive"`
 }
 
 func (r *bandwidthLimitResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -50,6 +60,7 @@ func (r *bandwidthLimitResource) Schema(_ context.Context, _ resource.SchemaRequ
 		Description: "Rate limits of one port (QoS > Bandwidth Control). Import with the port number. **Safety:** a limit throttles the port, so by default " +
 			"the provider refuses to change a port that has a link up or is in a LAG; set `allow_disruptive = true` to override. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch: resourceSwitchAttribute(),
 			"port": schema.Int64Attribute{Required: true, Description: "Port number (1-based).",
 				Validators:    []validator.Int64{validPortNumber()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
@@ -63,7 +74,7 @@ func (r *bandwidthLimitResource) Schema(_ context.Context, _ resource.SchemaRequ
 }
 
 func (r *bandwidthLimitResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom[bandwidthLimitClient](req.ProviderData, &resp.Diagnostics)
+	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
 func (r *bandwidthLimitResource) find(ctx context.Context, port int) (ingress, egress int, ok bool, err error) {
@@ -79,7 +90,13 @@ func (r *bandwidthLimitResource) find(ctx context.Context, port int) (ingress, e
 	return 0, 0, false, nil
 }
 
+// apply binds the resource to the switch the plan selects, then applies it.
 func (r *bandwidthLimitResource) apply(ctx context.Context, m *bandwidthLimitModel, add func(string, string)) bool {
+	b := r.bound(add, m.Switch)
+	return b != nil && b.applyBound(ctx, m, add)
+}
+
+func (r *bandwidthLimitResource) applyBound(ctx context.Context, m *bandwidthLimitModel, add func(string, string)) bool {
 	port := int(m.Port.ValueInt64())
 	in, eg := int(m.IngressKbps.ValueInt64()), int(m.EgressKbps.ValueInt64())
 	if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), port); err != nil {
@@ -106,7 +123,16 @@ func (r *bandwidthLimitResource) Update(ctx context.Context, req resource.Update
 	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
+// Read binds the resource to the switch recorded in state, then reads it.
 func (r *bandwidthLimitResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	sw := switchOf(ctx, req.State, &resp.Diagnostics)
+	if b := r.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (r *bandwidthLimitResource) readBound(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state bandwidthLimitModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -133,3 +159,10 @@ func (r *bandwidthLimitResource) ImportState(ctx context.Context, req resource.I
 		resetAllowDisruptive(ctx, resp)
 	}
 }
+
+// ModifyPlan refuses, while planning, a switch that cannot be resolved.
+func (r *bandwidthLimitResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+}
+
+var _ resource.ResourceWithModifyPlan = &bandwidthLimitResource{}

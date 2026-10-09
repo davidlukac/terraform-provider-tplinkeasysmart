@@ -305,7 +305,7 @@ func TestResourcesReportUndecodablePlanAndState(t *testing.T) {
 			t.Parallel()
 			fc := newFaulty(&fakeClient{})
 			r := ctor()
-			r.(resource.ResourceWithConfigure).Configure(ctx, resource.ConfigureRequest{ProviderData: fc}, &resource.ConfigureResponse{})
+			r.(resource.ResourceWithConfigure).Configure(ctx, resource.ConfigureRequest{ProviderData: &switchRegistry{def: fc}}, &resource.ConfigureResponse{})
 			var sch resource.SchemaResponse
 			r.Schema(ctx, resource.SchemaRequest{}, &sch)
 			objType := sch.Schema.Type().TerraformType(ctx)
@@ -355,7 +355,7 @@ func TestSetToIntsRejectsUnknownSets(t *testing.T) {
 
 func TestPortMirrorRejectsAnUnknownPortSet(t *testing.T) {
 	fc := newFaulty(&fakeClient{ports: testPorts(), mirror: &escp.Mirror{}})
-	r := &portMirrorResource{client: fc}
+	r := &portMirrorResource{src: &switchRegistry{def: fc}}
 	m := portMirrorResourceModel{Enabled: types.BoolValue(true), MirrorPort: types.Int64Value(7),
 		IngressPorts: types.SetUnknown(types.Int64Type), EgressPorts: emptyPortSet(), AllowDisruptive: types.BoolValue(false)}
 	var summary, detail string

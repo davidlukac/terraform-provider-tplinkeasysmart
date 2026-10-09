@@ -19,14 +19,24 @@ var (
 // NewConfigBackupDataSource returns the tplinkeasysmart_config_backup data source.
 func NewConfigBackupDataSource() datasource.DataSource { return &configBackupDataSource{} }
 
-type configBackupDataSource struct{ client configBackupReader }
+type configBackupDataSource struct {
+	src    switchSource
+	client configBackupReader // set on the per-call copy made by bound()
+	sw     types.String       // the switch that copy is bound to, for ids
+}
 
 // configBackupReader is the part of the switch API this data source reads.
 type configBackupReader interface {
 	ConfigBackup(ctx context.Context) ([]byte, error)
 }
 
+// bound returns a copy of the data source wired to the client of the named switch.
+func (d *configBackupDataSource) bound(add func(string, string), name types.String) *configBackupDataSource {
+	return bindSwitch(add, d.src, name, d, func(b *configBackupDataSource, c configBackupReader, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type configBackupModel struct {
+	Switch         types.String `tfsdk:"switch"`
 	ID             types.String `tfsdk:"id"`
 	IncludeContent types.Bool   `tfsdk:"include_content"`
 	Size           types.Int64  `tfsdk:"size"`
@@ -44,6 +54,7 @@ func (d *configBackupDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 			"By default only size and SHA-256 are returned, which is enough to detect configuration changes made outside Terraform. " +
 			"The file contains an obfuscated credential block; set `include_content` only if you need the bytes, and treat the state as secret.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch:        dataSourceSwitchAttribute(),
 			"id":              schema.StringAttribute{Computed: true, Description: "Always `config_backup`."},
 			"include_content": schema.BoolAttribute{Optional: true, Description: "Also return the file as base64 in `content_base64`. Defaults to false."},
 			"size":            schema.Int64Attribute{Computed: true, Description: "File size in bytes."},
@@ -54,10 +65,19 @@ func (d *configBackupDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 }
 
 func (d *configBackupDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom[configBackupReader](req.ProviderData, &resp.Diagnostics)
+	d.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
+// Read binds the data source to the switch selected in the configuration, then reads it.
 func (d *configBackupDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	sw := switchOf(ctx, req.Config, &resp.Diagnostics)
+	if b := d.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (d *configBackupDataSource) readBound(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var cfg configBackupModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
 	if !resp.Diagnostics.HasError() {
@@ -73,7 +93,7 @@ func (d *configBackupDataSource) read(ctx context.Context, cfg configBackupModel
 	}
 	sum := sha256.Sum256(data)
 	state := configBackupModel{
-		ID: types.StringValue("config_backup"), IncludeContent: cfg.IncludeContent,
+		ID: qualifiedID(d.sw, "config_backup"), IncludeContent: cfg.IncludeContent,
 		Size: types.Int64Value(int64(len(data))), SHA256: types.StringValue(hex.EncodeToString(sum[:])),
 		ContentBase64: types.StringNull(),
 	}

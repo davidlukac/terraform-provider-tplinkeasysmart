@@ -32,3 +32,7 @@ provider "tplinkeasysmart" {
 
 # Alternatively leave the provider block empty and export
 # TPLINK_EASYSMART_HOST, TPLINK_EASYSMART_USERNAME and TPLINK_EASYSMART_PASSWORD.
+
+# Several switches: use the `switches` map and select one per resource with
+# `switch = "<name>"` (see examples/multi-switch), or declare one provider
+# alias per switch.

@@ -38,6 +38,7 @@ resource "tplinkeasysmart_bandwidth_limit" "unused" {
 - `allow_disruptive` (Boolean) Allow changing a port that has a link up or is a LAG member. Defaults to false.
 - `egress_kbps` (Number) Egress limit in kbps: 0 (unlimited) or a multiple of 64 up to 1000000.
 - `ingress_kbps` (Number) Ingress limit in kbps: 0 (unlimited) or a multiple of 64 up to 1000000.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
 
 ## Import
 
@@ -47,3 +48,5 @@ Import is supported using the following syntax:
 # The import id is the port number.
 terraform import tplinkeasysmart_bandwidth_limit.unused 7
 ```
+
+For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`).

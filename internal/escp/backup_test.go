@@ -84,9 +84,9 @@ func TestConfigBackupNoReply(t *testing.T) {
 func TestConfigBackupHonoursContext(t *testing.T) {
 	f := startFakeSwitch(t)
 	f.setBackupMode("silent")
-	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 10 * time.Second,
+	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 30 * time.Second,
 		SwitchPort: f.port(), BroadcastAddr: "127.0.0.1"})
-	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	start := time.Now()
 	_, err := c.ConfigBackup(ctx)

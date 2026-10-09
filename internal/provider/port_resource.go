@@ -26,7 +26,11 @@ var (
 // NewPortResource returns the tplinkeasysmart_port resource.
 func NewPortResource() resource.Resource { return &portResource{} }
 
-type portResource struct{ client portClient }
+type portResource struct {
+	src    switchSource
+	client portClient   // set on the per-call copy made by bound()
+	sw     types.String // the switch that copy is bound to, for ids
+}
 
 // portClient is the part of the switch API this resource needs.
 type portClient interface {
@@ -34,7 +38,13 @@ type portClient interface {
 	SetPort(ctx context.Context, id int, enabled bool, speed string, flowControl bool) error
 }
 
+// bound returns a copy of the resource wired to the client of the named switch.
+func (r *portResource) bound(add func(string, string), name types.String) *portResource {
+	return bindSwitch(add, r.src, name, r, func(b *portResource, c portClient, sw types.String) { b.client, b.sw = c, sw })
+}
+
 type portResourceModel struct {
+	Switch          types.String `tfsdk:"switch"`
 	Port            types.Int64  `tfsdk:"port"`
 	Enabled         types.Bool   `tfsdk:"enabled"`
 	Speed           types.String `tfsdk:"speed"`
@@ -53,6 +63,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"Import with the port number. **Safety:** by default the provider refuses to change a port that has a link up or is in a LAG, " +
 			"because that can cut the uplink or the management path; set `allow_disruptive = true` to override. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
+			attrSwitch: resourceSwitchAttribute(),
 			"port": schema.Int64Attribute{Required: true, Description: "Port number (1-based).",
 				Validators:    []validator.Int64{validPortNumber()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
@@ -78,7 +89,7 @@ func joinSpeeds() string {
 }
 
 func (r *portResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom[portClient](req.ProviderData, &resp.Diagnostics)
+	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
 func (r *portResource) find(ctx context.Context, id int) (escp.Port, bool, error) {
@@ -94,7 +105,13 @@ func (r *portResource) find(ctx context.Context, id int) (escp.Port, bool, error
 	return escp.Port{}, false, nil
 }
 
+// apply binds the resource to the switch the plan selects, then applies it.
 func (r *portResource) apply(ctx context.Context, m *portResourceModel, add func(string, string)) bool {
+	b := r.bound(add, m.Switch)
+	return b != nil && b.applyBound(ctx, m, add)
+}
+
+func (r *portResource) applyBound(ctx context.Context, m *portResourceModel, add func(string, string)) bool {
 	id := int(m.Port.ValueInt64())
 	if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), id); err != nil {
 		add("Refusing to change port", err.Error())
@@ -125,7 +142,16 @@ func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
+// Read binds the resource to the switch recorded in state, then reads it.
 func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	sw := switchOf(ctx, req.State, &resp.Diagnostics)
+	if b := r.bound(resp.Diagnostics.AddError, sw); b != nil {
+		b.readBound(ctx, req, resp)
+		keepSwitch(ctx, sw, &resp.State, &resp.Diagnostics)
+	}
+}
+
+func (r *portResource) readBound(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state portResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -152,3 +178,10 @@ func (r *portResource) ImportState(ctx context.Context, req resource.ImportState
 		resetAllowDisruptive(ctx, resp)
 	}
 }
+
+// ModifyPlan refuses, while planning, a switch that cannot be resolved.
+func (r *portResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+}
+
+var _ resource.ResourceWithModifyPlan = &portResource{}

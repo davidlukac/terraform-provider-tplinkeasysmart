@@ -43,6 +43,7 @@ resource "tplinkeasysmart_lag" "uplink" {
 ### Optional
 
 - `allow_disruptive` (Boolean) Allow touching ports that have a link up or belong to a LAG. Defaults to false.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
 
 ## Import
 
@@ -52,3 +53,5 @@ Import is supported using the following syntax:
 # The import id is the LAG group number.
 terraform import tplinkeasysmart_lag.uplink 1
 ```
+
+For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`).
