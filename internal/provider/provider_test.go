@@ -18,6 +18,7 @@ import (
 type fakeClient struct {
 	mu      sync.Mutex
 	igmp    escp.IGMP
+	lags    map[int][]int
 	mirror  *escp.Mirror
 	storm   map[int]escp.PortStorm
 	bw      map[int][2]int
@@ -63,7 +64,20 @@ func (f *fakeClient) PortStatistics(context.Context) ([]escp.PortStats, error) {
 	return []escp.PortStats{{ID: 1, Enabled: true, Link: "1000Mbps-full", TxGood: 4000000000, RxGood: 7, RxBad: 1}}, nil
 }
 
+func (f *fakeClient) SetLAG(_ context.Context, group int, ports []int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lags[group] = append([]int{}, ports...)
+	f.sets++
+	return nil
+}
+
 func (f *fakeClient) LAGs(context.Context) ([]escp.LAG, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.lags != nil {
+		return []escp.LAG{{ID: 1, Ports: f.lags[1]}, {ID: 2, Ports: append([]int{}, f.lags[2]...)}}, nil
+	}
 	return []escp.LAG{{ID: 1, Ports: []int{1, 2}}, {ID: 2, Ports: []int{}}}, nil
 }
 
@@ -781,6 +795,50 @@ func TestAccPortMirrorGuard(t *testing.T) {
 		Steps: []resource.TestStep{
 			{Config: mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [7]\n"), ExpectError: regexp.MustCompile(`has a link up`)},
 			{Config: mirrorConfig("  enabled = true\n  mirror_port = 1\n  ingress_ports = [7]\n"), ExpectError: regexp.MustCompile(`member of LAG1`)},
+		},
+	})
+	if f.sets != 0 {
+		t.Fatalf("guard must prevent any write, got %d", f.sets)
+	}
+}
+
+func lagPorts() []escp.Port {
+	return []escp.Port{
+		{ID: 1, Enabled: true, LAG: 1, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
+		{ID: 2, Enabled: true, LAG: 1, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
+		{ID: 4, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
+		{ID: 6, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
+		{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
+	}
+}
+
+func lagConfig(group int, body string) string {
+	return providerBlock + fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"l\" {\n  group = %d\n%s}\n", group, body)
+}
+
+func TestAccLAGLifecycleOnUnusedPorts(t *testing.T) {
+	f := &fakeClient{ports: lagPorts(), lags: map[int][]int{1: {1, 2}}}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: lagConfig(2, "  ports = [6, 7]\n"), Check: resource.TestCheckResourceAttr("tplinkeasysmart_lag.l", "ports.#", "2")},
+			{ResourceName: "tplinkeasysmart_lag.l", ImportState: true, ImportStateId: "2", ImportStateVerify: true,
+				ImportStateVerifyIdentifierAttribute: "group"},
+		},
+	})
+	if len(f.lags[2]) != 0 || fmt.Sprint(f.lags[1]) != "[1 2]" {
+		t.Fatalf("after destroy LAG2 must be empty and LAG1 untouched: %v", f.lags)
+	}
+}
+
+func TestAccLAGGuard(t *testing.T) {
+	f := &fakeClient{ports: lagPorts(), lags: map[int][]int{1: {1, 2}}}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: lagConfig(2, "  ports = [4, 6]\n"), ExpectError: regexp.MustCompile(`port 4 has a link up`)},
+			{Config: lagConfig(2, "  ports = [1, 6]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
+			{Config: lagConfig(1, "  ports = [1]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up|port 2 has a link up`)},
 		},
 	})
 	if f.sets != 0 {

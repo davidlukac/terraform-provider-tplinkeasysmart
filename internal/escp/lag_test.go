@@ -1,6 +1,7 @@
 package escp
 
 import (
+	"context"
 	"reflect"
 	"testing"
 )
@@ -17,5 +18,30 @@ func TestParseLAGs(t *testing.T) {
 	}
 	if _, err := parseLAGs([]TLV{{Type: TLVLAG, Value: []byte{1}}}); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestSetLAGWire(t *testing.T) {
+	f := startFakeSwitch(t)
+	c := dialFake(t, f, "secret")
+	ctx := context.Background()
+	if err := c.SetLAG(ctx, 2, []int{6, 7}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.set(); got[0].Type != TLVLAG || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
+		t.Fatalf("wire %+v", got)
+	}
+	if err := c.SetLAG(ctx, 2, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.set(); !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0}) {
+		t.Fatalf("delete wire %v", got[0].Value)
+	}
+	n := len(f.allSets())
+	if c.SetLAG(ctx, 0, []int{1}) == nil || c.SetLAG(ctx, 2, []int{40}) == nil {
+		t.Fatal("invalid group or port must be rejected")
+	}
+	if len(f.allSets()) != n {
+		t.Fatal("rejected requests must not reach the switch")
 	}
 }

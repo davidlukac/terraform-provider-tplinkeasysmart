@@ -324,3 +324,47 @@ func TestLivePortMirror(t *testing.T) {
 		t.Fatalf("not applied: %+v", got)
 	}
 }
+
+func lagByID(t *testing.T, c *Client, id int) LAG {
+	t.Helper()
+	lags, err := c.LAGs(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range lags {
+		if l.ID == id {
+			return l
+		}
+	}
+	t.Fatalf("LAG%d missing", id)
+	return LAG{}
+}
+
+// Creates LAG2 from the two unused ports 6 and 7 and removes it again. LAG1
+// (the router uplink) is never written.
+func TestLiveLAG2(t *testing.T) {
+	c, ctx := liveClient(t), context.Background()
+	livePort(t, c, 6)
+	livePort(t, c, 7)
+	lag1 := lagByID(t, c, 1)
+	if orig := lagByID(t, c, 2); len(orig.Ports) != 0 {
+		t.Fatalf("LAG2 is already in use: %+v; refusing", orig)
+	}
+	defer func() {
+		if err := c.SetLAG(ctx, 2, nil); err != nil {
+			t.Errorf("RESTORE FAILED: %v", err)
+		}
+		if now := lagByID(t, c, 2); len(now.Ports) != 0 {
+			t.Errorf("LAG2 not removed: %+v", now)
+		}
+		if now := lagByID(t, c, 1); !reflect.DeepEqual(now, lag1) {
+			t.Errorf("LAG1 changed: %+v vs %+v", now, lag1)
+		}
+	}()
+	if err := c.SetLAG(ctx, 2, []int{6, 7}); err != nil {
+		t.Fatal(err)
+	}
+	if got := lagByID(t, c, 2); !reflect.DeepEqual(got.Ports, []int{6, 7}) {
+		t.Fatalf("not applied: %+v", got)
+	}
+}
