@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -118,11 +119,12 @@ func (c *Client) open() error {
 	if c.conn != nil {
 		return nil
 	}
-	conn, err := net.ListenUDP("udp4", &net.UDPAddr{Port: c.cfg.HostPort})
+	lc := net.ListenConfig{Control: shareSocket}
+	pc, err := lc.ListenPacket(context.Background(), "udp4", net.JoinHostPort("", strconv.Itoa(c.cfg.HostPort)))
 	if err != nil {
-		return fmt.Errorf("escp: binding UDP port %d (is another Easy Smart client or Terraform run active?): %w", c.cfg.HostPort, err)
+		return fmt.Errorf("escp: binding UDP port %d (is a client that does not share the port running, such as an old Easy Smart utility?): %w", c.cfg.HostPort, err)
 	}
-	c.conn = conn
+	c.conn = pc.(*net.UDPConn) // a "udp4" listener is always a *net.UDPConn
 	return nil
 }
 

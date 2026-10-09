@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25.0
+
+- Several switches at once: the client binds the reply port with address/port sharing (SO_REUSEADDR + SO_REUSEPORT; Windows SO_REUSEADDR), so provider aliases and concurrent processes coexist and each keeps the replies from its own switch. Verified with two switches and two processes; one timing-sensitive test made deterministic.
+
 ## 0.24.1
 
 - Security: transitive dependencies bumped (govulncheck clean, make vuln and CI step); fuzz tests for the packet and settings parsers; flaky test fixed; backup and drift-check helpers; decision records and runbook.

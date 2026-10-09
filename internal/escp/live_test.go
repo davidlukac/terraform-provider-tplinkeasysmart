@@ -470,3 +470,37 @@ func TestLiveHostnameRename(t *testing.T) {
 		t.Fatalf("after rename: %+v, want %+v (only the hostname may differ)", after, want)
 	}
 }
+
+// Two clients (one per switch, as two provider aliases would be) must work at
+// the same time on the shared reply port. Needs SWITCH_02_IP; it only sends
+// the unauthenticated discovery request to the second switch, no credentials.
+func TestLiveTwoClientsShareThePort(t *testing.T) {
+	second := os.Getenv("SWITCH_02_IP")
+	if second == "" {
+		t.Skip("set SWITCH_02_IP to run (discovery only, no credentials are sent to it)")
+	}
+	a := liveClient(t)
+	b, err := Dial(Config{Host: second, Timeout: 3 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { b.Close() })
+	type result struct {
+		info Info
+		err  error
+	}
+	ch := make(chan result, 2)
+	go func() { i, e := a.Info(context.Background()); ch <- result{i, e} }()
+	go func() { i, e := b.Info(context.Background()); ch <- result{i, e} }()
+	macs := map[string]bool{}
+	for i := 0; i < 2; i++ {
+		r := <-ch
+		if r.err != nil {
+			t.Fatalf("a client failed while sharing the port: %v", r.err)
+		}
+		macs[r.info.MAC] = true
+	}
+	if len(macs) != 2 {
+		t.Fatalf("each client must get its own switch's reply, got MACs %v", macs)
+	}
+}
