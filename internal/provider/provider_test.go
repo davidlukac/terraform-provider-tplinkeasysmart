@@ -38,6 +38,10 @@ func (f *fakeClient) PortStatistics(context.Context) ([]escp.PortStats, error) {
 	return []escp.PortStats{{ID: 1, Enabled: true, Link: "1000Mbps-full", TxGood: 4000000000, RxGood: 7, RxBad: 1}}, nil
 }
 
+func (f *fakeClient) LAGs(context.Context) ([]escp.LAG, error) {
+	return []escp.LAG{{ID: 1, Ports: []int{1, 2}}, {ID: 2, Ports: []int{}}}, nil
+}
+
 func (f *fakeClient) GetLED(context.Context) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -186,6 +190,21 @@ func TestAccPortStatisticsDataSource(t *testing.T) {
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_port_statistics.this", "ports.0.link", "1000Mbps-full"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_port_statistics.this", "ports.0.tx_good_packets", "4000000000"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_port_statistics.this", "ports.0.rx_bad_packets", "1"),
+			),
+		}},
+	})
+}
+
+func TestAccLAGsDataSource(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(&fakeClient{}),
+		Steps: []resource.TestStep{{
+			Config: providerBlock + `data "tplinkeasysmart_lags" "this" {}`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_lags.this", "lags.#", "2"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_lags.this", "lags.0.ports.#", "2"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_lags.this", "lags.0.ports.1", "2"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_lags.this", "lags.1.ports.#", "0"),
 			),
 		}},
 	})
