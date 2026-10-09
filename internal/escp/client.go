@@ -5,11 +5,16 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"sync"
 	"time"
 )
+
+// randReader is the entropy source for session keys; tests replace it to
+// provoke the (otherwise unreachable) read failure.
+var randReader io.Reader = rand.Reader
 
 // Default ports of the protocol: requests go to 29808, replies always come
 // back to 29809 regardless of the source port.
@@ -196,23 +201,32 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []TLV, static bool,
 			if err != nil {
 				break
 			}
-			if !from.IP.Equal(c.dest.IP) {
-				continue
+			if rep, ok := c.accept(from, buf[:n]); ok {
+				return rep, nil
 			}
-			h, t, err := unmarshal(c.decrypt(buf[:n]))
-			if err != nil || h.Seq != c.seq || h.Op == OpDiscovery {
-				continue
-			}
-			if !c.haveSwMAC {
-				c.swMAC, c.haveSwMAC = h.SwitchMAC, true
-			}
-			return reply{op: h.Op, err: h.ErrCode, tlvs: t}, nil
 		}
 		if err := ctx.Err(); err != nil {
 			return reply{}, err
 		}
 	}
 	return reply{}, ErrNoReply
+}
+
+// accept decides whether a datagram is the reply to the request in flight: it
+// must come from the switch, decode to a valid packet, echo the current
+// sequence number and not be our own broadcast discovery coming back.
+func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
+	if !from.IP.Equal(c.dest.IP) {
+		return reply{}, false
+	}
+	h, t, err := unmarshal(c.decrypt(data))
+	if err != nil || h.Seq != c.seq || h.Op == OpDiscovery {
+		return reply{}, false
+	}
+	if !c.haveSwMAC {
+		c.swMAC, c.haveSwMAC = h.SwitchMAC, true
+	}
+	return reply{op: h.Op, err: h.ErrCode, tlvs: t}, true
 }
 
 func (c *Client) discoverTargets() []*net.UDPAddr {
@@ -231,6 +245,12 @@ func (c *Client) discover(ctx context.Context) (Info, error) {
 	if err != nil {
 		return Info{}, err
 	}
+	return infoFromReply(r), nil
+}
+
+// infoFromReply maps the TLVs of a discovery reply to Info; absent or
+// malformed fields stay empty.
+func infoFromReply(r reply) Info {
 	str := func(t int16) string { v, _ := r.tlv(t); return cstring(v) }
 	ip := func(t int16) string {
 		if v, ok := r.tlv(t); ok && len(v) == 4 {
@@ -249,7 +269,7 @@ func (c *Client) discover(ctx context.Context) (Info, error) {
 	if v, ok := r.tlv(TLVFactoryDefault); ok && len(v) == 1 {
 		info.FactoryDefault = v[0] != 0
 	}
-	return info, nil
+	return info
 }
 
 // ensureSession discovers the switch MAC and performs the RSA session-key
@@ -266,7 +286,7 @@ func (c *Client) ensureSession(ctx context.Context) error {
 	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 	key := make([]byte, SessionKeyLen)
 	for i := range key {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(alphabet))))
+		n, err := rand.Int(randReader, big.NewInt(int64(len(alphabet))))
 		if err != nil {
 			return err
 		}

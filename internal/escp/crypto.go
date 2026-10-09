@@ -30,8 +30,10 @@ func teaDecryptBlock(b []byte) []byte {
 	return out
 }
 
-func staticKey() []byte {
-	blob, err := hex.DecodeString(staticKeyBlob)
+// staticKeyFrom decrypts the TEA-encrypted key blob (hex). It panics on invalid
+// hex: the blob is a compile-time constant, so that is a programming error.
+func staticKeyFrom(blobHex string) []byte {
+	blob, err := hex.DecodeString(blobHex)
 	if err != nil {
 		panic(err)
 	}
@@ -72,7 +74,7 @@ func rc4(data []byte, state []int, n int) []byte {
 	return out
 }
 
-var staticState = rc4State(staticKey(), 256)
+var staticState = rc4State(staticKeyFrom(staticKeyBlob), 256)
 
 func rc4Static(data []byte) []byte { return rc4(data, staticState, 256) }
 

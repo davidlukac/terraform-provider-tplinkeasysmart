@@ -1,0 +1,4 @@
+# coverage output (make cover / cover-html)
+cover.out
+coverage.html
+scripts/__pycache__/

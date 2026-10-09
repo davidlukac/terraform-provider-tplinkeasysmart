@@ -62,6 +62,20 @@ go build -o bin/terraform-provider-tplinkeasysmart .
 
 Tests do not touch hardware: `internal/escp` runs the client against an in-process fake switch (it can decrypt the session key because the switch's 64-bit RSA modulus factors trivially), and `internal/provider` runs real `terraform` plan/apply/import cycles against a fake client.
 
+### Testing and coverage
+
+```sh
+make cover        # suite with -race, writes cover.out, enforces the coverage policy
+make cover-html   # same, plus coverage.html
+```
+
+Policy: **every statement is covered**, except inside functions whose doc comment contains `// coverage: ignore - <reason>` (the reason is mandatory; `scripts/covercheck.py` fails the build without it, and lists every exclusion). Today the only exclusion is the `main()` shim, because `run` holds the logic and is tested. Do not delete a safety check to raise the number, and do not write tests without assertions: a test must fail when the behaviour it names is broken.
+
+How the failure paths are exercised without hardware:
+
+- `internal/escp`: the fake UDP switch can be scripted per request (`getFn`), can stay silent, reject the key exchange, reject the *n*th SET, or replace its discovery reply.
+- `internal/provider`: `faultyClient` wraps the in-memory fake and fails specific calls of any method (all of them, or only the *n*th), or accepts writes without applying them. `faultScenarios()` drives every resource through the same failure modes (write rejected, read-back fails, write ignored, update fails, refresh fails, bad import id, object vanishes, update succeeds).
+
 ## Layout
 
 - `internal/escp`: crypto (static RC4, 8-byte-state session RC4, 64-bit RSA), packet codec, UDP client (discovery, key exchange, LED get/set, retry, session recovery).
