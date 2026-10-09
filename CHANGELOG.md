@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.15.0
+
+- Resource tplinkeasysmart_port (admin state, speed, flow control) with a guard that refuses ports that have a link up or are in a LAG unless allow_disruptive is set; client SetHostname added but not live-verified (no resource yet); live toggle tests for IGMP snooping and loop prevention.
+
 ## 0.14.0
 
 - System info now also reports port count, auto-save and the factory-default flag; README lists all covered settings.

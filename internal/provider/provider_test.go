@@ -18,6 +18,7 @@ import (
 type fakeClient struct {
 	mu      sync.Mutex
 	igmp    escp.IGMP
+	ports   []escp.Port
 	loop    bool
 	led     bool
 	sets    int
@@ -30,7 +31,24 @@ func (f *fakeClient) Info(context.Context) (escp.Info, error) {
 		IP: "192.0.2.120", Netmask: "255.255.255.0", Gateway: "192.0.2.1", DHCP: true}, nil
 }
 
+func (f *fakeClient) SetPort(_ context.Context, id int, enabled bool, speed string, flow bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.ports {
+		if f.ports[i].ID == id {
+			f.ports[i].Enabled, f.ports[i].ConfiguredSpeed, f.ports[i].ConfiguredFlowControl = enabled, speed, flow
+			f.sets++
+		}
+	}
+	return nil
+}
+
 func (f *fakeClient) Ports(context.Context) ([]escp.Port, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.ports != nil {
+		return append([]escp.Port(nil), f.ports...), nil
+	}
 	return []escp.Port{
 		{ID: 1, Enabled: true, LAG: 1, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
 		{ID: 3, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
@@ -426,6 +444,76 @@ func TestAccStormControlDataSource(t *testing.T) {
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_storm_control.this", "ports.1.broadcast", "true"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_storm_control.this", "ports.1.rate_kbps", "5000"),
 			),
+		}},
+	})
+}
+
+func testPorts() []escp.Port {
+	return []escp.Port{
+		{ID: 1, Enabled: true, LAG: 1, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
+		{ID: 4, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
+		{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
+	}
+}
+
+func portConfig(port int, extra string) string {
+	return providerBlock + fmt.Sprintf(`
+resource "tplinkeasysmart_port" "p" {
+  port = %d
+%s}
+`, port, extra)
+}
+
+func TestAccPortLifecycleOnUnusedPort(t *testing.T) {
+	f := &fakeClient{ports: testPorts()}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: portConfig(7, "  flow_control = true\n"), Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("tplinkeasysmart_port.p", "flow_control", "true"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_port.p", "speed", "auto"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_port.p", "actual_speed", "link-down"),
+			)},
+			{Config: portConfig(7, "  speed = \"100Mbps-full\"\n  enabled = false\n"), Check: func(*terraformState) error {
+				f.mu.Lock()
+				defer f.mu.Unlock()
+				if p := f.ports[2]; p.Enabled || p.ConfiguredSpeed != "100Mbps-full" || p.ConfiguredFlowControl {
+					return fmt.Errorf("port 7 on the switch: %+v", p)
+				}
+				return nil
+			}},
+			{ResourceName: "tplinkeasysmart_port.p", ImportState: true, ImportStateId: "7", ImportStateVerify: true,
+				ImportStateVerifyIdentifierAttribute: "port"},
+		},
+	})
+}
+
+func TestAccPortGuardBlocksUsedPorts(t *testing.T) {
+	for _, tc := range []struct {
+		port int
+		want string
+	}{{1, `member of LAG1`}, {4, `has a link up`}} {
+		f := &fakeClient{ports: testPorts()}
+		resource.UnitTest(t, resource.TestCase{
+			ProtoV6ProviderFactories: factories(f),
+			Steps: []resource.TestStep{{
+				Config:      portConfig(tc.port, "  enabled = false\n"),
+				ExpectError: regexp.MustCompile(tc.want),
+			}},
+		})
+		if f.sets != 0 {
+			t.Fatalf("port %d: guard must prevent any write, got %d", tc.port, f.sets)
+		}
+	}
+}
+
+func TestAccPortGuardOverride(t *testing.T) {
+	f := &fakeClient{ports: testPorts()}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{{
+			Config: portConfig(4, "  flow_control = true\n  allow_disruptive = true\n"),
+			Check:  resource.TestCheckResourceAttr("tplinkeasysmart_port.p", "flow_control", "true"),
 		}},
 	})
 }

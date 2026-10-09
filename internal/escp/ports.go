@@ -62,3 +62,29 @@ func (c *Client) Ports(ctx context.Context) ([]Port, error) {
 	}
 	return parsePorts(tlvs)
 }
+
+// SpeedNames lists the configurable speeds in the order of the switch's codes 1..6.
+var SpeedNames = []string{"auto", "10Mbps-half", "10Mbps-full", "100Mbps-half", "100Mbps-full", "1000Mbps-full"}
+
+func speedCode(name string) (byte, error) {
+	for i, n := range SpeedNames {
+		if n == name {
+			return byte(i + 1), nil
+		}
+	}
+	return 0, fmt.Errorf("escp: unknown speed %q (valid: %v)", name, SpeedNames)
+}
+
+// SetPort writes the configuration of one port: admin state, speed and flow
+// control (7-byte TLV 4096 as sent by the vendor utility). Changing a port that
+// carries traffic can cut connectivity; callers must guard against that.
+func (c *Client) SetPort(ctx context.Context, id int, enabled bool, speed string, flowControl bool) error {
+	code, err := speedCode(speed)
+	if err != nil {
+		return err
+	}
+	if id < 1 || id > 32 {
+		return fmt.Errorf("escp: invalid port %d", id)
+	}
+	return c.setTLVs(ctx, TLV{TLVPorts, []byte{byte(id), boolByte(enabled), 0, code, 0, boolByte(flowControl), 0}})
+}

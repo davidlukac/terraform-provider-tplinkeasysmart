@@ -96,3 +96,40 @@ func TestSessionRecoversAfterSwitchRestart(t *testing.T) {
 		t.Fatalf("client should re-establish the session: %v", err)
 	}
 }
+
+func TestSetHostnameKeepsIPConfiguration(t *testing.T) {
+	f := startFakeSwitch(t)
+	c := dialFake(t, f, "secret")
+	if err := c.SetHostname(context.Background(), "new-name"); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.hostname != "new-name" || len(f.setIP) != 4 || f.setIP[0] != 127 || f.setIP[3] != 1 {
+		t.Fatalf("hostname=%q ip=%v: the current IP must be re-sent unchanged", f.hostname, f.setIP)
+	}
+	if err := c.SetHostname(context.Background(), "bad name"); err == nil {
+		t.Fatal("invalid name must be rejected before any packet is sent")
+	}
+}
+
+func TestSetPortWire(t *testing.T) {
+	f := startFakeSwitch(t)
+	c := dialFake(t, f, "secret")
+	if err := c.SetPort(context.Background(), 7, true, "100Mbps-full", true); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	got := f.port7
+	f.mu.Unlock()
+	want := []byte{7, 1, 0, 5, 0, 1, 0}
+	if string(got) != string(want) {
+		t.Fatalf("wire bytes %v, want %v", got, want)
+	}
+	if err := c.SetPort(context.Background(), 7, true, "warp", false); err == nil {
+		t.Fatal("unknown speed must be rejected before sending")
+	}
+	if err := c.SetPort(context.Background(), 0, true, "auto", false); err == nil {
+		t.Fatal("port 0 must be rejected")
+	}
+}

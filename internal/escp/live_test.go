@@ -55,3 +55,93 @@ func TestLiveLoopPreventionSameValueWrite(t *testing.T) {
 		t.Fatalf("state changed: %v err=%v", after, err)
 	}
 }
+
+// Real toggles. Each restores the original value unconditionally.
+func TestLiveIGMPToggle(t *testing.T) {
+	c, ctx := liveClient(t), context.Background()
+	orig, err := c.IGMP(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := c.SetIGMP(ctx, orig.Enabled, orig.ReportSuppression); err != nil {
+			t.Errorf("RESTORE FAILED: %v", err)
+		}
+	}()
+	if err := c.SetIGMP(ctx, !orig.Enabled, orig.ReportSuppression); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := c.IGMP(ctx); got.Enabled == orig.Enabled {
+		t.Fatalf("toggle had no effect: %+v", got)
+	}
+}
+
+func TestLiveLoopPreventionToggle(t *testing.T) {
+	c, ctx := liveClient(t), context.Background()
+	orig, err := c.LoopPrevention(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := c.SetLoopPrevention(ctx, orig); err != nil {
+			t.Errorf("RESTORE FAILED: %v", err)
+		}
+	}()
+	if err := c.SetLoopPrevention(ctx, !orig); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := c.LoopPrevention(ctx); got == orig {
+		t.Fatal("toggle had no effect")
+	}
+}
+
+// livePort returns the current state of an unused test port, aborting the test
+// if the port is carrying a link or belongs to a LAG.
+func livePort(t *testing.T, c *Client, id int) Port {
+	t.Helper()
+	ports, err := c.Ports(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range ports {
+		if p.ID == id {
+			if p.ActualSpeed != "link-down" || p.LAG != 0 {
+				t.Fatalf("port %d is in use (%s, LAG %d): refusing to touch it", id, p.ActualSpeed, p.LAG)
+			}
+			return p
+		}
+	}
+	t.Fatalf("port %d not found", id)
+	return Port{}
+}
+
+func TestLivePortWrites(t *testing.T) {
+	const id = 7
+	c, ctx := liveClient(t), context.Background()
+	orig := livePort(t, c, id)
+	defer func() {
+		if err := c.SetPort(ctx, id, orig.Enabled, orig.ConfiguredSpeed, orig.ConfiguredFlowControl); err != nil {
+			t.Errorf("RESTORE FAILED: %v", err)
+		}
+		if now := livePort(t, c, id); now != orig {
+			t.Errorf("port %d not restored: %+v vs %+v", id, now, orig)
+		}
+	}()
+	for _, step := range []struct {
+		enabled bool
+		speed   string
+		flow    bool
+	}{
+		{orig.Enabled, orig.ConfiguredSpeed, !orig.ConfiguredFlowControl},
+		{orig.Enabled, "100Mbps-full", orig.ConfiguredFlowControl},
+		{!orig.Enabled, orig.ConfiguredSpeed, orig.ConfiguredFlowControl},
+	} {
+		if err := c.SetPort(ctx, id, step.enabled, step.speed, step.flow); err != nil {
+			t.Fatalf("%+v: %v", step, err)
+		}
+		got := livePort(t, c, id)
+		if got.Enabled != step.enabled || got.ConfiguredSpeed != step.speed || got.ConfiguredFlowControl != step.flow {
+			t.Fatalf("step %+v not applied: %+v", step, got)
+		}
+	}
+}
