@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,7 +18,12 @@ var (
 // NewStormControlDataSource returns the tplinkeasysmart_storm_control data source.
 func NewStormControlDataSource() datasource.DataSource { return &stormDataSource{} }
 
-type stormDataSource struct{ client SwitchClient }
+type stormDataSource struct{ client stormReader }
+
+// stormReader is the part of the switch API this data source reads.
+type stormReader interface {
+	StormControl(ctx context.Context) ([]escp.PortStorm, error)
+}
 
 type portStormModel struct {
 	Port           types.Int64 `tfsdk:"port"`
@@ -55,7 +62,7 @@ func (d *stormDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 }
 
 func (d *stormDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	d.client = clientFrom[stormReader](req.ProviderData, &resp.Diagnostics)
 }
 
 func (d *stormDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {

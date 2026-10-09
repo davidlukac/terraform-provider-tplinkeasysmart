@@ -5,6 +5,18 @@ import (
 	"fmt"
 )
 
+// Layout of a port entry (TLV 4096): one byte per field.
+const (
+	portEntryLen    = 7
+	portOffPort     = 0
+	portOffState    = 1
+	portOffLAG      = 2
+	portOffCfgSpeed = 3
+	portOffActSpeed = 4
+	portOffCfgFlow  = 5
+	portOffActFlow  = 6
+)
+
 // TLV types of the settings read by this package (see docs/escp-protocol.md).
 const (
 	TLVPorts = 4096
@@ -42,13 +54,13 @@ func parsePorts(tlvs []TLV) ([]Port, error) {
 			continue
 		}
 		v := t.Value
-		if len(v) < 7 {
+		if len(v) < portEntryLen {
 			return nil, fmt.Errorf("escp: port TLV too short (%d bytes)", len(v))
 		}
 		ports = append(ports, Port{
-			ID: int(v[0]), Enabled: v[1] == 1, LAG: int(v[2]),
-			ConfiguredSpeed: speedName(v[3]), ActualSpeed: speedName(v[4]),
-			ConfiguredFlowControl: v[5] == 1, ActualFlowControl: v[6] == 1,
+			ID: int(v[portOffPort]), Enabled: v[portOffState] == 1, LAG: int(v[portOffLAG]),
+			ConfiguredSpeed: speedName(v[portOffCfgSpeed]), ActualSpeed: speedName(v[portOffActSpeed]),
+			ConfiguredFlowControl: v[portOffCfgFlow] == 1, ActualFlowControl: v[portOffActFlow] == 1,
 		})
 	}
 	return ports, nil
@@ -83,8 +95,10 @@ func (c *Client) SetPort(ctx context.Context, id int, enabled bool, speed string
 	if err != nil {
 		return err
 	}
-	if id < 1 || id > 32 {
-		return fmt.Errorf("escp: invalid port %d", id)
+	if err := validatePort(id); err != nil {
+		return err
 	}
-	return c.setTLVs(ctx, TLV{TLVPorts, []byte{byte(id), boolByte(enabled), 0, code, 0, boolByte(flowControl), 0}})
+	entry := make([]byte, portEntryLen)
+	entry[portOffPort], entry[portOffState], entry[portOffCfgSpeed], entry[portOffCfgFlow] = byte(id), boolByte(enabled), code, boolByte(flowControl)
+	return c.setTLVs(ctx, TLV{TLVPorts, entry})
 }

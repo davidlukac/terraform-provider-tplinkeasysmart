@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,7 +18,12 @@ var (
 // NewBandwidthControlDataSource returns the tplinkeasysmart_bandwidth_control data source.
 func NewBandwidthControlDataSource() datasource.DataSource { return &bandwidthDataSource{} }
 
-type bandwidthDataSource struct{ client SwitchClient }
+type bandwidthDataSource struct{ client bandwidthReader }
+
+// bandwidthReader is the part of the switch API this data source reads.
+type bandwidthReader interface {
+	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
+}
 
 type portBandwidthModel struct {
 	Port        types.Int64 `tfsdk:"port"`
@@ -48,7 +55,7 @@ func (d *bandwidthDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 }
 
 func (d *bandwidthDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	d.client = clientFrom[bandwidthReader](req.ProviderData, &resp.Diagnostics)
 }
 
 func (d *bandwidthDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {

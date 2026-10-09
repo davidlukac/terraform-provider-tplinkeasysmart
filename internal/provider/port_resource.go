@@ -3,9 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strconv"
 
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -26,7 +24,13 @@ var (
 // NewPortResource returns the tplinkeasysmart_port resource.
 func NewPortResource() resource.Resource { return &portResource{} }
 
-type portResource struct{ client SwitchClient }
+type portResource struct{ client portClient }
+
+// portClient is the part of the switch API this resource needs.
+type portClient interface {
+	Ports(ctx context.Context) ([]escp.Port, error)
+	SetPort(ctx context.Context, id int, enabled bool, speed string, flowControl bool) error
+}
 
 type portResourceModel struct {
 	Port            types.Int64  `tfsdk:"port"`
@@ -52,10 +56,9 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"enabled": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true), Description: "Administrative state. Defaults to true."},
 			"speed": schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("auto"),
 				Description: "One of: " + joinSpeeds() + ". Defaults to auto."},
-			"flow_control": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Flow control. Defaults to false."},
-			"allow_disruptive": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Allow changing a port that has a link up or is a LAG member. Defaults to false."},
-			"actual_speed": schema.StringAttribute{Computed: true, Description: "Currently negotiated speed, or link-down."},
+			"flow_control":      schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Flow control. Defaults to false."},
+			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing a port that has a link up or is a LAG member. Defaults to false."),
+			"actual_speed":      schema.StringAttribute{Computed: true, Description: "Currently negotiated speed, or link-down."},
 		},
 	}
 }
@@ -72,7 +75,7 @@ func joinSpeeds() string {
 }
 
 func (r *portResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	r.client = clientFrom[portClient](req.ProviderData, &resp.Diagnostics)
 }
 
 func (r *portResource) find(ctx context.Context, id int) (escp.Port, bool, error) {
@@ -112,19 +115,11 @@ func (r *portResource) apply(ctx context.Context, m *portResourceModel, add func
 }
 
 func (r *portResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan portResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *portResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan portResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -150,11 +145,7 @@ func (r *portResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 func (r *portResource) Delete(context.Context, resource.DeleteRequest, *resource.DeleteResponse) {}
 
 func (r *portResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	n, err := strconv.Atoi(req.ID)
-	if err != nil || n < 1 {
-		resp.Diagnostics.AddError("Invalid import id", fmt.Sprintf("expected a port number, got %q", req.ID))
-		return
+	if importPositiveInt(ctx, req, resp, "a port number", "port") {
+		resetAllowDisruptive(ctx, resp)
 	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("port"), int64(n))...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("allow_disruptive"), false)...)
 }

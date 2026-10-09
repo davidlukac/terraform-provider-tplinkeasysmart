@@ -6,8 +6,9 @@ import (
 	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
-// SwitchClient is the seam between the Terraform resources and the switch
-// transport. *escp.Client implements it; tests substitute a fake.
+// SwitchClient is the union of everything the provider asks of the switch, as
+// implemented by *escp.Client (and by test fakes). Resources and data sources
+// do not depend on it directly: each declares the small interface it needs.
 type SwitchClient interface {
 	Info(ctx context.Context) (escp.Info, error)
 	GetLED(ctx context.Context) (bool, error)

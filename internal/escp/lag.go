@@ -8,6 +8,12 @@ import (
 // TLVLAG is Switching > Port Trunk: one TLV per group, group id (1 byte) and member port mask (4 bytes).
 const TLVLAG = 4608
 
+// Layout of a LAG entry (TLV 4608): group id (1 byte), member port mask (maskLen bytes).
+const (
+	lagOffMask  = 1
+	lagEntryLen = lagOffMask + maskLen
+)
+
 // LAG is one link aggregation group (Switching > Port Trunk).
 type LAG struct {
 	ID    int
@@ -21,10 +27,10 @@ func parseLAGs(tlvs []TLV) ([]LAG, error) {
 		if t.Type != TLVLAG {
 			continue
 		}
-		if len(t.Value) < 5 {
+		if len(t.Value) < lagEntryLen {
 			return nil, fmt.Errorf("escp: LAG TLV too short (%d bytes)", len(t.Value))
 		}
-		out = append(out, LAG{ID: int(t.Value[0]), Ports: portsFromMask(t.Value[1:5])})
+		out = append(out, LAG{ID: int(t.Value[0]), Ports: portsFromMask(t.Value[lagOffMask:])})
 	}
 	return out, nil
 }
@@ -44,8 +50,8 @@ func (c *Client) LAGs(ctx context.Context) ([]LAG, error) {
 // or storm control. Changing a group whose ports carry traffic can cut the
 // uplink; callers must guard against that.
 func (c *Client) SetLAG(ctx context.Context, group int, ports []int) error {
-	if group < 1 || group > 255 {
-		return fmt.Errorf("escp: invalid LAG group %d", group)
+	if err := validateByteID("LAG group", group); err != nil {
+		return err
 	}
 	mask, err := maskFromPorts(ports)
 	if err != nil {

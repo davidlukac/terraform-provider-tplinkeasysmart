@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"net"
 )
@@ -11,6 +12,15 @@ const (
 	TLVIGMPEnabled     = 4352 // snooping enabled (1 byte)
 	TLVIGMPGroups      = 4353 // learned groups, repeated 10-byte entries
 	TLVIGMPSuppression = 4354 // report message suppression (1 byte)
+)
+
+// Layout of a learned multicast group entry (TLV 4353): IPv4 address, VLAN id
+// (2 bytes), port mask.
+const (
+	igmpOffIP    = 0
+	igmpOffVLAN  = igmpOffIP + net.IPv4len
+	igmpOffPorts = igmpOffVLAN + 2
+	igmpGroupLen = igmpOffPorts + maskLen
 )
 
 // IGMPGroup is one learned multicast group.
@@ -38,13 +48,13 @@ func parseIGMP(tlvs []TLV) (IGMP, error) {
 		case TLVIGMPSuppression:
 			out.ReportSuppression = len(t.Value) == 1 && t.Value[0] == 1
 		case TLVIGMPGroups:
-			if len(t.Value)%10 != 0 {
-				return out, fmt.Errorf("escp: IGMP group TLV length %d is not a multiple of 10", len(t.Value))
+			if len(t.Value)%igmpGroupLen != 0 {
+				return out, fmt.Errorf("escp: IGMP group TLV length %d is not a multiple of %d", len(t.Value), igmpGroupLen)
 			}
-			for i := 0; i < len(t.Value); i += 10 {
-				e := t.Value[i : i+10]
+			for i := 0; i < len(t.Value); i += igmpGroupLen {
+				e := t.Value[i : i+igmpGroupLen]
 				out.Groups = append(out.Groups, IGMPGroup{
-					IP: net.IP(e[0:4]).String(), VLAN: int(e[4])<<8 | int(e[5]), Ports: portsFromMask(e[6:10]),
+					IP: net.IP(e[igmpOffIP : igmpOffIP+net.IPv4len]).String(), VLAN: int(binary.BigEndian.Uint16(e[igmpOffVLAN:])), Ports: portsFromMask(e[igmpOffPorts:]),
 				})
 			}
 		}

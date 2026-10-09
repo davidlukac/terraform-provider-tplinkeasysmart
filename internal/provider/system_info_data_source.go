@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,7 +18,13 @@ var (
 // NewSystemInfoDataSource returns the tplinkeasysmart_system_info data source.
 func NewSystemInfoDataSource() datasource.DataSource { return &systemInfoDataSource{} }
 
-type systemInfoDataSource struct{ client SwitchClient }
+type systemInfoDataSource struct{ client systemInfoReader }
+
+// systemInfoReader is the part of the switch API this data source reads.
+type systemInfoReader interface {
+	Info(ctx context.Context) (escp.Info, error)
+	System(ctx context.Context) (escp.System, error)
+}
 
 type systemInfoModel struct {
 	ID       types.String `tfsdk:"id"`
@@ -64,7 +72,7 @@ func (d *systemInfoDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 }
 
 func (d *systemInfoDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	d.client = clientFrom[systemInfoReader](req.ProviderData, &resp.Diagnostics)
 }
 
 func (d *systemInfoDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {

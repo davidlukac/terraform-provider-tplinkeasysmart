@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -23,7 +22,13 @@ var (
 // NewLEDResource returns the tplinkeasysmart_led resource.
 func NewLEDResource() resource.Resource { return &ledResource{} }
 
-type ledResource struct{ client SwitchClient }
+type ledResource struct{ client ledClient }
+
+// ledClient is the part of the switch API this resource needs.
+type ledClient interface {
+	GetLED(ctx context.Context) (bool, error)
+	SetLED(ctx context.Context, on bool) error
+}
 
 type ledModel struct {
 	ID      types.String `tfsdk:"id"`
@@ -54,26 +59,24 @@ func (r *ledResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 }
 
 func (r *ledResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	r.client = clientFrom[ledClient](req.ProviderData, &resp.Diagnostics)
 }
 
 // apply writes the desired state and reads it back so the stored state is what
 // the switch really reports.
-func (r *ledResource) apply(ctx context.Context, plan *ledModel, resp interface {
-	AddError(string, string)
-}) bool {
+func (r *ledResource) apply(ctx context.Context, plan *ledModel, add func(string, string)) bool {
 	want := plan.Enabled.ValueBool()
 	if err := r.client.SetLED(ctx, want); err != nil {
-		resp.AddError("Setting LED failed", err.Error())
+		add("Setting LED failed", err.Error())
 		return false
 	}
 	got, err := r.client.GetLED(ctx)
 	if err != nil {
-		resp.AddError("Reading LED back failed", err.Error())
+		add("Reading LED back failed", err.Error())
 		return false
 	}
 	if got != want {
-		resp.AddError("LED state did not change", fmt.Sprintf("requested enabled=%t but the switch reports enabled=%t", want, got))
+		add("LED state did not change", fmt.Sprintf("requested enabled=%t but the switch reports enabled=%t", want, got))
 		return false
 	}
 	plan.ID = types.StringValue(ledID)
@@ -82,25 +85,11 @@ func (r *ledResource) apply(ctx context.Context, plan *ledModel, resp interface 
 }
 
 func (r *ledResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan ledModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if r.apply(ctx, &plan, &resp.Diagnostics) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *ledResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan ledModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if r.apply(ctx, &plan, &resp.Diagnostics) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *ledResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -123,9 +112,5 @@ func (r *ledResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 func (r *ledResource) Delete(context.Context, resource.DeleteRequest, *resource.DeleteResponse) {}
 
 func (r *ledResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	if req.ID != ledID {
-		resp.Diagnostics.AddError("Invalid import id", fmt.Sprintf("the only valid id is %q, got %q", ledID, req.ID))
-		return
-	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), ledID)...)
+	importSingletonID(ctx, req, resp, ledID)
 }

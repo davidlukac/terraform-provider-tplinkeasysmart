@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,7 +18,12 @@ var (
 // NewQoSDataSource returns the tplinkeasysmart_qos data source.
 func NewQoSDataSource() datasource.DataSource { return &qosDataSource{} }
 
-type qosDataSource struct{ client SwitchClient }
+type qosDataSource struct{ client qosReader }
+
+// qosReader is the part of the switch API this data source reads.
+type qosReader interface {
+	QoS(ctx context.Context) (escp.QoS, error)
+}
 
 type portPriorityModel struct {
 	Port     types.Int64 `tfsdk:"port"`
@@ -52,7 +59,7 @@ func (d *qosDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 }
 
 func (d *qosDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	d.client = clientFrom[qosReader](req.ProviderData, &resp.Diagnostics)
 }
 
 func (d *qosDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {

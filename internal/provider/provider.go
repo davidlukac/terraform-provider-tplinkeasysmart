@@ -15,6 +15,13 @@ import (
 	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
+// Environment variables that back the provider arguments.
+const (
+	envHost     = "TPLINK_EASYSMART_HOST"
+	envUsername = "TPLINK_EASYSMART_USERNAME"
+	envPassword = "TPLINK_EASYSMART_PASSWORD" //nolint:gosec // the name of an environment variable, not a credential
+)
+
 var _ provider.Provider = &tplinkProvider{}
 
 type tplinkProvider struct {
@@ -99,9 +106,9 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	host := envOr(cfg.Host, "TPLINK_EASYSMART_HOST")
-	user := envOr(cfg.Username, "TPLINK_EASYSMART_USERNAME")
-	pass := envOr(cfg.Password, "TPLINK_EASYSMART_PASSWORD")
+	host := envOr(cfg.Host, envHost)
+	user := envOr(cfg.Username, envUsername)
+	pass := envOr(cfg.Password, envPassword)
 	if host == "" {
 		resp.Diagnostics.AddAttributeError(pathRoot("host"), "Missing switch host", "Set `host` or TPLINK_EASYSMART_HOST.")
 	}
@@ -124,10 +131,12 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	resp.DataSourceData = c
 }
 
+// Resources lists the resources the provider manages.
 func (p *tplinkProvider) Resources(context.Context) []func() resource.Resource {
 	return []func() resource.Resource{NewLEDResource, NewIGMPSnoopingResource, NewLoopPreventionResource, NewPortResource, NewQoSResource, NewBandwidthLimitResource, NewStormLimitResource, NewPortMirrorResource, NewLAGResource, NewVLANPortBasedGroupResource, NewSystemResource}
 }
 
+// DataSources lists the read-only data sources the provider offers.
 func (p *tplinkProvider) DataSources(context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{NewSystemInfoDataSource, NewPortsDataSource, NewPortStatisticsDataSource, NewLAGsDataSource, NewPortMirrorDataSource, NewVLANMTUDataSource, NewVLANPortBasedDataSource, NewVLAN8021QDataSource, NewQoSDataSource, NewBandwidthControlDataSource, NewStormControlDataSource, NewConfigBackupDataSource}
 }

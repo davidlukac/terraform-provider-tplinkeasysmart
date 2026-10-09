@@ -19,7 +19,7 @@ func teaDecryptBlock(b []byte) []byte {
 	v0 := binary.BigEndian.Uint32(b[:4])
 	v1 := binary.BigEndian.Uint32(b[4:])
 	sum := uint32(0xC6EF3720)
-	for i := 0; i < 32; i++ {
+	for i := 0; i < teaRounds; i++ {
 		v1 -= ((v0 << 4) + teaKey[2]) ^ (v0 + sum) ^ (uint32(int32(v0)>>5) + teaKey[3])
 		v0 -= ((v1 << 4) + teaKey[0]) ^ (v1 + sum) ^ (uint32(int32(v1)>>5) + teaKey[1])
 		sum += 0x61C88647
@@ -74,9 +74,12 @@ func rc4(data []byte, state []int, n int) []byte {
 	return out
 }
 
-var staticState = rc4State(staticKeyFrom(staticKeyBlob), 256)
+// staticStateSize is the state size of the static RC4 (the session RC4 uses SessionKeyLen).
+const staticStateSize = 256
 
-func rc4Static(data []byte) []byte { return rc4(data, staticState, 256) }
+var staticState = rc4State(staticKeyFrom(staticKeyBlob), staticStateSize)
+
+func rc4Static(data []byte) []byte { return rc4(data, staticState, staticStateSize) }
 
 // SessionKeyLen is the length of the random per-session key.
 const SessionKeyLen = 8
@@ -90,6 +93,17 @@ var rsaN = new(big.Int).SetBytes(reverse([]byte{191, 78, 109, 100, 214, 185, 250
 
 const rsaE = 65537
 
+// RSA key-exchange value (TLV 528): a zero byte, the word count, then the
+// ciphertext as little-endian 16-bit words, least significant first. The
+// 64-bit modulus gives four words.
+const (
+	rsaWords  = 4
+	rsaTLVLen = 2 + 2*rsaWords
+)
+
+// teaRounds is the number of TEA rounds protecting the static key blob.
+const teaRounds = 32
+
 func reverse(b []byte) []byte {
 	out := make([]byte, len(b))
 	for i := range b {
@@ -102,16 +116,16 @@ func reverse(b []byte) []byte {
 // returns the 10-byte TLV 528 value: 00, word count, 4 little-endian words.
 func RSASessionTLV(key []byte) []byte {
 	c := new(big.Int).Exp(new(big.Int).SetBytes(reverse(key)), big.NewInt(rsaE), rsaN)
-	words := make([]uint16, 4)
+	words := make([]uint16, rsaWords)
 	mask := big.NewInt(0xFFFF)
 	for i := range words {
 		words[i] = uint16(new(big.Int).And(new(big.Int).Rsh(c, uint(16*i)), mask).Uint64())
 	}
-	n := 4
+	n := rsaWords
 	for n > 1 && words[n-1] == 0 {
 		n--
 	}
-	out := make([]byte, 10)
+	out := make([]byte, rsaTLVLen)
 	out[1] = byte(n)
 	for i, w := range words {
 		out[2+2*i] = byte(w)

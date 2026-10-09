@@ -55,8 +55,8 @@ var hostnameRE = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$`
 
 // ValidateHostname applies the web UI's rules for the device description.
 func ValidateHostname(name string) error {
-	if len(name) > 32 || !hostnameRE.MatchString(name) {
-		return fmt.Errorf("escp: invalid device description %q: 1-32 letters, digits and hyphens, not starting or ending with a hyphen", name)
+	if len(name) > MaxHostnameLen || !hostnameRE.MatchString(name) {
+		return fmt.Errorf("escp: invalid device description %q: 1-%d letters, digits and hyphens, not starting or ending with a hyphen", name, MaxHostnameLen)
 	}
 	return nil
 }

@@ -1,16 +1,31 @@
 package escp
 
-// portsFromMask expands a 32-bit big-endian port bitmap (bit n-1 = port n).
+import "encoding/binary"
+
+// portsFromMask expands a big-endian port bitmap (bit n-1 = port n). It reads
+// the first maskLen bytes of v; shorter input yields no ports.
 func portsFromMask(v []byte) []int {
-	if len(v) < 4 {
+	if len(v) < maskLen {
 		return nil
 	}
-	m := uint32(v[0])<<24 | uint32(v[1])<<16 | uint32(v[2])<<8 | uint32(v[3])
+	m := binary.BigEndian.Uint32(v)
 	ports := []int{}
-	for i := 0; i < 32; i++ {
+	for i := 0; i < MaxPort; i++ {
 		if m&(1<<uint(i)) != 0 {
 			ports = append(ports, i+1)
 		}
 	}
 	return ports
+}
+
+// maskFromPorts builds the big-endian port bitmap for the given ports.
+func maskFromPorts(ports []int) ([]byte, error) {
+	var m uint32
+	for _, p := range ports {
+		if err := validatePort(p); err != nil {
+			return nil, err
+		}
+		m |= 1 << uint(p-1)
+	}
+	return binary.BigEndian.AppendUint32(nil, m), nil
 }

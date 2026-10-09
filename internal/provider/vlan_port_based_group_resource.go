@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strconv"
 
-	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -24,7 +25,14 @@ var (
 // NewVLANPortBasedGroupResource returns the tplinkeasysmart_lag resource.
 func NewVLANPortBasedGroupResource() resource.Resource { return &portVLANResource{} }
 
-type portVLANResource struct{ client SwitchClient }
+type portVLANResource struct{ client portVLANClient }
+
+// portVLANClient is the part of the switch API this resource needs.
+type portVLANClient interface {
+	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
+	Ports(ctx context.Context) ([]escp.Port, error)
+	SetPortBasedVLAN(ctx context.Context, id int, ports []int) error
+}
 
 type portVLANResourceModel struct {
 	VLAN            types.Int64 `tfsdk:"vlan"`
@@ -45,15 +53,14 @@ func (r *portVLANResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 		Attributes: map[string]schema.Attribute{
 			"vlan": schema.Int64Attribute{Required: true, Description: "VLAN group id.",
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
-			"ports": schema.SetAttribute{Required: true, ElementType: types.Int64Type, Description: "Member ports (at least one)."},
-			"allow_disruptive": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Allow touching ports that have a link up or belong to a LAG. Defaults to false."},
+			"ports":             schema.SetAttribute{Required: true, ElementType: types.Int64Type, Description: "Member ports (at least one)."},
+			attrAllowDisruptive: allowDisruptiveAttribute("Allow touching ports that have a link up or belong to a LAG. Defaults to false."),
 		},
 	}
 }
 
 func (r *portVLANResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	r.client = clientFrom[portVLANClient](req.ProviderData, &resp.Diagnostics)
 }
 
 // guardVLAN checks every port of the old and new membership: none may have a
@@ -61,6 +68,7 @@ func (r *portVLANResource) Configure(_ context.Context, req resource.ConfigureRe
 // change moves the port out of its previous group.
 func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new []int) error {
 	if allow {
+		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped")
 		return nil
 	}
 	all, err := r.client.Ports(ctx)
@@ -140,19 +148,11 @@ func (r *portVLANResource) apply(ctx context.Context, m *portVLANResourceModel, 
 }
 
 func (r *portVLANResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan portVLANResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *portVLANResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan portVLANResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *portVLANResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -197,11 +197,7 @@ func (r *portVLANResource) Delete(ctx context.Context, req resource.DeleteReques
 }
 
 func (r *portVLANResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	n, err := strconv.Atoi(req.ID)
-	if err != nil || n < 1 {
-		resp.Diagnostics.AddError("Invalid import id", fmt.Sprintf("expected a VLAN id, got %q", req.ID))
-		return
+	if importPositiveInt(ctx, req, resp, "a VLAN id", "vlan") {
+		resetAllowDisruptive(ctx, resp)
 	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("vlan"), int64(n))...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("allow_disruptive"), false)...)
 }

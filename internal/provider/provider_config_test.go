@@ -255,17 +255,34 @@ func TestNewBuildsTheProductionProvider(t *testing.T) {
 
 func TestClientFromRefusesForeignProviderData(t *testing.T) {
 	var diags diag.Diagnostics
-	if c := clientFrom(nil, &diags); c != nil || diags.HasError() {
+	if c := clientFrom[SwitchClient](nil, &diags); c != nil || diags.HasError() {
 		t.Fatal("no provider data (provider not configured yet) is not an error")
 	}
 	want := &fakeClient{}
-	if c := clientFrom(want, &diags); c != want || diags.HasError() {
+	if c := clientFrom[SwitchClient](want, &diags); c != want || diags.HasError() {
 		t.Fatalf("a SwitchClient must be passed through, got %v / %v", c, diags)
 	}
-	if c := clientFrom("not a client", &diags); c != nil {
+	if c := clientFrom[SwitchClient]("not a client", &diags); c != nil {
 		t.Fatalf("foreign data must not be accepted, got %v", c)
 	}
 	if !diags.HasError() || diags[0].Summary() != "Unexpected provider data" {
 		t.Fatalf("foreign data must produce a diagnostic, got %v", diags)
+	}
+}
+
+// Consumers ask for their own narrow interface: the full client satisfies each
+// of them, but a value that lacks a method they need is refused.
+func TestClientFromServesNarrowInterfaces(t *testing.T) {
+	var diags diag.Diagnostics
+	full := &fakeClient{}
+	if c := clientFrom[ledClient](full, &diags); c == nil || diags.HasError() {
+		t.Fatalf("the full client must satisfy the LED interface, got %v / %v", c, diags)
+	}
+	if c := clientFrom[portLister](full, &diags); c == nil || diags.HasError() {
+		t.Fatalf("the full client must satisfy the port guard interface, got %v / %v", c, diags)
+	}
+	type onlyLED struct{ ledClient }
+	if c := clientFrom[portLister](onlyLED{full}, &diags); c != nil || !diags.HasError() {
+		t.Fatalf("a client without Ports must not satisfy the port guard interface, got %v", c)
 	}
 }

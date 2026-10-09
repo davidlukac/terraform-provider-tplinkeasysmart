@@ -12,6 +12,12 @@ const (
 	TLVVLANPortBasedMax = 8450 // maximum number of VLANs (1 byte)
 )
 
+// Layout of a port-based VLAN entry (TLV 8449): VLAN id (1 byte), member port mask (maskLen bytes).
+const (
+	pvlanOffMask  = 1
+	pvlanEntryLen = pvlanOffMask + maskLen
+)
+
 // PortVLAN is one port-based VLAN group.
 type PortVLAN struct {
 	ID    int
@@ -40,10 +46,10 @@ func parsePortBasedVLAN(tlvs []TLV) (PortBasedVLAN, error) {
 				out.MaxVLAN = int(t.Value[0])
 			}
 		case TLVVLANPortBasedVID:
-			if len(t.Value) != 5 {
-				return out, fmt.Errorf("escp: port-based VLAN entry has %d bytes, want 5", len(t.Value))
+			if len(t.Value) != pvlanEntryLen {
+				return out, fmt.Errorf("escp: port-based VLAN entry has %d bytes, want %d", len(t.Value), pvlanEntryLen)
 			}
-			out.VLANs = append(out.VLANs, PortVLAN{ID: int(t.Value[0]), Ports: portsFromMask(t.Value[1:5])})
+			out.VLANs = append(out.VLANs, PortVLAN{ID: int(t.Value[0]), Ports: portsFromMask(t.Value[pvlanOffMask:])})
 		}
 	}
 	if !seen {
@@ -66,8 +72,8 @@ func (c *Client) PortBasedVLAN(ctx context.Context) (PortBasedVLAN, error) {
 // the group. The mode itself (enabled/disabled) is not touched. Changing a
 // group whose ports carry traffic can cut connectivity; callers must guard.
 func (c *Client) SetPortBasedVLAN(ctx context.Context, id int, ports []int) error {
-	if id < 1 || id > 255 {
-		return fmt.Errorf("escp: invalid port-based VLAN id %d", id)
+	if err := validateByteID("port-based VLAN id", id); err != nil {
+		return err
 	}
 	mask, err := maskFromPorts(ports)
 	if err != nil {

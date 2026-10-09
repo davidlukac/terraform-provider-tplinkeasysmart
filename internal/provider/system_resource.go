@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -24,7 +25,13 @@ var (
 // NewSystemResource returns the tplinkeasysmart_system resource.
 func NewSystemResource() resource.Resource { return &systemResource{} }
 
-type systemResource struct{ client SwitchClient }
+type systemResource struct{ client systemClient }
+
+// systemClient is the part of the switch API this resource needs.
+type systemClient interface {
+	Info(ctx context.Context) (escp.Info, error)
+	SetHostname(ctx context.Context, name string) error
+}
 
 type systemResourceModel struct {
 	ID       types.String `tfsdk:"id"`
@@ -50,7 +57,7 @@ func (r *systemResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 }
 
 func (r *systemResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	r.client = clientFrom[systemClient](req.ProviderData, &resp.Diagnostics)
 }
 
 func (r *systemResource) apply(ctx context.Context, m *systemResourceModel, add func(string, string)) bool {
@@ -84,19 +91,11 @@ func (r *systemResource) apply(ctx context.Context, m *systemResourceModel, add 
 }
 
 func (r *systemResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan systemResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *systemResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan systemResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *systemResource) Read(ctx context.Context, _ resource.ReadRequest, resp *resource.ReadResponse) {
@@ -115,9 +114,5 @@ func (r *systemResource) Delete(ctx context.Context, _ resource.DeleteRequest, _
 }
 
 func (r *systemResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	if req.ID != systemID {
-		resp.Diagnostics.AddError("Invalid import id", fmt.Sprintf("the only valid id is %q, got %q", systemID, req.ID))
-		return
-	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), systemID)...)
+	importSingletonID(ctx, req, resp, systemID)
 }

@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,7 +18,12 @@ var (
 // NewVLANPortBasedDataSource returns the tplinkeasysmart_vlan_port_based data source.
 func NewVLANPortBasedDataSource() datasource.DataSource { return &vlanPortBasedDataSource{} }
 
-type vlanPortBasedDataSource struct{ client SwitchClient }
+type vlanPortBasedDataSource struct{ client vlanPortBasedReader }
+
+// vlanPortBasedReader is the part of the switch API this data source reads.
+type vlanPortBasedReader interface {
+	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
+}
 
 type portVLANModel struct {
 	ID    types.Int64 `tfsdk:"id"`
@@ -50,7 +57,7 @@ func (d *vlanPortBasedDataSource) Schema(_ context.Context, _ datasource.SchemaR
 }
 
 func (d *vlanPortBasedDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	d.client = clientFrom[vlanPortBasedReader](req.ProviderData, &resp.Diagnostics)
 }
 
 func (d *vlanPortBasedDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {

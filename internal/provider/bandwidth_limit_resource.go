@@ -3,12 +3,11 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strconv"
 
-	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -24,7 +23,14 @@ var (
 // NewBandwidthLimitResource returns the tplinkeasysmart_bandwidth_limit resource.
 func NewBandwidthLimitResource() resource.Resource { return &bandwidthLimitResource{} }
 
-type bandwidthLimitResource struct{ client SwitchClient }
+type bandwidthLimitResource struct{ client bandwidthLimitClient }
+
+// bandwidthLimitClient is the part of the switch API this resource needs.
+type bandwidthLimitClient interface {
+	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
+	Ports(ctx context.Context) ([]escp.Port, error)
+	SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps int) error
+}
 
 type bandwidthLimitModel struct {
 	Port            types.Int64 `tfsdk:"port"`
@@ -48,14 +54,13 @@ func (r *bandwidthLimitResource) Schema(_ context.Context, _ resource.SchemaRequ
 				Description: "Ingress limit in kbps: 0 (unlimited) or a multiple of 64 up to 1000000."},
 			"egress_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0),
 				Description: "Egress limit in kbps: 0 (unlimited) or a multiple of 64 up to 1000000."},
-			"allow_disruptive": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Allow changing a port that has a link up or is a LAG member. Defaults to false."},
+			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing a port that has a link up or is a LAG member. Defaults to false."),
 		},
 	}
 }
 
 func (r *bandwidthLimitResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	r.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	r.client = clientFrom[bandwidthLimitClient](req.ProviderData, &resp.Diagnostics)
 }
 
 func (r *bandwidthLimitResource) find(ctx context.Context, port int) (ingress, egress int, ok bool, err error) {
@@ -91,19 +96,11 @@ func (r *bandwidthLimitResource) apply(ctx context.Context, m *bandwidthLimitMod
 }
 
 func (r *bandwidthLimitResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan bandwidthLimitModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *bandwidthLimitResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan bandwidthLimitModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if !resp.Diagnostics.HasError() && r.apply(ctx, &plan, resp.Diagnostics.AddError) {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
 }
 
 func (r *bandwidthLimitResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -129,11 +126,7 @@ func (r *bandwidthLimitResource) Delete(context.Context, resource.DeleteRequest,
 }
 
 func (r *bandwidthLimitResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	n, err := strconv.Atoi(req.ID)
-	if err != nil || n < 1 {
-		resp.Diagnostics.AddError("Invalid import id", fmt.Sprintf("expected a port number, got %q", req.ID))
-		return
+	if importPositiveInt(ctx, req, resp, "a port number", "port") {
+		resetAllowDisruptive(ctx, resp)
 	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("port"), int64(n))...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("allow_disruptive"), false)...)
 }

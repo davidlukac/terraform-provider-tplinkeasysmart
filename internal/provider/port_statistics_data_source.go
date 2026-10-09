@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,7 +18,12 @@ var (
 // NewPortStatisticsDataSource returns the tplinkeasysmart_port_statistics data source.
 func NewPortStatisticsDataSource() datasource.DataSource { return &portStatisticsDataSource{} }
 
-type portStatisticsDataSource struct{ client SwitchClient }
+type portStatisticsDataSource struct{ client portStatisticsReader }
+
+// portStatisticsReader is the part of the switch API this data source reads.
+type portStatisticsReader interface {
+	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
+}
 
 type portStatsModel struct {
 	ID      types.Int64  `tfsdk:"id"`
@@ -59,7 +66,7 @@ func (d *portStatisticsDataSource) Schema(_ context.Context, _ datasource.Schema
 }
 
 func (d *portStatisticsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	d.client = clientFrom(req.ProviderData, &resp.Diagnostics)
+	d.client = clientFrom[portStatisticsReader](req.ProviderData, &resp.Diagnostics)
 }
 
 func (d *portStatisticsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {

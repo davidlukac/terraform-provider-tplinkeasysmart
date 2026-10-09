@@ -36,9 +36,27 @@ const (
 // ErrCodeKeyAccepted is returned in the reply to a successful RSA key exchange.
 const ErrCodeKeyAccepted = 4098
 
-const headerLen = 32
+// Layout of the packet header (all fields big-endian).
+const (
+	protocolVersion = 1  // first header byte
+	headerLen       = 32 // total header size
+	macLen          = 6  // length of a MAC address
+	tlvHeaderLen    = 4  // TLV type (2 bytes) + length (2 bytes)
 
+	offOp        = 1  // operation code
+	offSwitchMAC = 2  // switch MAC
+	offHostMAC   = 8  // host MAC
+	offSeq       = 14 // sequence number
+	offErrCode   = 16 // error code
+	offLength    = 20 // total packet length
+	offFragment  = 22 // non-zero while more fragments of the reply follow
+)
+
+// packetEnd terminates the TLV list: type -1 (0xffff), length 0.
 var packetEnd = []byte{0xff, 0xff, 0x00, 0x00}
+
+// tlvEndType is the type of the terminating TLV.
+const tlvEndType = -1
 
 // TLV is one type-length-value element.
 type TLV struct {
@@ -48,8 +66,8 @@ type TLV struct {
 
 type header struct {
 	Op        byte
-	SwitchMAC [6]byte
-	HostMAC   [6]byte
+	SwitchMAC [macLen]byte
+	HostMAC   [macLen]byte
 	Seq       uint16
 	ErrCode   int32
 	Length    uint16
@@ -66,20 +84,20 @@ func marshal(h header, tlvs []TLV) []byte {
 	}
 	payload = append(payload, packetEnd...)
 	b := make([]byte, headerLen, headerLen+len(payload))
-	b[0], b[1] = 1, h.Op
-	copy(b[2:8], h.SwitchMAC[:])
-	copy(b[8:14], h.HostMAC[:])
-	binary.BigEndian.PutUint16(b[14:], h.Seq)
-	binary.BigEndian.PutUint32(b[16:], uint32(h.ErrCode))
-	binary.BigEndian.PutUint16(b[20:], uint16(headerLen+len(payload)))
-	binary.BigEndian.PutUint16(b[22:], h.Fragment)
+	b[0], b[offOp] = protocolVersion, h.Op
+	copy(b[offSwitchMAC:], h.SwitchMAC[:])
+	copy(b[offHostMAC:], h.HostMAC[:])
+	binary.BigEndian.PutUint16(b[offSeq:], h.Seq)
+	binary.BigEndian.PutUint32(b[offErrCode:], uint32(h.ErrCode))
+	binary.BigEndian.PutUint16(b[offLength:], uint16(headerLen+len(payload)))
+	binary.BigEndian.PutUint16(b[offFragment:], h.Fragment)
 	return append(b, payload...)
 }
 
 // looksLikeHeader reports whether a decrypted buffer plausibly is a packet.
 func looksLikeHeader(b []byte) bool {
-	return len(b) >= headerLen+len(packetEnd) && b[0] == 1 && b[1] < 5 &&
-		int(binary.BigEndian.Uint16(b[20:])) == len(b)
+	return len(b) >= headerLen+len(packetEnd) && b[0] == protocolVersion && b[offOp] <= OpSetReply &&
+		int(binary.BigEndian.Uint16(b[offLength:])) == len(b)
 }
 
 func unmarshal(b []byte) (header, []TLV, error) {
@@ -87,26 +105,26 @@ func unmarshal(b []byte) (header, []TLV, error) {
 	if !looksLikeHeader(b) {
 		return h, nil, fmt.Errorf("escp: not a valid packet (%d bytes)", len(b))
 	}
-	h.Op = b[1]
-	copy(h.SwitchMAC[:], b[2:8])
-	copy(h.HostMAC[:], b[8:14])
-	h.Seq = binary.BigEndian.Uint16(b[14:])
-	h.ErrCode = int32(binary.BigEndian.Uint32(b[16:]))
-	h.Length = binary.BigEndian.Uint16(b[20:])
-	h.Fragment = binary.BigEndian.Uint16(b[22:])
+	h.Op = b[offOp]
+	copy(h.SwitchMAC[:], b[offSwitchMAC:offSwitchMAC+macLen])
+	copy(h.HostMAC[:], b[offHostMAC:offHostMAC+macLen])
+	h.Seq = binary.BigEndian.Uint16(b[offSeq:])
+	h.ErrCode = int32(binary.BigEndian.Uint32(b[offErrCode:]))
+	h.Length = binary.BigEndian.Uint16(b[offLength:])
+	h.Fragment = binary.BigEndian.Uint16(b[offFragment:])
 	var tlvs []TLV
 	p := b[headerLen:]
-	for len(p) >= 4 {
+	for len(p) >= tlvHeaderLen {
 		t := int16(binary.BigEndian.Uint16(p))
 		l := int(binary.BigEndian.Uint16(p[2:]))
-		if t == -1 && l == 0 {
+		if t == tlvEndType && l == 0 {
 			break
 		}
-		if 4+l > len(p) {
+		if tlvHeaderLen+l > len(p) {
 			return h, nil, fmt.Errorf("escp: truncated TLV type %d", t)
 		}
-		tlvs = append(tlvs, TLV{Type: t, Value: p[4 : 4+l]})
-		p = p[4+l:]
+		tlvs = append(tlvs, TLV{Type: t, Value: p[tlvHeaderLen : tlvHeaderLen+l]})
+		p = p[tlvHeaderLen+l:]
 	}
 	return h, tlvs, nil
 }
