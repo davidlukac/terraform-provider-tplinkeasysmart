@@ -30,5 +30,6 @@ type SwitchClient interface {
 	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
 	SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps int) error
 	StormControl(ctx context.Context) ([]escp.PortStorm, error)
+	SetStormControl(ctx context.Context, port int, unknownUnicast, multicast, broadcast bool, rateKbps int) error
 	System(ctx context.Context) (escp.System, error)
 }
