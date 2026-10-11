@@ -125,8 +125,9 @@ jobs:
   # Dry-run of the release build (no signing, no publishing), so a broken
   # .goreleaser.yml is found on the PR, not on release day. All 14 OS/arch targets
   # compile the whole dependency tree from scratch (~7 min on a 2-core runner), so
-  # PRs build the runner's own target only (config, hooks and archives are still
-  # exercised) and pushes to main build the full matrix.
+  # PRs only build the runner's own target (`goreleaser build --single-target`:
+  # config and hooks validated, no archives) and pushes to main run the full
+  # `release --snapshot` (all targets, archives, checksums).
   release-dry-run:
     name: Release build (snapshot)
     runs-on: ubuntu-latest
@@ -138,6 +139,6 @@ jobs:
       - uses: ./.github/actions/setup
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
-          args: release --snapshot --clean --skip=sign,publish ${{ github.event_name == 'pull_request' && '--single-target' || '' }}
+          args: ${{ github.event_name == 'pull_request' && 'build --snapshot --clean --single-target' || 'release --snapshot --clean --skip=sign,publish' }}
         env:
           GPG_FINGERPRINT: none
