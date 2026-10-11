@@ -7,7 +7,7 @@ import (
 )
 
 func TestParsePortBasedVLAN(t *testing.T) {
-	// captured from switch 01: mode on, VLAN 1 = ports 1-8, up to 8 VLANs
+	// captured from a TL-SG108E v6 (fw 20230218): mode on, VLAN 1 = ports 1-8, up to 8 VLANs
 	got, err := parsePortBasedVLAN([]TLV{
 		tlvHex(t, TLVVLANPortBased, "01"), tlvHex(t, TLVVLANPortBasedVID, "01000000ff"), tlvHex(t, TLVVLANPortBasedMax, "08"),
 	})

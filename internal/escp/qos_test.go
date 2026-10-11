@@ -7,7 +7,7 @@ import (
 )
 
 func TestParseQoS(t *testing.T) {
-	// captured from switch 01: mode 2 (DSCP/802.1p), all ports raw priority 0 = "1 (lowest)"
+	// captured from a TL-SG108E v6 (fw 20230218): mode 2 (DSCP/802.1p), all ports raw priority 0 = "1 (lowest)"
 	tl := []TLV{tlvHex(t, TLVQoSMode, "02")}
 	for p := 1; p <= 3; p++ {
 		tl = append(tl, TLV{Type: TLVQoSPriority, Value: []byte{byte(p), 0}})

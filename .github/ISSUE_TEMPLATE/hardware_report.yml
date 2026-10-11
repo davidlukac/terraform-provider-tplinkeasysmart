@@ -1,0 +1,24 @@
+name: Hardware or firmware report
+description: Tell us how the provider behaves on another model or firmware
+labels: [compatibility]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Switch model and hardware version
+      placeholder: TL-SG105E v5
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What you ran and what happened
+      description: Start with the read-only data sources (`system_info`, `ports`). Redact hosts, credentials and MAC addresses.
+    validations:
+      required: true

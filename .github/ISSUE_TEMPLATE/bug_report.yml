@@ -1,0 +1,43 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Switch model and hardware version
+      placeholder: TL-SG108E v6
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware
+      placeholder: 1.0.0 Build 20230218 Rel.50633
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Provider and Terraform / OpenTofu versions
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Minimal configuration and output
+      description: Redact hosts, credentials and MAC addresses. Never paste state or a config backup.
+      render: hcl
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Before you submit
+      options:
+        - label: I removed passwords, MAC addresses and the Terraform state from this report
+          required: true
