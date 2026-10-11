@@ -80,7 +80,7 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 }
 
 output "firmware" {
-  value = data.tplinkeasysmart_system_info.this.firmware
+  value = data.tplinkeasysmart_system_info.this.firmware_version
 }
 ```
 
@@ -168,7 +168,7 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 
 | | |
 |---|---|
-| **Hardware** | Developed and verified against the **TL-SG108E hardware v6**. Other Easy Smart models speak the same protocol family but are not yet verified. |
+| **Hardware** | Developed and verified against the **TL-SG108E hardware v6**. Other Easy Smart models are expected to speak the same protocol family but are not yet verified. |
 | **Firmware** | Verified on 1.0.0 Build 20230218 (the firmware that introduced the RSA key exchange). Newer builds are untried; start with the read-only data sources. |
 | **Terraform** | 1.4 and later, tested on 1.4, 1.6, 1.8, 1.10 and latest. |
 | **OpenTofu** | Tested on the latest release (informational job). |
