@@ -2,3 +2,9 @@
 cover.out
 coverage.html
 scripts/__pycache__/
+
+# build output
+bin/
+dist/
+cover.out
+cover.html
