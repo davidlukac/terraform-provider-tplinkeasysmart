@@ -24,7 +24,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: go build -v ./...
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: latest
       # tfplugindocs needs the Terraform binary to read the provider schema.
