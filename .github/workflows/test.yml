@@ -70,7 +70,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        terraform: ["1.4.*", "1.8.*", "latest"]
+        terraform: ["1.4.*", "1.6.*", "1.8.*", "1.10.*", "latest"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
@@ -81,6 +81,30 @@ jobs:
         with:
           terraform_version: ${{ matrix.terraform }}
           terraform_wrapper: false
+      - run: go test -race -count=1 ./internal/provider/...
+        env:
+          TF_ACC: "1"
+
+  # Same lifecycle tests on OpenTofu. Informational for now: a Tofu-only quirk
+  # must not block merges (continue-on-error); promote once it has proven stable.
+  opentofu:
+    name: OpenTofu latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_wrapper: false
+      - run: |
+          echo "TF_ACC_TERRAFORM_PATH=$(command -v tofu)" >> "$GITHUB_ENV"
+          echo "TF_ACC_PROVIDER_NAMESPACE=hashicorp" >> "$GITHUB_ENV"
+          echo "TF_ACC_PROVIDER_HOST=registry.opentofu.org" >> "$GITHUB_ENV"
       - run: go test -race -count=1 ./internal/provider/...
         env:
           TF_ACC: "1"
