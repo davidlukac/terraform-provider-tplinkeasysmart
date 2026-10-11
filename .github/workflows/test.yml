@@ -28,7 +28,7 @@ jobs:
         with:
           version: latest
       # tfplugindocs needs the Terraform binary to read the provider schema.
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_wrapper: false
       - name: Generated docs are up to date
@@ -55,7 +55,7 @@ jobs:
           cache: true
       # resource.UnitTest drives a real Terraform CLI; without one on PATH each
       # test downloads its own and the job times out.
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_wrapper: false
       - run: go test -race -count=1 -coverprofile=coverage.out ./...
@@ -77,7 +77,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ matrix.terraform }}
           terraform_wrapper: false
