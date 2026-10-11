@@ -1,13 +1,22 @@
-# These workflows assume the provider is the ROOT of its own GitHub repository
-# (github.com/davidlukac/terraform-provider-tplinkeasysmart).
-# Actions are pinned to major versions; pinning to commit SHAs is a follow-up
-# (Dependabot below keeps the majors current).
+# CI for github.com/davidlukac/terraform-provider-tplinkeasysmart (the provider is the
+# repository root). Everything runs against an in-memory fake switch: no hardware.
+#
+# Conventions:
+#   * Third-party actions are pinned to commit SHAs (the comment names the release);
+#     Dependabot keeps the SHAs current.
+#   * Steps call the Makefile, so a local `make <target>` reproduces CI.
+#   * Shared setup lives in .github/actions/setup.
 name: Tests
 
 on:
   pull_request:
   push:
     branches: [main]
+
+# A newer push to the same PR supersedes the running one; runs on main always finish.
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -18,51 +27,64 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # tfplugindocs needs a Terraform binary to read the provider schema.
+      - uses: ./.github/actions/setup
         with:
-          go-version-file: go.mod
-          cache: true
-      - run: go build -v ./...
-      - uses: golangci/golangci-lint-action@v9
+          terraform: latest
+      - name: Build
+        run: go build -v ./...
+      - name: Lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: latest
-      # tfplugindocs needs the Terraform binary to read the provider schema.
-      - uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_wrapper: false
       - name: Generated docs are up to date
-        run: |
-          go generate ./...
-          git diff --compact-summary --exit-code || \
-            (echo "::error::docs/ is stale. Run 'make generate' and commit the result." && exit 1)
+        run: make docs-check
       - name: Documentation examples validate against the schemas
         run: make validate-examples
       - name: Known vulnerabilities
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+          make vuln
 
   unit:
     name: Unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
         with:
-          go-version-file: go.mod
-          cache: true
-      # resource.UnitTest drives a real Terraform CLI; without one on PATH each
-      # test downloads its own and the job times out.
-      - uses: hashicorp/setup-terraform@v4
+          terraform: latest
+      # Race detector, whole module, and the coverage policy: every statement
+      # covered unless its function says `// coverage: ignore - <reason>`.
+      - name: Tests with coverage policy
+        run: make cover
+      - name: Coverage report
+        if: always()
+        run: |
+          [ -f cover.out ] || exit 0
+          go tool cover -html=cover.out -o coverage.html
+          {
+            echo "### Coverage"
+            echo '```'
+            go tool cover -func=cover.out | tail -1
+            echo '```'
+            echo "Per-function detail: download the \`coverage\` artifact (coverage.html)."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
         with:
-          terraform_wrapper: false
-      - run: go test -race -count=1 -coverprofile=coverage.out ./...
-      - run: go tool cover -func=coverage.out | tail -1
+          name: coverage
+          path: |
+            cover.out
+            coverage.html
+          if-no-files-found: ignore
+          retention-days: 14
 
-  # Full Terraform plan/apply/import/drift/destroy lifecycles against the in-memory
-  # fake switch (no hardware). Run against every supported Terraform version.
+  # Terraform plan/apply/import/drift/destroy lifecycles on every supported Terraform
+  # version. 1.4 is the documented lower bound; the others catch regressions at
+  # boundaries (import/moved handling, harness behaviour) without testing every minor.
   acceptance:
     name: Terraform ${{ matrix.terraform }}
     runs-on: ubuntu-latest
@@ -72,39 +94,51 @@ jobs:
       matrix:
         terraform: ["1.4.*", "1.6.*", "1.8.*", "1.10.*", "latest"]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
         with:
-          go-version-file: go.mod
-          cache: true
-      - uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_version: ${{ matrix.terraform }}
-          terraform_wrapper: false
-      - run: go test -race -count=1 ./internal/provider/...
-        env:
-          TF_ACC: "1"
+          terraform: ${{ matrix.terraform }}
+      - run: make testacc
 
-  # Same lifecycle tests on OpenTofu. Informational for now: a Tofu-only quirk
-  # must not block merges (continue-on-error); promote once it has proven stable.
+  # Same lifecycles on OpenTofu. Informational: a Tofu-only quirk must not block
+  # merges (continue-on-error). Promote it to required once it has proven stable.
   opentofu:
     name: OpenTofu latest
     runs-on: ubuntu-latest
     timeout-minutes: 15
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: opentofu/setup-opentofu@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
           tofu_wrapper: false
-      - run: |
-          echo "TF_ACC_TERRAFORM_PATH=$(command -v tofu)" >> "$GITHUB_ENV"
-          echo "TF_ACC_PROVIDER_NAMESPACE=hashicorp" >> "$GITHUB_ENV"
-          echo "TF_ACC_PROVIDER_HOST=registry.opentofu.org" >> "$GITHUB_ENV"
-      - run: go test -race -count=1 ./internal/provider/...
+      - name: Point the test harness at OpenTofu
+        run: |
+          {
+            echo "TF_ACC_TERRAFORM_PATH=$(command -v tofu)"
+            echo "TF_ACC_PROVIDER_NAMESPACE=hashicorp"
+            echo "TF_ACC_PROVIDER_HOST=registry.opentofu.org"
+          } >> "$GITHUB_ENV"
+      - run: make testacc
+
+  # Dry-run of the release build (no signing, no publishing), so a broken
+  # .goreleaser.yml is found on the PR, not on release day. All 14 OS/arch targets
+  # compile the whole dependency tree from scratch (~7 min on a 2-core runner), so
+  # PRs only build the runner's own target (`goreleaser build --single-target`:
+  # config and hooks validated, no archives) and pushes to main run the full
+  # `release --snapshot` (all targets, archives, checksums).
+  release-dry-run:
+    name: Release build (snapshot)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          args: ${{ github.event_name == 'pull_request' && 'build --snapshot --clean --single-target' || 'release --snapshot --clean --skip=sign,publish' }}
         env:
-          TF_ACC: "1"
+          GPG_FINGERPRINT: none

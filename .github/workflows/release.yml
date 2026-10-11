@@ -1,11 +1,22 @@
-# Publishes a signed release when a version tag is pushed. The Terraform Registry
-# ingests it through its webhook. Requires the repository secrets GPG_PRIVATE_KEY
-# and PASSPHRASE, and the matching public key registered in the Registry.
+# Publishes a signed GitHub release (which the Terraform Registry ingests through its
+# webhook). Requires the repository secrets GPG_PRIVATE_KEY and PASSPHRASE and the
+# matching public key registered in the Registry.
+#
+# MANUAL ONLY for now: pushing a v* tag does NOT release. The pre-1.0 tags are
+# published as plain git tags until the provider is ready for the Registry; at that
+# point bump to 1.0.0 and re-enable the tag trigger by adding:
+#
+#   push:
+#     tags: ["v*"]
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release (e.g. v1.0.0)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -15,20 +26,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: refs/tags/${{ inputs.tag }}
           fetch-depth: 0
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
+      - uses: ./.github/actions/setup
       - name: Import GPG key
         id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v7
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
-      - uses: goreleaser/goreleaser-action@v7
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           args: release --clean
         env:
