@@ -53,6 +53,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      # resource.UnitTest drives a real Terraform CLI; without one on PATH each
+      # test downloads its own and the job times out.
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
       - run: go test -race -count=1 -coverprofile=coverage.out ./...
       - run: go tool cover -func=coverage.out | tail -1
 
