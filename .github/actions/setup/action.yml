@@ -1,0 +1,20 @@
+name: Set up Go and Terraform
+description: Go from go.mod (module and build cache on) and, optionally, a Terraform CLI without the output-swallowing wrapper.
+inputs:
+  terraform:
+    description: Terraform version or range to install ("latest", "1.8.*"); empty installs none.
+    default: ""
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+        cache: true
+    - if: inputs.terraform != ''
+      # The lifecycle tests drive a real Terraform CLI. Without one on PATH each
+      # test downloads its own and the job times out.
+      uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+      with:
+        terraform_version: ${{ inputs.terraform }}
+        terraform_wrapper: false
