@@ -27,11 +27,25 @@ vuln:
 validate-examples:
 	scripts/validate-examples.sh
 
+# Enable the repository's git hooks (pre-commit runs `make pre-commit`).
+hooks:
+	git config core.hooksPath .githooks
+	@echo "git hooks enabled: .githooks/pre-commit"
+
+# What the pre-commit hook runs: format, vet, lint, then the whole suite with the
+# race detector and the coverage policy. Same checks CI enforces.
+pre-commit:
+	@test -z "$$(gofmt -l .)" || { echo "gofmt needed on:"; gofmt -l .; exit 1; }
+	go vet ./...
+	go vet -tags live ./...
+	golangci-lint run ./...
+	$(MAKE) cover
+
 # Local dry-run of the signed release pipeline (no signing, no publishing).
 snapshot:
 	GPG_FINGERPRINT=none goreleaser release --snapshot --clean --skip=sign,publish
 
-.PHONY: generate lint test testacc docs-check validate-examples vuln snapshot
+.PHONY: generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
 
 # --- coverage -------------------------------------------------------------
 # `make cover` runs the whole suite with the race detector, writes cover.out
@@ -47,4 +61,4 @@ cover-html: cover
 	go tool cover -html=cover.out -o coverage.html
 
 cover-selftest:
-	cd scripts && python3 -m unittest test_covercheck
+	cd scripts && python3 -m unittest test_covercheck test_coverbadge

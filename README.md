@@ -8,7 +8,7 @@
   <a href="go.mod"><img alt="Go version" src="https://img.shields.io/github/go-mod/go-version/davidlukac/terraform-provider-tplinkeasysmart?logo=go&logoColor=white&color=00ADD8"></a>
   <a href=".github/workflows/test.yml"><img alt="Terraform 1.4 and later" src="https://img.shields.io/badge/terraform-%E2%89%A5%201.4-844FBA?logo=terraform&logoColor=white"></a>
   <a href=".github/workflows/test.yml"><img alt="OpenTofu tested" src="https://img.shields.io/badge/opentofu-tested-FFDA18?logo=opentofu&logoColor=black"></a>
-  <a href="#testing"><img alt="Coverage policy: every reachable statement" src="https://img.shields.io/badge/coverage%20policy-100%25-brightgreen"></a>
+  <a href="#testing"><img alt="Test coverage" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavidlukac%2Fterraform-provider-tplinkeasysmart%2Fbadges%2Fcoverage.json"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
@@ -29,8 +29,9 @@
 
 ---
 
-<!-- The version and Go badges read the public GitHub API through shields.io and show
-     "repo not found" while the repository is private; they work once it is public. -->
+<!-- The version, Go and coverage badges are read through shields.io and show "repo not
+     found" while the repository is private; they work once it is public. The coverage
+     number is measured by CI on every push to main (coverage.json on the `badges` branch). -->
 
 ## Why this provider
 
@@ -195,6 +196,7 @@ templates/          docs templates      examples/   runnable examples used for t
 ## Development
 
 ```sh
+make hooks              # once per clone: enable the pre-commit hook (gofmt, vet, lint, tests, coverage)
 make test               # unit + Terraform lifecycle tests against fakes (needs `terraform` on PATH)
 make lint               # golangci-lint
 make cover              # tests with -race and the coverage policy
@@ -204,6 +206,8 @@ make snapshot           # dry-run of the signed release build
 ```
 
 ### Testing
+
+The coverage badge is the **measured** statement coverage of the module, computed by CI on every push to `main` (exclusions are counted as not covered). The *policy* below is stricter than a number: it fails the build on any uncovered statement.
 
 Policy: **every statement is covered**, except inside functions whose doc comment says `// coverage: ignore - <reason>` (the reason is mandatory; `scripts/covercheck.py` fails the build without it and lists every exclusion). A test must fail when the behaviour it names is broken; safety checks are never removed to raise a number.
 
@@ -216,7 +220,7 @@ CI runs the unit suite on the module's Go version and the latest stable, the lif
 
 ## Contributing
 
-Issues and pull requests are welcome. Please open an issue first for a new setting. Changes go through a pull request with [Conventional Commits](https://www.conventionalcommits.org/) titles and need green CI; see [`RELEASING.md`](RELEASING.md) for how versions are cut. Reports of other models or firmware (output of the read-only data sources, redacted) are especially useful.
+Issues and pull requests are welcome. Run `make hooks` once: the pre-commit hook runs the same checks as CI (format, vet, lint, tests with `-race` and the coverage policy), about a minute and a half. Please open an issue first for a new setting. Changes go through a pull request with [Conventional Commits](https://www.conventionalcommits.org/) titles and need green CI; see [`RELEASING.md`](RELEASING.md) for how versions are cut. Reports of other models or firmware (output of the read-only data sources, redacted) are especially useful.
 
 ## License
 
