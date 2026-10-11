@@ -1,6 +1,9 @@
 name: Set up Go and Terraform
 description: Go from go.mod (module and build cache on) and, optionally, a Terraform CLI without the output-swallowing wrapper.
 inputs:
+  go-version:
+    description: Go version to install ("stable", "1.27.x"); empty uses the version in go.mod.
+    default: ""
   terraform:
     description: Terraform version or range to install ("latest", "1.8.*"); empty installs none.
     default: ""
@@ -9,7 +12,8 @@ runs:
   steps:
     - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version-file: go.mod
+        go-version: ${{ inputs.go-version }}
+        go-version-file: ${{ inputs.go-version == '' && 'go.mod' || '' }}
         cache: true
     - if: inputs.terraform != ''
       # The lifecycle tests drive a real Terraform CLI. Without one on PATH each

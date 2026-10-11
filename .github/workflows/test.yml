@@ -47,14 +47,22 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           make vuln
 
+  # Go matrix: "go.mod" is the minimum the module declares (the supported floor),
+  # "stable" is the newest release and catches toolchain regressions early. Older Go
+  # releases are not tested because go.mod forbids them.
   unit:
-    name: Unit tests
+    name: Unit tests (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["go.mod", "stable"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
+          go-version: ${{ matrix.go == 'go.mod' && '' || matrix.go }}
           terraform: latest
       # Race detector, whole module, and the coverage policy: every statement
       # covered unless its function says `// coverage: ignore - <reason>`.
@@ -75,7 +83,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: coverage
+          name: coverage-go-${{ matrix.go }}
           path: |
             cover.out
             coverage.html

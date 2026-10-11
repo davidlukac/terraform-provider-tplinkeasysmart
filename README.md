@@ -1,66 +1,146 @@
-# terraform-provider-tplinkeasysmart
+<p align="center">
+  <img src="assets/hero.svg" alt="terraform-provider-tplinkeasysmart: an 8-port TP-Link Easy Smart switch and the Terraform resource that configures it" width="100%">
+</p>
 
-[![Tests](https://github.com/davidlukac/terraform-provider-tplinkeasysmart/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/davidlukac/terraform-provider-tplinkeasysmart/actions/workflows/test.yml)
-[![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
-[![Terraform](https://img.shields.io/badge/terraform-%E2%89%A5%201.4-844FBA?logo=terraform&logoColor=white)](.github/workflows/test.yml)
-[![OpenTofu](https://img.shields.io/badge/opentofu-tested-FFDA18?logo=opentofu&logoColor=black)](.github/workflows/test.yml)
-[![Coverage policy](https://img.shields.io/badge/coverage%20policy-100%25%20of%20reachable%20statements-brightgreen)](#testing-and-coverage)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Status](https://img.shields.io/badge/status-pre--1.0%20%C2%B7%20not%20yet%20on%20the%20Registry-orange)](#publishing)
+<p align="center">
+  <a href="https://github.com/davidlukac/terraform-provider-tplinkeasysmart/actions/workflows/test.yml"><img alt="Tests" src="https://github.com/davidlukac/terraform-provider-tplinkeasysmart/actions/workflows/test.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/davidlukac/terraform-provider-tplinkeasysmart/tags"><img alt="Version" src="https://img.shields.io/github/v/tag/davidlukac/terraform-provider-tplinkeasysmart?sort=semver&label=version&color=7c3aed"></a>
+  <a href="go.mod"><img alt="Go version" src="https://img.shields.io/github/go-mod/go-version/davidlukac/terraform-provider-tplinkeasysmart?logo=go&logoColor=white&color=00ADD8"></a>
+  <a href=".github/workflows/test.yml"><img alt="Terraform 1.4 and later" src="https://img.shields.io/badge/terraform-%E2%89%A5%201.4-844FBA?logo=terraform&logoColor=white"></a>
+  <a href=".github/workflows/test.yml"><img alt="OpenTofu tested" src="https://img.shields.io/badge/opentofu-tested-FFDA18?logo=opentofu&logoColor=black"></a>
+  <a href="#testing"><img alt="Coverage policy: every reachable statement" src="https://img.shields.io/badge/coverage%20policy-100%25-brightgreen"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+</p>
 
-<!-- Badges for the latest release and the Terraform Registry version are added when the
-     repository is public (shields.io cannot read private repositories). -->
+<p align="center">
+  <b>Infrastructure as code for TP-Link Easy Smart switches.</b><br>
+  Plan, review and apply your switch configuration like any other Terraform resource,<br>
+  through the switch's native management protocol instead of a scraped web UI.
+</p>
 
-Terraform provider for TP-Link **Easy Smart** switches, driving the switch through its native UDP management protocol (ESCP) instead of scraping the web UI. Developed against a **TL-SG108E hardware v6** (firmware 1.0.0 Build 20230218).
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#what-you-can-manage">What you can manage</a> ·
+  <a href="#safety-by-design">Safety</a> ·
+  <a href="#compatibility">Compatibility</a> ·
+  <a href="docs/index.md">Docs</a> ·
+  <a href="internal/escp/PROTOCOL.md">Protocol</a>
+</p>
 
-**Status: v0.1.0, proof of concept.** One resource and one data source. See `../docs/escp-protocol.md` for how the protocol was reverse-engineered and `../docs/terraform-plan.md` / `../docs/escp-research-plan.md` for the roadmap.
+---
 
-## Resources and data sources
+<!-- The version and Go badges read the public GitHub API through shields.io and show
+     "repo not found" while the repository is private; they work once it is public. -->
 
-Write support exists only where it cannot cut management access, and per-port or per-group writes are **guarded**: the provider refuses to touch a port that has a link up or belongs to a LAG unless `allow_disruptive = true` is set (see `../CLAUDE.md`). Every write path was verified on switch 01 using only unused ports (6, 7) and always restored. Nothing above the unused ports (router LAG on 1+2, switch 02 and the workstation on 4/8) was written.
+## Why this provider
 
-| Name | Kind | Web UI page | Guard |
-|---|---|---|---|
-| `tplinkeasysmart_led` | resource | System > LED On/Off | none needed |
-| `tplinkeasysmart_igmp_snooping` | resource | Switching > IGMP Snooping | none; real toggle verified |
-| `tplinkeasysmart_loop_prevention` | resource | Monitoring > Loop Prevention | none; real toggle verified |
-| `tplinkeasysmart_qos` | resource | QoS > QoS Basic | none; priorities only in port-based mode |
-| `tplinkeasysmart_port` | resource | Switching > Port Setting | port in use / LAG member |
-| `tplinkeasysmart_bandwidth_limit` | resource | QoS > Bandwidth Control | port in use / LAG member |
-| `tplinkeasysmart_storm_limit` | resource | QoS > Storm Control | port in use / LAG member |
-| `tplinkeasysmart_port_mirror` | resource | Monitoring > Port Mirror | destination port in use / LAG member |
-| `tplinkeasysmart_lag` | resource | Switching > Port Trunk | old and new member ports |
-| `tplinkeasysmart_vlan_port_based_group` | resource | VLAN > Port Based VLAN | old and new member ports (membership is exclusive) |
-| `tplinkeasysmart_system` | resource | System > System Info (device description) | none; the IP config is re-sent unchanged and verified; write skipped if unchanged |
-| `data.tplinkeasysmart_config_backup` | data | System > System Tools > Backup Config | read-only; content is optional and sensitive |
-| `data.tplinkeasysmart_system_info` | data | System Info / IP Setting | read-only |
-| `data.tplinkeasysmart_ports` | data | Switching > Port Setting | read-only |
-| `data.tplinkeasysmart_port_statistics` | data | Monitoring > Port Statistics | read-only |
-| `data.tplinkeasysmart_lags` | data | Switching > Port Trunk | read-only |
-| `data.tplinkeasysmart_port_mirror` | data | Monitoring > Port Mirror | read-only |
-| `data.tplinkeasysmart_vlan_mtu` | data | VLAN > MTU VLAN | read-only (mode is never written) |
-| `data.tplinkeasysmart_vlan_port_based` | data | VLAN > Port Based VLAN | read-only |
-| `data.tplinkeasysmart_vlan_8021q` | data | VLAN > 802.1Q VLAN / PVID | read-only |
-| `data.tplinkeasysmart_qos` | data | QoS > QoS Basic | read-only |
-| `data.tplinkeasysmart_bandwidth_control` | data | QoS > Bandwidth Control | read-only |
-| `data.tplinkeasysmart_storm_control` | data | QoS > Storm Control | read-only |
+The Easy Smart line (TL-SG105E, TL-SG108E, TL-SG1016DE and friends) is cheap, quiet and capable, and it has no CLI, no API and no config-as-code story. The web UI is the only supported way in. This provider gives these switches one.
 
-Deliberately **not** writable: management IP / DHCP, VLAN mode switches (MTU, port-based, 802.1Q), 802.1Q VLANs and PVIDs, user account, config restore, reboot, factory reset, firmware upgrade, cable diagnostics. The device description (hostname) is writable through `tplinkeasysmart_system` (letters, digits and hyphens only).
+| | |
+|---|---|
+| **Native protocol** | Speaks the same UDP management protocol (ESCP) as the vendor's own utility. No HTTP session scraping, no HTML parsing, no browser. |
+| **Read what is really there** | Data sources for ports, link state, statistics, LAGs, VLANs, QoS, rate limits, mirroring and the config backup. |
+| **Safe by default** | Writes that could cut your own management path (a port with a link up, a LAG member) are refused unless you opt in with `allow_disruptive = true`. |
+| **Fails at plan time** | Bad ports, VLAN ids, rates and cross-field mistakes are rejected while Terraform plans, before anything is applied. |
+| **Verified read-back** | Every write is read back and compared, so a switch that silently ignored a change is reported, not trusted. |
+| **Several switches** | One provider block can manage a whole fleet, per object, with their own credentials. |
+| **Tested without hardware** | A fake UDP switch and real Terraform plan/apply/import/drift/destroy lifecycles run on every pull request, on five Terraform versions and OpenTofu. |
 
-## Provider configuration
+## Quick start
+
+> **Status:** pre-1.0 and not yet in the Terraform Registry. Until it is, build it locally (below). The Registry address will be `registry.terraform.io/davidlukac/tplinkeasysmart`.
 
 ```hcl
+terraform {
+  required_providers {
+    tplinkeasysmart = {
+      source = "davidlukac/tplinkeasysmart"
+    }
+  }
+}
+
 provider "tplinkeasysmart" {
-  host            = "192.0.2.120"   # or TPLINK_EASYSMART_HOST
-  username        = "admin"            # or TPLINK_EASYSMART_USERNAME
-  password        = var.password       # or TPLINK_EASYSMART_PASSWORD (sensitive)
-  timeout_seconds = 3                  # optional
+  host     = "192.0.2.120"      # or TPLINK_EASYSMART_HOST
+  username = "admin"            # or TPLINK_EASYSMART_USERNAME
+  password = var.switch_password # or TPLINK_EASYSMART_PASSWORD (sensitive)
+}
+
+# Read the current state of the switch...
+data "tplinkeasysmart_system_info" "this" {}
+
+data "tplinkeasysmart_ports" "this" {}
+
+# ...and manage it.
+resource "tplinkeasysmart_led" "this" {
+  enabled = true
+}
+
+resource "tplinkeasysmart_loop_prevention" "this" {
+  enabled = true
+}
+
+output "firmware" {
+  value = data.tplinkeasysmart_system_info.this.firmware
 }
 ```
 
-### Several switches
+Build and use a local copy until the Registry release:
 
-Either declare one provider alias per switch, or define them as data and select one per object:
+```sh
+go build -o bin/terraform-provider-tplinkeasysmart .
+```
+
+then point a CLI config at it (`~/.terraformrc`):
+
+```hcl
+provider_installation {
+  dev_overrides {
+    "davidlukac/tplinkeasysmart" = "/path/to/terraform-provider-tplinkeasysmart/bin"
+  }
+  direct {}
+}
+```
+
+Existing settings are best brought under management with `terraform import` (every resource documents its import id) so the first plan shows no change.
+
+## What you can manage
+
+Write support exists only where it cannot cut management access. Per-port and per-group writes are **guarded** (see [Safety by design](#safety-by-design)).
+
+**Resources**
+
+| Resource | Web UI page | Guard |
+|---|---|---|
+| `tplinkeasysmart_led` | System > LED On/Off | none needed |
+| `tplinkeasysmart_system` | System > System Info (device description) | IP config re-sent unchanged and verified; skipped if unchanged |
+| `tplinkeasysmart_igmp_snooping` | Switching > IGMP Snooping | none |
+| `tplinkeasysmart_loop_prevention` | Monitoring > Loop Prevention | none |
+| `tplinkeasysmart_qos` | QoS > QoS Basic | priorities only in port-based mode |
+| `tplinkeasysmart_port` | Switching > Port Setting | port in use / LAG member |
+| `tplinkeasysmart_bandwidth_limit` | QoS > Bandwidth Control | port in use / LAG member |
+| `tplinkeasysmart_storm_limit` | QoS > Storm Control | port in use / LAG member |
+| `tplinkeasysmart_port_mirror` | Monitoring > Port Mirror | destination port in use / LAG member |
+| `tplinkeasysmart_lag` | Switching > Port Trunk | old and new member ports |
+| `tplinkeasysmart_vlan_port_based_group` | VLAN > Port Based VLAN | old and new member ports |
+
+**Data sources** (read-only): `system_info`, `ports`, `port_statistics`, `lags`, `port_mirror`, `qos`, `bandwidth_control`, `storm_control`, `vlan_mtu`, `vlan_port_based`, `vlan_8021q`, and `config_backup` (the configuration file, optional and sensitive).
+
+Deliberately **not** writable: management IP / DHCP, VLAN mode switches (MTU, port-based, 802.1Q), 802.1Q VLANs and PVIDs, user account, config restore, reboot, factory reset and firmware upgrade. These are the changes that can lock you out of a device that has no console. The full reference for every resource and data source is in [`docs/`](docs/index.md) and on the Registry once published.
+
+## Safety by design
+
+A managed switch is the one device you cannot reach when you misconfigure it. The provider is built around that.
+
+- **Guards.** `port`, `bandwidth_limit`, `storm_limit`, `port_mirror`, `lag` and `vlan_port_based_group` refuse to touch a port that has a link up or belongs to a LAG, because that is how you cut your own uplink. Set `allow_disruptive = true` on the object to take the risk deliberately.
+- **Import the uplink, protect it.** Bring the LAG that carries your router uplink under management and add `lifecycle { prevent_destroy = true }`.
+- **Plan-time validation.** Port numbers (1-32), LAG and VLAN ids (1-255), speeds, QoS modes and priorities (1-4), rate limits (0 or a multiple of 64 up to 1,000,000 kbps), device description (letters, digits, hyphens, up to 32) and cross-field rules (a storm limit needs a rate if a traffic type is selected, a mirror needs a destination that is not one of its sources) are checked before apply. The client repeats every check before it writes.
+- **Read-back.** Each write is verified against the switch afterwards; a write the switch ignored is an error.
+- **Back up first.** The `config_backup` data source returns the device configuration so you can keep a copy before a change.
+- **No hardware needed for tests.** Everything above is exercised against a fake switch, including the failure paths.
+
+## Several switches
+
+Either declare one provider alias per switch, or define them as data and pick one per object:
 
 ```hcl
 variable "switches" {
@@ -73,70 +153,70 @@ provider "tplinkeasysmart" {
 }
 
 resource "tplinkeasysmart_loop_prevention" "this" {
-  for_each = toset(nonsensitive(keys(var.switches)))  # names are not secret
+  for_each = toset(nonsensitive(keys(var.switches))) # names are not secret
   switch   = each.key
   enabled  = true
 }
 ```
 
-- `switch` is optional everywhere. Omitted, it means the provider's own switch (`host`), or the only configured one; with several switches and no default, planning fails and lists the names.
-- Ids and import ids of a named switch are prefixed with its name: `sw02:led`, `sw02:7`. The provider's own switch keeps the plain ids.
-- Changing `switch` replaces the object (it is a different device).
-- The same host cannot appear twice. A complete example is `examples/multi-switch`.
+- `switch` is optional everywhere. Omitted, it means the provider's own switch (`host`) or the only configured one; with several switches and no default, planning fails and lists the names.
+- Ids and import ids of a named switch are prefixed with its name (`sw02:led`, `sw02:7`). The provider's own switch keeps plain ids.
+- Changing `switch` replaces the object, because it is a different device.
+- The same host cannot appear twice. A complete example is in [`examples/multi-switch`](examples/multi-switch).
+
+## Compatibility
+
+| | |
+|---|---|
+| **Hardware** | Developed and verified against the **TL-SG108E hardware v6**. Other Easy Smart models speak the same protocol family but are not yet verified. |
+| **Firmware** | Verified on 1.0.0 Build 20230218 (the firmware that introduced the RSA key exchange). Newer builds are untried; start with the read-only data sources. |
+| **Terraform** | 1.4 and later, tested on 1.4, 1.6, 1.8, 1.10 and latest. |
+| **OpenTofu** | Tested on the latest release (informational job). |
+| **Go** | The version in [`go.mod`](go.mod) and the latest stable, for building from source. |
+
+Behaviour of other models and firmware is documented in the [protocol notes](internal/escp/PROTOCOL.md) as it is verified. Reports are welcome, see [Contributing](#contributing).
 
 ## Constraints (read these)
 
 - **Same layer-2 network only.** ESCP is UDP broadcast based; run Terraform on a host in the switch's subnet.
-- **Several switches are supported** through provider aliases (one `provider "tplinkeasysmart" { alias = ... }` per switch): the switch broadcasts every reply to UDP port 29809, and the provider binds that port with address/port sharing, so each client keeps the replies from its own switch address. Verified with two switches and two processes at once. Limits: don't run two clients against the *same* switch at once (they would compete for it and could mix up replies), and an old client that binds the port exclusively (for example an old Easy Smart utility) blocks the provider until it is closed.
-- **No real security on the wire.** The protocol's encryption keys are public or trivially breakable (see the protocol doc). Keep the switches on a trusted management network.
-- Only tested on TL-SG108E v6, firmware 20230218. Newer firmware (20250710) and other models are untried.
+- **One client per switch at a time.** Don't run two clients against the same switch concurrently; an old client that binds the reply port exclusively (for example an old Easy Smart utility) blocks the provider until it is closed. Several *different* switches work at once.
+- **No real security on the wire.** The protocol's encryption keys are public or trivially breakable (see the [protocol notes](internal/escp/PROTOCOL.md)). Keep the switches on a trusted management network.
 
-## Validation
+## How it works
 
-Bad values are refused while Terraform plans, before anything is applied: port numbers (1-32), LAG and VLAN ids (1-255), speeds, QoS modes and priorities (1-4), rate limits (0 or a multiple of 64 up to 1,000,000 kbps), device description (letters, digits, hyphens, up to 32), and cross-field rules (storm control needs a rate if a traffic type is selected, a mirror needs a destination that is not one of its sources, QoS priorities need port-based mode). Values that only become known during apply are validated by Terraform as soon as they resolve, and the client repeats every check before it writes.
+The provider talks UDP port 29808/29809 on the switch's own layer-2 segment: discovery, an RSA session-key exchange, RC4-encrypted TLV requests, then reads and writes with read-back. The wire format, every TLV layout and what was verified live are in [`internal/escp/PROTOCOL.md`](internal/escp/PROTOCOL.md).
 
-## Develop
-
-```sh
-go test ./...                      # protocol golden vectors, fake UDP switch, Terraform lifecycle tests (needs `terraform` on PATH)
-go build -o bin/terraform-provider-tplinkeasysmart .
-../scripts/tf.sh plan              # runs ../terraform/switch-01 against switch 01 with a temporary dev_overrides CLI config
+```
+internal/escp       crypto, packet codec, UDP client (discovery, key exchange, get/set, retry, session recovery)
+internal/provider   provider, resources and data sources, guards, validation
+templates/          docs templates      examples/   runnable examples used for the generated docs
 ```
 
-Tests do not touch hardware: `internal/escp` runs the client against an in-process fake switch (it can decrypt the session key because the switch's 64-bit RSA modulus factors trivially), and `internal/provider` runs real `terraform` plan/apply/import cycles against a fake client.
-
-## Publishing
-
-Status: the repository is private (`github.com/davidlukac/terraform-provider-tplinkeasysmart`) and nothing is published. Release plumbing is in place (`.goreleaser.yml`, `.github/workflows/`, `terraform-registry-manifest.json`, generated `docs/` and `examples/`, `.golangci.yml`, `Makefile`). Remaining steps, in order:
-
-1. ~~Choose a license~~ done: MIT (`LICENSE`).
-2. ~~Choose the namespace and extract the repo~~ done: module `github.com/davidlukac/terraform-provider-tplinkeasysmart`, address `registry.terraform.io/davidlukac/tplinkeasysmart`.
-3. **Create a GPG signing key**, add `GPG_PRIVATE_KEY` and `PASSPHRASE` as repository secrets, and add the public key in the Registry (Publish > Provider).
-4. **Make the repository public** once it is ready (the Registry only ingests public repositories).
-5. **Register the provider** on registry.terraform.io (sign in with GitHub, Publish > Provider, pick the repository), then release. The release workflow (`.github/workflows/release.yml`) is **manual only** (`workflow_dispatch` with a tag) until 1.0.0: pre-1.0 tags are plain git tags and pushing them does not release. At 1.0.0 add the `push: tags: ["v*"]` trigger back (comment at the top of the workflow); it then builds, signs and uploads the assets and the Registry ingests them.
-6. Optional: submit to the OpenTofu registry with a PR to `opentofu/registry`.
-7. Before the first public release re-verify the Registry requirements against the current publishing docs, run `make snapshot` and `make lint` (CI runs the snapshot as a dry run on every PR). The first public Registry release is `1.0.0`.
-
-Common tasks: `make generate` (docs), `make lint`, `make test`, `make testacc`, `make docs-check`, `make snapshot`.
-
-### Testing and coverage
+## Development
 
 ```sh
-make cover        # suite with -race, writes cover.out, enforces the coverage policy
-make cover-html   # same, plus coverage.html
+make test               # unit + Terraform lifecycle tests against fakes (needs `terraform` on PATH)
+make lint               # golangci-lint
+make cover              # tests with -race and the coverage policy
+make generate           # regenerate docs/ from the schema and examples/
+make validate-examples  # every documentation example against the schemas
+make snapshot           # dry-run of the signed release build
 ```
 
-Policy: **every statement is covered**, except inside functions whose doc comment contains `// coverage: ignore - <reason>` (the reason is mandatory; `scripts/covercheck.py` fails the build without it, and lists every exclusion). Today the only exclusion is the `main()` shim, because `run` holds the logic and is tested. Do not delete a safety check to raise the number, and do not write tests without assertions: a test must fail when the behaviour it names is broken.
+### Testing
 
-How the failure paths are exercised without hardware:
+Policy: **every statement is covered**, except inside functions whose doc comment says `// coverage: ignore - <reason>` (the reason is mandatory; `scripts/covercheck.py` fails the build without it and lists every exclusion). A test must fail when the behaviour it names is broken; safety checks are never removed to raise a number.
 
-- `internal/escp`: the fake UDP switch can be scripted per request (`getFn`), can stay silent, reject the key exchange, reject the *n*th SET, or replace its discovery reply.
-- `internal/provider`: `faultyClient` wraps the in-memory fake and fails specific calls of any method (all of them, or only the *n*th), or accepts writes without applying them. `faultScenarios()` drives every resource through the same failure modes (write rejected, read-back fails, write ignored, update fails, refresh fails, bad import id, object vanishes, update succeeds).
+Failure paths are exercised without hardware:
 
-## Layout
+- `internal/escp`: the fake UDP switch can be scripted per request, stay silent, reject the key exchange, reject the *n*th SET, or replace its discovery reply.
+- `internal/provider`: a fault-injecting client wraps the in-memory fake and fails specific calls of any method, or accepts writes without applying them; every resource is driven through the same failure scenarios (write rejected, read-back fails, write ignored, update fails, refresh fails, bad import id, object vanishes).
 
-- `internal/escp`: crypto (static RC4, 8-byte-state session RC4, 64-bit RSA), packet codec, UDP client (discovery, key exchange, LED get/set, retry, session recovery).
-- `internal/provider`: provider, `tplinkeasysmart_led`, `tplinkeasysmart_system_info`. Resources talk to the `SwitchClient` interface so a different transport (or the web UI) can be plugged in later.
+CI runs the unit suite on the module's Go version and the latest stable, the lifecycle tests on five Terraform versions and OpenTofu, the linter, a generated-docs check, a vulnerability scan and a release dry run.
+
+## Contributing
+
+Issues and pull requests are welcome. Please open an issue first for a new setting. Changes go through a pull request with [Conventional Commits](https://www.conventionalcommits.org/) titles and need green CI; see [`RELEASING.md`](RELEASING.md) for how versions are cut. Reports of other models or firmware (output of the read-only data sources, redacted) are especially useful.
 
 ## License
 
@@ -144,4 +224,4 @@ MIT, see [LICENSE](LICENSE).
 
 ## Disclaimer
 
-This is an independent project. It is not affiliated with, endorsed by, or supported by TP-Link. "TP-Link" and "Easy Smart" are trademarks of their owners and are used only to describe the hardware this provider works with.
+This is an independent project. It is not affiliated with, endorsed by, or supported by TP-Link. "TP-Link" and "Easy Smart" are trademarks of their owners and are used only to describe the hardware this provider works with. Use it at your own risk: you are changing the configuration of live network equipment.
