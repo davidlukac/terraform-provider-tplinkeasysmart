@@ -96,14 +96,15 @@ Tests do not touch hardware: `internal/escp` runs the client against an in-proce
 
 ## Publishing
 
-Release plumbing is in place (`.goreleaser.yml`, `.github/workflows/`, `terraform-registry-manifest.json`, generated `docs/` and `examples/`, `.golangci.yml`, `Makefile`), but nothing is published. Remaining manual steps, in order:
+Status: the repository is private (`github.com/davidlukac/terraform-provider-tplinkeasysmart`) and nothing is published. Release plumbing is in place (`.goreleaser.yml`, `.github/workflows/`, `terraform-registry-manifest.json`, generated `docs/` and `examples/`, `.golangci.yml`, `Makefile`). Remaining steps, in order:
 
 1. ~~Choose a license~~ done: MIT (`LICENSE`).
-2. **Decide the namespace and extract the repo**: the provider must be the root of a public GitHub repository named `terraform-provider-tplinkeasysmart`. Extract it from `local-infra` with history (for example `git subtree split --prefix=terraform-provider-tplinkeasysmart`), then change the Go module path (`go.mod` and all imports), the address in `main.go`, and the `source` in `examples/` and `docs/` (re-run `make generate`). `.github/workflows/` only works once the provider is the repo root.
+2. ~~Choose the namespace and extract the repo~~ done: module `github.com/davidlukac/terraform-provider-tplinkeasysmart`, address `registry.terraform.io/davidlukac/tplinkeasysmart`.
 3. **Create a GPG signing key**, add `GPG_PRIVATE_KEY` and `PASSPHRASE` as repository secrets, and add the public key in the Registry (Publish > Provider).
-4. **Register the provider** on registry.terraform.io (sign in with GitHub, Publish > Provider, pick the repository), then push a `vX.Y.Z` tag; the release workflow builds, signs and uploads the assets and the Registry ingests them.
-5. Optional: submit to the OpenTofu registry with a PR to `opentofu/registry`.
-6. Before the first public release re-verify the Registry requirements against the current publishing docs, run `make snapshot` and `make lint`, and decide whether to stay `0.x` until the schema is stable.
+4. **Make the repository public** once it is ready (the Registry only ingests public repositories).
+5. **Register the provider** on registry.terraform.io (sign in with GitHub, Publish > Provider, pick the repository), then push a `vX.Y.Z` tag; the release workflow builds, signs and uploads the assets and the Registry ingests them.
+6. Optional: submit to the OpenTofu registry with a PR to `opentofu/registry`.
+7. Before the first public release re-verify the Registry requirements against the current publishing docs, run `make snapshot` and `make lint`, and decide whether to stay `0.x` until the schema is stable.
 
 Common tasks: `make generate` (docs), `make lint`, `make test`, `make testacc`, `make docs-check`, `make snapshot`.
 
@@ -129,3 +130,7 @@ How the failure paths are exercised without hardware:
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+## Disclaimer
+
+This is an independent project. It is not affiliated with, endorsed by, or supported by TP-Link. "TP-Link" and "Easy Smart" are trademarks of their owners and are used only to describe the hardware this provider works with.

@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
 // SwitchClient is the union of everything the provider asks of the switch, as

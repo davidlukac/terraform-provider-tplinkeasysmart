@@ -1,4 +1,4 @@
-module github.com/local-infra/terraform-provider-tplinkeasysmart
+module github.com/davidlukac/terraform-provider-tplinkeasysmart
 
 go 1.27.2
 

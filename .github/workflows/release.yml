@@ -1,7 +1,6 @@
 # Publishes a signed release when a version tag is pushed. The Terraform Registry
 # ingests it through its webhook. Requires the repository secrets GPG_PRIVATE_KEY
 # and PASSPHRASE, and the matching public key registered in the Registry.
-# Assumes the provider is the ROOT of its own repository (see test.yml).
 name: Release
 
 on:

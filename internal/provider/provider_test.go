@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
 // fakeClient is an in-memory switch used instead of the UDP transport.

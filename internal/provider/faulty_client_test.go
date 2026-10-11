@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
 // errInjected is the error every injected fault returns.

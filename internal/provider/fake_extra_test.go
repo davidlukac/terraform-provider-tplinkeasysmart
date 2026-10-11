@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
 // extraState holds the fake switch behaviour for the device description and

@@ -11,7 +11,7 @@ trap 'rm -rf "$WORK"' EXIT
 CLI="$WORK/terraformrc"
 cat > "$CLI" <<CLIEOF
 provider_installation {
-  dev_overrides { "local-infra/tplinkeasysmart" = "$ROOT/bin" }
+  dev_overrides { "davidlukac/tplinkeasysmart" = "$ROOT/bin" }
   direct {}
 }
 CLIEOF
@@ -27,7 +27,7 @@ for dir in examples/provider examples/multi-switch examples/resources/* examples
     cat >> "$d/zz_provider.tf" <<'TFEOF'
 terraform {
   required_providers {
-    tplinkeasysmart = { source = "local-infra/tplinkeasysmart" }
+    tplinkeasysmart = { source = "davidlukac/tplinkeasysmart" }
   }
 }
 TFEOF
@@ -44,7 +44,7 @@ TFEOF
   if out=$(cd "$d" && TF_CLI_CONFIG_FILE="$CLI" terraform validate -no-color 2>&1); then
     echo "ok    $dir"
   else
-    echo "FAIL  $dir"; echo "$out" | grep -vE 'Warning: Provider development overrides|^\s*$|dev_overrides|behavior may|published releases|applying changes|following provider|local-infra/tplinkeasysmart in|^[│╵╷]' | head -8
+    echo "FAIL  $dir"; echo "$out" | grep -vE 'Warning: Provider development overrides|^\s*$|dev_overrides|behavior may|published releases|applying changes|following provider|davidlukac/tplinkeasysmart in|^[│╵╷]' | head -8
     fail=1
   fi
 done

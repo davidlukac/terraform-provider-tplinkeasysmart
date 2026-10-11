@@ -12,7 +12,7 @@ import os
 import re
 import sys
 
-MODULE = "github.com/local-infra/terraform-provider-tplinkeasysmart/"
+MODULE = "github.com/davidlukac/terraform-provider-tplinkeasysmart/"
 MARKER = re.compile(r"^\s*//\s*coverage:\s*ignore\b(?P<rest>.*)$")
 BLOCK = re.compile(r"^(?P<file>.+):(?P<sl>\d+)\.\d+,(?P<el>\d+)\.\d+ (?P<n>\d+) (?P<count>\d+)$")
 

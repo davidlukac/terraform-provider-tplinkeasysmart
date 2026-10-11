@@ -10,7 +10,7 @@ import (
 	frameworkprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/provider"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/provider"
 )
 
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name tplinkeasysmart --rendered-provider-name "TP-Link Easy Smart"
@@ -20,7 +20,7 @@ var version = "0.26.0"
 
 // registryAddress is the provider's source address; Terraform matches it
 // against `required_providers` (and `dev_overrides`).
-const registryAddress = "registry.terraform.io/local-infra/tplinkeasysmart"
+const registryAddress = "registry.terraform.io/davidlukac/tplinkeasysmart"
 
 // serveFunc is providerserver.Serve; it is a parameter of run so tests can
 // observe what would be served without starting a plugin server.

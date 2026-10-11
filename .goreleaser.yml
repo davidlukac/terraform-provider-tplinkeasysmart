@@ -1,8 +1,6 @@
 # GoReleaser configuration for the Terraform Registry (HashiCorp scaffolding pattern).
 # Produces, per tag: one zip per OS/arch, <name>_<version>_SHA256SUMS, its detached
 # GPG signature (.sig) and <name>_<version>_manifest.json, as the Registry requires.
-# The module's project name is derived from the repository directory, so this only
-# yields terraform-provider-tplinkeasysmart once the provider lives in a repo of that name.
 version: 2
 
 project_name: terraform-provider-tplinkeasysmart
