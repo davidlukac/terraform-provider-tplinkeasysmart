@@ -59,4 +59,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/local-infra/terraform-provider-tplinkeasysmart
+        - github.com/davidlukac/terraform-provider-tplinkeasysmart

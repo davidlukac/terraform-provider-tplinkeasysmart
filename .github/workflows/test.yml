@@ -1,6 +1,5 @@
-# NOTE: these workflows assume the provider is the ROOT of its own GitHub
-# repository (terraform-provider-tplinkeasysmart). They do nothing useful while
-# the provider lives in a subdirectory of the local-infra repository.
+# These workflows assume the provider is the ROOT of its own GitHub repository
+# (github.com/davidlukac/terraform-provider-tplinkeasysmart).
 # Actions are pinned to major versions; pinning to commit SHAs is a follow-up
 # (Dependabot below keeps the majors current).
 name: Tests

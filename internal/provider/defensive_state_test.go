@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 
-	"github.com/local-infra/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
 // State written by an older provider version has no allow_disruptive; Read must

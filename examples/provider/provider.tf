@@ -2,7 +2,7 @@ terraform {
   required_providers {
     tplinkeasysmart = {
       # Replace the namespace with the one the provider is published under.
-      source = "local-infra/tplinkeasysmart"
+      source = "davidlukac/tplinkeasysmart"
     }
   }
 }

@@ -31,7 +31,7 @@ func TestRunServesTheProviderUnderItsRegistryAddress(t *testing.T) {
 	if !s.called {
 		t.Fatal("the provider must be served")
 	}
-	if s.opts.Address != "registry.terraform.io/local-infra/tplinkeasysmart" || s.opts.Debug {
+	if s.opts.Address != "registry.terraform.io/davidlukac/tplinkeasysmart" || s.opts.Debug {
 		t.Fatalf("unexpected serve options %+v", s.opts)
 	}
 	p := s.factory()
