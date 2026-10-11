@@ -30,3 +30,22 @@ func TestExpiredNoticesADeadlineThatThePassedTimerHasNotReportedYet(t *testing.T
 		t.Fatalf("a deadline in the past must be reported as exceeded, got %v", err)
 	}
 }
+
+// deadlineOnlyContext reports a deadline in the past while Err is still nil,
+// the window in which the socket deadline has fired but the context's own timer
+// has not. That window is real but microscopic, so it is built by hand to cover
+// the branch deterministically instead of by timing.
+type deadlineOnlyContext struct{ context.Context }
+
+func (deadlineOnlyContext) Deadline() (time.Time, bool) {
+	return time.Now().Add(-time.Second), true
+}
+
+func (deadlineOnlyContext) Err() error { return nil }
+
+func TestExpiredComparesTheDeadlineWhenTheContextHasNotNoticedYet(t *testing.T) {
+	err := expired(deadlineOnlyContext{context.Background()})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("a passed deadline with a nil Err must be reported as exceeded, got %v", err)
+	}
+}

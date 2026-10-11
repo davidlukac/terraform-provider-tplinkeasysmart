@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="440" viewBox="0 0 1280 440" role="img" aria-labelledby="t d">
+  <title id="t">terraform-provider-tplinkeasysmart</title>
+  <desc id="d">An 8-port TP-Link Easy Smart switch next to a Terraform resource that configures a link aggregation group.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/><stop offset="0.6" stop-color="#1e1b4b"/><stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e2e8f0"/><stop offset="1" stop-color="#94a3b8"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#38bdf8"/>
+    </linearGradient>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity="0.04"/></pattern>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000" flood-opacity="0.45"/></filter>
+  </defs>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  </style>
+  <rect width="1280" height="440" rx="18" fill="url(#bg)"/>
+  <rect width="1280" height="440" rx="18" fill="url(#grid)"/>
+
+  <!-- headline -->
+  <text x="70" y="78" font-size="40" font-weight="700" fill="#f8fafc">terraform-provider-<tspan fill="url(#accent)">tplinkeasysmart</tspan></text>
+  <text x="70" y="116" font-size="20" fill="#cbd5e1">Manage TP-Link Easy Smart switches as code. Native UDP protocol, no web scraping.</text>
+
+  <!-- the switch -->
+  <g filter="url(#shadow)">
+    <rect x="46" y="170" width="660" height="150" rx="12" fill="url(#body)" stroke="#cbd5e1" stroke-width="1.5"/>
+    <rect x="46" y="170" width="660" height="26" rx="12" fill="#ffffff" fill-opacity="0.35"/>
+    <circle cx="66" cy="183" r="3" fill="#64748b"/><circle cx="686" cy="183" r="3" fill="#64748b"/>
+  </g>
+  <text x="70" y="190" font-size="13" font-weight="700" fill="#334155" letter-spacing="1.5">TL-SG108E  ·  8-PORT GIGABIT EASY SMART SWITCH</text>
+  
+  <g transform="translate(70,0)">
+    <circle cx="28" cy="214" r="4.5" fill="#22c55e" filter="url(#glow)"/>
+    <rect x="0" y="228" width="56" height="46" rx="5" fill="#0b1220" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="8" y="236" width="40" height="22" rx="2" fill="#020617"/>
+    <g fill="#eab308"><rect x="11.0" y="262" width="2.4" height="8" rx="1"/><rect x="15.6" y="262" width="2.4" height="8" rx="1"/><rect x="20.2" y="262" width="2.4" height="8" rx="1"/><rect x="24.8" y="262" width="2.4" height="8" rx="1"/><rect x="29.4" y="262" width="2.4" height="8" rx="1"/><rect x="34.0" y="262" width="2.4" height="8" rx="1"/><rect x="38.6" y="262" width="2.4" height="8" rx="1"/><rect x="43.2" y="262" width="2.4" height="8" rx="1"/></g>
+    <text x="28" y="298" text-anchor="middle" font-size="12" fill="#cbd5e1">1</text>
+  </g>
+  <g transform="translate(142,0)">
+    <circle cx="28" cy="214" r="4.5" fill="#22c55e" filter="url(#glow)"/>
+    <rect x="0" y="228" width="56" height="46" rx="5" fill="#0b1220" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="8" y="236" width="40" height="22" rx="2" fill="#020617"/>
+    <g fill="#eab308"><rect x="11.0" y="262" width="2.4" height="8" rx="1"/><rect x="15.6" y="262" width="2.4" height="8" rx="1"/><rect x="20.2" y="262" width="2.4" height="8" rx="1"/><rect x="24.8" y="262" width="2.4" height="8" rx="1"/><rect x="29.4" y="262" width="2.4" height="8" rx="1"/><rect x="34.0" y="262" width="2.4" height="8" rx="1"/><rect x="38.6" y="262" width="2.4" height="8" rx="1"/><rect x="43.2" y="262" width="2.4" height="8" rx="1"/></g>
+    <text x="28" y="298" text-anchor="middle" font-size="12" fill="#cbd5e1">2</text>
+  </g>
+  <g transform="translate(214,0)">
+    <circle cx="28" cy="214" r="4.5" fill="#22c55e" filter="url(#glow)"/>
+    <rect x="0" y="228" width="56" height="46" rx="5" fill="#0b1220" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="8" y="236" width="40" height="22" rx="2" fill="#020617"/>
+    <g fill="#eab308"><rect x="11.0" y="262" width="2.4" height="8" rx="1"/><rect x="15.6" y="262" width="2.4" height="8" rx="1"/><rect x="20.2" y="262" width="2.4" height="8" rx="1"/><rect x="24.8" y="262" width="2.4" height="8" rx="1"/><rect x="29.4" y="262" width="2.4" height="8" rx="1"/><rect x="34.0" y="262" width="2.4" height="8" rx="1"/><rect x="38.6" y="262" width="2.4" height="8" rx="1"/><rect x="43.2" y="262" width="2.4" height="8" rx="1"/></g>
+    <text x="28" y="298" text-anchor="middle" font-size="12" fill="#cbd5e1">3</text>
+  </g>
+  <g transform="translate(286,0)">
+    <circle cx="28" cy="214" r="4.5" fill="#22c55e" filter="url(#glow)"/>
+    <rect x="0" y="228" width="56" height="46" rx="5" fill="#0b1220" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="8" y="236" width="40" height="22" rx="2" fill="#020617"/>
+    <g fill="#eab308"><rect x="11.0" y="262" width="2.4" height="8" rx="1"/><rect x="15.6" y="262" width="2.4" height="8" rx="1"/><rect x="20.2" y="262" width="2.4" height="8" rx="1"/><rect x="24.8" y="262" width="2.4" height="8" rx="1"/><rect x="29.4" y="262" width="2.4" height="8" rx="1"/><rect x="34.0" y="262" width="2.4" height="8" rx="1"/><rect x="38.6" y="262" width="2.4" height="8" rx="1"/><rect x="43.2" y="262" width="2.4" height="8" rx="1"/></g>
+    <text x="28" y="298" text-anchor="middle" font-size="12" fill="#cbd5e1">4</text>
+  </g>
+  <g transform="translate(358,0)">
+    <circle cx="28" cy="214" r="4.5" fill="#22c55e" filter="url(#glow)"/>
+    <rect x="0" y="228" width="56" height="46" rx="5" fill="#0b1220" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="8" y="236" width="40" height="22" rx="2" fill="#020617"/>
+    <g fill="#eab308"><rect x="11.0" y="262" width="2.4" height="8" rx="1"/><rect x="15.6" y="262" width="2.4" height="8" rx="1"/><rect x="20.2" y="262" width="2.4" height="8" rx="1"/><rect x="24.8" y="262" width="2.4" height="8" rx="1"/><rect x="29.4" y="262" width="2.4" height="8" rx="1"/><rect x="34.0" y="262" width="2.4" height="8" rx="1"/><rect x="38.6" y="262" width="2.4" height="8" rx="1"/><rect x="43.2" y="262" width="2.4" height="8" rx="1"/></g>
+    <text x="28" y="298" text-anchor="middle" font-size="12" fill="#cbd5e1">5</text>
+  </g>
+  <g transform="translate(430,0)">
+    <circle cx="28" cy="214" r="4.5" fill="#475569" />
+    <rect x="0" y="228" width="56" height="46" rx="5" fill="#0b1220" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="8" y="236" width="40" height="22" rx="2" fill="#020617"/>
+    <g fill="#eab308"><rect x="11.0" y="262" width="2.4" height="8" rx="1"/><rect x="15.6" y="262" width="2.4" height="8" rx="1"/><rect x="20.2" y="262" width="2.4" height="8" rx="1"/><rect x="24.8" y="262" width="2.4" height="8" rx="1"/><rect x="29.4" y="262" width="2.4" height="8" rx="1"/><rect x="34.0" y="262" width="2.4" height="8" rx="1"/><rect x="38.6" y="262" width="2.4" height="8" rx="1"/><rect x="43.2" y="262" width="2.4" height="8" rx="1"/></g>
+    <text x="28" y="298" text-anchor="middle" font-size="12" fill="#cbd5e1">6</text>
+  </g>
+  <g transform="translate(502,0)">
+    <circle cx="28" cy="214" r="4.5" fill="#475569" />
+    <rect x="0" y="228" width="56" height="46" rx="5" fill="#0b1220" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="8" y="236" width="40" height="22" rx="2" fill="#020617"/>
+    <g fill="#eab308"><rect x="11.0" y="262" width="2.4" height="8" rx="1"/><rect x="15.6" y="262" width="2.4" height="8" rx="1"/><rect x="20.2" y="262" width="2.4" height="8" rx="1"/><rect x="24.8" y="262" width="2.4" height="8" rx="1"/><rect x="29.4" y="262" width="2.4" height="8" rx="1"/><rect x="34.0" y="262" width="2.4" height="8" rx="1"/><rect x="38.6" y="262" width="2.4" height="8" rx="1"/><rect x="43.2" y="262" width="2.4" height="8" rx="1"/></g>
+    <text x="28" y="298" text-anchor="middle" font-size="12" fill="#cbd5e1">7</text>
+  </g>
+  <g transform="translate(574,0)">
+    <circle cx="28" cy="214" r="4.5" fill="#22c55e" filter="url(#glow)"/>
+    <rect x="0" y="228" width="56" height="46" rx="5" fill="#0b1220" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="8" y="236" width="40" height="22" rx="2" fill="#020617"/>
+    <g fill="#eab308"><rect x="11.0" y="262" width="2.4" height="8" rx="1"/><rect x="15.6" y="262" width="2.4" height="8" rx="1"/><rect x="20.2" y="262" width="2.4" height="8" rx="1"/><rect x="24.8" y="262" width="2.4" height="8" rx="1"/><rect x="29.4" y="262" width="2.4" height="8" rx="1"/><rect x="34.0" y="262" width="2.4" height="8" rx="1"/><rect x="38.6" y="262" width="2.4" height="8" rx="1"/><rect x="43.2" y="262" width="2.4" height="8" rx="1"/></g>
+    <text x="28" y="298" text-anchor="middle" font-size="12" fill="#cbd5e1">8</text>
+  </g>
+  <!-- power / system LEDs -->
+  <circle cx="662" cy="224" r="4.5" fill="#22c55e" filter="url(#glow)"/>
+  <text x="662" y="246" text-anchor="middle" font-size="10" fill="#475569">PWR</text>
+  <circle cx="662" cy="268" r="4.5" fill="#38bdf8" filter="url(#glow)"/>
+  <text x="662" y="290" text-anchor="middle" font-size="10" fill="#475569">SYS</text>
+
+  <!-- feature chips -->
+  <g font-size="14" fill="#e2e8f0">
+    <rect x="46" y="350" width="214" height="34" rx="17" fill="#ffffff" fill-opacity="0.1"/><text x="153" y="372" text-anchor="middle">11 resources · 12 data sources</text>
+    <rect x="272" y="350" width="138" height="34" rx="17" fill="#ffffff" fill-opacity="0.1"/><text x="341" y="372" text-anchor="middle">guarded writes</text>
+    <rect x="422" y="350" width="146" height="34" rx="17" fill="#ffffff" fill-opacity="0.1"/><text x="495" y="372" text-anchor="middle">plan-time checks</text>
+    <rect x="580" y="350" width="126" height="34" rx="17" fill="#ffffff" fill-opacity="0.1"/><text x="643" y="372" text-anchor="middle">Terraform · Tofu</text>
+  </g>
+
+  <!-- code card -->
+  <g filter="url(#shadow)">
+    <rect x="750" y="150" width="482" height="206" rx="14" fill="#0b1220" stroke="#334155"/>
+    <circle cx="776" cy="174" r="6" fill="#ef4444"/><circle cx="798" cy="174" r="6" fill="#f59e0b"/><circle cx="820" cy="174" r="6" fill="#22c55e"/>
+  </g>
+  <g class="mono" font-size="17">
+    <text class="mono" x="774" y="224"><tspan fill="#c084fc">resource</tspan> <tspan fill="#86efac">"tplinkeasysmart_lag"</tspan> <tspan fill="#86efac">"uplink"</tspan> {</text>
+    <text class="mono" x="798" y="256"><tspan fill="#7dd3fc">group</tspan> <tspan fill="#94a3b8">=</tspan> <tspan fill="#fbbf24">1</tspan></text>
+    <text class="mono" x="798" y="284"><tspan fill="#7dd3fc">ports</tspan> <tspan fill="#94a3b8">=</tspan> [<tspan fill="#fbbf24">1</tspan>, <tspan fill="#fbbf24">2</tspan>]</text>
+    <text class="mono" x="774" y="312">}</text>
+  </g>
+  <text x="774" y="340" font-size="13" fill="#64748b">terraform plan → apply → verified read-back</text>
+
+  <!-- cable from switch to card -->
+  <path d="M706 245 C 730 245, 730 255, 750 255" stroke="url(#accent)" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="1 7"/>
+</svg>

@@ -47,14 +47,22 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           make vuln
 
+  # Go matrix: "go.mod" is the minimum the module declares (the supported floor),
+  # "stable" is the newest release and catches toolchain regressions early. Older Go
+  # releases are not tested because go.mod forbids them.
   unit:
-    name: Unit tests
+    name: Unit tests (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["go.mod", "stable"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
+          go-version: ${{ matrix.go }}
           terraform: latest
       # Race detector, whole module, and the coverage policy: every statement
       # covered unless its function says `// coverage: ignore - <reason>`.
@@ -75,12 +83,50 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: coverage
+          name: coverage-go-${{ matrix.go }}
           path: |
             cover.out
             coverage.html
           if-no-files-found: ignore
           retention-days: 14
+
+  # Publishes the measured coverage as a shields.io endpoint file (coverage.json) on
+  # the `badges` branch, written by CI only, never by hand. The README badge reads
+  # it from there. Runs on pushes to main, from the go.mod-version unit run.
+  coverage-badge:
+    name: Publish coverage badge
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-go-go.mod
+          path: ${{ runner.temp }}/coverage
+      - name: Compute coverage
+        working-directory: scripts
+        run: |
+          python3 coverbadge.py "$RUNNER_TEMP/coverage/cover.out" > "$RUNNER_TEMP/coverage.json"
+          cat "$RUNNER_TEMP/coverage.json"
+      - name: Publish to the badges branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin badges >/dev/null 2>&1; then
+            git fetch --depth=1 origin badges:refs/remotes/origin/badges
+            git switch --force -c badges origin/badges
+          else
+            git switch --orphan badges
+          fi
+          cp "$RUNNER_TEMP/coverage.json" coverage.json
+          git add coverage.json
+          git diff --cached --quiet && { echo "coverage unchanged"; exit 0; }
+          git commit -m "chore: coverage $(python3 -c 'import json;print(json.load(open("coverage.json"))["message"])')"
+          git push origin badges
 
   # Terraform plan/apply/import/drift/destroy lifecycles on every supported Terraform
   # version. 1.4 is the documented lower bound; the others catch regressions at
