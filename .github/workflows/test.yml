@@ -122,8 +122,11 @@ jobs:
           } >> "$GITHUB_ENV"
       - run: make testacc
 
-  # Dry-run of the release build (all OS/arch targets, no signing, no publishing),
-  # so a broken .goreleaser.yml is found on the PR, not on release day.
+  # Dry-run of the release build (no signing, no publishing), so a broken
+  # .goreleaser.yml is found on the PR, not on release day. All 14 OS/arch targets
+  # compile the whole dependency tree from scratch (~7 min on a 2-core runner), so
+  # PRs build the runner's own target only (config, hooks and archives are still
+  # exercised) and pushes to main build the full matrix.
   release-dry-run:
     name: Release build (snapshot)
     runs-on: ubuntu-latest
@@ -135,6 +138,6 @@ jobs:
       - uses: ./.github/actions/setup
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
-          args: release --snapshot --clean --skip=sign,publish
+          args: release --snapshot --clean --skip=sign,publish ${{ github.event_name == 'pull_request' && '--single-target' || '' }}
         env:
           GPG_FINGERPRINT: none
