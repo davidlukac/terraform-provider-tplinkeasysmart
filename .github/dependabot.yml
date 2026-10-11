@@ -4,11 +4,21 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "build(deps)"
     groups:
       terraform-plugin:
         patterns:
           - "github.com/hashicorp/*"
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/setup
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions:
+        patterns:
+          - "*"

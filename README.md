@@ -102,9 +102,9 @@ Status: the repository is private (`github.com/davidlukac/terraform-provider-tpl
 2. ~~Choose the namespace and extract the repo~~ done: module `github.com/davidlukac/terraform-provider-tplinkeasysmart`, address `registry.terraform.io/davidlukac/tplinkeasysmart`.
 3. **Create a GPG signing key**, add `GPG_PRIVATE_KEY` and `PASSPHRASE` as repository secrets, and add the public key in the Registry (Publish > Provider).
 4. **Make the repository public** once it is ready (the Registry only ingests public repositories).
-5. **Register the provider** on registry.terraform.io (sign in with GitHub, Publish > Provider, pick the repository), then push a `vX.Y.Z` tag; the release workflow builds, signs and uploads the assets and the Registry ingests them.
+5. **Register the provider** on registry.terraform.io (sign in with GitHub, Publish > Provider, pick the repository), then release. The release workflow (`.github/workflows/release.yml`) is **manual only** (`workflow_dispatch` with a tag) until 1.0.0: pre-1.0 tags are plain git tags and pushing them does not release. At 1.0.0 add the `push: tags: ["v*"]` trigger back (comment at the top of the workflow); it then builds, signs and uploads the assets and the Registry ingests them.
 6. Optional: submit to the OpenTofu registry with a PR to `opentofu/registry`.
-7. Before the first public release re-verify the Registry requirements against the current publishing docs, run `make snapshot` and `make lint`, and decide whether to stay `0.x` until the schema is stable.
+7. Before the first public release re-verify the Registry requirements against the current publishing docs, run `make snapshot` and `make lint` (CI runs the snapshot as a dry run on every PR). The first public Registry release is `1.0.0`.
 
 Common tasks: `make generate` (docs), `make lint`, `make test`, `make testacc`, `make docs-check`, `make snapshot`.
 
