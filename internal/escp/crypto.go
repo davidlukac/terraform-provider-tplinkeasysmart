@@ -1,6 +1,6 @@
 // Package escp implements the TP-Link Easy Smart UDP management protocol as
-// spoken by TL-SG108E v6 switches. See docs/escp-protocol.md in the
-// repository root for how it was reverse-engineered.
+// spoken by TL-SG108E v6 switches. See PROTOCOL.md in this
+// directory for the wire format.
 package escp
 
 import (

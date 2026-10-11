@@ -32,7 +32,7 @@ linters:
     gosec:
       excludes:
         # Weak primitives are the device's own protocol (RC4, 64-bit RSA,
-        # TEA, math/big) and are documented as such in docs/escp-protocol.md.
+        # math/big) and are documented as such in internal/escp/PROTOCOL.md.
         - G401
         - G501
         - G505

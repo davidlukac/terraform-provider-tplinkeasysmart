@@ -16,6 +16,11 @@ import (
 // maxDatagram is the receive buffer size; ESCP packets are well below it.
 const maxDatagram = 4096
 
+// maxFragmentedReply bounds a reply reassembled from fragments. The largest real
+// one is the configuration file (a few KiB); the cap keeps a misbehaving or
+// spoofed sender from growing the buffer until the deadline.
+const maxFragmentedReply = 64 << 10
+
 // randReader is the entropy source for session keys; tests replace it to
 // provoke the (otherwise unreachable) read failure.
 var randReader io.Reader = rand.Reader
@@ -30,6 +35,8 @@ const (
 var (
 	// ErrNoReply means the switch did not answer within the timeout.
 	ErrNoReply = errors.New("escp: no reply from switch")
+	// ErrReplyTooLarge means a fragmented reply grew past the sane limit.
+	ErrReplyTooLarge = errors.New("escp: fragmented reply is larger than any switch sends")
 	// ErrAuth means the switch rejected the credentials.
 	ErrAuth = errors.New("escp: switch rejected the credentials")
 )
@@ -295,6 +302,9 @@ func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []TLV, typ
 				if x.Type == typ {
 					out = append(out, x.Value...)
 				}
+			}
+			if len(out) > maxFragmentedReply {
+				return nil, ErrReplyTooLarge
 			}
 			if rep.fragment == 0 {
 				return out, nil

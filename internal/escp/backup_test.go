@@ -97,3 +97,15 @@ func TestConfigBackupHonoursContext(t *testing.T) {
 		t.Fatalf("the call ignored the context deadline and took %v", took)
 	}
 }
+
+func TestConfigBackupRefusesAnEndlessFragmentedReply(t *testing.T) {
+	// A sender that keeps the fragment flag set must not make the client buffer
+	// without limit.
+	f := startFakeSwitch(t)
+	f.setBackupMode("flood")
+	c := dialFake(t, f, "secret")
+	c.cfg.Timeout = 2 * time.Second
+	if _, err := c.ConfigBackup(context.Background()); !errors.Is(err, ErrReplyTooLarge) {
+		t.Fatalf("want ErrReplyTooLarge, got %v", err)
+	}
+}

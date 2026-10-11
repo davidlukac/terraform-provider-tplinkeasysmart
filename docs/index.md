@@ -15,7 +15,6 @@ Manages TP-Link Easy Smart switches (TL-SG108E v6) over their native UDP managem
 terraform {
   required_providers {
     tplinkeasysmart = {
-      # Replace the namespace with the one the provider is published under.
       source = "davidlukac/tplinkeasysmart"
     }
   }

@@ -6,7 +6,7 @@ import (
 )
 
 func TestParseDot1QDisabled(t *testing.T) {
-	// captured from switch 01: 802.1Q off, 32 VLANs max, every port PVID 1
+	// captured from a TL-SG108E v6 (fw 20230218): 802.1Q off, 32 VLANs max, every port PVID 1
 	var tl []TLV
 	tl = append(tl, tlvHex(t, TLVVLAN8021Q, "00"), tlvHex(t, TLVVLAN8021QMax, "20"))
 	for p := 1; p <= 8; p++ {

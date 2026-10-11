@@ -17,7 +17,7 @@ const (
 	portOffActFlow  = 6
 )
 
-// TLV types of the settings read by this package (see docs/escp-protocol.md).
+// TLV types of the settings read by this package (see PROTOCOL.md).
 const (
 	TLVPorts = 4096
 )

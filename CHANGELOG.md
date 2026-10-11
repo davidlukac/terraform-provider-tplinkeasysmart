@@ -1,8 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- A fragmented reply (configuration backup) is capped at 64 KiB: a sender that never clears the fragment flag now gets `ErrReplyTooLarge` instead of growing the buffer until the deadline.
+- Repository readiness for publication: SECURITY.md, issue and pull request templates, pre-commit hook, measured coverage badge.
+
 ## 0.26.0
 
-- Several switches in one provider: a `switches` map (name to host and credentials) plus an optional `switch` argument on every resource and data source; provider aliases keep working and can be mixed in. Ids and import ids of a named switch are prefixed (`sw02:led`, `sw02:7`); the provider's own switch keeps the plain ids. Changing `switch` replaces the object; duplicate hosts are rejected. Client deadline race fixed. See ADR-0005 and `examples/multi-switch`.
+- Several switches in one provider: a `switches` map (name to host and credentials) plus an optional `switch` argument on every resource and data source; provider aliases keep working and can be mixed in. Ids and import ids of a named switch are prefixed (`sw02:led`, `sw02:7`); the provider's own switch keeps the plain ids. Changing `switch` replaces the object; duplicate hosts are rejected. Client deadline race fixed. See `examples/multi-switch`.
 
 ## 0.25.0
 

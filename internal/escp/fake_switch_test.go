@@ -30,7 +30,7 @@ type fakeSwitch struct {
 	recv     int
 	mute     bool // swallow everything (switch gone)
 
-	backupMode string // config backup misbehaviour: "", "badmagic", "short", "dropsecond", "dropfirst", "silent"
+	backupMode string // config backup misbehaviour: "", "badmagic", "short", "dropsecond", "dropfirst", "silent", "flood"
 
 	// Programmable misbehaviour, set through configure().
 	getFn          func(types []int16) (tlvs []TLV, code int32, drop bool) // scripted GET replies
@@ -234,6 +234,15 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 			mode := f.backupMode
 			f.mu.Unlock()
 			if mode == "silent" {
+				return
+			}
+			if mode == "flood" {
+				// A sender that never clears the fragment flag.
+				h1 := h
+				h1.Fragment = 1
+				for i := 0; i < 100; i++ {
+					f.send(from, OpSetReply, h1, 0, []TLV{{TLVConfigFile, make([]byte, 1000)}}, true)
+				}
 				return
 			}
 			cfg := fakeConfig()

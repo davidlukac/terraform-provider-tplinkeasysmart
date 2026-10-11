@@ -13,12 +13,12 @@ import (
 // Manual tests against a real switch. They only read, or write the value that
 // is already set. Run with:
 //
-//	set -a; . ../../../.env; set +a
+//	export TPLINK_EASYSMART_HOST=... TPLINK_EASYSMART_USERNAME=... TPLINK_EASYSMART_PASSWORD=...
 //	go test -tags live -run Live ./internal/escp -v
 func liveClient(t *testing.T) *Client {
 	t.Helper()
-	c, err := Dial(Config{Host: os.Getenv("SWITCH_01_IP"), Username: os.Getenv("SWITCH_01_USERNAME"),
-		Password: os.Getenv("SWITCH_01_PASSWORD"), Timeout: 3 * time.Second})
+	c, err := Dial(Config{Host: os.Getenv("TPLINK_EASYSMART_HOST"), Username: os.Getenv("TPLINK_EASYSMART_USERNAME"),
+		Password: os.Getenv("TPLINK_EASYSMART_PASSWORD"), Timeout: 3 * time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -472,12 +472,12 @@ func TestLiveHostnameRename(t *testing.T) {
 }
 
 // Two clients (one per switch, as two provider aliases would be) must work at
-// the same time on the shared reply port. Needs SWITCH_02_IP; it only sends
+// the same time on the shared reply port. Needs TPLINK_EASYSMART_SECOND_HOST; it only sends
 // the unauthenticated discovery request to the second switch, no credentials.
 func TestLiveTwoClientsShareThePort(t *testing.T) {
-	second := os.Getenv("SWITCH_02_IP")
+	second := os.Getenv("TPLINK_EASYSMART_SECOND_HOST")
 	if second == "" {
-		t.Skip("set SWITCH_02_IP to run (discovery only, no credentials are sent to it)")
+		t.Skip("set TPLINK_EASYSMART_SECOND_HOST to run (discovery only, no credentials are sent to it)")
 	}
 	a := liveClient(t)
 	b, err := Dial(Config{Host: second, Timeout: 3 * time.Second})
