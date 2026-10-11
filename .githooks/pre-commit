@@ -1,0 +1,33 @@
+#!/bin/sh
+# Pre-commit: the CI checks, locally, before the commit exists.
+#   gofmt, go vet (also -tags live), golangci-lint, then tests with -race and the
+#   coverage policy (`make pre-commit`). Skipped when nothing that affects the Go
+#   build or tests is staged. Enable once per clone with `make hooks`.
+#
+# Do not bypass with --no-verify: a red hook is the same red CI would show.
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+[ -n "$staged" ] || exit 0
+
+# Only these paths can change build, lint or test results.
+if ! printf '%s\n' "$staged" | grep -Eq '(\.go$|^go\.(mod|sum)$|^\.golangci\.yml$|^Makefile$|^scripts/cover|^\.githooks/|^templates/|^examples/|^main\.go$)'; then
+  echo "pre-commit: no Go-relevant changes staged, skipping checks"
+  exit 0
+fi
+
+for tool in go golangci-lint python3 terraform; do
+  command -v "$tool" >/dev/null 2>&1 || {
+    echo "pre-commit: '$tool' is required but not on PATH" >&2
+    exit 1
+  }
+done
+
+# Workflow files get actionlint when it is installed (CI-only otherwise).
+if printf '%s\n' "$staged" | grep -q '^\.github/' && command -v actionlint >/dev/null 2>&1; then
+  actionlint
+fi
+
+echo "pre-commit: make pre-commit (gofmt, vet, lint, tests with -race and the coverage policy)"
+exec make pre-commit
