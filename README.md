@@ -1,5 +1,16 @@
 # terraform-provider-tplinkeasysmart
 
+[![Tests](https://github.com/davidlukac/terraform-provider-tplinkeasysmart/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/davidlukac/terraform-provider-tplinkeasysmart/actions/workflows/test.yml)
+[![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
+[![Terraform](https://img.shields.io/badge/terraform-%E2%89%A5%201.4-844FBA?logo=terraform&logoColor=white)](.github/workflows/test.yml)
+[![OpenTofu](https://img.shields.io/badge/opentofu-tested-FFDA18?logo=opentofu&logoColor=black)](.github/workflows/test.yml)
+[![Coverage policy](https://img.shields.io/badge/coverage%20policy-100%25%20of%20reachable%20statements-brightgreen)](#testing-and-coverage)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Status](https://img.shields.io/badge/status-pre--1.0%20%C2%B7%20not%20yet%20on%20the%20Registry-orange)](#publishing)
+
+<!-- Badges for the latest release and the Terraform Registry version are added when the
+     repository is public (shields.io cannot read private repositories). -->
+
 Terraform provider for TP-Link **Easy Smart** switches, driving the switch through its native UDP management protocol (ESCP) instead of scraping the web UI. Developed against a **TL-SG108E hardware v6** (firmware 1.0.0 Build 20230218).
 
 **Status: v0.1.0, proof of concept.** One resource and one data source. See `../docs/escp-protocol.md` for how the protocol was reverse-engineered and `../docs/terraform-plan.md` / `../docs/escp-research-plan.md` for the roadmap.
