@@ -45,7 +45,14 @@ jobs:
           test -s "$RUNNER_TEMP/release-notes.md" || { echo "no CHANGELOG section for ${TAG#v}"; exit 1; }
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
-          args: release --clean --release-notes ${{ runner.temp }}/release-notes.md
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+      # GoReleaser ignores --release-notes while changelog.disable is set, so the notes
+      # (extracted from CHANGELOG.md above) are applied to the release afterwards.
+      - name: Set release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: gh release edit "$TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
