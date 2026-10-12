@@ -16,12 +16,14 @@ How a version of the provider is cut and published. Maintainers only.
 
 ## Publishing to the Terraform Registry
 
-Status: not published yet. The release workflow (`.github/workflows/release.yml`) is manual only (`workflow_dispatch` with a tag input), so pushing a tag does not release anything.
+Status: **published** at <https://registry.terraform.io/providers/davidlukac/tplinkeasysmart>. The first version on the Registry is 0.26.1 (2026-10-12), released with the manual workflow. The Registry ingests every GitHub release that has the signed `SHA256SUMS` and the manifest, through its webhook.
 
-1. Create a GPG signing key and add `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` as repository secrets; add the public key in the Registry (Publish > Provider).
-2. Make the repository public (the Registry ingests public repositories only).
-3. Register the provider on registry.terraform.io (sign in with GitHub, Publish > Provider, pick the repository).
-4. Release `1.0.0`: bump the version, re-add the `push: tags: ["v*"]` trigger described at the top of `release.yml`, tag and push. The workflow builds every OS/arch, signs the checksums and uploads the assets; the Registry ingests them through its webhook.
-5. Optional: submit to the OpenTofu registry with a PR to `opentofu/registry`.
+The release workflow (`.github/workflows/release.yml`) is manual only (`workflow_dispatch` with a tag input), so pushing a tag does not release anything. To publish a version:
 
-Before the first release re-check the current [Registry publishing requirements](https://developer.hashicorp.com/terraform/registry/providers/publishing), run `make snapshot` and `make lint`. CI runs a snapshot build on every PR as a dry run.
+1. Cut the version as above (the PR bumps `main.go` and moves the `CHANGELOG.md` entries under the new version; the GitHub release notes are that CHANGELOG section).
+2. Push the tag, then dispatch the workflow: `gh workflow run release.yml -f tag=vX.Y.Z`. It builds every OS/arch, signs the checksums with the release key (`GPG_PRIVATE_KEY`, `GPG_PASSPHRASE` secrets; the public key is registered in the Registry) and uploads the assets.
+3. Check the new version on the Registry page and with `terraform init` in an empty directory.
+
+Optional: submit to the OpenTofu registry with a PR to `opentofu/registry`.
+
+Registry versions cannot be deleted by the maintainer, only deprecated, so verify a build (`make snapshot`) before releasing. CI runs a snapshot build on every PR as a dry run.

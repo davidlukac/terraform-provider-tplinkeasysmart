@@ -2,9 +2,9 @@
 # webhook). Requires the repository secrets GPG_PRIVATE_KEY and GPG_PASSPHRASE and the
 # matching public key registered in the Registry.
 #
-# MANUAL ONLY for now: pushing a v* tag does NOT release. The pre-1.0 tags are
-# published as plain git tags until the provider is ready for the Registry; at that
-# point bump to 1.0.0 and re-enable the tag trigger by adding:
+# MANUAL ONLY: pushing a v* tag does NOT release. Push the tag first, then run this
+# workflow with the tag as input (gh workflow run release.yml -f tag=vX.Y.Z). To release
+# on every tag push instead, add:
 #
 #   push:
 #     tags: ["v*"]

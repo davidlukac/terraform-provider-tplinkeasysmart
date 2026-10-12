@@ -9,6 +9,7 @@
   <a href=".github/workflows/test.yml"><img alt="Terraform 1.4 and later" src="https://img.shields.io/badge/terraform-%E2%89%A5%201.4-844FBA?logo=terraform&logoColor=white"></a>
   <a href=".github/workflows/test.yml"><img alt="OpenTofu tested" src="https://img.shields.io/badge/opentofu-tested-FFDA18?logo=opentofu&logoColor=black"></a>
   <a href="#testing"><img alt="Test coverage" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavidlukac%2Fterraform-provider-tplinkeasysmart%2Fbadges%2Fcoverage.json"></a>
+  <a href="https://registry.terraform.io/providers/davidlukac/tplinkeasysmart"><img alt="Terraform Registry" src="https://img.shields.io/badge/registry-davidlukac%2Ftplinkeasysmart-7B42BC?logo=terraform&logoColor=white"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
@@ -23,15 +24,14 @@
   <a href="#what-you-can-manage">What you can manage</a> ·
   <a href="#safety-by-design">Safety</a> ·
   <a href="#compatibility">Compatibility</a> ·
-  <a href="docs/index.md">Docs</a> ·
+  <a href="https://registry.terraform.io/providers/davidlukac/tplinkeasysmart/latest/docs">Registry docs</a> ·
   <a href="internal/escp/PROTOCOL.md">Protocol</a>
 </p>
 
 ---
 
-<!-- The version, Go and coverage badges are read through shields.io and show "repo not
-     found" while the repository is private; they work once it is public. The coverage
-     number is measured by CI on every push to main (coverage.json on the `badges` branch). -->
+<!-- The coverage number is measured by CI on every push to main (coverage.json on the
+     `badges` branch). -->
 
 ## Why this provider
 
@@ -49,13 +49,14 @@ The Easy Smart line (TL-SG105E, TL-SG108E, TL-SG1016DE and friends) is cheap, qu
 
 ## Quick start
 
-> **Status:** pre-1.0 and not yet in the Terraform Registry. Until it is, build it locally (below). The Registry address will be `registry.terraform.io/davidlukac/tplinkeasysmart`.
+> **Status:** pre-1.0. Install from the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart) with `terraform init`; releases are signed. Until 1.0 a minor version may change behaviour, so pin it (`~> 0.26`) and read the [changelog](CHANGELOG.md) before upgrading.
 
 ```hcl
 terraform {
   required_providers {
     tplinkeasysmart = {
-      source = "davidlukac/tplinkeasysmart"
+      source  = "davidlukac/tplinkeasysmart"
+      version = "~> 0.26"
     }
   }
 }
@@ -85,23 +86,6 @@ output "firmware" {
 }
 ```
 
-Build and use a local copy until the Registry release:
-
-```sh
-go build -o bin/terraform-provider-tplinkeasysmart .
-```
-
-then point a CLI config at it (`~/.terraformrc`):
-
-```hcl
-provider_installation {
-  dev_overrides {
-    "davidlukac/tplinkeasysmart" = "/path/to/terraform-provider-tplinkeasysmart/bin"
-  }
-  direct {}
-}
-```
-
 Existing settings are best brought under management with `terraform import` (every resource documents its import id) so the first plan shows no change.
 
 ## What you can manage
@@ -126,7 +110,7 @@ Write support exists only where it cannot cut management access. Per-port and pe
 
 **Data sources** (read-only): `system_info`, `ports`, `port_statistics`, `lags`, `port_mirror`, `qos`, `bandwidth_control`, `storm_control`, `vlan_mtu`, `vlan_port_based`, `vlan_8021q`, and `config_backup` (the configuration file, optional and sensitive).
 
-Deliberately **not** writable: management IP / DHCP, VLAN mode switches (MTU, port-based, 802.1Q), 802.1Q VLANs and PVIDs, user account, config restore, reboot, factory reset and firmware upgrade. These are the changes that can lock you out of a device that has no console. The full reference for every resource and data source is in [`docs/`](docs/index.md) and on the Registry once published.
+Deliberately **not** writable: management IP / DHCP, VLAN mode switches (MTU, port-based, 802.1Q), 802.1Q VLANs and PVIDs, user account, config restore, reboot, factory reset and firmware upgrade. These are the changes that can lock you out of a device that has no console. The full reference for every resource and data source is in [`docs/`](docs/index.md) and on the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart/latest/docs).
 
 ## Safety by design
 
@@ -203,6 +187,23 @@ make cover              # tests with -race and the coverage policy
 make generate           # regenerate docs/ from the schema and examples/
 make validate-examples  # every documentation example against the schemas
 make snapshot           # dry-run of the signed release build
+```
+
+### Building from source
+
+```sh
+go build -o bin/terraform-provider-tplinkeasysmart .
+```
+
+then point a CLI config at it (`~/.terraformrc`) instead of the Registry copy:
+
+```hcl
+provider_installation {
+  dev_overrides {
+    "davidlukac/tplinkeasysmart" = "/path/to/terraform-provider-tplinkeasysmart/bin"
+  }
+  direct {}
+}
 ```
 
 ### Testing
