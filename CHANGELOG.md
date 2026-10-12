@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.26.1
 
 - A fragmented reply (configuration backup) is capped at 64 KiB: a sender that never clears the fragment flag now gets `ErrReplyTooLarge` instead of growing the buffer until the deadline.
 - Repository readiness for publication: SECURITY.md, issue and pull request templates, pre-commit hook, measured coverage badge.
