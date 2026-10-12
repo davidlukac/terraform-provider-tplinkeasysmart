@@ -15,6 +15,37 @@ body:
       label: Firmware
     validations:
       required: true
+  - type: markdown
+    attributes:
+      value: |
+        Please start **read-only**: this configuration only logs in and reads, it never writes.
+
+        ```hcl
+        provider "tplinkeasysmart" {
+          host     = "192.0.2.10"   # your switch
+          username = "admin"
+          password = var.password
+        }
+
+        data "tplinkeasysmart_system_info" "this" {}
+        data "tplinkeasysmart_ports" "this" {}
+
+        output "info"  { value = data.tplinkeasysmart_system_info.this }
+        output "ports" { value = data.tplinkeasysmart_ports.this }
+        ```
+
+        `terraform plan` is enough. Redact hosts, credentials and MAC addresses.
+  - type: dropdown
+    id: login
+    attributes:
+      label: Did the login and the read-only data sources work?
+      options:
+        - Yes, both data sources returned data
+        - Login rejected or timed out
+        - Login worked, data looked wrong or incomplete
+        - Not tried yet
+    validations:
+      required: true
   - type: textarea
     id: result
     attributes:

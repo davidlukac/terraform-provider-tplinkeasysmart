@@ -33,6 +33,9 @@
 <!-- The coverage number is measured by CI on every push to main (coverage.json on the
      `badges` branch). -->
 
+> **Tested on:** TL-SG108E hardware v6, firmware 1.0.0 Build 20230218. That is the only device verified so far; other Easy Smart models are untested ([see the table](#compatibility), and [report yours](https://github.com/davidlukac/terraform-provider-tplinkeasysmart/issues/new?template=hardware_report.yml)).
+> **A bad write can lock you out:** these switches have no console, and recovery from an unreachable management path is a physical factory reset. The provider refuses the risky changes by default, see [Safety by design](#safety-by-design) and [Constraints](#constraints-read-these). Released under the [MIT license](LICENSE).
+
 ## Why this provider
 
 The Easy Smart line (TL-SG105E, TL-SG108E, TL-SG1016DE and friends) is cheap, quiet and capable, and it has no CLI, no API and no config-as-code story. The web UI is the only supported way in. This provider gives these switches one.
@@ -50,6 +53,8 @@ The Easy Smart line (TL-SG105E, TL-SG108E, TL-SG1016DE and friends) is cheap, qu
 ## Quick start
 
 > **Status:** pre-1.0. Install from the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart) with `terraform init`; releases are signed. Until 1.0 a minor version may change behaviour, so pin it (`~> 0.26`) and read the [changelog](CHANGELOG.md) before upgrading.
+
+New to it, or trying a different model? Start with **only** the read-only data sources (`system_info`, `ports`): they confirm the login and the protocol on your switch and firmware without a single write.
 
 ```hcl
 terraform {
@@ -151,15 +156,23 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 
 ## Compatibility
 
-| | |
-|---|---|
-| **Hardware** | Developed and verified against the **TL-SG108E hardware v6**. Other Easy Smart models are expected to speak the same protocol family but are not yet verified. |
-| **Firmware** | Verified on 1.0.0 Build 20230218 (the firmware that introduced the RSA key exchange). Newer builds are untried; start with the read-only data sources. |
-| **Terraform** | 1.4 and later, tested on 1.4, 1.6, 1.8, 1.10 and latest. |
-| **OpenTofu** | Tested on the latest release (informational job). |
-| **Go** | The version in [`go.mod`](go.mod) and the latest stable, for building from source. |
+| Switch | Hardware | Firmware | Status |
+|---|---|---|---|
+| TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads, writes, import and drift checked on a real device |
+| TL-SG108E | v6 | newer builds | Untried; start with the read-only data sources |
+| TL-SG108E | other hardware versions | any | Untested |
+| Other Easy Smart models (TL-SG105E, TL-SG1016DE, ...) | any | any | Untested; reports wanted |
+| Any | any | firmware **before the 2023 RSA key exchange** | Not supported: the client always performs the key exchange and has never been tried against the older login |
 
-Behaviour of other models and firmware is documented in the [protocol notes](internal/escp/PROTOCOL.md) as it is verified. Reports are welcome, see [Contributing](#contributing).
+Other Easy Smart models are expected to speak the same protocol family; that is a hope, not a claim. Reports (even "the read-only data sources work" or "login is rejected") fill in this table, see [Contributing](#contributing).
+
+| Tool | Tested |
+|---|---|
+| Terraform | 1.4 and later, tested on 1.4, 1.6, 1.8, 1.10 and latest |
+| OpenTofu | The latest release (informational job) |
+| Go | The version in [`go.mod`](go.mod) and the latest stable, for building from source |
+
+Behaviour of other models and firmware is documented in the [protocol notes](internal/escp/PROTOCOL.md) as it is verified.
 
 ## Constraints (read these)
 
@@ -221,7 +234,7 @@ CI runs the unit suite on the module's Go version and the latest stable, the lif
 
 ## Contributing
 
-Issues and pull requests are welcome. Run `make hooks` once: the pre-commit hook runs the same checks as CI (format, vet, lint, tests with `-race` and the coverage policy), about a minute and a half. Please open an issue first for a new setting. Changes go through a pull request with [Conventional Commits](https://www.conventionalcommits.org/) titles and need green CI; see [`RELEASING.md`](RELEASING.md) for how versions are cut. Reports of other models or firmware (output of the read-only data sources, redacted) are especially useful.
+Issues and pull requests are welcome. Run `make hooks` once: the pre-commit hook runs the same checks as CI (format, vet, lint, tests with `-race` and the coverage policy), about a minute and a half. Please open an issue first for a new setting. Changes go through a pull request with [Conventional Commits](https://www.conventionalcommits.org/) titles and need green CI; see [`RELEASING.md`](RELEASING.md) for how versions are cut. Reports of other models or firmware are especially useful: use the [hardware report template](https://github.com/davidlukac/terraform-provider-tplinkeasysmart/issues/new?template=hardware_report.yml), which starts from a read-only configuration.
 
 ## License
 
