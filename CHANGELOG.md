@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.26.2
+
+- Documentation only: the README, RELEASING.md and workflow notes now describe the provider as published on the Terraform Registry (install with `terraform init`, version pin, building from source moved to Development). The GitHub release notes are applied from this changelog by the release workflow. No behaviour change.
+
 ## 0.26.1
 
 - A fragmented reply (configuration backup) is capped at 64 KiB: a sender that never clears the fragment flag now gets `ErrReplyTooLarge` instead of growing the buffer until the deadline.
