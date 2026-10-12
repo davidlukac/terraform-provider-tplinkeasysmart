@@ -18,7 +18,7 @@ How a version of the provider is cut and published. Maintainers only.
 
 Status: not published yet. The release workflow (`.github/workflows/release.yml`) is manual only (`workflow_dispatch` with a tag input), so pushing a tag does not release anything.
 
-1. Create a GPG signing key and add `GPG_PRIVATE_KEY` and `PASSPHRASE` as repository secrets; add the public key in the Registry (Publish > Provider).
+1. Create a GPG signing key and add `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` as repository secrets; add the public key in the Registry (Publish > Provider).
 2. Make the repository public (the Registry ingests public repositories only).
 3. Register the provider on registry.terraform.io (sign in with GitHub, Publish > Provider, pick the repository).
 4. Release `1.0.0`: bump the version, re-add the `push: tags: ["v*"]` trigger described at the top of `release.yml`, tag and push. The workflow builds every OS/arch, signs the checksums and uploads the assets; the Registry ingests them through its webhook.
