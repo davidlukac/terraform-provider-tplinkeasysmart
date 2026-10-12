@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.26.3
+
+- Documentation only: the README states the verified device (TL-SG108E v6, firmware 1.0.0 Build 20230218) and the lockout caveat up front, Compatibility is a model / hardware / firmware / status table (firmware before the 2023 RSA key exchange is stated as not supported), and the hardware report template starts from a read-only configuration. No behaviour change.
+
 ## 0.26.2
 
 - Documentation only: the README, RELEASING.md and workflow notes now describe the provider as published on the Terraform Registry (install with `terraform init`, version pin, building from source moved to Development). The GitHub release notes are applied from this changelog by the release workflow. No behaviour change.
