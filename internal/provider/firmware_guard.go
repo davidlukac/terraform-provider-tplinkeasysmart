@@ -173,3 +173,10 @@ func (g *firmwareGuard) SetHostname(ctx context.Context, name string) error {
 	}
 	return g.SwitchClient.SetHostname(ctx, name)
 }
+
+func (g *firmwareGuard) SetIPConfig(ctx context.Context, cfg escp.IPConfig) error {
+	if err := g.check(ctx); err != nil {
+		return err
+	}
+	return g.SwitchClient.SetIPConfig(ctx, cfg)
+}

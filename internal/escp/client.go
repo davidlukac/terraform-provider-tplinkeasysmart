@@ -94,6 +94,13 @@ type Client struct {
 	mu   sync.Mutex
 	conn *net.UDPConn
 	dest *net.UDPAddr
+	// alsoFrom is a second address replies are accepted from while the switch is
+	// being moved to it (SetIPConfig); nil otherwise.
+	alsoFrom net.IP
+	// moveWait overrides ipMoveWait (tests); zero means the default.
+	moveWait time.Duration
+	// allowLoopback lets tests move a fake switch on 127.0.0.0/8 (tests only).
+	allowLoopback bool
 
 	hostMAC, swMAC [6]byte
 	haveSwMAC      bool
@@ -216,7 +223,7 @@ func (c *Client) decrypt(b []byte) []byte {
 // must come from the switch, decode to a valid packet, echo the current
 // sequence number and not be our own broadcast discovery coming back.
 func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
-	if !from.IP.Equal(c.dest.IP) {
+	if !from.IP.Equal(c.dest.IP) && (c.alsoFrom == nil || !from.IP.Equal(c.alsoFrom)) {
 		return reply{}, false
 	}
 	h, t, err := unmarshal(c.decrypt(data))

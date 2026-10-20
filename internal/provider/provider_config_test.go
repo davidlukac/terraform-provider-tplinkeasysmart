@@ -249,8 +249,8 @@ func TestNewBuildsTheProductionProvider(t *testing.T) {
 	if _, err := tp.newClient(escp.Config{Host: "::1"}); err == nil {
 		t.Fatal("an unresolvable host must be reported when the client is built")
 	}
-	if got := len(p.Resources(context.Background())); got != 14 {
-		t.Fatalf("expected 14 resources, got %d", got)
+	if got := len(p.Resources(context.Background())); got != 15 {
+		t.Fatalf("expected 15 resources, got %d", got)
 	}
 	if got := len(p.DataSources(context.Background())); got != 12 {
 		t.Fatalf("expected 12 data sources, got %d", got)

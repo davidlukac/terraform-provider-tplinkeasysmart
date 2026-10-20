@@ -24,6 +24,12 @@ type extraState struct {
 	backup          []byte
 	backupErr       error
 	ip              string
+	netmask         string // empty means 255.255.255.0
+	gateway         string // empty means 192.0.2.1
+	static          bool   // the switch uses a static address (DHCP off); the default fake leases one
+	ipSetCalls      int
+	ipSetErr        error
+	ipIgnoreSet     bool   // accept SetIPConfig but keep the old address
 	firmware        string // the firmware version Info reports; empty means defaultFakeFirmware
 }
 
@@ -71,7 +77,40 @@ func (e *extraState) info() (escp.Info, bool, error) {
 		return escp.Info{Firmware: e.firmwareVersion()}, false, nil
 	}
 	return escp.Info{Model: "TL-SG108E", Hostname: e.hostname, MAC: "00:00:5e:00:53:01", Firmware: e.firmwareVersion(),
-		IP: e.ip, Netmask: "255.255.255.0", Gateway: "192.0.2.1", DHCP: true}, true, nil
+		IP: e.ip, Netmask: orDefault(e.netmask, "255.255.255.0"), Gateway: orDefault(e.gateway, "192.0.2.1"), DHCP: !e.static}, true, nil
+}
+
+func orDefault(v, def string) string {
+	if v == "" {
+		return def
+	}
+	return v
+}
+
+// SetIPConfig moves the fake switch like the real one: the new triple is what Info reports afterwards.
+func (f *fakeClient) SetIPConfig(_ context.Context, cfg escp.IPConfig) error {
+	if err := escp.ValidateIPConfig(cfg); err != nil {
+		return err
+	}
+	e := f.extra()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.ipSetCalls++
+	if e.ipSetErr != nil {
+		return e.ipSetErr
+	}
+	if !e.ipIgnoreSet {
+		e.ip, e.netmask, e.gateway = cfg.IP.String(), cfg.Netmask.String(), cfg.Gateway.String()
+	}
+	return nil
+}
+
+// newStaticFake returns a fake switch with a static address, as switch 03 has.
+func newStaticFake(ip, mask, gateway string) *fakeClient {
+	f := &fakeClient{}
+	e := f.extra()
+	e.active, e.static, e.hostname, e.ip, e.netmask, e.gateway = true, true, "TL-SG108E-03", ip, mask, gateway
+	return f
 }
 
 func (f *fakeClient) SetHostname(_ context.Context, name string) error {

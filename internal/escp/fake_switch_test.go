@@ -16,19 +16,22 @@ type fakeSwitch struct {
 	user     string
 	password string
 
-	mu       sync.Mutex
-	hostname string
-	history  [][]TLV // every accepted SET, in order
-	lastSet  []TLV   // settings TLVs (credentials stripped) of the most recent accepted SET
-	port7    []byte
-	setIP    []byte
-	led      bool
-	session  []byte
-	gets     int
-	sets     int
-	dropNth  int // drop the nth received packet (1-based) to test retries
-	recv     int
-	mute     bool // swallow everything (switch gone)
+	mu               sync.Mutex
+	hostname         string
+	history          [][]TLV // every accepted SET, in order
+	lastSet          []TLV   // settings TLVs (credentials stripped) of the most recent accepted SET
+	port7            []byte
+	setIP            []byte
+	staleAfterSet    int              // after a System SET, the next n discoveries are stale
+	staleDiscoveries int              // the next n discoveries still report 127.0.0.9, like a network whose caches have not caught up
+	addr             map[int16][]byte // IP, mask and gateway as last set; discovery reports them instead of the defaults
+	led              bool
+	session          []byte
+	gets             int
+	sets             int
+	dropNth          int // drop the nth received packet (1-based) to test retries
+	recv             int
+	mute             bool // swallow everything (switch gone)
 
 	backupMode string // config backup misbehaviour: "", "badmagic", "short", "dropsecond", "dropfirst", "silent", "flood"
 
@@ -216,10 +219,21 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 			f.send(from, OpReply, h, 0, override, false)
 			return
 		}
+		f.mu.Lock()
+		addr := f.addr
+		if f.staleDiscoveries > 0 {
+			f.staleDiscoveries--
+			addr = map[int16][]byte{TLVIP: {127, 0, 0, 9}, TLVNetmask: {255, 255, 255, 0}, TLVGateway: {127, 0, 0, 254}}
+		}
+		f.mu.Unlock()
+		ip, mask, gw := []byte{127, 0, 0, 1}, []byte{255, 255, 255, 0}, []byte{127, 0, 0, 254}
+		if addr != nil {
+			ip, mask, gw = addr[TLVIP], addr[TLVNetmask], addr[TLVGateway]
+		}
 		f.send(from, OpReply, h, 0, []TLV{
 			{TLVModel, []byte("TL-SG108E\x00")}, {TLVHostname, []byte("TL-SG108E-fake\x00")},
-			{TLVMAC, []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}, {TLVIP, []byte{127, 0, 0, 1}},
-			{TLVNetmask, []byte{255, 255, 255, 0}}, {TLVGateway, []byte{127, 0, 0, 254}},
+			{TLVMAC, []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}, {TLVIP, ip},
+			{TLVNetmask, mask}, {TLVGateway, gw},
 			{TLVFirmware, []byte("1.0.0 Build 20230218 Rel.50633\x00")}, {TLVHardware, []byte("TL-SG108E 6.0\x00")},
 			{TLVDHCP, []byte{1}}, {TLVFactoryDefault, []byte{1}},
 		}, false)
@@ -324,6 +338,12 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 			f.mu.Lock()
 			f.hostname = cstring(v)
 			f.setIP, _ = find(TLVIP)
+			f.staleDiscoveries = f.staleAfterSet
+			if ip, ok := find(TLVIP); ok {
+				mask, _ := find(TLVNetmask)
+				gw, _ := find(TLVGateway)
+				f.addr = map[int16][]byte{TLVIP: ip, TLVNetmask: mask, TLVGateway: gw}
+			}
 			f.sets++
 			f.mu.Unlock()
 		}
