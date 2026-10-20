@@ -51,14 +51,17 @@ type providerModel struct {
 	Password       types.String `tfsdk:"password"`
 	TimeoutSeconds types.Int64  `tfsdk:"timeout_seconds"`
 	Switches       types.Map    `tfsdk:"switches"`
+	// AllowUnverifiedFirmware lifts the write refusal on firmware builds this provider was not verified against.
+	AllowUnverifiedFirmware types.Bool `tfsdk:"allow_unverified_firmware"`
 }
 
 // switchModel is one entry of the `switches` map.
 type switchModel struct {
-	Host           types.String `tfsdk:"host"`
-	Username       types.String `tfsdk:"username"`
-	Password       types.String `tfsdk:"password"`
-	TimeoutSeconds types.Int64  `tfsdk:"timeout_seconds"`
+	Host                    types.String `tfsdk:"host"`
+	Username                types.String `tfsdk:"username"`
+	Password                types.String `tfsdk:"password"`
+	TimeoutSeconds          types.Int64  `tfsdk:"timeout_seconds"`
+	AllowUnverifiedFirmware types.Bool   `tfsdk:"allow_unverified_firmware"`
 }
 
 func (p *tplinkProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -91,6 +94,12 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				Validators:  []validator.Int64{int64validator.AtLeast(1)},
 				Description: "Seconds to wait for a reply before retrying a request. Defaults to 3.",
 			},
+			"allow_unverified_firmware": schema.BoolAttribute{
+				Optional: true,
+				Description: "Write to switches whose firmware build this provider version was not verified against. Defaults to false: reads and imports always work, " +
+					"but every write is refused on an unverified build, because a newer firmware may have changed the protocol. Verified builds: " + verifiedBuilds() + ". " +
+					"Can be overridden per switch in the `switches` map.",
+			},
 			"switches": schema.MapNestedAttribute{
 				Optional: true,
 				Description: "Switches managed by this provider, by name. Select one on a resource or data source with `switch = \"<name>\"`. " +
@@ -102,11 +111,16 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 					"password": schema.StringAttribute{Required: true, Sensitive: true, Description: "Admin password."},
 					"timeout_seconds": schema.Int64Attribute{Optional: true, Validators: []validator.Int64{int64validator.AtLeast(1)},
 						Description: "Seconds to wait for a reply before retrying a request. Defaults to the provider-level `timeout_seconds`, then 3."},
+					"allow_unverified_firmware": schema.BoolAttribute{Optional: true,
+						Description: "Overrides the provider-level `allow_unverified_firmware` for this switch."},
 				}},
 			},
 		},
 	}
 }
+
+// verifiedBuilds lists the verified firmware builds for the attribute description.
+func verifiedBuilds() string { return strings.Join(escp.VerifiedFirmwareBuilds, ", ") }
 
 func envOr(v types.String, env string) string {
 	if !v.IsNull() && !v.IsUnknown() {
@@ -181,7 +195,8 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	providerTimeout := timeoutOr(cfg.TimeoutSeconds, defaultTimeout)
 	reg := &switchRegistry{named: map[string]SwitchClient{}}
 	hosts := map[string]string{} // host -> switch, so one device is never configured twice
-	build := func(name, h, u, pw string, timeout time.Duration) {
+	providerAllow := cfg.AllowUnverifiedFirmware.ValueBool()
+	build := func(name, h, u, pw string, timeout time.Duration, allowUnverified bool) {
 		label := name
 		if label == "" {
 			label = "the provider's own switch"
@@ -196,6 +211,7 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			resp.Diagnostics.AddError("Cannot configure switch client", fmt.Sprintf("%s: %s", label, err))
 			return
 		}
+		c = newFirmwareGuard(c, allowUnverified)
 		if name == "" {
 			reg.def = c
 			return
@@ -203,11 +219,15 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		reg.named[name] = c
 	}
 	if hasDefault {
-		build("", host, user, pass, providerTimeout)
+		build("", host, user, pass, providerTimeout, providerAllow)
 	}
 	for _, name := range sortedKeys(entries) {
 		e := entries[name]
-		build(name, e.Host.ValueString(), e.Username.ValueString(), e.Password.ValueString(), timeoutOr(e.TimeoutSeconds, providerTimeout))
+		allow := providerAllow
+		if !e.AllowUnverifiedFirmware.IsNull() {
+			allow = e.AllowUnverifiedFirmware.ValueBool()
+		}
+		build(name, e.Host.ValueString(), e.Username.ValueString(), e.Password.ValueString(), timeoutOr(e.TimeoutSeconds, providerTimeout), allow)
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -229,7 +249,7 @@ func sortedKeys[V any](m map[string]V) []string {
 
 // Resources lists the resources the provider manages.
 func (p *tplinkProvider) Resources(context.Context) []func() resource.Resource {
-	return []func() resource.Resource{NewLEDResource, NewIGMPSnoopingResource, NewLoopPreventionResource, NewPortResource, NewQoSResource, NewBandwidthLimitResource, NewStormLimitResource, NewPortMirrorResource, NewLAGResource, NewVLANPortBasedGroupResource, NewSystemResource}
+	return []func() resource.Resource{NewLEDResource, NewIGMPSnoopingResource, NewLoopPreventionResource, NewPortResource, NewQoSResource, NewBandwidthLimitResource, NewStormLimitResource, NewPortMirrorResource, NewLAGResource, NewVLANPortBasedGroupResource, NewSystemResource, NewVLANModeResource, NewVLAN8021QGroupResource, NewVLAN8021QPVIDResource}
 }
 
 // DataSources lists the read-only data sources the provider offers.

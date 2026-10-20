@@ -202,11 +202,12 @@ func TestProviderExplainsHowToResolveAnUnknownAttribute(t *testing.T) {
 	p.Schema(context.Background(), provider.SchemaRequest{}, schemaResp)
 	objType := schemaResp.Schema.Type().TerraformType(context.Background()).(tftypes.Object)
 	raw := tftypes.NewValue(objType, map[string]tftypes.Value{
-		"host":            tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
-		"username":        tftypes.NewValue(tftypes.String, "admin"),
-		"password":        tftypes.NewValue(tftypes.String, "x"),
-		"timeout_seconds": tftypes.NewValue(tftypes.Number, nil),
-		"switches":        tftypes.NewValue(objType.AttributeTypes["switches"], nil),
+		"host":                      tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
+		"username":                  tftypes.NewValue(tftypes.String, "admin"),
+		"password":                  tftypes.NewValue(tftypes.String, "x"),
+		"timeout_seconds":           tftypes.NewValue(tftypes.Number, nil),
+		"allow_unverified_firmware": tftypes.NewValue(tftypes.Bool, nil),
+		"switches":                  tftypes.NewValue(objType.AttributeTypes["switches"], nil),
 	})
 	resp := &provider.ConfigureResponse{}
 	p.Configure(context.Background(), provider.ConfigureRequest{Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: raw}}, resp)
@@ -248,8 +249,8 @@ func TestNewBuildsTheProductionProvider(t *testing.T) {
 	if _, err := tp.newClient(escp.Config{Host: "::1"}); err == nil {
 		t.Fatal("an unresolvable host must be reported when the client is built")
 	}
-	if got := len(p.Resources(context.Background())); got != 11 {
-		t.Fatalf("expected 11 resources, got %d", got)
+	if got := len(p.Resources(context.Background())); got != 14 {
+		t.Fatalf("expected 14 resources, got %d", got)
 	}
 	if got := len(p.DataSources(context.Background())); got != 12 {
 		t.Fatalf("expected 12 data sources, got %d", got)

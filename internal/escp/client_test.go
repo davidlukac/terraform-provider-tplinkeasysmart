@@ -3,6 +3,8 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -136,5 +138,25 @@ func TestSetPortWire(t *testing.T) {
 	}
 	if err := c.SetPort(context.Background(), 0, true, "auto", false); err == nil {
 		t.Fatal("port 0 must be rejected")
+	}
+}
+
+func TestRejectedErrorNamesTheCodeAndMatchesErrAuth(t *testing.T) {
+	err := error(&RejectedError{Code: 4})
+	if !errors.Is(err, ErrAuth) {
+		t.Fatal("a rejected write must match ErrAuth")
+	}
+	if errors.Is(err, ErrNoReply) {
+		t.Fatal("a rejected write is not a missing reply")
+	}
+	msg := err.Error()
+	for _, want := range []string{"rejected the request", "error code 4", "refuses this setting"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("message %q must contain %q", msg, want)
+		}
+	}
+	var rejected *RejectedError
+	if !errors.As(fmt.Errorf("setting a LAG: %w", err), &rejected) || rejected.Code != 4 {
+		t.Fatalf("the code must be recoverable with errors.As, got %+v", rejected)
 	}
 }

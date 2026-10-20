@@ -11,6 +11,8 @@ A link aggregation group (Switching > Port Trunk). Import with the group number.
 
 ~> **Safety** The provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to another LAG. Import the group that carries the router uplink and protect it with `lifecycle { prevent_destroy = true }`. The switch itself rejects ports that conflict with mirroring, VLANs, rate limits or storm control.
 
+~> **Firmware 20250710** The switch refuses to create a LAG (error code 4, and its own web UI answers "invalid port mask"), whatever the ports. Nothing is changed when that happens. Creating a LAG is verified on firmware 20230218 only.
+
 ## Example Usage
 
 ```terraform

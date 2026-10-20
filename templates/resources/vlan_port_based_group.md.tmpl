@@ -9,7 +9,7 @@ description: |-
 
 {{ .Description | trimspace }}
 
-~> **Safety** The provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to a LAG, because VLAN membership is exclusive and a change moves the port out of its previous group. The VLAN mode itself is never written.
+~> **Safety** The provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to a LAG, because VLAN membership is exclusive and a change moves the port out of its previous group. The VLAN mode itself is not written here; use `tplinkeasysmart_vlan_mode`.
 
 {{ if .HasExample -}}
 ## Example Usage

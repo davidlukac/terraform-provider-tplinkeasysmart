@@ -9,13 +9,12 @@ description: |-
 
 A port-based VLAN group (VLAN > Port Based VLAN). Import with the VLAN id. The VLAN **mode** is not managed here. Membership is exclusive: adding ports to a group removes them from their previous group, and removing a group returns its ports to VLAN 1. **Safety:** the provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to a LAG, because that can cut connectivity or management access; set `allow_disruptive = true` to override. Import VLAN 1 (the default group) only together with `lifecycle { prevent_destroy = true }`.
 
-~> **Safety** The provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to a LAG, because VLAN membership is exclusive and a change moves the port out of its previous group. The VLAN mode itself is never written.
+~> **Safety** The provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to a LAG, because VLAN membership is exclusive and a change moves the port out of its previous group. The VLAN mode itself is not written here; use `tplinkeasysmart_vlan_mode`.
 
 ## Example Usage
 
 ```terraform
-# Only valid while the switch is in port-based VLAN mode, which this provider
-# never switches. Membership is exclusive: the ports leave their previous group
+# Only valid while the switch is in port-based VLAN mode (see tplinkeasysmart_vlan_mode). Membership is exclusive: the ports leave their previous group
 # (VLAN 1) and return to it when this group is destroyed.
 resource "tplinkeasysmart_vlan_port_based_group" "lab" {
   vlan  = 2

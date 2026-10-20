@@ -41,6 +41,10 @@ provider "tplinkeasysmart" {
 
   # Seconds to wait for a reply before retrying a request (default 3).
   # timeout_seconds = 3
+
+  # Writes are refused on firmware builds this provider version was not
+  # verified against (reads and imports always work). Opt in at your own risk:
+  # allow_unverified_firmware = true
 }
 
 # Alternatively leave the provider block empty and export
@@ -56,6 +60,7 @@ provider "tplinkeasysmart" {
 
 ### Optional
 
+- `allow_unverified_firmware` (Boolean) Write to switches whose firmware build this provider version was not verified against. Defaults to false: reads and imports always work, but every write is refused on an unverified build, because a newer firmware may have changed the protocol. Verified builds: 20230218, 20250710. Can be overridden per switch in the `switches` map.
 - `host` (String) IPv4 address or hostname of the switch. Falls back to TPLINK_EASYSMART_HOST.
 - `password` (String, Sensitive) Admin password. Falls back to TPLINK_EASYSMART_PASSWORD.
 - `switches` (Attributes Map) Switches managed by this provider, by name. Select one on a resource or data source with `switch = "<name>"`. May be combined with `host`, which then names the default switch used when `switch` is omitted. (see [below for nested schema](#nestedatt--switches))
@@ -73,4 +78,5 @@ Required:
 
 Optional:
 
+- `allow_unverified_firmware` (Boolean) Overrides the provider-level `allow_unverified_firmware` for this switch.
 - `timeout_seconds` (Number) Seconds to wait for a reply before retrying a request. Defaults to the provider-level `timeout_seconds`, then 3.

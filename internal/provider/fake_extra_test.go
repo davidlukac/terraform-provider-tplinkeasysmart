@@ -24,6 +24,25 @@ type extraState struct {
 	backup          []byte
 	backupErr       error
 	ip              string
+	firmware        string // the firmware version Info reports; empty means defaultFakeFirmware
+}
+
+// defaultFakeFirmware is the build the fakes report unless a test sets another: the verified baseline.
+const defaultFakeFirmware = "1.0.0 Build 20230218 Rel.50633"
+
+func (e *extraState) firmwareVersion() string {
+	if e.firmware == "" {
+		return defaultFakeFirmware
+	}
+	return e.firmware
+}
+
+// setFirmware makes Info report the given firmware version.
+func (f *fakeClient) setFirmware(version string) {
+	e := f.extra()
+	e.mu.Lock()
+	e.firmware = version
+	e.mu.Unlock()
 }
 
 var (
@@ -49,9 +68,9 @@ func (e *extraState) info() (escp.Info, bool, error) {
 		return escp.Info{}, true, e.infoErr
 	}
 	if !e.active {
-		return escp.Info{}, false, nil
+		return escp.Info{Firmware: e.firmwareVersion()}, false, nil
 	}
-	return escp.Info{Model: "TL-SG108E", Hostname: e.hostname, MAC: "00:00:5e:00:53:01",
+	return escp.Info{Model: "TL-SG108E", Hostname: e.hostname, MAC: "00:00:5e:00:53:01", Firmware: e.firmwareVersion(),
 		IP: e.ip, Netmask: "255.255.255.0", Gateway: "192.0.2.1", DHCP: true}, true, nil
 }
 

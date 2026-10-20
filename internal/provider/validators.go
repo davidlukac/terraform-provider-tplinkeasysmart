@@ -179,3 +179,14 @@ func qosProblem(mode types.String, priorities types.Map) string {
 	}
 	return ""
 }
+
+// validVLANID accepts an 802.1Q VLAN id or PVID.
+func validVLANID() validator.Int64 { return int64validator.Between(escp.MinVLANID, escp.MaxVLANID) }
+
+// validVLANName accepts what the switch accepts as an 802.1Q VLAN name.
+func validVLANName() []validator.String {
+	return []validator.String{
+		stringvalidator.LengthAtMost(escp.MaxVLANNameLen),
+		stringvalidator.RegexMatches(regexp.MustCompile(escp.VLANNamePattern), "must contain only letters, digits, hyphens and underscores"),
+	}
+}

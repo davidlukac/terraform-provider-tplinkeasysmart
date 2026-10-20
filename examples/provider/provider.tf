@@ -27,6 +27,10 @@ provider "tplinkeasysmart" {
 
   # Seconds to wait for a reply before retrying a request (default 3).
   # timeout_seconds = 3
+
+  # Writes are refused on firmware builds this provider version was not
+  # verified against (reads and imports always work). Opt in at your own risk:
+  # allow_unverified_firmware = true
 }
 
 # Alternatively leave the provider block empty and export

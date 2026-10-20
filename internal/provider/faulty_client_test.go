@@ -249,3 +249,27 @@ func (w *faultyClient) StormControl(ctx context.Context) ([]escp.PortStorm, erro
 func (w *faultyClient) SetStormControl(ctx context.Context, port int, uu, mc, bc bool, rate int) error {
 	return w.write("SetStormControl", func() error { return w.SwitchClient.SetStormControl(ctx, port, uu, mc, bc, rate) })
 }
+
+func (w *faultyClient) SetMTUVLAN(ctx context.Context, enabled bool, uplink int) error {
+	return w.write("SetMTUVLAN", func() error { return w.SwitchClient.SetMTUVLAN(ctx, enabled, uplink) })
+}
+
+func (w *faultyClient) SetPortBasedVLANMode(ctx context.Context, enabled bool) error {
+	return w.write("SetPortBasedVLANMode", func() error { return w.SwitchClient.SetPortBasedVLANMode(ctx, enabled) })
+}
+
+func (w *faultyClient) SetVLAN8021QMode(ctx context.Context, enabled bool) error {
+	return w.write("SetVLAN8021QMode", func() error { return w.SwitchClient.SetVLAN8021QMode(ctx, enabled) })
+}
+
+func (w *faultyClient) SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error {
+	return w.write("SetVLAN8021Q", func() error { return w.SwitchClient.SetVLAN8021Q(ctx, v) })
+}
+
+func (w *faultyClient) DeleteVLAN8021Q(ctx context.Context, id int) error {
+	return w.write("DeleteVLAN8021Q", func() error { return w.SwitchClient.DeleteVLAN8021Q(ctx, id) })
+}
+
+func (w *faultyClient) SetPVIDs(ctx context.Context, pvids map[int]int) error {
+	return w.write("SetPVIDs", func() error { return w.SwitchClient.SetPVIDs(ctx, pvids) })
+}
