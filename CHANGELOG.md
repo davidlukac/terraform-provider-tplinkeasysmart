@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.28.0
+
+- tplinkeasysmart_management_ip: set the static IP address, subnet mask and gateway (allow_disruptive, plan-time validation, the client follows the switch); verified live on firmware 20250710
+
 ## 0.27.0
 
 - VLAN writes, verified on a real switch (TL-SG108E v6, firmware 20250710, free ports only): `tplinkeasysmart_vlan_mode` (MTU / port-based / 802.1Q, exactly one active), `tplinkeasysmart_vlan_8021q_group` (id, name, tagged and untagged ports) and `tplinkeasysmart_vlan_8021q_pvid`. Changing the mode needs `allow_disruptive = true`; groups and PVIDs refuse ports that carry a link or belong to a LAG, and a change that would leave a port in no VLAN. 802.1Q must be the active mode for groups and PVIDs.

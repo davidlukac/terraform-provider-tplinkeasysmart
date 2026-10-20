@@ -249,7 +249,7 @@ func sortedKeys[V any](m map[string]V) []string {
 
 // Resources lists the resources the provider manages.
 func (p *tplinkProvider) Resources(context.Context) []func() resource.Resource {
-	return []func() resource.Resource{NewLEDResource, NewIGMPSnoopingResource, NewLoopPreventionResource, NewPortResource, NewQoSResource, NewBandwidthLimitResource, NewStormLimitResource, NewPortMirrorResource, NewLAGResource, NewVLANPortBasedGroupResource, NewSystemResource, NewVLANModeResource, NewVLAN8021QGroupResource, NewVLAN8021QPVIDResource}
+	return []func() resource.Resource{NewLEDResource, NewIGMPSnoopingResource, NewLoopPreventionResource, NewPortResource, NewQoSResource, NewBandwidthLimitResource, NewStormLimitResource, NewPortMirrorResource, NewLAGResource, NewVLANPortBasedGroupResource, NewSystemResource, NewVLANModeResource, NewVLAN8021QGroupResource, NewVLAN8021QPVIDResource, NewManagementIPResource}
 }
 
 // DataSources lists the read-only data sources the provider offers.

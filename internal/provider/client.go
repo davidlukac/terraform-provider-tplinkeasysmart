@@ -43,5 +43,6 @@ type SwitchClient interface {
 	SetStormControl(ctx context.Context, port int, unknownUnicast, multicast, broadcast bool, rateKbps int) error
 	System(ctx context.Context) (escp.System, error)
 	SetHostname(ctx context.Context, name string) error
+	SetIPConfig(ctx context.Context, cfg escp.IPConfig) error
 	ConfigBackup(ctx context.Context) ([]byte, error)
 }

@@ -5,6 +5,7 @@ package escp
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"reflect"
 	"testing"
@@ -700,4 +701,103 @@ func pvidByPort(q Dot1Q, port int) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+// Management IP (owner-approved on 2026-10-19 for switch 03 only). Moves the
+// switch to TPLINK_EASYSMART_LIVE_NEWIP (same subnet, unused address), checks
+// that it answers there and not at the old address, then moves it back. Only
+// the address changes; the mask and gateway stay. Needs ping monitoring.
+func TestLiveIPChange(t *testing.T) {
+	newIP, newMask, newGW := net.ParseIP(os.Getenv("TPLINK_EASYSMART_LIVE_NEWIP")), net.ParseIP(os.Getenv("TPLINK_EASYSMART_LIVE_NEWMASK")), net.ParseIP(os.Getenv("TPLINK_EASYSMART_LIVE_NEWGATEWAY"))
+	if newIP == nil && newMask == nil && newGW == nil {
+		t.Skip("set TPLINK_EASYSMART_LIVE_NEWIP (an unused address in the subnet), _NEWMASK or _NEWGATEWAY")
+	}
+	c, ctx := liveClient(t), context.Background()
+	before, err := c.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orig, err := ipConfigFromInfo(before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	moved := orig
+	for _, o := range []struct {
+		dst *net.IP
+		val net.IP
+	}{{&moved.IP, newIP}, {&moved.Netmask, newMask}, {&moved.Gateway, newGW}} {
+		if o.val != nil {
+			*o.dst = o.val.To4()
+		}
+	}
+	// The restore comes first: it asks at the new address, then at the old one, whichever answers.
+	defer func() {
+		for _, host := range []string{moved.IP.String(), orig.IP.String()} {
+			r, err := Dial(Config{Host: host, Username: os.Getenv("TPLINK_EASYSMART_USERNAME"),
+				Password: os.Getenv("TPLINK_EASYSMART_PASSWORD"), Timeout: 3 * time.Second})
+			if err != nil {
+				t.Errorf("RESTORE dial %s: %v", host, err)
+				continue
+			}
+			defer r.Close()
+			cur, err := r.Info(ctx)
+			if err != nil {
+				continue
+			}
+			if cur.IP != orig.IP.String() || cur.Netmask != orig.Netmask.String() || cur.Gateway != orig.Gateway.String() {
+				if err := r.SetIPConfig(ctx, orig); err != nil {
+					t.Errorf("RESTORE FAILED via %s: %v", host, err)
+				}
+			}
+			if now, err := r.Info(ctx); err != nil || now != before {
+				t.Errorf("not restored: %+v vs %+v err=%v", now, before, err)
+			}
+			return
+		}
+		t.Errorf("RESTORE FAILED: the switch answers at neither %s nor %s", moved.IP, orig.IP)
+	}()
+	start := time.Now()
+	if err := c.SetIPConfig(ctx, moved); err != nil {
+		t.Fatalf("move to %s: %v", moved, err)
+	}
+	t.Logf("moved to %s in %s", moved, time.Since(start))
+	after, err := c.Info(ctx)
+	if err != nil {
+		t.Fatalf("no discovery reply at the new address: %v", err)
+	}
+	want := before
+	want.IP, want.Netmask, want.Gateway = moved.IP.String(), moved.Netmask.String(), moved.Gateway.String()
+	if after != want {
+		t.Fatalf("after move: %+v, want %+v", after, want)
+	}
+	// A login at the new address must work too (reads need a session).
+	if _, err := c.System(ctx); err != nil {
+		t.Fatalf("authenticated read at the new address: %v", err)
+	}
+}
+
+// TestLiveIPSet moves the switch (reached at TPLINK_EASYSMART_HOST) to
+// TPLINK_EASYSMART_LIVE_SETIP without restoring: it is the manual way back
+// when TestLiveIPChange could not restore.
+func TestLiveIPSet(t *testing.T) {
+	target := net.ParseIP(os.Getenv("TPLINK_EASYSMART_LIVE_SETIP"))
+	if target == nil {
+		t.Skip("set TPLINK_EASYSMART_LIVE_SETIP")
+	}
+	c, ctx := liveClient(t), context.Background()
+	before, err := c.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := ipConfigFromInfo(before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.IP = target.To4()
+	if err := c.SetIPConfig(ctx, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if after, err := c.Info(ctx); err != nil || after.IP != target.String() {
+		t.Fatalf("after: %+v err=%v", after, err)
+	}
 }

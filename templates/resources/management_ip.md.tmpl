@@ -1,0 +1,31 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.ProviderName}}"
+subcategory: "System"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+~> **Safety** Moving the switch to another address, mask or gateway can cut the management path for good: there is no console, and recovery is a physical factory reset. The provider refuses to change it unless `allow_disruptive = true`, validates the values while planning (IPv4, a contiguous mask between /8 and /30, a usable host address, a gateway inside the subnet) and only manages a static address: a switch that leases its address by DHCP is refused. After the change the provider's `host` must point at the new address, so update it right after the apply; the same run keeps working because the client follows the switch. If the switch does not answer at the new address in time, the apply fails and says to look at both addresses. Pick an address outside your router's DHCP pool. On the verified firmware (20250710) a move took about two seconds, and the address, mask and gateway were each changed and restored live with no change to the rest of the configuration.
+
+{{ if .HasExample -}}
+## Example Usage
+
+{{ tffile .ExampleFile }}
+{{- end }}
+
+{{ .SchemaMarkdown | trimspace }}
+{{- if .HasImport }}
+
+## Import
+
+Import is supported using the following syntax:
+
+{{ codefile "shell" .ImportFile }}
+
+For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`).
+
+{{- end }}

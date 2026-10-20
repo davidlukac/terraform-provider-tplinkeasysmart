@@ -13,6 +13,7 @@ func dialFake(t *testing.T, f *fakeSwitch, pass string) *Client {
 	t.Helper()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 300 * time.Millisecond,
 		SwitchPort: f.port(), BroadcastAddr: "127.0.0.1"})
+	c.allowLoopback = true
 	t.Cleanup(func() { c.Close() })
 	return c
 }
@@ -23,6 +24,7 @@ func dialFast(t *testing.T, f *fakeSwitch, pass string) *Client {
 	t.Helper()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 80 * time.Millisecond, Retries: 1,
 		SwitchPort: f.port(), BroadcastAddr: "127.0.0.1"})
+	c.allowLoopback = true
 	t.Cleanup(func() { c.Close() })
 	return c
 }

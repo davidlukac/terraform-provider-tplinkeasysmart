@@ -3,7 +3,6 @@ package escp
 import (
 	"context"
 	"fmt"
-	"net"
 	"regexp"
 )
 
@@ -64,11 +63,10 @@ func ValidateHostname(name string) error {
 	return nil
 }
 
-// SetHostname changes the device description. NOT verified live: the same-value
-// write was blocked by the permission classifier, so no resource uses it yet.
-// Like the vendor utility, the
+// SetHostname changes the device description. Like the vendor utility, the
 // request carries the current IP settings (read via discovery) unchanged, so
-// the management address is re-asserted as it is.
+// the management address is re-asserted as it is. Verified live on firmware
+// 20230218 and 20250710.
 func (c *Client) SetHostname(ctx context.Context, name string) error {
 	if err := ValidateHostname(name); err != nil {
 		return err
@@ -77,12 +75,18 @@ func (c *Client) SetHostname(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	ip, mask, gw := net.ParseIP(info.IP).To4(), net.ParseIP(info.Netmask).To4(), net.ParseIP(info.Gateway).To4()
-	if ip == nil || mask == nil || gw == nil {
-		return fmt.Errorf("escp: switch reported an unusable IP configuration (%q %q %q); refusing to write", info.IP, info.Netmask, info.Gateway)
+	cur, err := ipConfigFromInfo(info)
+	if err != nil {
+		return err
 	}
+	return c.writeSystem(ctx, name, info.DHCP, cur)
+}
+
+// writeSystem sends the System-page SET: device description, DHCP flag and the
+// static address triple. The switch takes all of them in one request.
+func (c *Client) writeSystem(ctx context.Context, name string, dhcp bool, cfg IPConfig) error {
 	return c.setTLVs(ctx,
 		TLV{TLVHostname, append([]byte(name), 0)},
-		TLV{TLVDHCP, []byte{boolByte(info.DHCP)}},
-		TLV{TLVIP, ip}, TLV{TLVNetmask, mask}, TLV{TLVGateway, gw})
+		TLV{TLVDHCP, []byte{boolByte(dhcp)}},
+		TLV{TLVIP, cfg.IP.To4()}, TLV{TLVNetmask, cfg.Netmask.To4()}, TLV{TLVGateway, cfg.Gateway.To4()})
 }
