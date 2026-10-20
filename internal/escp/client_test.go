@@ -160,3 +160,14 @@ func TestRejectedErrorNamesTheCodeAndMatchesErrAuth(t *testing.T) {
 		t.Fatalf("the code must be recoverable with errors.As, got %+v", rejected)
 	}
 }
+
+func TestRejectedErrorWithAReasonReplacesTheGenericHint(t *testing.T) {
+	err := &RejectedError{Code: 7404, Reason: "a member port has storm control enabled"}
+	if !errors.Is(err, ErrAuth) {
+		t.Fatal("must still match ErrAuth")
+	}
+	want := "escp: switch rejected the request (error code 7404): a member port has storm control enabled"
+	if err.Error() != want {
+		t.Fatalf("got %q, want %q", err.Error(), want)
+	}
+}

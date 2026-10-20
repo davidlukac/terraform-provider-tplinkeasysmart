@@ -406,32 +406,38 @@ func lagByID(t *testing.T, c *Client, id int) LAG {
 	return LAG{}
 }
 
-// Creates LAG2 from the two unused ports 6 and 7 and removes it again. LAG1
-// (the router uplink) is never written.
+// Creates a LAG from the two unused test ports and removes it again. Both ports
+// must belong to the same group's range (ports 1-4 or 5-8); the other group
+// (the router uplink, usually LAG1) is never written.
 func TestLiveLAG2(t *testing.T) {
 	c, ctx := liveClient(t), context.Background()
 	a, b, _ := liveTestPorts(t)
 	livePort(t, c, a)
 	livePort(t, c, b)
-	lag1 := lagByID(t, c, 1)
-	if orig := lagByID(t, c, 2); len(orig.Ports) != 0 {
-		t.Fatalf("LAG2 is already in use: %+v; refusing", orig)
+	group := (a-1)/LAGPortsPerGroup + 1
+	if other := (b-1)/LAGPortsPerGroup + 1; other != group {
+		t.Skipf("ports %d and %d are not in the same LAG range", a, b)
+	}
+	untouched := 3 - group
+	before := lagByID(t, c, untouched)
+	if orig := lagByID(t, c, group); len(orig.Ports) != 0 {
+		t.Fatalf("LAG%d is already in use: %+v; refusing", group, orig)
 	}
 	defer func() {
-		if err := c.SetLAG(ctx, 2, nil); err != nil {
+		if err := c.SetLAG(ctx, group, nil); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
-		if now := lagByID(t, c, 2); len(now.Ports) != 0 {
-			t.Errorf("LAG2 not removed: %+v", now)
+		if now := lagByID(t, c, group); len(now.Ports) != 0 {
+			t.Errorf("LAG%d not removed: %+v", group, now)
 		}
-		if now := lagByID(t, c, 1); !reflect.DeepEqual(now, lag1) {
-			t.Errorf("LAG1 changed: %+v vs %+v", now, lag1)
+		if now := lagByID(t, c, untouched); !reflect.DeepEqual(now, before) {
+			t.Errorf("LAG%d changed: %+v vs %+v", untouched, now, before)
 		}
 	}()
-	if err := c.SetLAG(ctx, 2, []int{a, b}); err != nil {
+	if err := c.SetLAG(ctx, group, []int{a, b}); err != nil {
 		t.Fatal(err)
 	}
-	if got := lagByID(t, c, 2); !reflect.DeepEqual(got.Ports, []int{a, b}) {
+	if got := lagByID(t, c, group); !reflect.DeepEqual(got.Ports, []int{a, b}) {
 		t.Fatalf("not applied: %+v", got)
 	}
 }

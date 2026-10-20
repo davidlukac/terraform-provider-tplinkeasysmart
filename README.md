@@ -128,7 +128,7 @@ A managed switch is the one device you cannot reach when you misconfigure it. Th
 - **VLAN mode.** Switching between MTU, port-based and 802.1Q VLAN discards the other modes' settings and can cut every connection, so `vlan_mode` refuses unless `allow_disruptive = true`; applying the mode the switch already has writes nothing.
 - **Firmware guard.** Writes are refused while the switch runs a firmware build this provider was not verified against (reads and imports always work). `allow_unverified_firmware = true` opts in.
 - **Import the uplink, protect it.** Bring the LAG that carries your router uplink under management and add `lifecycle { prevent_destroy = true }`.
-- **Plan-time validation.** Port numbers (1-32), LAG and VLAN ids (1-255), speeds, QoS modes and priorities (1-4), rate limits (0 or a multiple of 64 up to 1,000,000 kbps), device description (letters, digits, hyphens, up to 32) and cross-field rules (a storm limit needs a rate if a traffic type is selected, a mirror needs a destination that is not one of its sources) are checked before apply. The client repeats every check before it writes.
+- **Plan-time validation.** Port numbers (1-32), VLAN ids (1-255), LAG groups (1 takes ports 1-4, 2 takes ports 5-8, two to four members), speeds, QoS modes and priorities (1-4), rate limits (0 or a multiple of 64 up to 1,000,000 kbps), device description (letters, digits, hyphens, up to 32) and cross-field rules (a storm limit needs a rate if a traffic type is selected, a mirror needs a destination that is not one of its sources) are checked before apply. The client repeats every check before it writes.
 - **Read-back.** Each write is verified against the switch afterwards; a write the switch ignored is an error.
 - **Back up first.** The `config_backup` data source returns the device configuration so you can keep a copy before a change.
 - **No hardware needed for tests.** Everything above is exercised against a fake switch, including the failure paths.
@@ -164,7 +164,7 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 | Switch | Hardware | Firmware | Status |
 |---|---|---|---|
 | TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads, writes, import and drift checked on a real device. The VLAN mode, 802.1Q group and PVID resources were not tried on this build (they are verified on 20250710; same protocol generation). |
-| TL-SG108E | v6 | 1.0.0 Build 20250710 | **Verified**: reads, imports and drift; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID resources). **LAG creation is refused** by this firmware (error code 4; its own web UI also rejects it), so `tplinkeasysmart_lag` cannot create groups on it. |
+| TL-SG108E | v6 | 1.0.0 Build 20250710 | **Verified**: reads, imports and drift; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID resources). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8; see the `lag` page). |
 | TL-SG108E | v6 | builds newer than 20250710 | Untried; reads work, writes are refused unless `allow_unverified_firmware = true`; start with the read-only data sources |
 | TL-SG108E | other hardware versions | any | Untested |
 | Other Easy Smart models (TL-SG105E, TL-SG1016DE, ...) | any | any | Untested; reports wanted |

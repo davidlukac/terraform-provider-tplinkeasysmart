@@ -2,16 +2,18 @@
 page_title: "tplinkeasysmart_lag Resource - tplinkeasysmart"
 subcategory: "Switching"
 description: |-
-  A link aggregation group (Switching > Port Trunk). Import with the group number. Safety: the provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to another LAG, because that can cut the uplink; set allow_disruptive = true to override. The existing router uplink (usually LAG1) should be imported and protected with lifecycle { prevent_destroy = true }. The switch itself rejects ports that conflict with mirroring, VLANs, rate limits or storm control.
+  A link aggregation group (Switching > Port Trunk). Import with the group number. Safety: the provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to another LAG, because that can cut the uplink; set allow_disruptive = true to override. The existing router uplink (usually LAG1) should be imported and protected with lifecycle { prevent_destroy = true }. The group number decides the ports: LAG 1 takes ports 1-4 and LAG 2 takes ports 5-8, each with 2 to 4 members. The switch itself rejects ports that conflict with the port mirror (source or destination), a port-based VLAN other than the default, a bandwidth limit or storm control; the error then names the conflict.
 ---
 
 # tplinkeasysmart_lag (Resource)
 
-A link aggregation group (Switching > Port Trunk). Import with the group number. **Safety:** the provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to another LAG, because that can cut the uplink; set `allow_disruptive = true` to override. The existing router uplink (usually LAG1) should be imported and protected with `lifecycle { prevent_destroy = true }`. The switch itself rejects ports that conflict with mirroring, VLANs, rate limits or storm control.
+A link aggregation group (Switching > Port Trunk). Import with the group number. **Safety:** the provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to another LAG, because that can cut the uplink; set `allow_disruptive = true` to override. The existing router uplink (usually LAG1) should be imported and protected with `lifecycle { prevent_destroy = true }`. The group number decides the ports: LAG 1 takes ports 1-4 and LAG 2 takes ports 5-8, each with 2 to 4 members. The switch itself rejects ports that conflict with the port mirror (source or destination), a port-based VLAN other than the default, a bandwidth limit or storm control; the error then names the conflict.
 
-~> **Safety** The provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to another LAG. Import the group that carries the router uplink and protect it with `lifecycle { prevent_destroy = true }`. The switch itself rejects ports that conflict with mirroring, VLANs, rate limits or storm control.
+~> **Safety** The provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to another LAG. Import the group that carries the router uplink and protect it with `lifecycle { prevent_destroy = true }`. 
 
-~> **Firmware 20250710** The switch refuses to create a LAG (error code 4, and its own web UI answers "invalid port mask"), whatever the ports. Nothing is changed when that happens. Creating a LAG is verified on firmware 20230218 only.
+~> **Which ports go where** The TL-SG108E has two LAG groups with fixed port ranges: group 1 takes ports 1-4 and group 2 takes ports 5-8, with two to four members each. A group that mixes ranges (for example group 1 with ports 4 and 5) is refused by the switch, so the provider refuses it while planning. Verified on firmware 20230218 and 20250710.
+
+~> **Ports the switch refuses** A port that is mirrored or is the mirror destination, belongs to a port-based VLAN other than the default one, has a bandwidth limit or has storm control cannot join a LAG. The switch answers with an error code and the provider names the conflict; nothing is changed. Remove the conflicting setting first.
 
 ## Example Usage
 
@@ -39,8 +41,8 @@ resource "tplinkeasysmart_lag" "uplink" {
 
 ### Required
 
-- `group` (Number) Group number (1-based).
-- `ports` (Set of Number) Member ports.
+- `group` (Number) Group number: 1 (ports 1-4) or 2 (ports 5-8).
+- `ports` (Set of Number) Member ports: 2 to 4, all within the range of the group (group 1: ports 1-4, group 2: ports 5-8).
 
 ### Optional
 

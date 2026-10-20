@@ -882,7 +882,9 @@ func lagPorts() []escp.Port {
 	return []escp.Port{
 		{ID: 1, Enabled: true, LAG: 1, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
 		{ID: 2, Enabled: true, LAG: 1, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
+		{ID: 3, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
 		{ID: 4, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
+		{ID: 5, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
 		{ID: 6, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
 		{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
 	}
@@ -908,13 +910,16 @@ func TestAccLAGLifecycleOnUnusedPorts(t *testing.T) {
 }
 
 func TestAccLAGGuard(t *testing.T) {
-	f := &fakeClient{ports: lagPorts(), lags: map[int][]int{1: {1, 2}}}
+	ports := lagPorts()
+	ports[6].ActualSpeed = "1000Mbps-full" // port 7 carries a link
+	f := &fakeClient{ports: ports, lags: map[int][]int{1: {1, 2}}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
-			{Config: lagConfig(2, "  ports = [4, 6]\n"), ExpectError: regexp.MustCompile(`port 4 has a link up`)},
-			{Config: lagConfig(2, "  ports = [1, 6]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
-			{Config: lagConfig(1, "  ports = [1]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up|port 2 has a link up`)},
+			{Config: lagConfig(2, "  ports = [6, 7]\n"), ExpectError: regexp.MustCompile(`port 7 has a link up`)},
+			// A change to group 1 is refused because of its current members (the uplink), not the new ones.
+			{Config: lagConfig(1, "  ports = [3, 4]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
+			{Config: lagConfig(1, "  ports = [1, 2]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up|port 2 has a link up`)},
 		},
 	})
 	if f.sets != 0 {

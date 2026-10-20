@@ -46,10 +46,14 @@ func TestInvalidConfigurationIsRejectedWhilePlanning(t *testing.T) {
 		{"disabled mirror with ports", mirrorConfig("  enabled = false\n  mirror_port = 7\n"), `(?s)must\s+be\s+empty`},
 		{"mirror source out of range", mirrorConfig("  enabled = true\n  mirror_port = 7\n  ingress_ports = [40]\n"), `between 1 and 32`},
 		{"mirror destination out of range", mirrorConfig("  enabled = true\n  mirror_port = 40\n  ingress_ports = [4]\n"), `between 0 and 32`},
-		{"LAG group zero", lagConfig(0, "  ports = [6, 7]\n"), `between 1 and 255`},
-		{"LAG group above a byte", lagConfig(256, "  ports = [6, 7]\n"), `between 1 and 255`},
-		{"LAG without members", lagConfig(2, "  ports = []\n"), `at least 1`},
+		{"LAG group zero", lagConfig(0, "  ports = [6, 7]\n"), `between 1 and 2`},
+		{"LAG group three", lagConfig(3, "  ports = [6, 7]\n"), `between 1 and 2`},
+		{"LAG without members", lagConfig(2, "  ports = []\n"), `at least 2`},
+		{"LAG with one member", lagConfig(2, "  ports = [6]\n"), `at least 2`},
+		{"LAG with five members", lagConfig(1, "  ports = [1, 2, 3, 4, 5]\n"), `at most 4`},
 		{"LAG member out of range", lagConfig(2, "  ports = [6, 40]\n"), `between 1 and 32`},
+		{"LAG 1 reaching into the ports of LAG 2", lagConfig(1, "  ports = [4, 5]\n"), `(?s)port 5 cannot be in LAG 1.*ports 1-4`},
+		{"LAG 2 with low ports", lagConfig(2, "  ports = [2, 3]\n"), `(?s)port 2 cannot be in LAG 2.*ports 5-8`},
 		{"VLAN id zero", vlanGroupConfig(0, "  ports = [6, 7]\n"), `between 1 and 255`},
 		{"VLAN group without members", vlanGroupConfig(2, "  ports = []\n"), `at least 1`},
 		{"VLAN member out of range", vlanGroupConfig(2, "  ports = [0]\n"), `between 1 and 32`},
@@ -85,7 +89,7 @@ func TestInvalidConfigurationIsRejectedWhilePlanning(t *testing.T) {
 func TestValuesUnknownWhilePlanningAreValidatedBeforeAnythingIsWritten(t *testing.T) {
 	cases := []struct{ name, cfg, want string }{
 		{"LAG members decided later and empty", providerBlock + "resource \"terraform_data\" \"p\" {\n  input = []\n}\n" +
-			"resource \"tplinkeasysmart_lag\" \"l\" {\n  group = 2\n  ports = terraform_data.p.output\n}\n", `at least 1`},
+			"resource \"tplinkeasysmart_lag\" \"l\" {\n  group = 2\n  ports = terraform_data.p.output\n}\n", `at least 2`},
 		{"VLAN members decided later and empty", providerBlock + "resource \"terraform_data\" \"p\" {\n  input = []\n}\n" +
 			"resource \"tplinkeasysmart_vlan_port_based_group\" \"v\" {\n  vlan = 2\n  ports = terraform_data.p.output\n}\n", `at least 1`},
 		{"QoS mode decided later and invalid", providerBlock + "resource \"terraform_data\" \"m\" {\n  input = \"turbo\"\n}\n" +
