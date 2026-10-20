@@ -4,6 +4,7 @@ package escp
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -77,6 +78,31 @@ func TestLiveIGMPToggle(t *testing.T) {
 	}
 }
 
+// The report message suppression flag is written together with the IGMP mode; this
+// toggles only the flag (the mode stays as it is) and restores it.
+func TestLiveIGMPSuppressionToggle(t *testing.T) {
+	c, ctx := liveClient(t), context.Background()
+	orig, err := c.IGMP(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := c.SetIGMP(ctx, orig.Enabled, orig.ReportSuppression); err != nil {
+			t.Errorf("RESTORE FAILED: %v", err)
+		}
+		if now, _ := c.IGMP(ctx); now.Enabled != orig.Enabled || now.ReportSuppression != orig.ReportSuppression {
+			t.Errorf("not restored: %+v vs %+v", now, orig)
+		}
+	}()
+	if err := c.SetIGMP(ctx, orig.Enabled, !orig.ReportSuppression); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := c.IGMP(ctx)
+	if got.ReportSuppression == orig.ReportSuppression || got.Enabled != orig.Enabled {
+		t.Fatalf("toggle had no effect, or changed the mode: %+v (was %+v)", got, orig)
+	}
+}
+
 func TestLiveLoopPreventionToggle(t *testing.T) {
 	c, ctx := liveClient(t), context.Background()
 	orig, err := c.LoopPrevention(ctx)
@@ -94,6 +120,27 @@ func TestLiveLoopPreventionToggle(t *testing.T) {
 	if got, _ := c.LoopPrevention(ctx); got == orig {
 		t.Fatal("toggle had no effect")
 	}
+}
+
+// The unused ports the live tests may write to. Switch 01 uses ports 6 and 7
+// (and mirrors port 4); another switch has other free ports, so they can be
+// chosen with TPLINK_EASYSMART_LIVE_PORTS="a,b" and TPLINK_EASYSMART_LIVE_SOURCE
+// (the port whose traffic the mirror test copies). Every test still aborts
+// unless its ports are link-down and in no LAG.
+func liveTestPorts(t *testing.T) (first, second, source int) {
+	t.Helper()
+	first, second, source = 6, 7, 4
+	if v := os.Getenv("TPLINK_EASYSMART_LIVE_PORTS"); v != "" {
+		if _, err := fmt.Sscanf(v, "%d,%d", &first, &second); err != nil {
+			t.Fatalf("TPLINK_EASYSMART_LIVE_PORTS=%q: want \"a,b\": %v", v, err)
+		}
+	}
+	if v := os.Getenv("TPLINK_EASYSMART_LIVE_SOURCE"); v != "" {
+		if _, err := fmt.Sscanf(v, "%d", &source); err != nil {
+			t.Fatalf("TPLINK_EASYSMART_LIVE_SOURCE=%q: %v", v, err)
+		}
+	}
+	return first, second, source
 }
 
 // livePort returns the current state of an unused test port, aborting the test
@@ -117,7 +164,7 @@ func livePort(t *testing.T, c *Client, id int) Port {
 }
 
 func TestLivePortWrites(t *testing.T) {
-	const id = 7
+	_, id, _ := liveTestPorts(t)
 	c, ctx := liveClient(t), context.Background()
 	orig := livePort(t, c, id)
 	defer func() {
@@ -148,7 +195,7 @@ func TestLivePortWrites(t *testing.T) {
 }
 
 func TestLiveQoS(t *testing.T) {
-	const id = 7
+	_, id, _ := liveTestPorts(t)
 	c, ctx := liveClient(t), context.Background()
 	livePort(t, c, id) // abort unless port 7 is unused
 	orig, err := c.QoS(ctx)
@@ -220,7 +267,7 @@ func bandwidthOf(t *testing.T, c *Client, port int) PortBandwidth {
 }
 
 func TestLiveBandwidth(t *testing.T) {
-	const id = 7
+	_, id, _ := liveTestPorts(t)
 	c, ctx := liveClient(t), context.Background()
 	livePort(t, c, id) // abort unless port 7 is unused
 	orig := bandwidthOf(t, c, id)
@@ -269,7 +316,7 @@ func stormOf(t *testing.T, c *Client, port int) PortStorm {
 }
 
 func TestLiveStormControl(t *testing.T) {
-	const id = 7
+	_, id, _ := liveTestPorts(t)
 	c, ctx := liveClient(t), context.Background()
 	livePort(t, c, id) // abort unless port 7 is unused
 	orig := stormOf(t, c, id)
@@ -294,10 +341,17 @@ func TestLiveStormControl(t *testing.T) {
 			t.Fatalf("port %d was affected: %+v", r.Port, r)
 		}
 	}
+	// unknown unicast, which the first live run (switch 01) did not cover
+	if err := c.SetStormControl(ctx, id, true, false, false, 2048); err != nil {
+		t.Fatal(err)
+	}
+	if got := stormOf(t, c, id); !got.Enabled || !got.UnknownUnicast || got.Multicast || got.Broadcast || got.RateKbps != 2048 {
+		t.Fatalf("unknown unicast not applied: %+v", got)
+	}
 }
 
 func TestLivePortMirror(t *testing.T) {
-	const dest = 7
+	_, dest, source := liveTestPorts(t)
 	c, ctx := liveClient(t), context.Background()
 	livePort(t, c, dest) // the destination must be unused
 	orig, err := c.PortMirror(ctx)
@@ -315,13 +369,25 @@ func TestLivePortMirror(t *testing.T) {
 			t.Errorf("not restored: %+v vs %+v", now, orig)
 		}
 	}()
-	want := Mirror{Enabled: true, MirrorPort: dest, IngressPorts: []int{4}, EgressPorts: []int{}}
+	want := Mirror{Enabled: true, MirrorPort: dest, IngressPorts: []int{source}, EgressPorts: []int{}}
 	if err := c.SetPortMirror(ctx, want); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := c.PortMirror(ctx)
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("not applied: %+v", got)
+	}
+	// egress and both directions, which the first live run (switch 01) did not cover
+	for _, m := range []Mirror{
+		{Enabled: true, MirrorPort: dest, IngressPorts: []int{}, EgressPorts: []int{source}},
+		{Enabled: true, MirrorPort: dest, IngressPorts: []int{source}, EgressPorts: []int{source}},
+	} {
+		if err := c.SetPortMirror(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := c.PortMirror(ctx); !reflect.DeepEqual(got, m) {
+			t.Fatalf("not applied: %+v, want %+v", got, m)
+		}
 	}
 }
 
@@ -340,31 +406,38 @@ func lagByID(t *testing.T, c *Client, id int) LAG {
 	return LAG{}
 }
 
-// Creates LAG2 from the two unused ports 6 and 7 and removes it again. LAG1
-// (the router uplink) is never written.
+// Creates a LAG from the two unused test ports and removes it again. Both ports
+// must belong to the same group's range (ports 1-4 or 5-8); the other group
+// (the router uplink, usually LAG1) is never written.
 func TestLiveLAG2(t *testing.T) {
 	c, ctx := liveClient(t), context.Background()
-	livePort(t, c, 6)
-	livePort(t, c, 7)
-	lag1 := lagByID(t, c, 1)
-	if orig := lagByID(t, c, 2); len(orig.Ports) != 0 {
-		t.Fatalf("LAG2 is already in use: %+v; refusing", orig)
+	a, b, _ := liveTestPorts(t)
+	livePort(t, c, a)
+	livePort(t, c, b)
+	group := (a-1)/LAGPortsPerGroup + 1
+	if other := (b-1)/LAGPortsPerGroup + 1; other != group {
+		t.Skipf("ports %d and %d are not in the same LAG range", a, b)
+	}
+	untouched := 3 - group
+	before := lagByID(t, c, untouched)
+	if orig := lagByID(t, c, group); len(orig.Ports) != 0 {
+		t.Fatalf("LAG%d is already in use: %+v; refusing", group, orig)
 	}
 	defer func() {
-		if err := c.SetLAG(ctx, 2, nil); err != nil {
+		if err := c.SetLAG(ctx, group, nil); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
-		if now := lagByID(t, c, 2); len(now.Ports) != 0 {
-			t.Errorf("LAG2 not removed: %+v", now)
+		if now := lagByID(t, c, group); len(now.Ports) != 0 {
+			t.Errorf("LAG%d not removed: %+v", group, now)
 		}
-		if now := lagByID(t, c, 1); !reflect.DeepEqual(now, lag1) {
-			t.Errorf("LAG1 changed: %+v vs %+v", now, lag1)
+		if now := lagByID(t, c, untouched); !reflect.DeepEqual(now, before) {
+			t.Errorf("LAG%d changed: %+v vs %+v", untouched, now, before)
 		}
 	}()
-	if err := c.SetLAG(ctx, 2, []int{6, 7}); err != nil {
+	if err := c.SetLAG(ctx, group, []int{a, b}); err != nil {
 		t.Fatal(err)
 	}
-	if got := lagByID(t, c, 2); !reflect.DeepEqual(got.Ports, []int{6, 7}) {
+	if got := lagByID(t, c, group); !reflect.DeepEqual(got.Ports, []int{a, b}) {
 		t.Fatalf("not applied: %+v", got)
 	}
 }
@@ -382,8 +455,9 @@ func portVLANByID(v PortBasedVLAN, id int) (PortVLAN, bool) {
 // 1 must stay unchanged; if the firmware reshuffles it, it is repaired.
 func TestLivePortBasedVLAN2(t *testing.T) {
 	c, ctx := liveClient(t), context.Background()
-	livePort(t, c, 6)
-	livePort(t, c, 7)
+	a, b, _ := liveTestPorts(t)
+	livePort(t, c, a)
+	livePort(t, c, b)
 	orig, err := c.PortBasedVLAN(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -413,11 +487,11 @@ func TestLivePortBasedVLAN2(t *testing.T) {
 			t.Errorf("not restored: %+v", now)
 		}
 	}()
-	if err := c.SetPortBasedVLAN(ctx, 2, []int{6, 7}); err != nil {
+	if err := c.SetPortBasedVLAN(ctx, 2, []int{a, b}); err != nil {
 		t.Fatal(err)
 	}
 	now, _ := c.PortBasedVLAN(ctx)
-	if g, ok := portVLANByID(now, 2); !ok || !reflect.DeepEqual(g.Ports, []int{6, 7}) {
+	if g, ok := portVLANByID(now, 2); !ok || !reflect.DeepEqual(g.Ports, []int{a, b}) {
 		t.Fatalf("VLAN 2 not applied: %+v", now)
 	}
 	t.Logf("with VLAN 2: %+v", now.VLANs)
@@ -503,4 +577,127 @@ func TestLiveTwoClientsShareThePort(t *testing.T) {
 	if len(macs) != 2 {
 		t.Fatalf("each client must get its own switch's reply, got MACs %v", macs)
 	}
+}
+
+// vlanModes reads the three VLAN mode flags and the port-based group of VLAN 1.
+func vlanModes(t *testing.T, c *Client) (mtu MTUVLAN, portBased PortBasedVLAN, dot1q Dot1Q) {
+	t.Helper()
+	ctx := context.Background()
+	var err error
+	if mtu, err = c.MTUVLAN(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if portBased, err = c.PortBasedVLAN(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if dot1q, err = c.VLAN8021Q(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return mtu, portBased, dot1q
+}
+
+// Switches the VLAN mode to 802.1Q, builds a test VLAN on two unused ports, changes
+// the PVID of one of them, and puts everything back, including the original mode.
+// It can cut management access if the switch does not behave as the vendor
+// utility documents, so it only runs with TPLINK_EASYSMART_LIVE_VLAN_MODE=1 and
+// only on a switch that is in port-based mode with the default VLAN 1.
+func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
+	if os.Getenv("TPLINK_EASYSMART_LIVE_VLAN_MODE") != "1" {
+		t.Skip("set TPLINK_EASYSMART_LIVE_VLAN_MODE=1 to switch the VLAN mode of the switch")
+	}
+	a, b, _ := liveTestPorts(t)
+	const testVLAN = 20
+	c, ctx := liveClient(t), context.Background()
+	livePort(t, c, a)
+	livePort(t, c, b)
+	mtu0, pb0, q0 := vlanModes(t, c)
+	if mtu0.Enabled || !pb0.Enabled || q0.Enabled {
+		t.Fatalf("refusing to start: want port-based mode only, have mtu=%+v portBased=%v 802.1Q=%v", mtu0, pb0.Enabled, q0.Enabled)
+	}
+	t.Logf("original: port-based groups %+v", pb0.VLANs)
+
+	restore := func() {
+		_, _, q := vlanModes(t, c)
+		if q.Enabled {
+			if _, ok := vlanByID(q, testVLAN); ok {
+				if err := c.SetPVIDs(ctx, map[int]int{a: 1, b: 1}); err != nil {
+					t.Errorf("RESTORE: PVIDs: %v", err)
+				}
+				if err := c.DeleteVLAN8021Q(ctx, testVLAN); err != nil {
+					t.Errorf("RESTORE: delete VLAN: %v", err)
+				}
+			}
+		}
+		if err := c.SetPortBasedVLANMode(ctx, true); err != nil {
+			t.Errorf("RESTORE FAILED: port-based mode: %v", err)
+		}
+		mtu, pb, q := vlanModes(t, c)
+		t.Logf("after restore: mtu=%+v port-based=%+v 802.1Q enabled=%v", mtu, pb, q.Enabled)
+		if mtu.Enabled || !pb.Enabled || q.Enabled || !reflect.DeepEqual(pb.VLANs, pb0.VLANs) {
+			t.Errorf("NOT RESTORED: mtu=%+v port-based=%+v 802.1Q=%v, want port-based %+v", mtu, pb, q.Enabled, pb0.VLANs)
+		}
+	}
+	defer restore()
+
+	if err := c.SetVLAN8021QMode(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	mtu, pb, q := vlanModes(t, c)
+	t.Logf("802.1Q on: mtu=%+v port-based enabled=%v groups=%+v 802.1Q=%+v", mtu, pb.Enabled, pb.VLANs, q)
+	if !q.Enabled {
+		t.Fatalf("the mode write had no effect: %+v", q)
+	}
+
+	want := VLAN8021Q{ID: testVLAN, Name: "livetest", Untagged: []int{a}, Tagged: []int{b}}
+	if err := c.SetVLAN8021Q(ctx, want); err != nil {
+		t.Fatal(err)
+	}
+	_, _, q = vlanModes(t, c)
+	got, ok := vlanByID(q, testVLAN)
+	t.Logf("test VLAN: %+v (found %v)", got, ok)
+	if !ok || got.Name != want.Name || !reflect.DeepEqual(got.Untagged, want.Untagged) || !reflect.DeepEqual(got.Tagged, want.Tagged) {
+		t.Fatalf("VLAN not applied as requested: %+v", got)
+	}
+
+	if err := c.SetPVIDs(ctx, map[int]int{a: testVLAN}); err != nil {
+		t.Fatal(err)
+	}
+	_, _, q = vlanModes(t, c)
+	t.Logf("PVIDs: %+v", q.PVIDs)
+	if pvid, _ := pvidByPort(q, a); pvid != testVLAN {
+		t.Fatalf("PVID of port %d is %d, want %d", a, pvid, testVLAN)
+	}
+	if err := c.SetPVIDs(ctx, map[int]int{a: 1}); err != nil {
+		t.Fatal(err)
+	}
+	_, _, q = vlanModes(t, c)
+	if pvid, _ := pvidByPort(q, a); pvid != 1 {
+		t.Fatalf("PVID not restored: %+v", q.PVIDs)
+	}
+
+	if err := c.DeleteVLAN8021Q(ctx, testVLAN); err != nil {
+		t.Fatal(err)
+	}
+	_, _, q = vlanModes(t, c)
+	if _, still := vlanByID(q, testVLAN); still {
+		t.Fatalf("VLAN %d still present after the delete: %+v", testVLAN, q.VLANs)
+	}
+}
+
+func vlanByID(q Dot1Q, id int) (VLAN8021Q, bool) {
+	for _, v := range q.VLANs {
+		if v.ID == id {
+			return v, true
+		}
+	}
+	return VLAN8021Q{}, false
+}
+
+func pvidByPort(q Dot1Q, port int) (int, bool) {
+	for _, p := range q.PVIDs {
+		if p.Port == port {
+			return p.PVID, true
+		}
+	}
+	return 0, false
 }

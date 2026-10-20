@@ -27,7 +27,13 @@ type SwitchClient interface {
 	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
 	SetPortBasedVLAN(ctx context.Context, id int, ports []int) error
+	SetMTUVLAN(ctx context.Context, enabled bool, uplinkPort int) error
+	SetPortBasedVLANMode(ctx context.Context, enabled bool) error
 	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
+	SetVLAN8021QMode(ctx context.Context, enabled bool) error
+	SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error
+	DeleteVLAN8021Q(ctx context.Context, id int) error
+	SetPVIDs(ctx context.Context, pvids map[int]int) error
 	QoS(ctx context.Context) (escp.QoS, error)
 	SetQoSMode(ctx context.Context, mode int) error
 	SetPortPriorities(ctx context.Context, changes map[int]int) error

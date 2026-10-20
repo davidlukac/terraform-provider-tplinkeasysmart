@@ -9,7 +9,11 @@ description: |-
 
 {{ .Description | trimspace }}
 
-~> **Safety** The provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to another LAG. Import the group that carries the router uplink and protect it with `lifecycle { prevent_destroy = true }`. The switch itself rejects ports that conflict with mirroring, VLANs, rate limits or storm control.
+~> **Safety** The provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to another LAG. Import the group that carries the router uplink and protect it with `lifecycle { prevent_destroy = true }`. 
+
+~> **Which ports go where** The TL-SG108E has two LAG groups with fixed port ranges: group 1 takes ports 1-4 and group 2 takes ports 5-8, with two to four members each. A group that mixes ranges (for example group 1 with ports 4 and 5) is refused by the switch, so the provider refuses it while planning. Verified on firmware 20230218 and 20250710.
+
+~> **Ports the switch refuses** A port that is mirrored or is the mirror destination, belongs to a port-based VLAN other than the default one, has a bandwidth limit or has storm control cannot join a LAG. The switch answers with an error code and the provider names the conflict; nothing is changed. Remove the conflicting setting first.
 
 {{ if .HasExample -}}
 ## Example Usage

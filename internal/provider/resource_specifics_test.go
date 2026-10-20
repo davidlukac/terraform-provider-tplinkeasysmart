@@ -86,16 +86,23 @@ func TestQoSResourceOnlyManagesTheListedPorts(t *testing.T) {
 	})
 }
 
+// singleLAGClient reports only LAG1, as a switch without a second group would.
+type singleLAGClient struct{ *fakeClient }
+
+func (singleLAGClient) LAGs(context.Context) ([]escp.LAG, error) {
+	return []escp.LAG{{ID: 1, Ports: []int{1, 2}}}, nil
+}
+
 func TestLAGResourceSpecifics(t *testing.T) {
 	newFake := func() *fakeClient {
 		return &fakeClient{ports: lagPorts(), lags: map[int][]int{1: {1, 2}}}
 	}
-	t.Run("a LAG needs at least one member", func(t *testing.T) {
+	t.Run("a LAG needs at least two members", func(t *testing.T) {
 		t.Parallel()
 		inner := newFake()
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),
-			Steps:                    []tfresource.TestStep{{Config: lagConfig(2, "  ports = []\n"), ExpectError: regexp.MustCompile(`at least 1`)}},
+			Steps:                    []tfresource.TestStep{{Config: lagConfig(2, "  ports = []\n"), ExpectError: regexp.MustCompile(`at least 2`)}},
 		})
 		if inner.sets != 0 {
 			t.Fatal("nothing may be written")
@@ -103,10 +110,10 @@ func TestLAGResourceSpecifics(t *testing.T) {
 	})
 	t.Run("the group must exist on the switch", func(t *testing.T) {
 		t.Parallel()
-		inner := newFake()
+		inner := singleLAGClient{newFake()}
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),
-			Steps:                    []tfresource.TestStep{{Config: lagConfig(9, "  ports = [6]\n"), ExpectError: regexp.MustCompile(`LAG9 does not exist`)}},
+			Steps:                    []tfresource.TestStep{{Config: lagConfig(2, "  ports = [6, 7]\n"), ExpectError: regexp.MustCompile(`LAG2 does not exist`)}},
 		})
 	})
 	t.Run("reading the current group fails", func(t *testing.T) {
@@ -120,11 +127,11 @@ func TestLAGResourceSpecifics(t *testing.T) {
 	})
 	t.Run("a port that already belongs to another LAG", func(t *testing.T) {
 		t.Parallel()
-		inner := &fakeClient{lags: map[int][]int{1: {1, 2}},
-			ports: append(lagPorts(), escp.Port{ID: 5, Enabled: true, LAG: 3, ConfiguredSpeed: "auto", ActualSpeed: "link-down"})}
+		inner := &fakeClient{lags: map[int][]int{1: {1, 2}}, ports: lagPorts()}
+		inner.ports[4].LAG = 3 // port 5
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),
-			Steps:                    []tfresource.TestStep{{Config: lagConfig(2, "  ports = [5]\n"), ExpectError: regexp.MustCompile(`already belongs to LAG3`)}},
+			Steps:                    []tfresource.TestStep{{Config: lagConfig(2, "  ports = [5, 6]\n"), ExpectError: regexp.MustCompile(`already belongs to LAG3`)}},
 		})
 		if inner.sets != 0 {
 			t.Fatal("nothing may be written")
@@ -135,7 +142,7 @@ func TestLAGResourceSpecifics(t *testing.T) {
 		inner := newFake()
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),
-			Steps:                    []tfresource.TestStep{{Config: lagConfig(2, "  ports = [9]\n"), ExpectError: regexp.MustCompile(`port 9 does not exist`)}},
+			Steps:                    []tfresource.TestStep{{Config: lagConfig(2, "  ports = [6, 8]\n"), ExpectError: regexp.MustCompile(`port 8 does not exist`)}},
 		})
 	})
 	t.Run("destroying a group whose ports now carry a link is refused", func(t *testing.T) {
@@ -147,9 +154,9 @@ func TestLAGResourceSpecifics(t *testing.T) {
 			ProtoV6ProviderFactories: factories(fc),
 			Steps: []tfresource.TestStep{
 				{Config: cfg},
-				{PreConfig: func() { inner.mutate(func(f *fakeClient) { f.ports[3].ActualSpeed = "1000Mbps-full" }) },
+				{PreConfig: func() { inner.mutate(func(f *fakeClient) { f.ports[5].ActualSpeed = "1000Mbps-full" }) },
 					Config: cfg, Destroy: true, ExpectError: regexp.MustCompile(`Refusing to remove LAG`)},
-				{PreConfig: func() { inner.mutate(func(f *fakeClient) { f.ports[3].ActualSpeed = "link-down" }) }, Config: cfg}, // cleanup destroys
+				{PreConfig: func() { inner.mutate(func(f *fakeClient) { f.ports[5].ActualSpeed = "link-down" }) }, Config: cfg}, // cleanup destroys
 			},
 		})
 		if len(inner.lags[2]) != 0 {
@@ -247,9 +254,9 @@ func TestVLANGroupResourceSpecifics(t *testing.T) {
 			ProtoV6ProviderFactories: factories(inner),
 			Steps: []tfresource.TestStep{
 				{Config: cfg},
-				{PreConfig: func() { inner.mutate(func(f *fakeClient) { f.ports[3].ActualSpeed = "1000Mbps-full" }) },
+				{PreConfig: func() { inner.mutate(func(f *fakeClient) { f.ports[5].ActualSpeed = "1000Mbps-full" }) },
 					Config: cfg, Destroy: true, ExpectError: regexp.MustCompile(`Refusing to remove VLAN group`)},
-				{PreConfig: func() { inner.mutate(func(f *fakeClient) { f.ports[3].ActualSpeed = "link-down" }) }, Config: cfg},
+				{PreConfig: func() { inner.mutate(func(f *fakeClient) { f.ports[5].ActualSpeed = "link-down" }) }, Config: cfg},
 			},
 		})
 		if _, still := inner.pvlans[2]; still {
@@ -292,13 +299,14 @@ func TestResourcesReportUndecodablePlanAndState(t *testing.T) {
 		"led": NewLEDResource, "igmp snooping": NewIGMPSnoopingResource, "loop prevention": NewLoopPreventionResource,
 		"port": NewPortResource, "qos": NewQoSResource, "bandwidth limit": NewBandwidthLimitResource,
 		"storm limit": NewStormLimitResource, "port mirror": NewPortMirrorResource, "lag": NewLAGResource,
-		"vlan group": NewVLANPortBasedGroupResource,
+		"vlan group": NewVLANPortBasedGroupResource, "vlan mode": NewVLANModeResource,
+		"802.1Q vlan": NewVLAN8021QGroupResource, "802.1Q pvid": NewVLAN8021QPVIDResource,
 	}
 	// resources whose Read/Delete decode the prior state (the singletons that only
 	// re-read the switch ignore it)
 	readsState := map[string]bool{"led": true, "port": true, "qos": true, "bandwidth limit": true, "storm limit": true,
-		"port mirror": true, "lag": true, "vlan group": true}
-	deletesState := map[string]bool{"lag": true, "vlan group": true}
+		"port mirror": true, "lag": true, "vlan group": true, "vlan mode": true, "802.1Q vlan": true, "802.1Q pvid": true}
+	deletesState := map[string]bool{"lag": true, "vlan group": true, "802.1Q vlan": true, "802.1Q pvid": true}
 	ctx := context.Background()
 	for name, ctor := range ctors {
 		t.Run(name, func(t *testing.T) {

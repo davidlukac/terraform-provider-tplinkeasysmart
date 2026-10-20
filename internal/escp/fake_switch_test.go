@@ -39,6 +39,7 @@ type fakeSwitch struct {
 	dropSets       bool                                                    // never answer authenticated SETs
 	discoverTLVs   []TLV                                                   // replace the discovery reply (nil: the default TL-SG108E reply)
 	rejectSetsFrom int                                                     // reject the nth and later authenticated SETs (1-based)
+	rejectCode     int32                                                   // reply code of a rejected SET (default 9)
 }
 
 var (
@@ -286,7 +287,7 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 			return
 		}
 		f.mu.Lock()
-		dropSets, rejectFrom, accepted := f.dropSets, f.rejectSetsFrom, len(f.history)
+		dropSets, rejectFrom, rejectCode, accepted := f.dropSets, f.rejectSetsFrom, f.rejectCode, len(f.history)
 		f.mu.Unlock()
 		if dropSets {
 			return
@@ -298,7 +299,10 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h header, tlvs []TLV) {
 			return
 		}
 		if rejectFrom > 0 && accepted+1 >= rejectFrom {
-			f.send(from, OpSetReply, h, 9, nil, true)
+			if rejectCode == 0 {
+				rejectCode = 9
+			}
+			f.send(from, OpSetReply, h, rejectCode, nil, true)
 			return
 		}
 		f.mu.Lock()

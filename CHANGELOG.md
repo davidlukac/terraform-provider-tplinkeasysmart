@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.27.0
+
+- VLAN writes, verified on a real switch (TL-SG108E v6, firmware 20250710, free ports only): `tplinkeasysmart_vlan_mode` (MTU / port-based / 802.1Q, exactly one active), `tplinkeasysmart_vlan_8021q_group` (id, name, tagged and untagged ports) and `tplinkeasysmart_vlan_8021q_pvid`. Changing the mode needs `allow_disruptive = true`; groups and PVIDs refuse ports that carry a link or belong to a LAG, and a change that would leave a port in no VLAN. 802.1Q must be the active mode for groups and PVIDs.
+- Firmware guard: writes are refused on a firmware build the provider was not verified against (20230218 and 20250710 are); reads and imports always work. `allow_unverified_firmware = true` (provider, or per switch in the `switches` map) lifts it.
+- A rejected write now reads `switch rejected the request (error code N)` instead of claiming bad credentials; `errors.Is(err, escp.ErrAuth)` still matches and `*escp.RejectedError` carries the code.
+- `tplinkeasysmart_lag` knows the switch's real rules: group 1 takes ports 1-4 and group 2 takes ports 5-8, with two to four members. A group or port set that breaks them is refused while planning and again by the client before anything is sent. A LAG the switch itself refuses (a mirrored or mirror-destination port, a port in a port-based VLAN other than the default, a bandwidth limit, storm control) now reports the conflict instead of blaming the credentials. LAG creation was verified on firmware 20250710 as well, and the DESTROY path through ESCP. Mirror egress and unknown-unicast storm control, which were not covered before, were verified on it too.
+- **Behaviour change:** a LAG group other than 1 or 2, or with fewer than two members, is now refused at plan time (the switch never accepted them).
+- Live tests take their unused ports from `TPLINK_EASYSMART_LIVE_PORTS` / `TPLINK_EASYSMART_LIVE_SOURCE`, plus an opt-in 802.1Q mode test.
+
 ## 0.26.3
 
 - Documentation only: the README states the verified device (TL-SG108E v6, firmware 1.0.0 Build 20230218) and the lockout caveat up front, Compatibility is a model / hardware / firmware / status table (firmware before the 2023 RSA key exchange is stated as not supported), and the hardware report template starts from a read-only configuration. No behaviour change.

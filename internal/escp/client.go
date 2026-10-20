@@ -37,9 +37,31 @@ var (
 	ErrNoReply = errors.New("escp: no reply from switch")
 	// ErrReplyTooLarge means a fragmented reply grew past the sane limit.
 	ErrReplyTooLarge = errors.New("escp: fragmented reply is larger than any switch sends")
-	// ErrAuth means the switch rejected the credentials.
-	ErrAuth = errors.New("escp: switch rejected the credentials")
+	// ErrAuth means the switch rejected a write. Wrong credentials are one reason, but
+	// any non-zero reply code lands here (a LAG with ports outside its group's range, for
+	// example, is refused with code 4 although the credentials are fine); the
+	// *RejectedError that wraps it carries the code.
+	ErrAuth = errors.New("escp: switch rejected the request")
 )
+
+// RejectedError is a write the switch answered with a non-zero code. It matches
+// ErrAuth (errors.Is) for callers that treat every refusal alike, and names the
+// code for those that want to know which one it was. Reason, when set, says why
+// the switch refused (only for codes whose cause has been established).
+type RejectedError struct {
+	Code   int32
+	Reason string
+}
+
+func (e *RejectedError) Error() string {
+	if e.Reason != "" {
+		return fmt.Sprintf("%s (error code %d): %s", ErrAuth.Error(), e.Code, e.Reason)
+	}
+	return fmt.Sprintf("%s (error code %d): wrong credentials, or the switch refuses this setting or value", ErrAuth.Error(), e.Code)
+}
+
+// Is makes errors.Is(err, ErrAuth) true for every rejected write.
+func (e *RejectedError) Is(target error) bool { return target == ErrAuth }
 
 // Config configures a Client. Zero values select sensible defaults.
 type Config struct {
@@ -455,7 +477,7 @@ func (c *Client) setTLVs(ctx context.Context, tlvs ...TLV) error {
 			return err
 		}
 		if r.err != 0 {
-			return fmt.Errorf("%w (error code %d)", ErrAuth, r.err)
+			return &RejectedError{Code: r.err}
 		}
 		return nil
 	})

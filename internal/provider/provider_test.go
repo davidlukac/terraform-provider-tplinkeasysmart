@@ -33,6 +33,8 @@ type fakeClient struct {
 	pvlanOff bool
 	// rowPorts are the ports returned by Bandwidth and StormControl (default 1, 4, 7).
 	rowPorts []int
+	// vlans models the VLAN modes and the 802.1Q tables; nil keeps the static replies the data-source tests expect.
+	vlans *fakeVLANs
 }
 
 // mutate changes the fake's state under its lock (for PreConfig hooks).
@@ -46,11 +48,12 @@ func (f *fakeClient) rows() []int {
 }
 
 func (f *fakeClient) Info(context.Context) (escp.Info, error) {
-	if info, handled, err := f.extra().info(); handled {
+	info, handled, err := f.extra().info()
+	if handled {
 		return info, err
 	}
 	return escp.Info{Model: "TL-SG108E", Hostname: "TL-SG108E-01", MAC: "00:00:5e:00:53:01",
-		Firmware: "1.0.0 Build 20230218 Rel.50633", Hardware: "TL-SG108E 6.0",
+		Firmware: info.Firmware, Hardware: "TL-SG108E 6.0",
 		IP: "192.0.2.120", Netmask: "255.255.255.0", Gateway: "192.0.2.1", DHCP: true}, nil
 }
 
@@ -157,6 +160,11 @@ func (f *fakeClient) PortMirror(context.Context) (escp.Mirror, error) {
 }
 
 func (f *fakeClient) MTUVLAN(context.Context) (escp.MTUVLAN, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.vlans != nil {
+		return f.vlans.mtu, nil
+	}
 	return escp.MTUVLAN{Enabled: true, UplinkPort: 8}, nil
 }
 
@@ -191,6 +199,9 @@ func (f *fakeClient) SetPortBasedVLAN(_ context.Context, id int, ports []int) er
 func (f *fakeClient) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.vlans != nil {
+		return escp.PortBasedVLAN{Enabled: f.vlans.portBased, MaxVLAN: 8, VLANs: []escp.PortVLAN{}}, nil
+	}
 	if f.pvlans != nil {
 		v := escp.PortBasedVLAN{Enabled: !f.pvlanOff, MaxVLAN: 8}
 		for _, id := range []int{1, 2} {
@@ -204,6 +215,11 @@ func (f *fakeClient) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) 
 }
 
 func (f *fakeClient) VLAN8021Q(context.Context) (escp.Dot1Q, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.vlans != nil {
+		return f.vlans.dot1q(), nil
+	}
 	return escp.Dot1Q{Enabled: true, MaxVLAN: 32,
 		VLANs: []escp.VLAN8021Q{{ID: 10, Name: "iot", Tagged: []int{8}, Untagged: []int{1, 2}}},
 		PVIDs: []escp.PortPVID{{Port: 1, PVID: 10}, {Port: 8, PVID: 1}}}, nil
@@ -866,7 +882,9 @@ func lagPorts() []escp.Port {
 	return []escp.Port{
 		{ID: 1, Enabled: true, LAG: 1, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
 		{ID: 2, Enabled: true, LAG: 1, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
+		{ID: 3, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
 		{ID: 4, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
+		{ID: 5, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
 		{ID: 6, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
 		{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"},
 	}
@@ -892,13 +910,16 @@ func TestAccLAGLifecycleOnUnusedPorts(t *testing.T) {
 }
 
 func TestAccLAGGuard(t *testing.T) {
-	f := &fakeClient{ports: lagPorts(), lags: map[int][]int{1: {1, 2}}}
+	ports := lagPorts()
+	ports[6].ActualSpeed = "1000Mbps-full" // port 7 carries a link
+	f := &fakeClient{ports: ports, lags: map[int][]int{1: {1, 2}}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
-			{Config: lagConfig(2, "  ports = [4, 6]\n"), ExpectError: regexp.MustCompile(`port 4 has a link up`)},
-			{Config: lagConfig(2, "  ports = [1, 6]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
-			{Config: lagConfig(1, "  ports = [1]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up|port 2 has a link up`)},
+			{Config: lagConfig(2, "  ports = [6, 7]\n"), ExpectError: regexp.MustCompile(`port 7 has a link up`)},
+			// A change to group 1 is refused because of its current members (the uplink), not the new ones.
+			{Config: lagConfig(1, "  ports = [3, 4]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
+			{Config: lagConfig(1, "  ports = [1, 2]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up|port 2 has a link up`)},
 		},
 	})
 	if f.sets != 0 {

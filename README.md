@@ -33,7 +33,7 @@
 <!-- The coverage number is measured by CI on every push to main (coverage.json on the
      `badges` branch). -->
 
-> **Tested on:** TL-SG108E hardware v6, firmware 1.0.0 Build 20230218. That is the only device verified so far; other Easy Smart models are untested ([see the table](#compatibility), and [report yours](https://github.com/davidlukac/terraform-provider-tplinkeasysmart/issues/new?template=hardware_report.yml)).
+> **Tested on:** TL-SG108E hardware v6, firmware 1.0.0 Build 20230218 and Build 20250710. Those are the only devices verified so far; other Easy Smart models are untested ([see the table](#compatibility), and [report yours](https://github.com/davidlukac/terraform-provider-tplinkeasysmart/issues/new?template=hardware_report.yml)).
 > **A bad write can lock you out:** these switches have no console, and recovery from an unreachable management path is a physical factory reset. The provider refuses the risky changes by default, see [Safety by design](#safety-by-design) and [Constraints](#constraints-read-these). Released under the [MIT license](LICENSE).
 
 ## Why this provider
@@ -112,18 +112,23 @@ Write support exists only where it cannot cut management access. Per-port and pe
 | `tplinkeasysmart_port_mirror` | Monitoring > Port Mirror | destination port in use / LAG member |
 | `tplinkeasysmart_lag` | Switching > Port Trunk | old and new member ports |
 | `tplinkeasysmart_vlan_port_based_group` | VLAN > Port Based VLAN | old and new member ports |
+| `tplinkeasysmart_vlan_mode` | VLAN > MTU / Port Based / 802.1Q VLAN (the active mode) | `allow_disruptive` for every change |
+| `tplinkeasysmart_vlan_8021q_group` | VLAN > 802.1Q VLAN | old and new member ports, no port left in no VLAN |
+| `tplinkeasysmart_vlan_8021q_pvid` | VLAN > 802.1Q PVID Setting | port in use / LAG member |
 
 **Data sources** (read-only): `system_info`, `ports`, `port_statistics`, `lags`, `port_mirror`, `qos`, `bandwidth_control`, `storm_control`, `vlan_mtu`, `vlan_port_based`, `vlan_8021q`, and `config_backup` (the configuration file, optional and sensitive).
 
-Deliberately **not** writable: management IP / DHCP, VLAN mode switches (MTU, port-based, 802.1Q), 802.1Q VLANs and PVIDs, user account, config restore, reboot, factory reset and firmware upgrade. These are the changes that can lock you out of a device that has no console. The full reference for every resource and data source is in [`docs/`](docs/index.md) and on the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart/latest/docs).
+Deliberately **not** writable: management IP / DHCP, user account, config restore, reboot, factory reset and firmware upgrade. These are the changes that can lock you out of a device that has no console. The full reference for every resource and data source is in [`docs/`](docs/index.md) and on the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart/latest/docs).
 
 ## Safety by design
 
 A managed switch is the one device you cannot reach when you misconfigure it. The provider is built around that.
 
-- **Guards.** `port`, `bandwidth_limit`, `storm_limit`, `port_mirror`, `lag` and `vlan_port_based_group` refuse to touch a port that has a link up or belongs to a LAG, because that is how you cut your own uplink. Set `allow_disruptive = true` on the object to take the risk deliberately.
+- **Guards.** `port`, `bandwidth_limit`, `storm_limit`, `port_mirror`, `lag`, `vlan_port_based_group`, `vlan_8021q_group` and `vlan_8021q_pvid` refuse to touch a port that has a link up or belongs to a LAG, because that is how you cut your own uplink. Set `allow_disruptive = true` on the object to take the risk deliberately.
+- **VLAN mode.** Switching between MTU, port-based and 802.1Q VLAN discards the other modes' settings and can cut every connection, so `vlan_mode` refuses unless `allow_disruptive = true`; applying the mode the switch already has writes nothing.
+- **Firmware guard.** Writes are refused while the switch runs a firmware build this provider was not verified against (reads and imports always work). `allow_unverified_firmware = true` opts in.
 - **Import the uplink, protect it.** Bring the LAG that carries your router uplink under management and add `lifecycle { prevent_destroy = true }`.
-- **Plan-time validation.** Port numbers (1-32), LAG and VLAN ids (1-255), speeds, QoS modes and priorities (1-4), rate limits (0 or a multiple of 64 up to 1,000,000 kbps), device description (letters, digits, hyphens, up to 32) and cross-field rules (a storm limit needs a rate if a traffic type is selected, a mirror needs a destination that is not one of its sources) are checked before apply. The client repeats every check before it writes.
+- **Plan-time validation.** Port numbers (1-32), VLAN ids (1-255), LAG groups (1 takes ports 1-4, 2 takes ports 5-8, two to four members), speeds, QoS modes and priorities (1-4), rate limits (0 or a multiple of 64 up to 1,000,000 kbps), device description (letters, digits, hyphens, up to 32) and cross-field rules (a storm limit needs a rate if a traffic type is selected, a mirror needs a destination that is not one of its sources) are checked before apply. The client repeats every check before it writes.
 - **Read-back.** Each write is verified against the switch afterwards; a write the switch ignored is an error.
 - **Back up first.** The `config_backup` data source returns the device configuration so you can keep a copy before a change.
 - **No hardware needed for tests.** Everything above is exercised against a fake switch, including the failure paths.
@@ -158,8 +163,9 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 
 | Switch | Hardware | Firmware | Status |
 |---|---|---|---|
-| TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads, writes, import and drift checked on a real device |
-| TL-SG108E | v6 | newer builds | Untried; start with the read-only data sources |
+| TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads, writes, import and drift checked on a real device. The VLAN mode, 802.1Q group and PVID resources were not tried on this build (they are verified on 20250710; same protocol generation). |
+| TL-SG108E | v6 | 1.0.0 Build 20250710 | **Verified**: reads, imports and drift; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID resources). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8; see the `lag` page). |
+| TL-SG108E | v6 | builds newer than 20250710 | Untried; reads work, writes are refused unless `allow_unverified_firmware = true`; start with the read-only data sources |
 | TL-SG108E | other hardware versions | any | Untested |
 | Other Easy Smart models (TL-SG105E, TL-SG1016DE, ...) | any | any | Untested; reports wanted |
 | Any | any | firmware **before the 2023 RSA key exchange** | Not supported: the client always performs the key exchange and has never been tried against the older login |

@@ -65,17 +65,17 @@ func parseDot1Q(tlvs []TLV) (Dot1Q, error) {
 				out.MaxVLAN = int(v[0])
 			}
 		case TLVVLAN8021QVLAN:
-			if len(v) < 10 {
-				return out, fmt.Errorf("escp: 802.1Q VLAN entry has %d bytes, want at least 10", len(v))
+			if len(v) < vlan8021QOffName {
+				return out, fmt.Errorf("escp: 802.1Q VLAN entry has %d bytes, want at least %d", len(v), vlan8021QOffName)
 			}
 			// Vendor semantics: member and tagged-mask -> tagged; member only -> untagged.
-			members, taggedMask := portsFromMask(v[2:6]), portsFromMask(v[6:10])
+			members, taggedMask := portsFromMask(v[vlan8021QOffMember:]), portsFromMask(v[vlan8021QOffTagged:])
 			untagged := subtractPorts(members, taggedMask)
-			out.VLANs = append(out.VLANs, VLAN8021Q{ID: int(v[0])<<8 | int(v[1]), Name: cstring(v[10:]),
+			out.VLANs = append(out.VLANs, VLAN8021Q{ID: int(v[0])<<8 | int(v[1]), Name: cstring(v[vlan8021QOffName:]),
 				Tagged: subtractPorts(members, untagged), Untagged: untagged})
 		case TLVVLAN8021QPVID:
-			if len(v) != 3 {
-				return out, fmt.Errorf("escp: 802.1Q PVID entry has %d bytes, want 3", len(v))
+			if len(v) != pvidEntryLen {
+				return out, fmt.Errorf("escp: 802.1Q PVID entry has %d bytes, want %d", len(v), pvidEntryLen)
 			}
 			out.PVIDs = append(out.PVIDs, PortPVID{Port: int(v[0]), PVID: int(v[1])<<8 | int(v[2])})
 		}

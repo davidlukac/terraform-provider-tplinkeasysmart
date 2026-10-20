@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
@@ -24,6 +27,9 @@ var (
 	_ resource.ResourceWithConfigure   = &lagResource{}
 	_ resource.ResourceWithImportState = &lagResource{}
 )
+
+// lagRangeNote states the group rule once, for the description and messages.
+const lagRangeNote = "LAG 1 takes ports 1-4 and LAG 2 takes ports 5-8, each with 2 to 4 members"
 
 // NewLAGResource returns the tplinkeasysmart_lag resource.
 func NewLAGResource() resource.Resource { return &lagResource{} }
@@ -62,13 +68,14 @@ func (r *lagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Description: "A link aggregation group (Switching > Port Trunk). Import with the group number. **Safety:** the provider refuses to create, change or " +
 			"destroy a group when any port involved (old or new members) has a link up or belongs to another LAG, because that can cut the uplink; set " +
 			"`allow_disruptive = true` to override. The existing router uplink (usually LAG1) should be imported and protected with `lifecycle { prevent_destroy = true }`. " +
-			"The switch itself rejects ports that conflict with mirroring, VLANs, rate limits or storm control.",
+			"The group number decides the ports: " + lagRangeNote + ". The switch itself rejects ports that conflict with the port mirror (source or destination), a port-based VLAN other than the default, " +
+			"a bandwidth limit or storm control; the error then names the conflict.",
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: resourceSwitchAttribute(),
-			"group": schema.Int64Attribute{Required: true, Description: "Group number (1-based).",
-				Validators:    []validator.Int64{validByteID()},
+			"group": schema.Int64Attribute{Required: true, Description: "Group number: 1 (ports 1-4) or 2 (ports 5-8).",
+				Validators:    []validator.Int64{int64validator.Between(1, escp.LAGGroupCount)},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
-			"ports":             schema.SetAttribute{Required: true, ElementType: types.Int64Type, Validators: []validator.Set{validPortSet(), setvalidator.SizeAtLeast(1)}, Description: "Member ports."},
+			"ports":             schema.SetAttribute{Required: true, ElementType: types.Int64Type, Validators: []validator.Set{validPortSet(), setvalidator.SizeBetween(escp.LAGMinPorts, escp.LAGPortsPerGroup)}, Description: "Member ports: 2 to 4, all within the range of the group (group 1: ports 1-4, group 2: ports 5-8)."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow touching ports that have a link up or belong to a LAG. Defaults to false."),
 		},
 	}
@@ -236,9 +243,31 @@ func (r *lagResource) ImportState(ctx context.Context, req resource.ImportStateR
 	}
 }
 
+// ValidateConfig rejects, at plan time, member ports outside the range of the
+// group. The count and the group number are checked by the schema validators,
+// so they are not repeated here.
+func (r *lagResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var m lagResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	ports, ok := portsOf(ctx, m.Ports)
+	if m.Group.IsNull() || m.Group.IsUnknown() || !ok {
+		return
+	}
+	group := int(m.Group.ValueInt64())
+	if group < 1 || group > escp.LAGGroupCount || len(ports) < escp.LAGMinPorts || len(ports) > escp.LAGPortsPerGroup {
+		return
+	}
+	if err := escp.ValidateLAG(group, ports); err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("ports"), "Ports do not fit the LAG group", strings.TrimPrefix(err.Error(), "escp: "))
+	}
+}
+
 // ModifyPlan refuses, while planning, a switch that cannot be resolved.
 func (r *lagResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
 }
 
-var _ resource.ResourceWithModifyPlan = &lagResource{}
+var (
+	_ resource.ResourceWithValidateConfig = &lagResource{}
+	_ resource.ResourceWithModifyPlan     = &lagResource{}
+)

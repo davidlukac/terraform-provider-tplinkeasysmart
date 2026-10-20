@@ -2,7 +2,10 @@ package escp
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -38,10 +41,91 @@ func TestSetLAGWire(t *testing.T) {
 		t.Fatalf("delete wire %v", got[0].Value)
 	}
 	n := len(f.allSets())
-	if c.SetLAG(ctx, 0, []int{1}) == nil || c.SetLAG(ctx, 2, []int{40}) == nil {
-		t.Fatal("invalid group or port must be rejected")
+	for _, bad := range []struct {
+		group int
+		ports []int
+	}{{0, []int{1, 2}}, {2, []int{40}}, {3, []int{5, 6}}, {1, []int{4, 5}}, {2, []int{2, 3}}, {2, []int{6}}, {1, []int{1, 2, 3, 4, 5}}} {
+		if c.SetLAG(ctx, bad.group, bad.ports) == nil {
+			t.Errorf("LAG %d with ports %v must be rejected", bad.group, bad.ports)
+		}
 	}
 	if len(f.allSets()) != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
+}
+
+func TestValidateLAG(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		group int
+		ports []int
+		want  string // empty: valid
+	}{
+		{"group 1 low ports", 1, []int{1, 2}, ""},
+		{"group 1 all four", 1, []int{1, 2, 3, 4}, ""},
+		{"group 2 high ports", 2, []int{5, 8}, ""},
+		{"group 2 all four", 2, []int{5, 6, 7, 8}, ""},
+		{"remove group 1", 1, nil, ""},
+		{"remove group 2", 2, []int{}, ""},
+		{"group 0", 0, []int{1, 2}, "invalid LAG group"},
+		{"group 3", 3, []int{1, 2}, "invalid LAG group"},
+		{"remove group 3", 3, nil, "invalid LAG group"},
+		{"one port", 1, []int{2}, "2 to 4 ports"},
+		{"five ports", 1, []int{1, 2, 3, 4, 5}, "2 to 4 ports"},
+		{"group 1 reaching into group 2", 1, []int{4, 5}, "port 5 cannot be in LAG 1 (LAG 1 takes ports 1-4)"},
+		{"group 2 with low ports", 2, []int{2, 3}, "port 2 cannot be in LAG 2 (LAG 2 takes ports 5-8)"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateLAG(tc.group, tc.ports)
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("got %v, want an error containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
+// Every code below was provoked on a real TL-SG108E (firmware 20250710); the
+// error must name the conflict instead of blaming the credentials.
+func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
+	for _, tc := range []struct {
+		code int32
+		want string
+	}{
+		{4, "LAG 1 takes ports 1-4"},
+		{7401, "port-based VLAN"},
+		{7403, "bandwidth limit"},
+		{7404, "storm control"},
+		{7205, "destination of the port mirror"},
+		{7206, "is mirrored"},
+		{7415, "at least two ports"},
+	} {
+		t.Run(fmt.Sprint(tc.code), func(t *testing.T) {
+			f := startFakeSwitch(t)
+			f.configure(func(f *fakeSwitch) { f.rejectSetsFrom, f.rejectCode = 1, tc.code })
+			c := dialFast(t, f, "secret")
+			err := c.SetLAG(context.Background(), 1, []int{2, 3})
+			var rejected *RejectedError
+			if !errors.Is(err, ErrAuth) || !errors.As(err, &rejected) || rejected.Code != tc.code {
+				t.Fatalf("got %v, want a RejectedError with code %d that matches ErrAuth", err, tc.code)
+			}
+			if !strings.Contains(err.Error(), tc.want) || strings.Contains(err.Error(), "wrong credentials") {
+				t.Fatalf("message %q must contain %q and not blame the credentials", err, tc.want)
+			}
+		})
+	}
+	t.Run("an unknown code keeps the generic message", func(t *testing.T) {
+		f := startFakeSwitch(t)
+		f.configure(func(f *fakeSwitch) { f.rejectSetsFrom = 1 })
+		c := dialFast(t, f, "secret")
+		err := c.SetLAG(context.Background(), 1, []int{2, 3})
+		if !errors.Is(err, ErrAuth) || !strings.Contains(err.Error(), "error code 9") || !strings.Contains(err.Error(), "wrong credentials") {
+			t.Fatalf("got %v", err)
+		}
+	})
 }
