@@ -178,7 +178,7 @@ func multiFactories(fakes map[string]SwitchClient, log *configLog) map[string]fu
 				if !ok {
 					return nil, fmt.Errorf("no fake for host %s", c.Host)
 				}
-				return f, nil
+				return gated(f, c), nil
 			},
 		}),
 	}

@@ -195,6 +195,7 @@ The provider talks UDP port 29808/29809 on the switch's own layer-2 segment: dis
 ```
 internal/escp                 UDP client (discovery, key exchange, get/set, retry, session recovery) and the settings
 internal/escp/internal/wire   packet codec, TLV catalogue, RC4 and RSA
+internal/escp/safety          write policy without Terraform types (verified firmware builds, the write gate)
 internal/provider             provider, resources and data sources, guards, validation
 templates/                    docs templates      examples/   runnable examples used for the generated docs
 ```

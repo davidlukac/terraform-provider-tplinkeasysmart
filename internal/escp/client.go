@@ -77,7 +77,25 @@ type Config struct {
 	HostPort   int // default 29809
 	// BroadcastAddr is only used as discovery fallback, default 255.255.255.255.
 	BroadcastAddr string
+
+	// WriteGate, when set, is consulted before every write; see WriteGate.
+	WriteGate WriteGate
 }
+
+// InfoReader is the part of a Client that a WriteGate may use. It only reads.
+type InfoReader interface {
+	Info(ctx context.Context) (Info, error)
+}
+
+// WriteGate decides whether the client may send a write to the switch. Every
+// method that changes the switch (each Set* and Delete*) calls it first, with
+// the client itself, and sends nothing when it returns an error: the method
+// returns that error unchanged. A gate may read from the switch through sw but
+// must never write, and must be safe for concurrent use. Reads are never gated.
+//
+// A method that sends several writes consults the gate before each of them, so
+// a gate that is expensive should remember its verdict.
+type WriteGate func(ctx context.Context, sw InfoReader) error
 
 // Info is what a discovery reply reports about the switch.
 type Info struct {
@@ -472,8 +490,16 @@ func boolByte(b bool) byte {
 	return 0
 }
 
-// setTLVs sends a SET carrying the credentials plus the given settings.
+// setTLVs sends a SET carrying the credentials plus the given settings. It is
+// the only place where the client writes, so the write gate sits here: no
+// setting can be added without passing it. The gate runs before the lock is
+// taken because it reads through the client.
 func (c *Client) setTLVs(ctx context.Context, tlvs ...wire.TLV) error {
+	if gate := c.cfg.WriteGate; gate != nil {
+		if err := gate(ctx, c); err != nil {
+			return err
+		}
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.withSession(ctx, func() error {
