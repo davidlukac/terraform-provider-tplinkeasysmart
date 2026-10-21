@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -41,6 +42,20 @@ func capturingFactories(got *escp.Config, mu *sync.Mutex, fail error) map[string
 
 const infoDataSource = `data "tplinkeasysmart_system_info" "this" {}`
 
+// checkClientConfig compares the configuration a client was built with against
+// want. The write gate is a func and cannot be compared, so its presence is
+// checked on its own: a switch that has not opted in to unverified firmware gets one.
+func checkClientConfig(t *testing.T, got, want escp.Config, wantGate bool) {
+	t.Helper()
+	if (got.WriteGate != nil) != wantGate {
+		t.Fatalf("client configured with a write gate = %t, want %t", got.WriteGate != nil, wantGate)
+	}
+	got.WriteGate = nil
+	if !reflect.DeepEqual(got, want) { // Config holds a func, so == does not compile
+		t.Fatalf("client configured as %+v, want %+v", got, want)
+	}
+}
+
 func clearProviderEnv(t *testing.T) {
 	t.Helper()
 	for _, k := range []string{"TPLINK_EASYSMART_HOST", "TPLINK_EASYSMART_USERNAME", "TPLINK_EASYSMART_PASSWORD"} {
@@ -60,9 +75,7 @@ func TestProviderConfigurationFromTheEnvironment(t *testing.T) {
 		Steps:                    []resource.TestStep{{Config: `provider "tplinkeasysmart" {}` + "\n" + infoDataSource}},
 	})
 	want := escp.Config{Host: "10.1.2.3", Username: "env-admin", Password: "env-secret", Timeout: 3 * time.Second}
-	if got != want {
-		t.Fatalf("client configured as %+v, want %+v", got, want)
-	}
+	checkClientConfig(t, got, want, true)
 }
 
 func TestExplicitProviderAttributesOverrideTheEnvironment(t *testing.T) {
@@ -84,9 +97,7 @@ func TestExplicitProviderAttributesOverrideTheEnvironment(t *testing.T) {
 		Steps:                    []resource.TestStep{{Config: cfg}},
 	})
 	want := escp.Config{Host: "192.0.2.120", Username: "admin", Password: "hcl-secret", Timeout: 7 * time.Second}
-	if got != want {
-		t.Fatalf("client configured as %+v, want %+v", got, want)
-	}
+	checkClientConfig(t, got, want, true)
 }
 
 // timeout_seconds below 1 is rejected while planning, before any client exists.
@@ -141,7 +152,7 @@ func TestProviderRejectsIncompleteConfiguration(t *testing.T) {
 				ProtoV6ProviderFactories: capturingFactories(&got, &mu, nil),
 				Steps:                    []resource.TestStep{{Config: tc.hcl + "\n" + infoDataSource, ExpectError: regexp.MustCompile(tc.want)}},
 			})
-			if got != (escp.Config{}) {
+			if !reflect.DeepEqual(got, escp.Config{}) {
 				t.Fatalf("no client may be built from an incomplete configuration, got %+v", got)
 			}
 		})
@@ -185,7 +196,7 @@ provider "tplinkeasysmart" {
 				ProtoV6ProviderFactories: capturingFactories(&got, &mu, nil),
 				Steps:                    []resource.TestStep{{Config: cfg, ExpectError: regexp.MustCompile(`Unknown switch ` + attr)}},
 			})
-			if got != (escp.Config{}) {
+			if !reflect.DeepEqual(got, escp.Config{}) {
 				t.Fatalf("no client may be built while %s is unknown, got %+v", attr, got)
 			}
 		})

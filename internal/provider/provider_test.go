@@ -341,7 +341,7 @@ func factories(f SwitchClient) map[string]func() (tfprotov6.ProviderServer, erro
 	return map[string]func() (tfprotov6.ProviderServer, error){
 		"tplinkeasysmart": providerserver.NewProtocol6WithError(&tplinkProvider{
 			version:   "test",
-			newClient: func(escp.Config) (SwitchClient, error) { return f, nil },
+			newClient: func(c escp.Config) (SwitchClient, error) { return gated(f, c), nil },
 		}),
 	}
 }

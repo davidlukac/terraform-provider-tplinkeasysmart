@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/safety"
 )
 
 // Environment variables that back the provider arguments.
@@ -120,7 +121,7 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 }
 
 // verifiedBuilds lists the verified firmware builds for the attribute description.
-func verifiedBuilds() string { return strings.Join(escp.VerifiedFirmwareBuilds, ", ") }
+func verifiedBuilds() string { return strings.Join(safety.VerifiedFirmwareBuilds, ", ") }
 
 func envOr(v types.String, env string) string {
 	if !v.IsNull() && !v.IsUnknown() {
@@ -206,12 +207,11 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			return
 		}
 		hosts[h] = label
-		c, err := p.newClient(escp.Config{Host: h, Username: u, Password: pw, Timeout: timeout})
+		c, err := p.newClient(escp.Config{Host: h, Username: u, Password: pw, Timeout: timeout, WriteGate: firmwareWriteGate(allowUnverified)})
 		if err != nil {
 			resp.Diagnostics.AddError("Cannot configure switch client", fmt.Sprintf("%s: %s", label, err))
 			return
 		}
-		c = newFirmwareGuard(c, allowUnverified)
 		if name == "" {
 			reg.def = c
 			return

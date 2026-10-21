@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -34,7 +35,8 @@ func TestDialKeepsExplicitValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.cfg != want {
+	// Config holds a func (the write gate), so it is not comparable with ==; the gate is nil here.
+	if !reflect.DeepEqual(c.cfg, want) {
 		t.Fatalf("explicit configuration was overwritten: %+v", c.cfg)
 	}
 }
