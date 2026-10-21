@@ -4,12 +4,14 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestParseBandwidth(t *testing.T) {
-	got, err := parseBandwidth([]TLV{
-		tlvHex(t, TLVBandwidthIngress, "010000000000"), tlvHex(t, TLVBandwidthIngress, "020000001000"),
-		tlvHex(t, TLVBandwidthEgress, "010000000000"), tlvHex(t, TLVBandwidthEgress, "020000002000"),
+	got, err := parseBandwidth([]wire.TLV{
+		tlvHex(t, wire.TLVBandwidthIngress, "010000000000"), tlvHex(t, wire.TLVBandwidthIngress, "020000001000"),
+		tlvHex(t, wire.TLVBandwidthEgress, "010000000000"), tlvHex(t, wire.TLVBandwidthEgress, "020000002000"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -18,7 +20,7 @@ func TestParseBandwidth(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v", got)
 	}
-	if _, err := parseBandwidth([]TLV{{Type: TLVBandwidthIngress, Value: []byte{1}}}); err == nil {
+	if _, err := parseBandwidth([]wire.TLV{{Type: wire.TLVBandwidthIngress, Value: []byte{1}}}); err == nil {
 		t.Fatal("expected length error")
 	}
 }
@@ -33,10 +35,10 @@ func TestSetBandwidthWire(t *testing.T) {
 	if len(h) != 2 {
 		t.Fatalf("want 2 SETs (ingress, egress), got %d", len(h))
 	}
-	if h[0][0].Type != TLVBandwidthIngress || !reflect.DeepEqual(h[0][0].Value, []byte{7, 1, 0, 0, 4, 0}) {
+	if h[0][0].Type != wire.TLVBandwidthIngress || !reflect.DeepEqual(h[0][0].Value, []byte{7, 1, 0, 0, 4, 0}) {
 		t.Fatalf("ingress wire: %+v", h[0])
 	}
-	if h[1][0].Type != TLVBandwidthEgress || !reflect.DeepEqual(h[1][0].Value, []byte{7, 0, 0, 0, 0, 0}) {
+	if h[1][0].Type != wire.TLVBandwidthEgress || !reflect.DeepEqual(h[1][0].Value, []byte{7, 0, 0, 0, 0, 0}) {
 		t.Fatalf("egress wire: %+v", h[1])
 	}
 	for _, bad := range []int{-64, 100, 2000000} {

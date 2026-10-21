@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 // Limits of 802.1Q VLANs (VLAN > 802.1Q VLAN, VLAN > 802.1Q PVID Setting). The
@@ -108,7 +110,7 @@ func (c *Client) SetVLAN8021Q(ctx context.Context, v VLAN8021Q) error {
 	if err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, TLV{TLVVLAN8021QVLAN, value})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: value})
 }
 
 // DeleteVLAN8021Q removes an 802.1Q VLAN: TLV 8705 with both masks empty and an
@@ -118,7 +120,7 @@ func (c *Client) DeleteVLAN8021Q(ctx context.Context, id int) error {
 		return err
 	}
 	empty := make([]byte, maskLen)
-	return c.setTLVs(ctx, TLV{TLVVLAN8021QVLAN, vlanEntryBytes(id, empty, empty, "")})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
 }
 
 // SetPVIDs sets the default VLAN of the given ports (port -> pvid): one TLV
@@ -139,10 +141,10 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids map[int]int) error {
 		ports = append(ports, p)
 	}
 	sort.Ints(ports)
-	tlvs := make([]TLV, 0, len(ports))
+	tlvs := make([]wire.TLV, 0, len(ports))
 	for _, p := range ports {
 		value := binary.BigEndian.AppendUint16([]byte{byte(p)}, uint16(pvids[p])) //nolint:gosec // bounded by the validation above
-		tlvs = append(tlvs, TLV{TLVVLAN8021QPVID, value})
+		tlvs = append(tlvs, wire.TLV{Type: wire.TLVVLAN8021QPVID, Value: value})
 	}
 	return c.setTLVs(ctx, tlvs...)
 }
@@ -151,13 +153,13 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids map[int]int) error {
 // vendor utility warns that the VLAN modes are mutually exclusive, so turning
 // it on discards the settings of the other modes. Callers must guard.
 func (c *Client) SetVLAN8021QMode(ctx context.Context, enabled bool) error {
-	return c.setTLVs(ctx, TLV{TLVVLAN8021Q, []byte{boolByte(enabled)}})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLAN8021Q, Value: []byte{boolByte(enabled)}})
 }
 
 // SetPortBasedVLANMode switches the port-based VLAN mode on or off: TLV 8448.
 // Same warning as SetVLAN8021QMode.
 func (c *Client) SetPortBasedVLANMode(ctx context.Context, enabled bool) error {
-	return c.setTLVs(ctx, TLV{TLVVLANPortBased, []byte{boolByte(enabled)}})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLANPortBased, Value: []byte{boolByte(enabled)}})
 }
 
 // SetMTUVLAN switches the MTU VLAN mode on or off: TLV 8192 with the enabled
@@ -170,5 +172,5 @@ func (c *Client) SetMTUVLAN(ctx context.Context, enabled bool, uplinkPort int) e
 	if err := ValidatePort(uplinkPort); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, TLV{TLVVLANMTU, []byte{boolByte(enabled), byte(uplinkPort)}})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{boolByte(enabled), byte(uplinkPort)}})
 }

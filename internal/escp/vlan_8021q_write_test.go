@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestVLAN8021QEncodeMatchesVendorLayout(t *testing.T) {
@@ -40,7 +42,7 @@ func TestVLAN8021QEncodeRoundTripsThroughParser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := parseDot1Q([]TLV{{TLVVLAN8021Q, []byte{1}}, {TLVVLAN8021QVLAN, value}})
+	got, err := parseDot1Q([]wire.TLV{{Type: wire.TLVVLAN8021Q, Value: []byte{1}}, {Type: wire.TLVVLAN8021QVLAN, Value: value}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,14 +93,14 @@ func TestSetVLAN8021QWire(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := f.set()
-	if len(got) != 1 || got[0].Type != TLVVLAN8021QVLAN || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0x18, 0, 0, 0, 0, 'i', 'o', 't', 0}) {
+	if len(got) != 1 || got[0].Type != wire.TLVVLAN8021QVLAN || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0x18, 0, 0, 0, 0, 'i', 'o', 't', 0}) {
 		t.Fatalf("wire %+v", got)
 	}
 	if err := c.DeleteVLAN8021Q(ctx, 2); err != nil {
 		t.Fatal(err)
 	}
 	got = f.set()
-	if len(got) != 1 || got[0].Type != TLVVLAN8021QVLAN || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
+	if len(got) != 1 || got[0].Type != wire.TLVVLAN8021QVLAN || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
 		t.Fatalf("delete wire %+v", got)
 	}
 	n := len(f.allSets())
@@ -119,7 +121,7 @@ func TestSetPVIDsWire(t *testing.T) {
 	}
 	got := f.set()
 	// One TLV per port, in port order, each port (1 byte) and pvid (2 bytes, big endian).
-	want := []TLV{{TLVVLAN8021QPVID, []byte{4, 0, 2}}, {TLVVLAN8021QPVID, []byte{5, 1, 0x2c}}}
+	want := []wire.TLV{{Type: wire.TLVVLAN8021QPVID, Value: []byte{4, 0, 2}}, {Type: wire.TLVVLAN8021QPVID, Value: []byte{5, 1, 0x2c}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("wire %+v, want %+v", got, want)
 	}
@@ -141,14 +143,14 @@ func TestVLANModeWires(t *testing.T) {
 	steps := []struct {
 		name string
 		do   func() error
-		want TLV
+		want wire.TLV
 	}{
-		{"802.1Q on", func() error { return c.SetVLAN8021QMode(ctx, true) }, TLV{TLVVLAN8021Q, []byte{1}}},
-		{"802.1Q off", func() error { return c.SetVLAN8021QMode(ctx, false) }, TLV{TLVVLAN8021Q, []byte{0}}},
-		{"port-based on", func() error { return c.SetPortBasedVLANMode(ctx, true) }, TLV{TLVVLANPortBased, []byte{1}}},
-		{"port-based off", func() error { return c.SetPortBasedVLANMode(ctx, false) }, TLV{TLVVLANPortBased, []byte{0}}},
-		{"MTU on, uplink 3", func() error { return c.SetMTUVLAN(ctx, true, 3) }, TLV{TLVVLANMTU, []byte{1, 3}}},
-		{"MTU off ignores the uplink", func() error { return c.SetMTUVLAN(ctx, false, 7) }, TLV{TLVVLANMTU, []byte{0, 1}}},
+		{"802.1Q on", func() error { return c.SetVLAN8021QMode(ctx, true) }, wire.TLV{Type: wire.TLVVLAN8021Q, Value: []byte{1}}},
+		{"802.1Q off", func() error { return c.SetVLAN8021QMode(ctx, false) }, wire.TLV{Type: wire.TLVVLAN8021Q, Value: []byte{0}}},
+		{"port-based on", func() error { return c.SetPortBasedVLANMode(ctx, true) }, wire.TLV{Type: wire.TLVVLANPortBased, Value: []byte{1}}},
+		{"port-based off", func() error { return c.SetPortBasedVLANMode(ctx, false) }, wire.TLV{Type: wire.TLVVLANPortBased, Value: []byte{0}}},
+		{"MTU on, uplink 3", func() error { return c.SetMTUVLAN(ctx, true, 3) }, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{1, 3}}},
+		{"MTU off ignores the uplink", func() error { return c.SetMTUVLAN(ctx, false, 7) }, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{0, 1}}},
 	}
 	for _, s := range steps {
 		if err := s.do(); err != nil {

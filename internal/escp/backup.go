@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
-// ConfigMagic is the 4-byte prefix of the switch's configuration file.
-var ConfigMagic = []byte{0x23, 0x89, 0x23, 0x89}
+// configMagic is the 4-byte prefix of the switch's configuration file.
+var configMagic = []byte{0x23, 0x89, 0x23, 0x89}
 
 // ErrInvalidConfig means the reply was not a switch configuration file.
 var ErrInvalidConfig = fmt.Errorf("escp: reply is not a switch configuration file")
@@ -21,12 +23,12 @@ func (c *Client) ConfigBackup(ctx context.Context) ([]byte, error) {
 	defer c.mu.Unlock()
 	var out []byte
 	err := c.withSession(ctx, func() error {
-		req := []TLV{
-			{TLVUsername, append([]byte(c.cfg.Username), 0)},
-			{TLVPassword, append([]byte(c.cfg.Password), 0)},
-			{TLVConfigFile, nil},
+		req := []wire.TLV{
+			{Type: wire.TLVUsername, Value: append([]byte(c.cfg.Username), 0)},
+			{Type: wire.TLVPassword, Value: append([]byte(c.cfg.Password), 0)},
+			{Type: wire.TLVConfigFile, Value: nil},
 		}
-		data, err := c.exchangeFragments(ctx, OpSet, req, TLVConfigFile)
+		data, err := c.exchangeFragments(ctx, wire.OpSet, req, wire.TLVConfigFile)
 		if err != nil {
 			return err
 		}
@@ -36,7 +38,7 @@ func (c *Client) ConfigBackup(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(out) <= len(ConfigMagic) || !bytes.HasPrefix(out, ConfigMagic) {
+	if len(out) <= len(configMagic) || !bytes.HasPrefix(out, configMagic) {
 		return nil, fmt.Errorf("%w (%d bytes)", ErrInvalidConfig, len(out))
 	}
 	return out, nil

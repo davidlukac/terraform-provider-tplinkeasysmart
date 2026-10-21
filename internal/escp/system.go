@@ -4,12 +4,8 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-)
 
-// TLV types of the System page that are not part of discovery.
-const (
-	TLVPortCount = 10 // number of physical ports (1 byte)
-	TLVAutoSave  = 13 // 1 = configuration changes are saved automatically (1 byte)
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 // System holds device facts that are not part of discovery.
@@ -18,16 +14,16 @@ type System struct {
 	AutoSave  bool
 }
 
-func parseSystem(ports, auto []TLV) (System, error) {
+func parseSystem(ports, auto []wire.TLV) (System, error) {
 	var s System
 	found := 0
 	for _, t := range ports {
-		if t.Type == TLVPortCount && len(t.Value) == 1 {
+		if t.Type == wire.TLVPortCount && len(t.Value) == 1 {
 			s.PortCount, found = int(t.Value[0]), found+1
 		}
 	}
 	for _, t := range auto {
-		if t.Type == TLVAutoSave && len(t.Value) == 1 {
+		if t.Type == wire.TLVAutoSave && len(t.Value) == 1 {
 			s.AutoSave, found = t.Value[0] == 1, found+1
 		}
 	}
@@ -39,11 +35,11 @@ func parseSystem(ports, auto []TLV) (System, error) {
 
 // System reads the port count and the auto-save flag.
 func (c *Client) System(ctx context.Context) (System, error) {
-	ports, err := c.getTLVs(ctx, TLVPortCount)
+	ports, err := c.getTLVs(ctx, wire.TLVPortCount)
 	if err != nil {
 		return System{}, err
 	}
-	auto, err := c.getTLVs(ctx, TLVAutoSave)
+	auto, err := c.getTLVs(ctx, wire.TLVAutoSave)
 	if err != nil {
 		return System{}, err
 	}
@@ -86,7 +82,7 @@ func (c *Client) SetHostname(ctx context.Context, name string) error {
 // static address triple. The switch takes all of them in one request.
 func (c *Client) writeSystem(ctx context.Context, name string, dhcp bool, cfg IPConfig) error {
 	return c.setTLVs(ctx,
-		TLV{TLVHostname, append([]byte(name), 0)},
-		TLV{TLVDHCP, []byte{boolByte(dhcp)}},
-		TLV{TLVIP, cfg.IP.To4()}, TLV{TLVNetmask, cfg.Netmask.To4()}, TLV{TLVGateway, cfg.Gateway.To4()})
+		wire.TLV{Type: wire.TLVHostname, Value: append([]byte(name), 0)},
+		wire.TLV{Type: wire.TLVDHCP, Value: []byte{boolByte(dhcp)}},
+		wire.TLV{Type: wire.TLVIP, Value: cfg.IP.To4()}, wire.TLV{Type: wire.TLVNetmask, Value: cfg.Netmask.To4()}, wire.TLV{Type: wire.TLVGateway, Value: cfg.Gateway.To4()})
 }

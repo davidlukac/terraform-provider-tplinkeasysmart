@@ -4,10 +4,12 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestParseMirror(t *testing.T) {
-	off, err := parseMirror([]TLV{tlvHex(t, TLVMirror, "00000000000000000000")})
+	off, err := parseMirror([]wire.TLV{tlvHex(t, wire.TLVMirror, "00000000000000000000")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -15,7 +17,7 @@ func TestParseMirror(t *testing.T) {
 		t.Fatalf("disabled: %+v", off)
 	}
 	// layout from the vendor code; mirror port 8, ingress ports 1+2, egress port 3
-	on, err := parseMirror([]TLV{tlvHex(t, TLVMirror, "01080000000300000004")})
+	on, err := parseMirror([]wire.TLV{tlvHex(t, wire.TLVMirror, "01080000000300000004")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,7 +25,7 @@ func TestParseMirror(t *testing.T) {
 	if !reflect.DeepEqual(on, want) {
 		t.Fatalf("enabled: %+v", on)
 	}
-	if _, err := parseMirror([]TLV{{Type: TLVMirror, Value: make([]byte, 3)}}); err == nil {
+	if _, err := parseMirror([]wire.TLV{{Type: wire.TLVMirror, Value: make([]byte, 3)}}); err == nil {
 		t.Fatal("expected length error")
 	}
 }

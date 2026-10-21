@@ -5,12 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sort"
-)
 
-// TLV types of QoS > Bandwidth Control.
-const (
-	TLVBandwidthIngress = 12544 // one TLV per port: port(1) reserved(1) rate(4, kbps; 0 = unlimited)
-	TLVBandwidthEgress  = 12545
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 // PortBandwidth holds a port's rate limits in kbps; 0 means unlimited.
@@ -20,10 +16,10 @@ type PortBandwidth struct {
 	EgressKbps  int
 }
 
-func parseBandwidth(tlvs []TLV) ([]PortBandwidth, error) {
+func parseBandwidth(tlvs []wire.TLV) ([]PortBandwidth, error) {
 	byPort := map[int]*PortBandwidth{}
 	for _, t := range tlvs {
-		if t.Type != TLVBandwidthIngress && t.Type != TLVBandwidthEgress {
+		if t.Type != wire.TLVBandwidthIngress && t.Type != wire.TLVBandwidthEgress {
 			continue
 		}
 		if len(t.Value) != bwEntryLen {
@@ -35,7 +31,7 @@ func parseBandwidth(tlvs []TLV) ([]PortBandwidth, error) {
 			pb = &PortBandwidth{Port: port}
 			byPort[port] = pb
 		}
-		if t.Type == TLVBandwidthIngress {
+		if t.Type == wire.TLVBandwidthIngress {
 			pb.IngressKbps = rate
 		} else {
 			pb.EgressKbps = rate
@@ -51,11 +47,11 @@ func parseBandwidth(tlvs []TLV) ([]PortBandwidth, error) {
 
 // Bandwidth reads the per-port ingress and egress rate limits.
 func (c *Client) Bandwidth(ctx context.Context) ([]PortBandwidth, error) {
-	in, err := c.getTLVs(ctx, TLVBandwidthIngress)
+	in, err := c.getTLVs(ctx, wire.TLVBandwidthIngress)
 	if err != nil {
 		return nil, err
 	}
-	eg, err := c.getTLVs(ctx, TLVBandwidthEgress)
+	eg, err := c.getTLVs(ctx, wire.TLVBandwidthEgress)
 	if err != nil {
 		return nil, err
 	}
@@ -74,9 +70,9 @@ const (
 // MaxBandwidthKbps is the largest limit the web UI offers.
 const MaxBandwidthKbps = 1000000
 
-func bandwidthTLV(typ int16, port, kbps int) (TLV, error) {
+func bandwidthTLV(typ int16, port, kbps int) (wire.TLV, error) {
 	if !validateRateKbps(kbps) {
-		return TLV{}, fmt.Errorf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", kbps, port, RateStepKbps, MaxBandwidthKbps)
+		return wire.TLV{}, fmt.Errorf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", kbps, port, RateStepKbps, MaxBandwidthKbps)
 	}
 	v := make([]byte, bwEntryLen)
 	v[bwOffPort] = byte(port)
@@ -84,7 +80,7 @@ func bandwidthTLV(typ int16, port, kbps int) (TLV, error) {
 		v[bwOffEnabled] = 1
 	}
 	binary.BigEndian.PutUint32(v[bwOffRate:], uint32(kbps))
-	return TLV{typ, v}, nil
+	return wire.TLV{Type: typ, Value: v}, nil
 }
 
 // SetBandwidth sets a port's ingress and egress limits in kbps (0 = unlimited,
@@ -95,11 +91,11 @@ func (c *Client) SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps
 	if err := ValidatePort(port); err != nil {
 		return err
 	}
-	in, err := bandwidthTLV(TLVBandwidthIngress, port, ingressKbps)
+	in, err := bandwidthTLV(wire.TLVBandwidthIngress, port, ingressKbps)
 	if err != nil {
 		return err
 	}
-	eg, err := bandwidthTLV(TLVBandwidthEgress, port, egressKbps)
+	eg, err := bandwidthTLV(wire.TLVBandwidthEgress, port, egressKbps)
 	if err != nil {
 		return err
 	}

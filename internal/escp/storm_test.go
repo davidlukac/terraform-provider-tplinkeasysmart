@@ -4,13 +4,15 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestParseStorm(t *testing.T) {
-	got, err := parseStorm([]TLV{
-		tlvHex(t, TLVStormControl, "010000000000000000"), // captured: everything off
-		tlvHex(t, TLVStormControl, "0200010100"+"00001388"),
-		tlvHex(t, TLVStormControl, "0300010100"+"00000000"),
+	got, err := parseStorm([]wire.TLV{
+		tlvHex(t, wire.TLVStormControl, "010000000000000000"), // captured: everything off
+		tlvHex(t, wire.TLVStormControl, "0200010100"+"00001388"),
+		tlvHex(t, wire.TLVStormControl, "0300010100"+"00000000"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -24,7 +26,7 @@ func TestParseStorm(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v\nwant %+v", got, want)
 	}
-	if _, err := parseStorm([]TLV{{Type: TLVStormControl, Value: []byte{1}}}); err == nil {
+	if _, err := parseStorm([]wire.TLV{{Type: wire.TLVStormControl, Value: []byte{1}}}); err == nil {
 		t.Fatal("expected length error")
 	}
 }
@@ -38,7 +40,7 @@ func TestSetStormWire(t *testing.T) {
 	}
 	got := f.set()
 	want := []byte{7, 1, 0, 1, 1, 0, 0, 4, 0}
-	if len(got) != 1 || got[0].Type != TLVStormControl || !reflect.DeepEqual(got[0].Value, want) {
+	if len(got) != 1 || got[0].Type != wire.TLVStormControl || !reflect.DeepEqual(got[0].Value, want) {
 		t.Fatalf("wire %+v, want %v", got, want)
 	}
 	if err := c.SetStormControl(ctx, 7, false, false, false, 0); err != nil {

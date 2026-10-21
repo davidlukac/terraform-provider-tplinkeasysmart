@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-)
 
-// TLVStormControl is QoS > Storm Control: one TLV per port, 9 bytes:
-// port(1) reserved(1) unknown-unicast(1) multicast(1) broadcast(1) rate(4, kbps).
-const TLVStormControl = 12800
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+)
 
 // Layout of a storm control entry.
 const (
@@ -32,10 +30,10 @@ type PortStorm struct {
 	Enabled bool
 }
 
-func parseStorm(tlvs []TLV) ([]PortStorm, error) {
+func parseStorm(tlvs []wire.TLV) ([]PortStorm, error) {
 	var out []PortStorm
 	for _, t := range tlvs {
-		if t.Type != TLVStormControl {
+		if t.Type != wire.TLVStormControl {
 			continue
 		}
 		v := t.Value
@@ -52,7 +50,7 @@ func parseStorm(tlvs []TLV) ([]PortStorm, error) {
 
 // StormControl reads the per-port storm control settings.
 func (c *Client) StormControl(ctx context.Context) ([]PortStorm, error) {
-	tlvs, err := c.getTLVs(ctx, TLVStormControl)
+	tlvs, err := c.getTLVs(ctx, wire.TLVStormControl)
 	if err != nil {
 		return nil, err
 	}
@@ -80,5 +78,5 @@ func (c *Client) SetStormControl(ctx context.Context, port int, unknownUnicast, 
 	v[stormOffEnabled] = boolByte(any)
 	v[stormOffUnknownUnicast], v[stormOffMulticast], v[stormOffBroadcast] = boolByte(unknownUnicast), boolByte(multicast), boolByte(broadcast)
 	binary.BigEndian.PutUint32(v[stormOffRate:], uint32(rateKbps))
-	return c.setTLVs(ctx, TLV{TLVStormControl, v})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVStormControl, Value: v})
 }

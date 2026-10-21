@@ -1,7 +1,4 @@
-// Package escp implements the TP-Link Easy Smart UDP management protocol as
-// spoken by TL-SG108E v6 switches. See PROTOCOL.md in this
-// directory for the wire format.
-package escp
+package wire
 
 import (
 	"encoding/binary"
@@ -79,19 +76,22 @@ const staticStateSize = 256
 
 var staticState = rc4State(staticKeyFrom(staticKeyBlob), staticStateSize)
 
-func rc4Static(data []byte) []byte { return rc4(data, staticState, staticStateSize) }
+// RC4Static encrypts or decrypts (RC4 is symmetric) with the vendor utility's static key.
+func RC4Static(data []byte) []byte { return rc4(data, staticState, staticStateSize) }
 
 // SessionKeyLen is the length of the random per-session key.
 const SessionKeyLen = 8
 
-func rc4Session(data, key []byte) []byte {
+// RC4Session encrypts or decrypts with the per-session key (SessionKeyLen bytes).
+func RC4Session(data, key []byte) []byte {
 	return rc4(data, rc4State(key, SessionKeyLen), SessionKeyLen)
 }
 
 // rsaN is the 64-bit modulus used by TL-SG108E v6 (little-endian in the jar).
-var rsaN = new(big.Int).SetBytes(reverse([]byte{191, 78, 109, 100, 214, 185, 250, 179}))
+var rsaN = new(big.Int).SetBytes(ReverseBytes([]byte{191, 78, 109, 100, 214, 185, 250, 179}))
 
-const rsaE = 65537
+// RSAExponent is the public exponent of the switch's session-key RSA.
+const RSAExponent = 65537
 
 // RSA key-exchange value (TLV 528): a zero byte, the word count, then the
 // ciphertext as little-endian 16-bit words, least significant first. The
@@ -104,7 +104,8 @@ const (
 // teaRounds is the number of TEA rounds protecting the static key blob.
 const teaRounds = 32
 
-func reverse(b []byte) []byte {
+// ReverseBytes returns b reversed: the RSA operands travel little-endian.
+func ReverseBytes(b []byte) []byte {
 	out := make([]byte, len(b))
 	for i := range b {
 		out[len(b)-1-i] = b[i]
@@ -115,7 +116,7 @@ func reverse(b []byte) []byte {
 // RSASessionTLV encrypts the session key (textbook RSA, no padding) and
 // returns the 10-byte TLV 528 value: 00, word count, 4 little-endian words.
 func RSASessionTLV(key []byte) []byte {
-	c := new(big.Int).Exp(new(big.Int).SetBytes(reverse(key)), big.NewInt(rsaE), rsaN)
+	c := new(big.Int).Exp(new(big.Int).SetBytes(ReverseBytes(key)), big.NewInt(RSAExponent), rsaN)
 	words := make([]uint16, rsaWords)
 	mask := big.NewInt(0xFFFF)
 	for i := range words {
@@ -133,3 +134,6 @@ func RSASessionTLV(key []byte) []byte {
 	}
 	return out
 }
+
+// RSAModulus returns a copy of the 64-bit public modulus of the key exchange.
+func RSAModulus() *big.Int { return new(big.Int).Set(rsaN) }

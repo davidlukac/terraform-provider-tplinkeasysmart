@@ -193,9 +193,10 @@ Behaviour of other models and firmware is documented in the [protocol notes](int
 The provider talks UDP port 29808/29809 on the switch's own layer-2 segment: discovery, an RSA session-key exchange, RC4-encrypted TLV requests, then reads and writes with read-back. The wire format, every TLV layout and what was verified live are in [`internal/escp/PROTOCOL.md`](internal/escp/PROTOCOL.md).
 
 ```
-internal/escp       crypto, packet codec, UDP client (discovery, key exchange, get/set, retry, session recovery)
-internal/provider   provider, resources and data sources, guards, validation
-templates/          docs templates      examples/   runnable examples used for the generated docs
+internal/escp                 UDP client (discovery, key exchange, get/set, retry, session recovery) and the settings
+internal/escp/internal/wire   packet codec, TLV catalogue, RC4 and RSA
+internal/provider             provider, resources and data sources, guards, validation
+templates/                    docs templates      examples/   runnable examples used for the generated docs
 ```
 
 ## Development

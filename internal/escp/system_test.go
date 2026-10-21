@@ -1,13 +1,17 @@
 package escp
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+)
 
 func TestParseSystem(t *testing.T) {
-	s, err := parseSystem([]TLV{tlvHex(t, TLVPortCount, "08")}, []TLV{tlvHex(t, TLVAutoSave, "01")})
+	s, err := parseSystem([]wire.TLV{tlvHex(t, wire.TLVPortCount, "08")}, []wire.TLV{tlvHex(t, wire.TLVAutoSave, "01")})
 	if err != nil || s != (System{PortCount: 8, AutoSave: true}) {
 		t.Fatalf("got %+v %v", s, err)
 	}
-	if _, err := parseSystem(nil, []TLV{tlvHex(t, TLVAutoSave, "01")}); err == nil {
+	if _, err := parseSystem(nil, []wire.TLV{tlvHex(t, wire.TLVAutoSave, "01")}); err == nil {
 		t.Fatal("expected incomplete error")
 	}
 }

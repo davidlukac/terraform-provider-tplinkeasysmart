@@ -1,13 +1,17 @@
 package escp
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+)
 
 func TestParseLoopPrevention(t *testing.T) {
-	on, err := parseLoopPrevention([]TLV{tlvHex(t, TLVLoopPrevention, "01")})
+	on, err := parseLoopPrevention([]wire.TLV{tlvHex(t, wire.TLVLoopPrevention, "01")})
 	if err != nil || !on {
 		t.Fatalf("got %v, %v", on, err)
 	}
-	off, err := parseLoopPrevention([]TLV{tlvHex(t, TLVLoopPrevention, "00")})
+	off, err := parseLoopPrevention([]wire.TLV{tlvHex(t, wire.TLVLoopPrevention, "00")})
 	if err != nil || off {
 		t.Fatalf("got %v, %v", off, err)
 	}

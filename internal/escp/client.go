@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 // maxDatagram is the receive buffer size; ESCP packets are well below it.
@@ -28,8 +30,8 @@ var randReader io.Reader = rand.Reader
 // Default ports of the protocol: requests go to 29808, replies always come
 // back to 29809 regardless of the source port.
 const (
-	DefaultSwitchPort = 29808
-	DefaultHostPort   = 29809
+	defaultSwitchPort = 29808
+	defaultHostPort   = 29809
 )
 
 var (
@@ -118,10 +120,10 @@ func Dial(cfg Config) (*Client, error) {
 		cfg.Retries = 2
 	}
 	if cfg.SwitchPort == 0 {
-		cfg.SwitchPort = DefaultSwitchPort
+		cfg.SwitchPort = defaultSwitchPort
 	}
 	if cfg.HostPort == 0 {
-		cfg.HostPort = DefaultHostPort
+		cfg.HostPort = defaultHostPort
 	}
 	if cfg.BroadcastAddr == "" {
 		cfg.BroadcastAddr = "255.255.255.255"
@@ -188,7 +190,7 @@ func localMAC(dst net.IP) (mac [6]byte) {
 type reply struct {
 	op   byte
 	err  int32
-	tlvs []TLV
+	tlvs []wire.TLV
 	// fragment is non-zero when more packets of the same reply follow.
 	fragment uint16
 }
@@ -204,19 +206,19 @@ func (r reply) tlv(t int16) ([]byte, bool) {
 
 func (c *Client) encrypt(b []byte, static bool) []byte {
 	if static || c.session == nil {
-		return rc4Static(b)
+		return wire.RC4Static(b)
 	}
-	return rc4Session(b, c.session)
+	return wire.RC4Session(b, c.session)
 }
 
 func (c *Client) decrypt(b []byte) []byte {
-	if p := rc4Static(b); looksLikeHeader(p) {
+	if p := wire.RC4Static(b); wire.LooksLikeHeader(p) {
 		return p
 	}
 	if c.session != nil {
-		return rc4Session(b, c.session)
+		return wire.RC4Session(b, c.session)
 	}
-	return rc4Static(b)
+	return wire.RC4Static(b)
 }
 
 // accept decides whether a datagram is the reply to the request in flight: it
@@ -226,8 +228,8 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 	if !from.IP.Equal(c.dest.IP) && (c.alsoFrom == nil || !from.IP.Equal(c.alsoFrom)) {
 		return reply{}, false
 	}
-	h, t, err := unmarshal(c.decrypt(data))
-	if err != nil || h.Seq != c.seq || h.Op == OpDiscovery {
+	h, t, err := wire.Unmarshal(c.decrypt(data))
+	if err != nil || h.Seq != c.seq || h.Op == wire.OpDiscovery {
 		return reply{}, false
 	}
 	if !c.haveSwMAC {
@@ -278,9 +280,9 @@ func (c *Client) attemptDeadline(ctx context.Context) time.Time {
 }
 
 // send transmits one request with a fresh sequence number.
-func (c *Client) send(op byte, tlvs []TLV, static bool, to []*net.UDPAddr) error {
+func (c *Client) send(op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) error {
 	c.seq = (c.seq + 1) % 1000
-	pkt := c.encrypt(marshal(header{Op: op, SwitchMAC: c.swMAC, HostMAC: c.hostMAC, Seq: c.seq}, tlvs), static)
+	pkt := c.encrypt(wire.Marshal(wire.Header{Op: op, SwitchMAC: c.swMAC, HostMAC: c.hostMAC, Seq: c.seq}, tlvs), static)
 	for _, d := range to {
 		if _, err := c.conn.WriteToUDP(pkt, d); err != nil {
 			return fmt.Errorf("escp: send: %w", err)
@@ -291,7 +293,7 @@ func (c *Client) send(op byte, tlvs []TLV, static bool, to []*net.UDPAddr) error
 
 // exchange sends one packet and waits for the reply with the same sequence
 // number from the switch, retrying on silence. Callers hold c.mu.
-func (c *Client) exchange(ctx context.Context, op byte, tlvs []TLV, static bool, to []*net.UDPAddr) (reply, error) {
+func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) (reply, error) {
 	if err := c.open(); err != nil {
 		return reply{}, err
 	}
@@ -312,7 +314,7 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []TLV, static bool,
 // exchangeFragments is exchange for replies that span several packets: it
 // concatenates the values of every TLV of the given type until a packet
 // without the fragment flag arrives. A missing fragment restarts the request.
-func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []TLV, typ int16) ([]byte, error) {
+func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ int16) ([]byte, error) {
 	// Callers hold c.mu and run inside withSession, so the socket is open.
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
 		if err := c.send(op, tlvs, false, []*net.UDPAddr{c.dest}); err != nil {
@@ -358,7 +360,7 @@ func (c *Client) Info(ctx context.Context) (Info, error) {
 }
 
 func (c *Client) discover(ctx context.Context) (Info, error) {
-	r, err := c.exchange(ctx, OpDiscovery, nil, true, c.discoverTargets())
+	r, err := c.exchange(ctx, wire.OpDiscovery, nil, true, c.discoverTargets())
 	if err != nil {
 		return Info{}, err
 	}
@@ -368,22 +370,22 @@ func (c *Client) discover(ctx context.Context) (Info, error) {
 // infoFromReply maps the TLVs of a discovery reply to Info; absent or
 // malformed fields stay empty.
 func infoFromReply(r reply) Info {
-	str := func(t int16) string { v, _ := r.tlv(t); return cstring(v) }
+	str := func(t int16) string { v, _ := r.tlv(t); return wire.CString(v) }
 	ip := func(t int16) string {
 		if v, ok := r.tlv(t); ok && len(v) == 4 {
 			return net.IP(v).String()
 		}
 		return ""
 	}
-	info := Info{Model: str(TLVModel), Hostname: str(TLVHostname), Firmware: str(TLVFirmware),
-		Hardware: str(TLVHardware), IP: ip(TLVIP), Netmask: ip(TLVNetmask), Gateway: ip(TLVGateway)}
-	if v, ok := r.tlv(TLVMAC); ok && len(v) == 6 {
+	info := Info{Model: str(wire.TLVModel), Hostname: str(wire.TLVHostname), Firmware: str(wire.TLVFirmware),
+		Hardware: str(wire.TLVHardware), IP: ip(wire.TLVIP), Netmask: ip(wire.TLVNetmask), Gateway: ip(wire.TLVGateway)}
+	if v, ok := r.tlv(wire.TLVMAC); ok && len(v) == 6 {
 		info.MAC = net.HardwareAddr(v).String()
 	}
-	if v, ok := r.tlv(TLVDHCP); ok && len(v) == 1 {
+	if v, ok := r.tlv(wire.TLVDHCP); ok && len(v) == 1 {
 		info.DHCP = v[0] != 0
 	}
-	if v, ok := r.tlv(TLVFactoryDefault); ok && len(v) == 1 {
+	if v, ok := r.tlv(wire.TLVFactoryDefault); ok && len(v) == 1 {
 		info.FactoryDefault = v[0] != 0
 	}
 	return info
@@ -401,7 +403,7 @@ func (c *Client) ensureSession(ctx context.Context) error {
 		}
 	}
 	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-	key := make([]byte, SessionKeyLen)
+	key := make([]byte, wire.SessionKeyLen)
 	for i := range key {
 		n, err := rand.Int(randReader, big.NewInt(int64(len(alphabet))))
 		if err != nil {
@@ -410,12 +412,12 @@ func (c *Client) ensureSession(ctx context.Context) error {
 		key[i] = alphabet[n.Int64()]
 	}
 	c.session = key // the reply is already encrypted with it
-	r, err := c.exchange(ctx, OpSet, []TLV{{TLVRSAKey, RSASessionTLV(key)}}, true, []*net.UDPAddr{c.dest})
+	r, err := c.exchange(ctx, wire.OpSet, []wire.TLV{{Type: wire.TLVRSAKey, Value: wire.RSASessionTLV(key)}}, true, []*net.UDPAddr{c.dest})
 	if err != nil {
 		c.session = nil
 		return fmt.Errorf("session key exchange: %w", err)
 	}
-	if r.err != ErrCodeKeyAccepted {
+	if r.err != wire.ErrCodeKeyAccepted {
 		c.session = nil
 		return fmt.Errorf("session key exchange: unexpected error code %d", r.err)
 	}
@@ -444,11 +446,11 @@ func (c *Client) GetLED(ctx context.Context) (bool, error) {
 	defer c.mu.Unlock()
 	var on bool
 	err := c.withSession(ctx, func() error {
-		r, err := c.exchange(ctx, OpGet, []TLV{{TLVLED, nil}}, false, []*net.UDPAddr{c.dest})
+		r, err := c.exchange(ctx, wire.OpGet, []wire.TLV{{Type: wire.TLVLED, Value: nil}}, false, []*net.UDPAddr{c.dest})
 		if err != nil {
 			return err
 		}
-		v, ok := r.tlv(TLVLED)
+		v, ok := r.tlv(wire.TLVLED)
 		if !ok || len(v) != 1 {
 			return fmt.Errorf("escp: unexpected LED reply (error code %d, %d TLVs)", r.err, len(r.tlvs))
 		}
@@ -460,7 +462,7 @@ func (c *Client) GetLED(ctx context.Context) (bool, error) {
 
 // SetLED switches the LEDs on or off. Credentials accompany every SET.
 func (c *Client) SetLED(ctx context.Context, on bool) error {
-	return c.setTLVs(ctx, TLV{TLVLED, []byte{boolByte(on)}})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVLED, Value: []byte{boolByte(on)}})
 }
 
 func boolByte(b bool) byte {
@@ -471,15 +473,15 @@ func boolByte(b bool) byte {
 }
 
 // setTLVs sends a SET carrying the credentials plus the given settings.
-func (c *Client) setTLVs(ctx context.Context, tlvs ...TLV) error {
+func (c *Client) setTLVs(ctx context.Context, tlvs ...wire.TLV) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.withSession(ctx, func() error {
-		req := append([]TLV{
-			{TLVUsername, append([]byte(c.cfg.Username), 0)},
-			{TLVPassword, append([]byte(c.cfg.Password), 0)},
+		req := append([]wire.TLV{
+			{Type: wire.TLVUsername, Value: append([]byte(c.cfg.Username), 0)},
+			{Type: wire.TLVPassword, Value: append([]byte(c.cfg.Password), 0)},
 		}, tlvs...)
-		r, err := c.exchange(ctx, OpSet, req, false, []*net.UDPAddr{c.dest})
+		r, err := c.exchange(ctx, wire.OpSet, req, false, []*net.UDPAddr{c.dest})
 		if err != nil {
 			return err
 		}
@@ -492,16 +494,16 @@ func (c *Client) setTLVs(ctx context.Context, tlvs ...TLV) error {
 
 // getTLVs reads one or more setting types with an authenticated session and
 // returns every TLV of the reply. It never writes.
-func (c *Client) getTLVs(ctx context.Context, types ...int16) ([]TLV, error) {
+func (c *Client) getTLVs(ctx context.Context, types ...int16) ([]wire.TLV, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var out []TLV
+	var out []wire.TLV
 	err := c.withSession(ctx, func() error {
-		req := make([]TLV, len(types))
+		req := make([]wire.TLV, len(types))
 		for i, t := range types {
-			req[i] = TLV{Type: t}
+			req[i] = wire.TLV{Type: t}
 		}
-		r, err := c.exchange(ctx, OpGet, req, false, []*net.UDPAddr{c.dest})
+		r, err := c.exchange(ctx, wire.OpGet, req, false, []*net.UDPAddr{c.dest})
 		if err != nil {
 			return err
 		}

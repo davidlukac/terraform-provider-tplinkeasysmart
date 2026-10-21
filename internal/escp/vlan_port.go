@@ -3,13 +3,8 @@ package escp
 import (
 	"context"
 	"fmt"
-)
 
-// TLV types of VLAN > Port Based VLAN.
-const (
-	TLVVLANPortBased    = 8448 // mode enabled (1 byte)
-	TLVVLANPortBasedVID = 8449 // one TLV per VLAN: id (1 byte), member port mask (4 bytes)
-	TLVVLANPortBasedMax = 8450 // maximum number of VLANs (1 byte)
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 // Layout of a port-based VLAN entry (TLV 8449): VLAN id (1 byte), member port mask (maskLen bytes).
@@ -31,21 +26,21 @@ type PortBasedVLAN struct {
 	VLANs   []PortVLAN
 }
 
-func parsePortBasedVLAN(tlvs []TLV) (PortBasedVLAN, error) {
+func parsePortBasedVLAN(tlvs []wire.TLV) (PortBasedVLAN, error) {
 	out := PortBasedVLAN{VLANs: []PortVLAN{}}
 	seen := false
 	for _, t := range tlvs {
 		switch t.Type {
-		case TLVVLANPortBased:
+		case wire.TLVVLANPortBased:
 			if len(t.Value) != 1 {
 				return out, fmt.Errorf("escp: port-based VLAN state TLV has %d bytes", len(t.Value))
 			}
 			out.Enabled, seen = t.Value[0] == 1, true
-		case TLVVLANPortBasedMax:
+		case wire.TLVVLANPortBasedMax:
 			if len(t.Value) == 1 {
 				out.MaxVLAN = int(t.Value[0])
 			}
-		case TLVVLANPortBasedVID:
+		case wire.TLVVLANPortBasedVID:
 			if len(t.Value) != pvlanEntryLen {
 				return out, fmt.Errorf("escp: port-based VLAN entry has %d bytes, want %d", len(t.Value), pvlanEntryLen)
 			}
@@ -60,7 +55,7 @@ func parsePortBasedVLAN(tlvs []TLV) (PortBasedVLAN, error) {
 
 // PortBasedVLAN reads the port-based VLAN mode and groups.
 func (c *Client) PortBasedVLAN(ctx context.Context) (PortBasedVLAN, error) {
-	tlvs, err := c.getTLVs(ctx, TLVVLANPortBased)
+	tlvs, err := c.getTLVs(ctx, wire.TLVVLANPortBased)
 	if err != nil {
 		return PortBasedVLAN{}, err
 	}
@@ -79,5 +74,5 @@ func (c *Client) SetPortBasedVLAN(ctx context.Context, id int, ports []int) erro
 	if err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, TLV{TLVVLANPortBasedVID, append([]byte{byte(id)}, mask...)})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(id)}, mask...)})
 }

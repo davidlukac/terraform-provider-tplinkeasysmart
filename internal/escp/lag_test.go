@@ -7,10 +7,12 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestParseLAGs(t *testing.T) {
-	got, err := parseLAGs([]TLV{tlvHex(t, TLVLAG, "0100000003"), tlvHex(t, TLVLAG, "0200000000"), tlvHex(t, TLVLAG, "0380000005")})
+	got, err := parseLAGs([]wire.TLV{tlvHex(t, wire.TLVLAG, "0100000003"), tlvHex(t, wire.TLVLAG, "0200000000"), tlvHex(t, wire.TLVLAG, "0380000005")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,7 +21,7 @@ func TestParseLAGs(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v want %+v", got, want)
 	}
-	if _, err := parseLAGs([]TLV{{Type: TLVLAG, Value: []byte{1}}}); err == nil {
+	if _, err := parseLAGs([]wire.TLV{{Type: wire.TLVLAG, Value: []byte{1}}}); err == nil {
 		t.Fatal("expected error")
 	}
 }
@@ -31,7 +33,7 @@ func TestSetLAGWire(t *testing.T) {
 	if err := c.SetLAG(ctx, 2, []int{6, 7}); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.set(); got[0].Type != TLVLAG || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
+	if got := f.set(); got[0].Type != wire.TLVLAG || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
 		t.Fatalf("wire %+v", got)
 	}
 	if err := c.SetLAG(ctx, 2, nil); err != nil {
