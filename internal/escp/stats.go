@@ -26,7 +26,7 @@ const (
 type PortStats struct {
 	ID      int
 	Enabled bool
-	Link    string // link-down or negotiated speed
+	Link    Speed // SpeedLinkDown or the negotiated speed
 	TxGood  uint32
 	TxBad   uint32
 	RxGood  uint32
@@ -45,7 +45,7 @@ func parsePortStats(tlvs []wire.TLV) ([]PortStats, error) {
 			return nil, fmt.Errorf("escp: port statistics TLV too short (%d bytes)", len(v))
 		}
 		out = append(out, PortStats{
-			ID: int(v[statsOffPort]), Enabled: v[statsOffState] == 1, Link: speedName(v[statsOffLink]),
+			ID: int(v[statsOffPort]), Enabled: v[statsOffState] == 1, Link: speedFromCode(v[statsOffLink]),
 			TxGood: binary.BigEndian.Uint32(v[statsOffTxGood:]), TxBad: binary.BigEndian.Uint32(v[statsOffTxBad:]),
 			RxGood: binary.BigEndian.Uint32(v[statsOffRxGood:]), RxBad: binary.BigEndian.Uint32(v[statsOffRxBad:]),
 		})

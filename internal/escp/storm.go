@@ -57,26 +57,36 @@ func (c *Client) StormControl(ctx context.Context) ([]PortStorm, error) {
 	return parseStorm(tlvs)
 }
 
+// StormConfig is what SetStormControl writes to one port. Unlike PortStorm (a reading)
+// it has no Enabled flag: storm control is on exactly when a traffic type is selected.
+type StormConfig struct {
+	Port           int
+	UnknownUnicast bool
+	Multicast      bool
+	Broadcast      bool
+	RateKbps       int
+}
+
 // SetStormControl configures storm control on one port. Following the vendor
 // utility: selecting any traffic type requires a rate (a multiple of 64 kbps,
 // at least 64, at most MaxBandwidthKbps); selecting none disables it and the
 // rate must be 0. A rate on a port that carries traffic drops its excess
 // broadcast/multicast; callers must guard against that.
-func (c *Client) SetStormControl(ctx context.Context, port int, unknownUnicast, multicast, broadcast bool, rateKbps int) error {
-	if err := ValidatePort(port); err != nil {
+func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
+	if err := ValidatePort(cfg.Port); err != nil {
 		return err
 	}
-	any := unknownUnicast || multicast || broadcast
+	any := cfg.UnknownUnicast || cfg.Multicast || cfg.Broadcast
 	switch {
-	case any && (rateKbps < RateStepKbps || !validateRateKbps(rateKbps)):
-		return fmt.Errorf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", port, RateStepKbps, RateStepKbps, MaxBandwidthKbps, rateKbps)
-	case !any && rateKbps != 0:
-		return fmt.Errorf("escp: storm control on port %d has a rate (%d) but no traffic type selected", port, rateKbps)
+	case any && (cfg.RateKbps < RateStepKbps || !validateRateKbps(cfg.RateKbps)):
+		return fmt.Errorf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", cfg.Port, RateStepKbps, RateStepKbps, MaxBandwidthKbps, cfg.RateKbps)
+	case !any && cfg.RateKbps != 0:
+		return fmt.Errorf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.RateKbps)
 	}
 	v := make([]byte, stormEntryLen)
-	v[stormOffPort] = byte(port)
+	v[stormOffPort] = byte(cfg.Port)
 	v[stormOffEnabled] = boolByte(any)
-	v[stormOffUnknownUnicast], v[stormOffMulticast], v[stormOffBroadcast] = boolByte(unknownUnicast), boolByte(multicast), boolByte(broadcast)
-	binary.BigEndian.PutUint32(v[stormOffRate:], uint32(rateKbps))
+	v[stormOffUnknownUnicast], v[stormOffMulticast], v[stormOffBroadcast] = boolByte(cfg.UnknownUnicast), boolByte(cfg.Multicast), boolByte(cfg.Broadcast)
+	binary.BigEndian.PutUint32(v[stormOffRate:], uint32(cfg.RateKbps))
 	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVStormControl, Value: v})
 }

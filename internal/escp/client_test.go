@@ -125,7 +125,7 @@ func TestSetHostnameKeepsIPConfiguration(t *testing.T) {
 func TestSetPortWire(t *testing.T) {
 	f := startFakeSwitch(t)
 	c := dialFake(t, f, "secret")
-	if err := c.SetPort(context.Background(), 7, true, "100Mbps-full", true); err != nil {
+	if err := c.SetPort(context.Background(), PortConfig{ID: 7, Enabled: true, Speed: "100Mbps-full", FlowControl: true}); err != nil {
 		t.Fatal(err)
 	}
 	f.mu.Lock()
@@ -135,10 +135,10 @@ func TestSetPortWire(t *testing.T) {
 	if string(got) != string(want) {
 		t.Fatalf("wire bytes %v, want %v", got, want)
 	}
-	if err := c.SetPort(context.Background(), 7, true, "warp", false); err == nil {
+	if err := c.SetPort(context.Background(), PortConfig{ID: 7, Enabled: true, Speed: "warp", FlowControl: false}); err == nil {
 		t.Fatal("unknown speed must be rejected before sending")
 	}
-	if err := c.SetPort(context.Background(), 0, true, "auto", false); err == nil {
+	if err := c.SetPort(context.Background(), PortConfig{ID: 0, Enabled: true, Speed: "auto", FlowControl: false}); err == nil {
 		t.Fatal("port 0 must be rejected")
 	}
 }
@@ -171,5 +171,33 @@ func TestRejectedErrorWithAReasonReplacesTheGenericHint(t *testing.T) {
 	want := "escp: switch rejected the request (error code 7404): a member port has storm control enabled"
 	if err.Error() != want {
 		t.Fatalf("got %q, want %q", err.Error(), want)
+	}
+}
+
+// Admin state and flow control are separate bytes: one set and the other clear tells a swapped
+// field apart, which TestSetPortWire (both set) cannot.
+func TestSetPortWireStateAndFlowControlAreNotSwapped(t *testing.T) {
+	cases := []struct {
+		name string
+		cfg  PortConfig
+		want []byte
+	}{
+		{"enabled, no flow control", PortConfig{ID: 7, Enabled: true, Speed: SpeedAuto}, []byte{7, 1, 0, 1, 0, 0, 0}},
+		{"disabled, flow control", PortConfig{ID: 7, Speed: SpeedAuto, FlowControl: true}, []byte{7, 0, 0, 1, 0, 1, 0}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := startFakeSwitch(t)
+			c := dialFake(t, f, "secret")
+			if err := c.SetPort(context.Background(), tc.cfg); err != nil {
+				t.Fatal(err)
+			}
+			f.mu.Lock()
+			got := f.port7
+			f.mu.Unlock()
+			if string(got) != string(tc.want) {
+				t.Fatalf("wire bytes %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

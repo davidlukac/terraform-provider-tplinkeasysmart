@@ -57,7 +57,8 @@ func (f *fakeClient) Info(context.Context) (escp.Info, error) {
 		IP: "192.0.2.120", Netmask: "255.255.255.0", Gateway: "192.0.2.1", DHCP: true}, nil
 }
 
-func (f *fakeClient) SetPort(_ context.Context, id int, enabled bool, speed string, flow bool) error {
+func (f *fakeClient) SetPort(_ context.Context, cfg escp.PortConfig) error {
+	id, enabled, speed, flow := cfg.ID, cfg.Enabled, cfg.Speed, cfg.FlowControl
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for i := range f.ports {
@@ -258,7 +259,8 @@ func (f *fakeClient) QoS(context.Context) (escp.QoS, error) {
 	return escp.QoS{Mode: 2, ModeName: "dscp-802.1p", Priorities: []escp.PortPriority{{Port: 1, Priority: 1}, {Port: 2, Priority: 4}}}, nil
 }
 
-func (f *fakeClient) SetBandwidth(_ context.Context, port, in, eg int) error {
+func (f *fakeClient) SetBandwidth(_ context.Context, limit escp.PortBandwidth) error {
+	port, in, eg := limit.Port, limit.IngressKbps, limit.EgressKbps
 	if in%64 != 0 || eg%64 != 0 {
 		return fmt.Errorf("invalid rate: use 0 or a multiple of 64")
 	}
@@ -285,7 +287,8 @@ func (f *fakeClient) Bandwidth(context.Context) ([]escp.PortBandwidth, error) {
 	return []escp.PortBandwidth{{Port: 1}, {Port: 2, IngressKbps: 4096, EgressKbps: 8192}}, nil
 }
 
-func (f *fakeClient) SetStormControl(_ context.Context, port int, uu, mc, bc bool, rate int) error {
+func (f *fakeClient) SetStormControl(_ context.Context, cfg escp.StormConfig) error {
+	port, uu, mc, bc, rate := cfg.Port, cfg.UnknownUnicast, cfg.Multicast, cfg.Broadcast, cfg.RateKbps
 	if (uu || mc || bc) != (rate != 0) || rate%64 != 0 {
 		return fmt.Errorf("invalid storm control request")
 	}

@@ -36,7 +36,7 @@ type stormLimitResource struct {
 // stormLimitClient is the part of the switch API this resource needs.
 type stormLimitClient interface {
 	Ports(ctx context.Context) ([]escp.Port, error)
-	SetStormControl(ctx context.Context, port int, unknownUnicast, multicast, broadcast bool, rateKbps int) error
+	SetStormControl(ctx context.Context, cfg escp.StormConfig) error
 	StormControl(ctx context.Context) ([]escp.PortStorm, error)
 }
 
@@ -108,7 +108,7 @@ func (r *stormLimitResource) applyBound(ctx context.Context, m *stormLimitModel,
 		add("Refusing to change port", err.Error())
 		return false
 	}
-	if err := r.client.SetStormControl(ctx, port, uu, mc, bc, rate); err != nil {
+	if err := r.client.SetStormControl(ctx, escp.StormConfig{Port: port, UnknownUnicast: uu, Multicast: mc, Broadcast: bc, RateKbps: rate}); err != nil {
 		add("Setting storm control failed", err.Error())
 		return false
 	}

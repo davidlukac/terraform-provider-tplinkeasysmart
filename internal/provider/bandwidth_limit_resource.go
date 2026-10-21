@@ -35,7 +35,7 @@ type bandwidthLimitResource struct {
 type bandwidthLimitClient interface {
 	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
 	Ports(ctx context.Context) ([]escp.Port, error)
-	SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps int) error
+	SetBandwidth(ctx context.Context, limit escp.PortBandwidth) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -103,7 +103,7 @@ func (r *bandwidthLimitResource) applyBound(ctx context.Context, m *bandwidthLim
 		add("Refusing to change port", err.Error())
 		return false
 	}
-	if err := r.client.SetBandwidth(ctx, port, in, eg); err != nil {
+	if err := r.client.SetBandwidth(ctx, escp.PortBandwidth{Port: port, IngressKbps: in, EgressKbps: eg}); err != nil {
 		add("Setting bandwidth limit failed", err.Error())
 		return false
 	}

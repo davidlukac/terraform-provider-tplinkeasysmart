@@ -54,11 +54,11 @@ func (g *gatedClient) SetLED(ctx context.Context, on bool) error {
 	return g.SwitchClient.SetLED(ctx, on)
 }
 
-func (g *gatedClient) SetPort(ctx context.Context, id int, enabled bool, speed string, flowControl bool) error {
+func (g *gatedClient) SetPort(ctx context.Context, cfg escp.PortConfig) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
-	return g.SwitchClient.SetPort(ctx, id, enabled, speed, flowControl)
+	return g.SwitchClient.SetPort(ctx, cfg)
 }
 
 func (g *gatedClient) SetLAG(ctx context.Context, group int, ports []int) error {
@@ -152,18 +152,18 @@ func (g *gatedClient) SetPortPriorities(ctx context.Context, changes map[int]int
 	return g.SwitchClient.SetPortPriorities(ctx, changes)
 }
 
-func (g *gatedClient) SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps int) error {
+func (g *gatedClient) SetBandwidth(ctx context.Context, limit escp.PortBandwidth) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
-	return g.SwitchClient.SetBandwidth(ctx, port, ingressKbps, egressKbps)
+	return g.SwitchClient.SetBandwidth(ctx, limit)
 }
 
-func (g *gatedClient) SetStormControl(ctx context.Context, port int, unknownUnicast, multicast, broadcast bool, rateKbps int) error {
+func (g *gatedClient) SetStormControl(ctx context.Context, cfg escp.StormConfig) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
-	return g.SwitchClient.SetStormControl(ctx, port, unknownUnicast, multicast, broadcast, rateKbps)
+	return g.SwitchClient.SetStormControl(ctx, cfg)
 }
 
 func (g *gatedClient) SetHostname(ctx context.Context, name string) error {

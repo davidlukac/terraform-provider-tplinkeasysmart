@@ -84,18 +84,18 @@ func bandwidthTLV(typ int16, port, kbps int) (wire.TLV, error) {
 }
 
 // SetBandwidth sets a port's ingress and egress limits in kbps (0 = unlimited,
-// otherwise a multiple of 64). Like the vendor utility it sends two requests,
+// otherwise a multiple of 64; the same type Bandwidth reads). Like the vendor utility it sends two requests,
 // ingress first, then egress. A limit on a port that carries traffic throttles
 // it; callers must guard against that.
-func (c *Client) SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps int) error {
-	if err := ValidatePort(port); err != nil {
+func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error {
+	if err := ValidatePort(limit.Port); err != nil {
 		return err
 	}
-	in, err := bandwidthTLV(wire.TLVBandwidthIngress, port, ingressKbps)
+	in, err := bandwidthTLV(wire.TLVBandwidthIngress, limit.Port, limit.IngressKbps)
 	if err != nil {
 		return err
 	}
-	eg, err := bandwidthTLV(wire.TLVBandwidthEgress, port, egressKbps)
+	eg, err := bandwidthTLV(wire.TLVBandwidthEgress, limit.Port, limit.EgressKbps)
 	if err != nil {
 		return err
 	}

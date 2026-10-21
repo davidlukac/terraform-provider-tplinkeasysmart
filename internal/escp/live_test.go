@@ -154,7 +154,7 @@ func livePort(t *testing.T, c *Client, id int) Port {
 	}
 	for _, p := range ports {
 		if p.ID == id {
-			if p.ActualSpeed != "link-down" || p.LAG != 0 {
+			if p.ActualSpeed != SpeedLinkDown || p.LAG != 0 {
 				t.Fatalf("port %d is in use (%s, LAG %d): refusing to touch it", id, p.ActualSpeed, p.LAG)
 			}
 			return p
@@ -169,7 +169,7 @@ func TestLivePortWrites(t *testing.T) {
 	c, ctx := liveClient(t), context.Background()
 	orig := livePort(t, c, id)
 	defer func() {
-		if err := c.SetPort(ctx, id, orig.Enabled, orig.ConfiguredSpeed, orig.ConfiguredFlowControl); err != nil {
+		if err := c.SetPort(ctx, PortConfig{ID: id, Enabled: orig.Enabled, Speed: orig.ConfiguredSpeed, FlowControl: orig.ConfiguredFlowControl}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if now := livePort(t, c, id); now != orig {
@@ -178,14 +178,14 @@ func TestLivePortWrites(t *testing.T) {
 	}()
 	for _, step := range []struct {
 		enabled bool
-		speed   string
+		speed   Speed
 		flow    bool
 	}{
 		{orig.Enabled, orig.ConfiguredSpeed, !orig.ConfiguredFlowControl},
 		{orig.Enabled, "100Mbps-full", orig.ConfiguredFlowControl},
 		{!orig.Enabled, orig.ConfiguredSpeed, orig.ConfiguredFlowControl},
 	} {
-		if err := c.SetPort(ctx, id, step.enabled, step.speed, step.flow); err != nil {
+		if err := c.SetPort(ctx, PortConfig{ID: id, Enabled: step.enabled, Speed: step.speed, FlowControl: step.flow}); err != nil {
 			t.Fatalf("%+v: %v", step, err)
 		}
 		got := livePort(t, c, id)
@@ -273,14 +273,14 @@ func TestLiveBandwidth(t *testing.T) {
 	livePort(t, c, id) // abort unless port 7 is unused
 	orig := bandwidthOf(t, c, id)
 	defer func() {
-		if err := c.SetBandwidth(ctx, id, orig.IngressKbps, orig.EgressKbps); err != nil {
+		if err := c.SetBandwidth(ctx, PortBandwidth{Port: id, IngressKbps: orig.IngressKbps, EgressKbps: orig.EgressKbps}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if now := bandwidthOf(t, c, id); now != orig {
 			t.Errorf("not restored: %+v vs %+v", now, orig)
 		}
 	}()
-	if err := c.SetBandwidth(ctx, id, 1024, 2048); err != nil {
+	if err := c.SetBandwidth(ctx, PortBandwidth{Port: id, IngressKbps: 1024, EgressKbps: 2048}); err != nil {
 		t.Fatal(err)
 	}
 	if got := bandwidthOf(t, c, id); got.IngressKbps != 1024 || got.EgressKbps != 2048 {
@@ -322,14 +322,14 @@ func TestLiveStormControl(t *testing.T) {
 	livePort(t, c, id) // abort unless port 7 is unused
 	orig := stormOf(t, c, id)
 	defer func() {
-		if err := c.SetStormControl(ctx, id, orig.UnknownUnicast, orig.Multicast, orig.Broadcast, orig.RateKbps); err != nil {
+		if err := c.SetStormControl(ctx, StormConfig{Port: id, UnknownUnicast: orig.UnknownUnicast, Multicast: orig.Multicast, Broadcast: orig.Broadcast, RateKbps: orig.RateKbps}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if now := stormOf(t, c, id); now != orig {
 			t.Errorf("not restored: %+v vs %+v", now, orig)
 		}
 	}()
-	if err := c.SetStormControl(ctx, id, false, true, true, 1024); err != nil {
+	if err := c.SetStormControl(ctx, StormConfig{Port: id, UnknownUnicast: false, Multicast: true, Broadcast: true, RateKbps: 1024}); err != nil {
 		t.Fatal(err)
 	}
 	got := stormOf(t, c, id)
@@ -343,7 +343,7 @@ func TestLiveStormControl(t *testing.T) {
 		}
 	}
 	// unknown unicast, which the first live run (switch 01) did not cover
-	if err := c.SetStormControl(ctx, id, true, false, false, 2048); err != nil {
+	if err := c.SetStormControl(ctx, StormConfig{Port: id, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 2048}); err != nil {
 		t.Fatal(err)
 	}
 	if got := stormOf(t, c, id); !got.Enabled || !got.UnknownUnicast || got.Multicast || got.Broadcast || got.RateKbps != 2048 {

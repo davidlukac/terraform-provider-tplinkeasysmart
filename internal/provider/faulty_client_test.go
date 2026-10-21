@@ -133,8 +133,8 @@ func (w *faultyClient) Ports(ctx context.Context) ([]escp.Port, error) {
 	return w.SwitchClient.Ports(ctx)
 }
 
-func (w *faultyClient) SetPort(ctx context.Context, id int, enabled bool, speed string, flow bool) error {
-	return w.write("SetPort", func() error { return w.SwitchClient.SetPort(ctx, id, enabled, speed, flow) })
+func (w *faultyClient) SetPort(ctx context.Context, cfg escp.PortConfig) error {
+	return w.write("SetPort", func() error { return w.SwitchClient.SetPort(ctx, cfg) })
 }
 
 func (w *faultyClient) PortStatistics(ctx context.Context) ([]escp.PortStats, error) {
@@ -235,8 +235,8 @@ func (w *faultyClient) Bandwidth(ctx context.Context) ([]escp.PortBandwidth, err
 	return w.SwitchClient.Bandwidth(ctx)
 }
 
-func (w *faultyClient) SetBandwidth(ctx context.Context, port, in, eg int) error {
-	return w.write("SetBandwidth", func() error { return w.SwitchClient.SetBandwidth(ctx, port, in, eg) })
+func (w *faultyClient) SetBandwidth(ctx context.Context, limit escp.PortBandwidth) error {
+	return w.write("SetBandwidth", func() error { return w.SwitchClient.SetBandwidth(ctx, limit) })
 }
 
 func (w *faultyClient) StormControl(ctx context.Context) ([]escp.PortStorm, error) {
@@ -246,8 +246,8 @@ func (w *faultyClient) StormControl(ctx context.Context) ([]escp.PortStorm, erro
 	return w.SwitchClient.StormControl(ctx)
 }
 
-func (w *faultyClient) SetStormControl(ctx context.Context, port int, uu, mc, bc bool, rate int) error {
-	return w.write("SetStormControl", func() error { return w.SwitchClient.SetStormControl(ctx, port, uu, mc, bc, rate) })
+func (w *faultyClient) SetStormControl(ctx context.Context, cfg escp.StormConfig) error {
+	return w.write("SetStormControl", func() error { return w.SwitchClient.SetStormControl(ctx, cfg) })
 }
 
 func (w *faultyClient) SetMTUVLAN(ctx context.Context, enabled bool, uplink int) error {

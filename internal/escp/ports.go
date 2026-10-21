@@ -23,26 +23,68 @@ const (
 type Port struct {
 	ID                    int
 	Enabled               bool
-	LAG                   int    // 0 = not in a LAG
-	ConfiguredSpeed       string // auto, 10Mbps-half, ... 1000Mbps-full
-	ActualSpeed           string // link-down or a negotiated speed
+	LAG                   int   // 0 = not in a LAG
+	ConfiguredSpeed       Speed // auto, 10Mbps-half, ... 1000Mbps-full
+	ActualSpeed           Speed // SpeedLinkDown or a negotiated speed
 	ConfiguredFlowControl bool
 	ActualFlowControl     bool
 }
 
-// SpeedLinkDown is the ActualSpeed of a port with no link.
-const SpeedLinkDown = "link-down"
+// Speed is a port's speed and duplex, spelled as the web UI and the Terraform
+// provider spell it. The values are part of the provider's state: do not change them.
+type Speed string
 
-var speedNames = map[byte]string{
-	0: SpeedLinkDown, 1: "auto", 2: "10Mbps-half", 3: "10Mbps-full",
-	4: "100Mbps-half", 5: "100Mbps-full", 6: "1000Mbps-full",
+// The speeds a port can be configured to (codes 1..6 on the wire), and the one state
+// that is only ever reported.
+const (
+	SpeedAuto     Speed = "auto"
+	Speed10Half   Speed = "10Mbps-half"
+	Speed10Full   Speed = "10Mbps-full"
+	Speed100Half  Speed = "100Mbps-half"
+	Speed100Full  Speed = "100Mbps-full"
+	Speed1000Full Speed = "1000Mbps-full"
+	// SpeedLinkDown is the ActualSpeed of a port with no link; it cannot be configured.
+	SpeedLinkDown Speed = "link-down"
+)
+
+// configurableSpeeds are the speeds SetPort accepts, in the order of the switch's codes 1..6.
+var configurableSpeeds = [...]Speed{SpeedAuto, Speed10Half, Speed10Full, Speed100Half, Speed100Full, Speed1000Full}
+
+// ConfigurableSpeeds lists the speeds SetPort accepts, in the order of the switch's codes 1..6.
+func ConfigurableSpeeds() []Speed { return append([]Speed(nil), configurableSpeeds[:]...) }
+
+// String returns the speed as spelled in the web UI.
+func (s Speed) String() string { return string(s) }
+
+// ParseSpeed converts a configurable speed name; SpeedLinkDown and unknown names are errors.
+func ParseSpeed(name string) (Speed, error) {
+	for _, s := range configurableSpeeds {
+		if string(s) == name {
+			return s, nil
+		}
+	}
+	return "", fmt.Errorf("escp: unknown speed %q (valid: %v)", name, configurableSpeeds)
 }
 
-func speedName(b byte) string {
-	if n, ok := speedNames[b]; ok {
-		return n
+// speedFromCode names a speed code of a read reply (0 = no link).
+func speedFromCode(b byte) Speed {
+	if b == 0 {
+		return SpeedLinkDown
 	}
-	return fmt.Sprintf("unknown(%d)", b)
+	if int(b) <= len(configurableSpeeds) {
+		return configurableSpeeds[b-1]
+	}
+	return Speed(fmt.Sprintf("unknown(%d)", b))
+}
+
+// code returns the wire code of a configurable speed.
+func (s Speed) code() (byte, error) {
+	for i, n := range configurableSpeeds {
+		if n == s {
+			return byte(i + 1), nil
+		}
+	}
+	return 0, fmt.Errorf("escp: unknown speed %q (valid: %v)", string(s), configurableSpeeds)
 }
 
 // parsePorts decodes TLV 4096 values: port, state, lag, cfg speed, actual
@@ -59,7 +101,7 @@ func parsePorts(tlvs []wire.TLV) ([]Port, error) {
 		}
 		ports = append(ports, Port{
 			ID: int(v[portOffPort]), Enabled: v[portOffState] == 1, LAG: int(v[portOffLAG]),
-			ConfiguredSpeed: speedName(v[portOffCfgSpeed]), ActualSpeed: speedName(v[portOffActSpeed]),
+			ConfiguredSpeed: speedFromCode(v[portOffCfgSpeed]), ActualSpeed: speedFromCode(v[portOffActSpeed]),
 			ConfiguredFlowControl: v[portOffCfgFlow] == 1, ActualFlowControl: v[portOffActFlow] == 1,
 		})
 	}
@@ -75,30 +117,27 @@ func (c *Client) Ports(ctx context.Context) ([]Port, error) {
 	return parsePorts(tlvs)
 }
 
-// SpeedNames lists the configurable speeds in the order of the switch's codes 1..6.
-var SpeedNames = []string{"auto", "10Mbps-half", "10Mbps-full", "100Mbps-half", "100Mbps-full", "1000Mbps-full"}
-
-func speedCode(name string) (byte, error) {
-	for i, n := range SpeedNames {
-		if n == name {
-			return byte(i + 1), nil
-		}
-	}
-	return 0, fmt.Errorf("escp: unknown speed %q (valid: %v)", name, SpeedNames)
+// PortConfig is what SetPort writes to one port. All fields are required: the switch
+// takes the whole entry, so a caller changing one field passes the others as read.
+type PortConfig struct {
+	ID          int
+	Enabled     bool
+	Speed       Speed // a configurable speed; SpeedLinkDown is refused
+	FlowControl bool
 }
 
 // SetPort writes the configuration of one port: admin state, speed and flow
 // control (7-byte TLV 4096 as sent by the vendor utility). Changing a port that
 // carries traffic can cut connectivity; callers must guard against that.
-func (c *Client) SetPort(ctx context.Context, id int, enabled bool, speed string, flowControl bool) error {
-	code, err := speedCode(speed)
+func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
+	code, err := cfg.Speed.code()
 	if err != nil {
 		return err
 	}
-	if err := ValidatePort(id); err != nil {
+	if err := ValidatePort(cfg.ID); err != nil {
 		return err
 	}
 	entry := make([]byte, portEntryLen)
-	entry[portOffPort], entry[portOffState], entry[portOffCfgSpeed], entry[portOffCfgFlow] = byte(id), boolByte(enabled), code, boolByte(flowControl)
+	entry[portOffPort], entry[portOffState], entry[portOffCfgSpeed], entry[portOffCfgFlow] = byte(cfg.ID), boolByte(cfg.Enabled), code, boolByte(cfg.FlowControl)
 	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVPorts, Value: entry})
 }

@@ -12,7 +12,7 @@ type PortUse struct {
 	Exists bool
 	// Speed is the negotiated speed as the client reports it (escp.SpeedLinkDown
 	// without a link).
-	Speed string
+	Speed escp.Speed
 	// LAG is the link aggregation group the port belongs to, 0 for none.
 	LAG int
 }

@@ -28,7 +28,7 @@ func TestParseBandwidth(t *testing.T) {
 func TestSetBandwidthWire(t *testing.T) {
 	f := startFakeSwitch(t)
 	c := dialFake(t, f, "secret")
-	if err := c.SetBandwidth(context.Background(), 7, 1024, 0); err != nil {
+	if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 1024, EgressKbps: 0}); err != nil {
 		t.Fatal(err)
 	}
 	h := f.allSets()
@@ -42,7 +42,7 @@ func TestSetBandwidthWire(t *testing.T) {
 		t.Fatalf("egress wire: %+v", h[1])
 	}
 	for _, bad := range []int{-64, 100, 2000000} {
-		if err := c.SetBandwidth(context.Background(), 7, bad, 0); err == nil {
+		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: bad, EgressKbps: 0}); err == nil {
 			t.Errorf("rate %d must be rejected", bad)
 		}
 	}

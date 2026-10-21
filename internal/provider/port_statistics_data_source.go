@@ -98,7 +98,7 @@ func (d *portStatisticsDataSource) readBound(ctx context.Context, _ datasource.R
 	state := portStatisticsModel{ID: qualifiedID(d.sw, "port_statistics"), Ports: make([]portStatsModel, 0, len(rows))}
 	for _, r := range rows {
 		state.Ports = append(state.Ports, portStatsModel{
-			ID: types.Int64Value(int64(r.ID)), Enabled: types.BoolValue(r.Enabled), Link: types.StringValue(r.Link),
+			ID: types.Int64Value(int64(r.ID)), Enabled: types.BoolValue(r.Enabled), Link: types.StringValue(r.Link.String()),
 			TxGood: types.Int64Value(int64(r.TxGood)), TxBad: types.Int64Value(int64(r.TxBad)),
 			RxGood: types.Int64Value(int64(r.RxGood)), RxBad: types.Int64Value(int64(r.RxBad)),
 		})

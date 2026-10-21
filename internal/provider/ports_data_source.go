@@ -100,7 +100,7 @@ func (d *portsDataSource) readBound(ctx context.Context, _ datasource.ReadReques
 	for _, p := range ports {
 		state.Ports = append(state.Ports, portModel{
 			ID: types.Int64Value(int64(p.ID)), Enabled: types.BoolValue(p.Enabled), LAG: types.Int64Value(int64(p.LAG)),
-			ConfiguredSpeed: types.StringValue(p.ConfiguredSpeed), ActualSpeed: types.StringValue(p.ActualSpeed),
+			ConfiguredSpeed: types.StringValue(p.ConfiguredSpeed.String()), ActualSpeed: types.StringValue(p.ActualSpeed.String()),
 			ConfiguredFlowControl: types.BoolValue(p.ConfiguredFlowControl), ActualFlowControl: types.BoolValue(p.ActualFlowControl),
 		})
 	}
