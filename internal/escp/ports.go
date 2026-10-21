@@ -30,8 +30,11 @@ type Port struct {
 	ActualFlowControl     bool
 }
 
+// SpeedLinkDown is the ActualSpeed of a port with no link.
+const SpeedLinkDown = "link-down"
+
 var speedNames = map[byte]string{
-	0: "link-down", 1: "auto", 2: "10Mbps-half", 3: "10Mbps-full",
+	0: SpeedLinkDown, 1: "auto", 2: "10Mbps-half", 3: "10Mbps-full",
 	4: "100Mbps-half", 5: "100Mbps-full", 6: "1000Mbps-full",
 }
 

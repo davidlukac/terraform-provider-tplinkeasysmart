@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/safety"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -96,21 +97,14 @@ func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new [
 			continue
 		}
 		seen[p] = true
-		found := false
-		for _, info := range all {
-			if info.ID != p {
-				continue
-			}
-			found = true
-			if info.ActualSpeed != "link-down" {
-				return fmt.Errorf("port %d has a link up (%s); changing its VLAN membership can cut traffic or management access. Set allow_disruptive = true to proceed anyway", p, info.ActualSpeed)
-			}
-			if info.LAG != 0 {
-				return fmt.Errorf("port %d is a member of LAG%d; changing its VLAN can cut the uplink. Set allow_disruptive = true to proceed anyway", p, info.LAG)
-			}
-		}
-		if !found {
+		use := safety.UseOf(all, p)
+		switch {
+		case !use.Exists:
 			return fmt.Errorf("port %d does not exist on this switch", p)
+		case use.LinkUp():
+			return fmt.Errorf("port %d has a link up (%s); changing its VLAN membership can cut traffic or management access. Set allow_disruptive = true to proceed anyway", p, use.Speed)
+		case use.InLAG():
+			return fmt.Errorf("port %d is a member of LAG%d; changing its VLAN can cut the uplink. Set allow_disruptive = true to proceed anyway", p, use.LAG)
 		}
 	}
 	return nil
