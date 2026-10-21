@@ -3,12 +3,8 @@ package escp
 import (
 	"context"
 	"fmt"
-)
 
-// TLV types of QoS > QoS Basic.
-const (
-	TLVQoSMode     = 12288 // 1 byte
-	TLVQoSPriority = 12289 // one TLV per port: port(1) priority(1), raw 0..3
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 // QoSModeNames maps the switch's mode byte to the web UI names.
@@ -27,12 +23,12 @@ type QoS struct {
 	Priorities []PortPriority
 }
 
-func parseQoS(tlvs []TLV) (QoS, error) {
+func parseQoS(tlvs []wire.TLV) (QoS, error) {
 	out := QoS{Priorities: []PortPriority{}}
 	seen := false
 	for _, t := range tlvs {
 		switch t.Type {
-		case TLVQoSMode:
+		case wire.TLVQoSMode:
 			if len(t.Value) != 1 {
 				return out, fmt.Errorf("escp: QoS mode TLV has %d bytes", len(t.Value))
 			}
@@ -41,7 +37,7 @@ func parseQoS(tlvs []TLV) (QoS, error) {
 			if out.ModeName == "" {
 				out.ModeName = fmt.Sprintf("unknown(%d)", out.Mode)
 			}
-		case TLVQoSPriority:
+		case wire.TLVQoSPriority:
 			if len(t.Value) != 2 {
 				return out, fmt.Errorf("escp: QoS priority entry has %d bytes, want 2", len(t.Value))
 			}
@@ -57,11 +53,11 @@ func parseQoS(tlvs []TLV) (QoS, error) {
 // QoS reads the QoS mode and per-port priorities. Priorities are only
 // effective in port-based mode but are always reported.
 func (c *Client) QoS(ctx context.Context) (QoS, error) {
-	mode, err := c.getTLVs(ctx, TLVQoSMode)
+	mode, err := c.getTLVs(ctx, wire.TLVQoSMode)
 	if err != nil {
 		return QoS{}, err
 	}
-	pri, err := c.getTLVs(ctx, TLVQoSPriority)
+	pri, err := c.getTLVs(ctx, wire.TLVQoSPriority)
 	if err != nil {
 		return QoS{}, err
 	}
@@ -73,7 +69,7 @@ func (c *Client) SetQoSMode(ctx context.Context, mode int) error {
 	if _, ok := QoSModeNames[mode]; !ok {
 		return fmt.Errorf("escp: invalid QoS mode %d (valid: 0, 1, 2)", mode)
 	}
-	return c.setTLVs(ctx, TLV{TLVQoSMode, []byte{byte(mode)}})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
 }
 
 // SetPortPriorities changes the priority (1 lowest .. 4 highest) of the given
@@ -97,9 +93,9 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes map[int]int) err
 		}
 		prio[port] = v
 	}
-	tlvs := make([]TLV, 0, len(prio))
+	tlvs := make([]wire.TLV, 0, len(prio))
 	for _, p := range cur.Priorities { // keep the switch's port order
-		tlvs = append(tlvs, TLV{TLVQoSPriority, []byte{byte(p.Port), byte(prio[p.Port] - 1)}})
+		tlvs = append(tlvs, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p.Port), byte(prio[p.Port] - 1)}})
 	}
 	return c.setTLVs(ctx, tlvs...)
 }

@@ -7,12 +7,14 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestSetHostnameRefusesUnusableIPConfiguration(t *testing.T) {
 	f := startFakeSwitch(t)
 	f.configure(func(f *fakeSwitch) {
-		f.discoverTLVs = []TLV{{TLVModel, []byte("TL-SG108E\x00")}, {TLVHostname, []byte("TL-SG108E-fake\x00")}, {TLVMAC, []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
+		f.discoverTLVs = []wire.TLV{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte("TL-SG108E-fake\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
 	})
 	c := dialFake(t, f, "secret")
 	err := c.SetHostname(context.Background(), "sw01")

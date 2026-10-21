@@ -4,23 +4,25 @@ import (
 	"encoding/hex"
 	"reflect"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
-func tlvHex(t *testing.T, typ int16, h string) TLV {
+func tlvHex(t *testing.T, typ int16, h string) wire.TLV {
 	t.Helper()
 	b, err := hex.DecodeString(h)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return TLV{Type: typ, Value: b}
+	return wire.TLV{Type: typ, Value: b}
 }
 
 // Values captured from a TL-SG108E v6 (ports 1+2 in LAG1, ports 1,2,4,8 linked at 1 Gbps).
 func TestParsePorts(t *testing.T) {
-	got, err := parsePorts([]TLV{
-		tlvHex(t, TLVPorts, "01010101060000"),
-		tlvHex(t, TLVPorts, "03010001000000"),
-		tlvHex(t, TLVPorts, "08010001060000"),
+	got, err := parsePorts([]wire.TLV{
+		tlvHex(t, wire.TLVPorts, "01010101060000"),
+		tlvHex(t, wire.TLVPorts, "03010001000000"),
+		tlvHex(t, wire.TLVPorts, "08010001060000"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -36,7 +38,7 @@ func TestParsePorts(t *testing.T) {
 }
 
 func TestParsePortsShort(t *testing.T) {
-	if _, err := parsePorts([]TLV{{Type: TLVPorts, Value: []byte{1, 1}}}); err == nil {
+	if _, err := parsePorts([]wire.TLV{{Type: wire.TLVPorts, Value: []byte{1, 1}}}); err == nil {
 		t.Fatal("expected error for short TLV")
 	}
 }

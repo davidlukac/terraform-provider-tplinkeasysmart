@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-)
 
-// TLVPortStats is Monitoring > Port Statistics: one 19-byte TLV per port.
-const TLVPortStats = 16384
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+)
 
 // Layout of a port statistics entry: port, state, link speed (1 byte each),
 // then four 4-byte counters.
@@ -35,10 +34,10 @@ type PortStats struct {
 }
 
 // parsePortStats decodes TLV 16384: port, state, link, tx good, tx bad, rx good, rx bad (4 bytes each).
-func parsePortStats(tlvs []TLV) ([]PortStats, error) {
+func parsePortStats(tlvs []wire.TLV) ([]PortStats, error) {
 	var out []PortStats
 	for _, t := range tlvs {
-		if t.Type != TLVPortStats {
+		if t.Type != wire.TLVPortStats {
 			continue
 		}
 		v := t.Value
@@ -56,7 +55,7 @@ func parsePortStats(tlvs []TLV) ([]PortStats, error) {
 
 // PortStatistics reads the per-port traffic counters.
 func (c *Client) PortStatistics(ctx context.Context) ([]PortStats, error) {
-	tlvs, err := c.getTLVs(ctx, TLVPortStats)
+	tlvs, err := c.getTLVs(ctx, wire.TLVPortStats)
 	if err != nil {
 		return nil, err
 	}

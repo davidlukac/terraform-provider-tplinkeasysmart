@@ -4,12 +4,14 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestParsePortBasedVLAN(t *testing.T) {
 	// captured from a TL-SG108E v6 (fw 20230218): mode on, VLAN 1 = ports 1-8, up to 8 VLANs
-	got, err := parsePortBasedVLAN([]TLV{
-		tlvHex(t, TLVVLANPortBased, "01"), tlvHex(t, TLVVLANPortBasedVID, "01000000ff"), tlvHex(t, TLVVLANPortBasedMax, "08"),
+	got, err := parsePortBasedVLAN([]wire.TLV{
+		tlvHex(t, wire.TLVVLANPortBased, "01"), tlvHex(t, wire.TLVVLANPortBasedVID, "01000000ff"), tlvHex(t, wire.TLVVLANPortBasedMax, "08"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -18,7 +20,7 @@ func TestParsePortBasedVLAN(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v", got)
 	}
-	if _, err := parsePortBasedVLAN([]TLV{tlvHex(t, TLVVLANPortBased, "01"), {Type: TLVVLANPortBasedVID, Value: []byte{1}}}); err == nil {
+	if _, err := parsePortBasedVLAN([]wire.TLV{tlvHex(t, wire.TLVVLANPortBased, "01"), {Type: wire.TLVVLANPortBasedVID, Value: []byte{1}}}); err == nil {
 		t.Fatal("expected entry length error")
 	}
 	if _, err := parsePortBasedVLAN(nil); err == nil {
@@ -33,7 +35,7 @@ func TestSetPortBasedVLANWire(t *testing.T) {
 	if err := c.SetPortBasedVLAN(ctx, 2, []int{6, 7}); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.set(); got[0].Type != TLVVLANPortBasedVID || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
+	if got := f.set(); got[0].Type != wire.TLVVLANPortBasedVID || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
 		t.Fatalf("wire %+v", got)
 	}
 	if err := c.SetPortBasedVLAN(ctx, 2, nil); err != nil {

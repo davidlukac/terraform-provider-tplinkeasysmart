@@ -3,23 +3,22 @@ package escp
 import (
 	"context"
 	"fmt"
-)
 
-// TLVLoopPrevention is Monitoring > Loop Prevention: 1 byte, 1 = enabled.
-const TLVLoopPrevention = 17152
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+)
 
 // LoopPrevention reports Monitoring > Loop Prevention.
 func (c *Client) LoopPrevention(ctx context.Context) (bool, error) {
-	tlvs, err := c.getTLVs(ctx, TLVLoopPrevention)
+	tlvs, err := c.getTLVs(ctx, wire.TLVLoopPrevention)
 	if err != nil {
 		return false, err
 	}
 	return parseLoopPrevention(tlvs)
 }
 
-func parseLoopPrevention(tlvs []TLV) (bool, error) {
+func parseLoopPrevention(tlvs []wire.TLV) (bool, error) {
 	for _, t := range tlvs {
-		if t.Type == TLVLoopPrevention && len(t.Value) == 1 {
+		if t.Type == wire.TLVLoopPrevention && len(t.Value) == 1 {
 			return t.Value[0] == 1, nil
 		}
 	}
@@ -28,5 +27,5 @@ func parseLoopPrevention(tlvs []TLV) (bool, error) {
 
 // SetLoopPrevention enables or disables loop prevention.
 func (c *Client) SetLoopPrevention(ctx context.Context, on bool) error {
-	return c.setTLVs(ctx, TLV{TLVLoopPrevention, []byte{boolByte(on)}})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVLoopPrevention, Value: []byte{boolByte(on)}})
 }

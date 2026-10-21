@@ -1,4 +1,9 @@
-package escp
+// Package wire is the byte level of the ESCP protocol: the 32-byte packet header, the
+// type-length-value elements, the catalogue of TLV types, and the RC4 and RSA
+// primitives that protect them. It knows nothing about settings, sockets or
+// switches. The package is internal: the settings code in the parent package
+// and the fake switch use it, nobody else.
+package wire
 
 import (
 	"encoding/binary"
@@ -14,34 +19,14 @@ const (
 	OpSetReply  = 4
 )
 
-// TLV types used by this client.
-const (
-	TLVModel          = 1
-	TLVHostname       = 2
-	TLVMAC            = 3
-	TLVIP             = 4
-	TLVNetmask        = 5
-	TLVGateway        = 6
-	TLVFirmware       = 7
-	TLVHardware       = 8
-	TLVDHCP           = 9
-	TLVLED            = 12
-	TLVFactoryDefault = 14
-	TLVConfigFile     = 768 // configuration backup (read through an authenticated SET)
-	TLVUsername       = 512
-	TLVPassword       = 514
-	TLVRSAKey         = 528
-)
-
-// ErrCodeKeyAccepted is returned in the reply to a successful RSA key exchange.
-const ErrCodeKeyAccepted = 4098
-
 // Layout of the packet header (all fields big-endian).
 const (
-	protocolVersion = 1  // first header byte
-	headerLen       = 32 // total header size
-	macLen          = 6  // length of a MAC address
-	tlvHeaderLen    = 4  // TLV type (2 bytes) + length (2 bytes)
+	protocolVersion = 1 // first header byte
+	// HeaderLen is the total header size.
+	HeaderLen = 32
+	macLen    = 6 // length of a MAC address
+	// TLVHeaderLen is the size of a TLV header: type (2 bytes) + length (2 bytes).
+	TLVHeaderLen = 4
 
 	offOp        = 1  // operation code
 	offSwitchMAC = 2  // switch MAC
@@ -64,7 +49,8 @@ type TLV struct {
 	Value []byte
 }
 
-type header struct {
+// Header is the 32-byte packet header.
+type Header struct {
 	Op        byte
 	SwitchMAC [macLen]byte
 	HostMAC   [macLen]byte
@@ -75,7 +61,9 @@ type header struct {
 	Fragment uint16
 }
 
-func marshal(h header, tlvs []TLV) []byte {
+// Marshal encodes a header and TLVs into one packet, appending the terminating TLV and
+// filling in the length field.
+func Marshal(h Header, tlvs []TLV) []byte {
 	payload := []byte{}
 	for _, t := range tlvs {
 		payload = binary.BigEndian.AppendUint16(payload, uint16(t.Type))
@@ -83,26 +71,28 @@ func marshal(h header, tlvs []TLV) []byte {
 		payload = append(payload, t.Value...)
 	}
 	payload = append(payload, packetEnd...)
-	b := make([]byte, headerLen, headerLen+len(payload))
+	b := make([]byte, HeaderLen, HeaderLen+len(payload))
 	b[0], b[offOp] = protocolVersion, h.Op
 	copy(b[offSwitchMAC:], h.SwitchMAC[:])
 	copy(b[offHostMAC:], h.HostMAC[:])
 	binary.BigEndian.PutUint16(b[offSeq:], h.Seq)
 	binary.BigEndian.PutUint32(b[offErrCode:], uint32(h.ErrCode))
-	binary.BigEndian.PutUint16(b[offLength:], uint16(headerLen+len(payload)))
+	binary.BigEndian.PutUint16(b[offLength:], uint16(HeaderLen+len(payload)))
 	binary.BigEndian.PutUint16(b[offFragment:], h.Fragment)
 	return append(b, payload...)
 }
 
-// looksLikeHeader reports whether a decrypted buffer plausibly is a packet.
-func looksLikeHeader(b []byte) bool {
-	return len(b) >= headerLen+len(packetEnd) && b[0] == protocolVersion && b[offOp] <= OpSetReply &&
+// LooksLikeHeader reports whether a decrypted buffer plausibly is a packet.
+func LooksLikeHeader(b []byte) bool {
+	return len(b) >= HeaderLen+len(packetEnd) && b[0] == protocolVersion && b[offOp] <= OpSetReply &&
 		int(binary.BigEndian.Uint16(b[offLength:])) == len(b)
 }
 
-func unmarshal(b []byte) (header, []TLV, error) {
-	var h header
-	if !looksLikeHeader(b) {
+// Unmarshal decodes a packet. It validates the header and the TLV lengths and never
+// reads beyond the buffer.
+func Unmarshal(b []byte) (Header, []TLV, error) {
+	var h Header
+	if !LooksLikeHeader(b) {
 		return h, nil, fmt.Errorf("escp: not a valid packet (%d bytes)", len(b))
 	}
 	h.Op = b[offOp]
@@ -113,23 +103,24 @@ func unmarshal(b []byte) (header, []TLV, error) {
 	h.Length = binary.BigEndian.Uint16(b[offLength:])
 	h.Fragment = binary.BigEndian.Uint16(b[offFragment:])
 	var tlvs []TLV
-	p := b[headerLen:]
-	for len(p) >= tlvHeaderLen {
+	p := b[HeaderLen:]
+	for len(p) >= TLVHeaderLen {
 		t := int16(binary.BigEndian.Uint16(p))
 		l := int(binary.BigEndian.Uint16(p[2:]))
 		if t == tlvEndType && l == 0 {
 			break
 		}
-		if tlvHeaderLen+l > len(p) {
+		if TLVHeaderLen+l > len(p) {
 			return h, nil, fmt.Errorf("escp: truncated TLV type %d", t)
 		}
-		tlvs = append(tlvs, TLV{Type: t, Value: p[tlvHeaderLen : tlvHeaderLen+l]})
-		p = p[tlvHeaderLen+l:]
+		tlvs = append(tlvs, TLV{Type: t, Value: p[TLVHeaderLen : TLVHeaderLen+l]})
+		p = p[TLVHeaderLen+l:]
 	}
 	return h, tlvs, nil
 }
 
-func cstring(b []byte) string {
+// CString returns the bytes up to the first NUL (or all of them) as a string.
+func CString(b []byte) string {
 	for i, c := range b {
 		if c == 0 {
 			return string(b[:i])

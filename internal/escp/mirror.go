@@ -3,10 +3,9 @@ package escp
 import (
 	"context"
 	"fmt"
-)
 
-// TLVMirror is Monitoring > Port Mirror: 10 bytes (enabled, destination port, ingress mask, egress mask).
-const TLVMirror = 16640
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+)
 
 // Layout of the mirror entry: enabled flag, destination port, ingress mask, egress mask.
 const (
@@ -27,9 +26,9 @@ type Mirror struct {
 
 // parseMirror decodes TLV 16640: enabled, destination port, ingress mask(4), egress mask(4).
 // When disabled the switch zeroes the rest, and so do we.
-func parseMirror(tlvs []TLV) (Mirror, error) {
+func parseMirror(tlvs []wire.TLV) (Mirror, error) {
 	for _, t := range tlvs {
-		if t.Type != TLVMirror {
+		if t.Type != wire.TLVMirror {
 			continue
 		}
 		if len(t.Value) != mirrorEntryLen {
@@ -48,7 +47,7 @@ func parseMirror(tlvs []TLV) (Mirror, error) {
 
 // PortMirror reads the port mirroring configuration.
 func (c *Client) PortMirror(ctx context.Context) (Mirror, error) {
-	tlvs, err := c.getTLVs(ctx, TLVMirror)
+	tlvs, err := c.getTLVs(ctx, wire.TLVMirror)
 	if err != nil {
 		return Mirror{}, err
 	}
@@ -86,5 +85,5 @@ func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
 	} else if m.MirrorPort != 0 || len(m.IngressPorts) != 0 || len(m.EgressPorts) != 0 {
 		return fmt.Errorf("escp: a disabled mirror must have no destination or source ports")
 	}
-	return c.setTLVs(ctx, TLV{TLVMirror, v})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVMirror, Value: v})
 }

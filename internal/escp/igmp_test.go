@@ -3,10 +3,12 @@ package escp
 import (
 	"reflect"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestParseIGMP(t *testing.T) {
-	got, err := parseIGMP([]TLV{tlvHex(t, TLVIGMPEnabled, "01"), tlvHex(t, TLVIGMPSuppression, "00")})
+	got, err := parseIGMP([]wire.TLV{tlvHex(t, wire.TLVIGMPEnabled, "01"), tlvHex(t, wire.TLVIGMPSuppression, "00")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -14,7 +16,7 @@ func TestParseIGMP(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 	// 239.255.255.250 vlan 1 ports 1 and 4, then 224.0.1.1 vlan 10 port 8
-	got, err = parseIGMP([]TLV{tlvHex(t, TLVIGMPGroups, "effffffa000100000009"+"e0000101000a00000080"), tlvHex(t, TLVIGMPSuppression, "01")})
+	got, err = parseIGMP([]wire.TLV{tlvHex(t, wire.TLVIGMPGroups, "effffffa000100000009"+"e0000101000a00000080"), tlvHex(t, wire.TLVIGMPSuppression, "01")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +27,7 @@ func TestParseIGMP(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v\nwant %+v", got, want)
 	}
-	if _, err := parseIGMP([]TLV{{Type: TLVIGMPGroups, Value: make([]byte, 7)}}); err == nil {
+	if _, err := parseIGMP([]wire.TLV{{Type: wire.TLVIGMPGroups, Value: make([]byte, 7)}}); err == nil {
 		t.Fatal("expected length error")
 	}
 }

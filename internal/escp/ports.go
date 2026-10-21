@@ -3,6 +3,8 @@ package escp
 import (
 	"context"
 	"fmt"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 // Layout of a port entry (TLV 4096): one byte per field.
@@ -15,11 +17,6 @@ const (
 	portOffActSpeed = 4
 	portOffCfgFlow  = 5
 	portOffActFlow  = 6
-)
-
-// TLV types of the settings read by this package (see PROTOCOL.md).
-const (
-	TLVPorts = 4096
 )
 
 // Port is one row of the Port Setting page.
@@ -47,10 +44,10 @@ func speedName(b byte) string {
 
 // parsePorts decodes TLV 4096 values: port, state, lag, cfg speed, actual
 // speed, cfg flow control, actual flow control.
-func parsePorts(tlvs []TLV) ([]Port, error) {
+func parsePorts(tlvs []wire.TLV) ([]Port, error) {
 	var ports []Port
 	for _, t := range tlvs {
-		if t.Type != TLVPorts {
+		if t.Type != wire.TLVPorts {
 			continue
 		}
 		v := t.Value
@@ -68,7 +65,7 @@ func parsePorts(tlvs []TLV) ([]Port, error) {
 
 // Ports reads the Port Setting page: state, LAG membership, speed and flow control per port.
 func (c *Client) Ports(ctx context.Context) ([]Port, error) {
-	tlvs, err := c.getTLVs(ctx, TLVPorts)
+	tlvs, err := c.getTLVs(ctx, wire.TLVPorts)
 	if err != nil {
 		return nil, err
 	}
@@ -100,5 +97,5 @@ func (c *Client) SetPort(ctx context.Context, id int, enabled bool, speed string
 	}
 	entry := make([]byte, portEntryLen)
 	entry[portOffPort], entry[portOffState], entry[portOffCfgSpeed], entry[portOffCfgFlow] = byte(id), boolByte(enabled), code, boolByte(flowControl)
-	return c.setTLVs(ctx, TLV{TLVPorts, entry})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVPorts, Value: entry})
 }

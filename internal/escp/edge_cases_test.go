@@ -8,27 +8,33 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 // Parsers receive replies that may carry TLV types they do not own (a GET of
 // several types, or a switch answering more than asked). They must ignore them
 // and still decode what is theirs.
 func TestParsersIgnoreForeignTLVs(t *testing.T) {
-	foreign := TLV{Type: 9999, Value: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}
+	foreign := wire.TLV{Type: 9999, Value: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}
 	tests := []struct {
 		name string
 		got  func() (any, error)
 		want any
 	}{
-		{"ports", func() (any, error) { return parsePorts([]TLV{foreign, th(TLVPorts, "03010001000000")}) },
+		{"ports", func() (any, error) { return parsePorts([]wire.TLV{foreign, th(wire.TLVPorts, "03010001000000")}) },
 			[]Port{{ID: 3, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"}}},
-		{"port statistics", func() (any, error) { return parsePortStats([]TLV{foreign}) }, []PortStats(nil)},
-		{"LAGs", func() (any, error) { return parseLAGs([]TLV{foreign, th(TLVLAG, "0100000003")}) },
+		{"port statistics", func() (any, error) { return parsePortStats([]wire.TLV{foreign}) }, []PortStats(nil)},
+		{"LAGs", func() (any, error) { return parseLAGs([]wire.TLV{foreign, th(wire.TLVLAG, "0100000003")}) },
 			[]LAG{{ID: 1, Ports: []int{1, 2}}}},
-		{"storm control", func() (any, error) { return parseStorm([]TLV{foreign}) }, []PortStorm(nil)},
-		{"bandwidth", func() (any, error) { return parseBandwidth([]TLV{foreign, th(TLVBandwidthEgress, "010000000040")}) },
+		{"storm control", func() (any, error) { return parseStorm([]wire.TLV{foreign}) }, []PortStorm(nil)},
+		{"bandwidth", func() (any, error) {
+			return parseBandwidth([]wire.TLV{foreign, th(wire.TLVBandwidthEgress, "010000000040")})
+		},
 			[]PortBandwidth{{Port: 1, EgressKbps: 0x40}}},
-		{"mirror", func() (any, error) { return parseMirror([]TLV{foreign, th(TLVMirror, "00000000000000000000")}) },
+		{"mirror", func() (any, error) {
+			return parseMirror([]wire.TLV{foreign, th(wire.TLVMirror, "00000000000000000000")})
+		},
 			Mirror{IngressPorts: []int{}, EgressPorts: []int{}}},
 	}
 	for _, tt := range tests {
@@ -51,11 +57,11 @@ func TestParsersRejectMalformedState(t *testing.T) {
 		wantMsg string
 	}{
 		{"mirror without a TLV", second(parseMirror(nil)), "no port mirror TLV"},
-		{"QoS mode with two bytes", second(parseQoS([]TLV{{Type: TLVQoSMode, Value: []byte{1, 2}}})), "QoS mode TLV has 2 bytes"},
-		{"QoS without any mode", second(parseQoS([]TLV{th(TLVQoSPriority, "0100")})), "no QoS mode"},
-		{"802.1Q state with two bytes", second(parseDot1Q([]TLV{{Type: TLVVLAN8021Q, Value: []byte{0, 0}}})), "802.1Q state TLV has 2 bytes"},
+		{"QoS mode with two bytes", second(parseQoS([]wire.TLV{{Type: wire.TLVQoSMode, Value: []byte{1, 2}}})), "QoS mode TLV has 2 bytes"},
+		{"QoS without any mode", second(parseQoS([]wire.TLV{th(wire.TLVQoSPriority, "0100")})), "no QoS mode"},
+		{"802.1Q state with two bytes", second(parseDot1Q([]wire.TLV{{Type: wire.TLVVLAN8021Q, Value: []byte{0, 0}}})), "802.1Q state TLV has 2 bytes"},
 		{"802.1Q without any state", second(parseDot1Q(nil)), "no 802.1Q state"},
-		{"port-based VLAN state with two bytes", second(parsePortBasedVLAN([]TLV{{Type: TLVVLANPortBased, Value: []byte{1, 1}}})), "port-based VLAN state TLV has 2 bytes"},
+		{"port-based VLAN state with two bytes", second(parsePortBasedVLAN([]wire.TLV{{Type: wire.TLVVLANPortBased, Value: []byte{1, 1}}})), "port-based VLAN state TLV has 2 bytes"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -114,40 +120,40 @@ func TestMaskFromPorts(t *testing.T) {
 }
 
 func TestUnmarshalRejectsPacketsThatLieAboutTheirStructure(t *testing.T) {
-	good := marshal(header{Op: OpReply, Seq: 7}, []TLV{{Type: 5, Value: []byte{1, 2}}})
-	if _, tlvs, err := unmarshal(good); err != nil || len(tlvs) != 1 {
+	good := wire.Marshal(wire.Header{Op: wire.OpReply, Seq: 7}, []wire.TLV{{Type: 5, Value: []byte{1, 2}}})
+	if _, tlvs, err := wire.Unmarshal(good); err != nil || len(tlvs) != 1 {
 		t.Fatalf("control packet must parse: %v %v", tlvs, err)
 	}
 	t.Run("TLV longer than the packet", func(t *testing.T) {
 		bad := append([]byte(nil), good...)
-		bad[headerLen+2], bad[headerLen+3] = 0, 100 // claims 100 value bytes, 2 present
-		if _, _, err := unmarshal(bad); err == nil || !strings.Contains(err.Error(), "truncated TLV type 5") {
+		bad[wire.HeaderLen+2], bad[wire.HeaderLen+3] = 0, 100 // claims 100 value bytes, 2 present
+		if _, _, err := wire.Unmarshal(bad); err == nil || !strings.Contains(err.Error(), "truncated TLV type 5") {
 			t.Fatalf("want a truncation error, got %v", err)
 		}
 	})
 	t.Run("too short for a header", func(t *testing.T) {
-		if _, _, err := unmarshal(good[:20]); err == nil || !strings.Contains(err.Error(), "not a valid packet") {
+		if _, _, err := wire.Unmarshal(good[:20]); err == nil || !strings.Contains(err.Error(), "not a valid packet") {
 			t.Fatalf("got %v", err)
 		}
 	})
 	t.Run("declared length does not match", func(t *testing.T) {
 		bad := append([]byte(nil), good...)
 		bad[21]++
-		if _, _, err := unmarshal(bad); err == nil {
+		if _, _, err := wire.Unmarshal(bad); err == nil {
 			t.Fatal("a wrong total length must be rejected")
 		}
 	})
 	t.Run("unknown version", func(t *testing.T) {
 		bad := append([]byte(nil), good...)
 		bad[0] = 2
-		if _, _, err := unmarshal(bad); err == nil {
+		if _, _, err := wire.Unmarshal(bad); err == nil {
 			t.Fatal("version 2 must be rejected")
 		}
 	})
 	t.Run("opcode out of range", func(t *testing.T) {
 		bad := append([]byte(nil), good...)
 		bad[1] = 5
-		if _, _, err := unmarshal(bad); err == nil {
+		if _, _, err := wire.Unmarshal(bad); err == nil {
 			t.Fatal("opcode 5 must be rejected")
 		}
 	})
@@ -155,7 +161,7 @@ func TestUnmarshalRejectsPacketsThatLieAboutTheirStructure(t *testing.T) {
 
 func TestCString(t *testing.T) {
 	for in, want := range map[string]string{"abc\x00def": "abc", "abc": "abc", "": "", "\x00": ""} {
-		if got := cstring([]byte(in)); got != want {
+		if got := wire.CString([]byte(in)); got != want {
 			t.Errorf("cstring(%q) = %q, want %q", in, got, want)
 		}
 	}
@@ -167,7 +173,7 @@ func TestCString(t *testing.T) {
 func TestRSASessionTLVTrimsLeadingZeroWords(t *testing.T) {
 	key := []byte("AAAAahqn")
 	want, _ := hex.DecodeString("0003569d648da2df0000")
-	got := RSASessionTLV(key)
+	got := wire.RSASessionTLV(key)
 	if !bytes.Equal(got, want) {
 		t.Fatalf("got %x, want %x", got, want)
 	}
@@ -218,7 +224,7 @@ func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 		if err := c.SetBandwidth(context.Background(), 7, 64, 64); !errors.Is(err, ErrAuth) {
 			t.Fatalf("got %v", err)
 		}
-		if h := f.allSets(); len(h) != 1 || h[0][0].Type != TLVBandwidthIngress {
+		if h := f.allSets(); len(h) != 1 || h[0][0].Type != wire.TLVBandwidthIngress {
 			t.Fatalf("exactly the ingress SET should have been applied: %+v", h)
 		}
 	})
@@ -257,7 +263,7 @@ func TestMirrorRejectsInvalidSourcePortsBeforeSending(t *testing.T) {
 func TestSetPortPrioritiesStopsWhenTheCurrentStateCannotBeRead(t *testing.T) {
 	f := startFakeSwitch(t)
 	c := dialFast(t, f, "secret")
-	f.configure(func(f *fakeSwitch) { f.getFn = func([]int16) ([]TLV, int32, bool) { return nil, 0, true } })
+	f.configure(func(f *fakeSwitch) { f.getFn = func([]int16) ([]wire.TLV, int32, bool) { return nil, 0, true } })
 	if err := c.SetPortPriorities(context.Background(), map[int]int{3: 2}); !errors.Is(err, ErrNoReply) {
 		t.Fatalf("got %v", err)
 	}
@@ -275,11 +281,11 @@ func TestSetHostnameRefusesToWriteWithoutAUsableIPConfiguration(t *testing.T) {
 			t.Fatalf("got %v", err)
 		}
 	})
-	bad := map[string][]TLV{
-		"missing IP":      {{Type: TLVNetmask, Value: []byte{255, 255, 255, 0}}, {Type: TLVGateway, Value: []byte{10, 0, 0, 1}}},
-		"missing netmask": {{Type: TLVIP, Value: []byte{10, 0, 0, 5}}, {Type: TLVGateway, Value: []byte{10, 0, 0, 1}}},
-		"missing gateway": {{Type: TLVIP, Value: []byte{10, 0, 0, 5}}, {Type: TLVNetmask, Value: []byte{255, 255, 255, 0}}},
-		"malformed IP":    {{Type: TLVIP, Value: []byte{10, 0, 5}}, {Type: TLVNetmask, Value: []byte{255, 255, 255, 0}}, {Type: TLVGateway, Value: []byte{10, 0, 0, 1}}},
+	bad := map[string][]wire.TLV{
+		"missing IP":      {{Type: wire.TLVNetmask, Value: []byte{255, 255, 255, 0}}, {Type: wire.TLVGateway, Value: []byte{10, 0, 0, 1}}},
+		"missing netmask": {{Type: wire.TLVIP, Value: []byte{10, 0, 0, 5}}, {Type: wire.TLVGateway, Value: []byte{10, 0, 0, 1}}},
+		"missing gateway": {{Type: wire.TLVIP, Value: []byte{10, 0, 0, 5}}, {Type: wire.TLVNetmask, Value: []byte{255, 255, 255, 0}}},
+		"malformed IP":    {{Type: wire.TLVIP, Value: []byte{10, 0, 5}}, {Type: wire.TLVNetmask, Value: []byte{255, 255, 255, 0}}, {Type: wire.TLVGateway, Value: []byte{10, 0, 0, 1}}},
 	}
 	for name, tlvs := range bad {
 		t.Run(name, func(t *testing.T) {

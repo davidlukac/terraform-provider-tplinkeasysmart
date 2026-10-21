@@ -4,10 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-)
 
-// TLVLAG is Switching > Port Trunk: one TLV per group, group id (1 byte) and member port mask (4 bytes).
-const TLVLAG = 4608
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+)
 
 // Layout of a LAG entry (TLV 4608): group id (1 byte), member port mask (maskLen bytes).
 const (
@@ -79,10 +78,10 @@ type LAG struct {
 }
 
 // parseLAGs decodes TLV 4608: group id (1 byte), member port bitmap (4 bytes).
-func parseLAGs(tlvs []TLV) ([]LAG, error) {
+func parseLAGs(tlvs []wire.TLV) ([]LAG, error) {
 	var out []LAG
 	for _, t := range tlvs {
-		if t.Type != TLVLAG {
+		if t.Type != wire.TLVLAG {
 			continue
 		}
 		if len(t.Value) < lagEntryLen {
@@ -95,7 +94,7 @@ func parseLAGs(tlvs []TLV) ([]LAG, error) {
 
 // LAGs reads the link aggregation groups.
 func (c *Client) LAGs(ctx context.Context) ([]LAG, error) {
-	tlvs, err := c.getTLVs(ctx, TLVLAG)
+	tlvs, err := c.getTLVs(ctx, wire.TLVLAG)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +116,7 @@ func (c *Client) SetLAG(ctx context.Context, group int, ports []int) error {
 	if err := ValidateLAG(group, ports); err != nil {
 		return err
 	}
-	err = c.setTLVs(ctx, TLV{TLVLAG, append([]byte{byte(group)}, mask...)})
+	err = c.setTLVs(ctx, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(group)}, mask...)})
 	var rejected *RejectedError
 	if errors.As(err, &rejected) {
 		if reason, ok := lagRefusals[rejected.Code]; ok {

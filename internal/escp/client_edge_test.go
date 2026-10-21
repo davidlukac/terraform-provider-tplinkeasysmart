@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestDialAppliesDefaults(t *testing.T) {
@@ -14,8 +16,8 @@ func TestDialAppliesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.cfg.Timeout != 3*time.Second || c.cfg.Retries != 2 || c.cfg.SwitchPort != DefaultSwitchPort ||
-		c.cfg.HostPort != DefaultHostPort || c.cfg.BroadcastAddr != "255.255.255.255" {
+	if c.cfg.Timeout != 3*time.Second || c.cfg.Retries != 2 || c.cfg.SwitchPort != defaultSwitchPort ||
+		c.cfg.HostPort != defaultHostPort || c.cfg.BroadcastAddr != "255.255.255.255" {
 		t.Fatalf("defaults not applied: %+v", c.cfg)
 	}
 	if c.conn != nil {
@@ -126,7 +128,7 @@ func TestLocalMAC(t *testing.T) {
 }
 
 func TestReplyTLVLookup(t *testing.T) {
-	r := reply{tlvs: []TLV{{Type: 5, Value: []byte{1}}, {Type: 9, Value: []byte{2, 3}}}}
+	r := reply{tlvs: []wire.TLV{{Type: 5, Value: []byte{1}}, {Type: 9, Value: []byte{2, 3}}}}
 	if v, ok := r.tlv(9); !ok || len(v) != 2 || v[1] != 3 {
 		t.Fatalf("existing TLV not found: %v %v", v, ok)
 	}
@@ -136,23 +138,23 @@ func TestReplyTLVLookup(t *testing.T) {
 }
 
 func TestDecryptChoosesTheKeyThatYieldsAHeader(t *testing.T) {
-	pkt := marshal(header{Op: OpReply, Seq: 4}, nil)
+	pkt := wire.Marshal(wire.Header{Op: wire.OpReply, Seq: 4}, nil)
 	garbage := []byte("this is definitely not an ESCP packet, and long enough to look like one....")
 
 	noSession := &Client{}
-	if got := noSession.decrypt(rc4Static(pkt)); !looksLikeHeader(got) {
+	if got := noSession.decrypt(wire.RC4Static(pkt)); !wire.LooksLikeHeader(got) {
 		t.Fatal("a statically encrypted packet must decode without a session")
 	}
-	if got := noSession.decrypt(garbage); string(got) != string(rc4Static(garbage)) {
+	if got := noSession.decrypt(garbage); string(got) != string(wire.RC4Static(garbage)) {
 		t.Fatal("without a session, undecodable data falls back to the static key")
 	}
 
 	key := []byte("AbCdEf12")
 	withSession := &Client{session: key}
-	if got := withSession.decrypt(rc4Session(pkt, key)); !looksLikeHeader(got) {
+	if got := withSession.decrypt(wire.RC4Session(pkt, key)); !wire.LooksLikeHeader(got) {
 		t.Fatal("a session-encrypted packet must decode with the session key")
 	}
-	if got := withSession.decrypt(rc4Static(pkt)); !looksLikeHeader(got) {
+	if got := withSession.decrypt(wire.RC4Static(pkt)); !wire.LooksLikeHeader(got) {
 		t.Fatal("a statically encrypted packet must still decode while a session exists")
 	}
 }
@@ -164,8 +166,8 @@ func TestAcceptFiltersForeignAndStaleDatagrams(t *testing.T) {
 	}
 	c.seq = 41
 	fromSwitch := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1}
-	enc := func(op byte, seq uint16, tlvs ...TLV) []byte {
-		return rc4Static(marshal(header{Op: op, Seq: seq, ErrCode: 3, SwitchMAC: [6]byte{1, 2, 3, 4, 5, 6}}, tlvs))
+	enc := func(op byte, seq uint16, tlvs ...wire.TLV) []byte {
+		return wire.RC4Static(wire.Marshal(wire.Header{Op: op, Seq: seq, ErrCode: 3, SwitchMAC: [6]byte{1, 2, 3, 4, 5, 6}}, tlvs))
 	}
 	tests := []struct {
 		name string
@@ -173,11 +175,11 @@ func TestAcceptFiltersForeignAndStaleDatagrams(t *testing.T) {
 		data []byte
 		ok   bool
 	}{
-		{"other source address", &net.UDPAddr{IP: net.IPv4(10, 9, 8, 7)}, enc(OpReply, 41), false},
+		{"other source address", &net.UDPAddr{IP: net.IPv4(10, 9, 8, 7)}, enc(wire.OpReply, 41), false},
 		{"not a packet", fromSwitch, []byte("garbage"), false},
-		{"stale sequence number", fromSwitch, enc(OpReply, 40), false},
-		{"our own discovery echoed back", fromSwitch, enc(OpDiscovery, 41), false},
-		{"the awaited reply", fromSwitch, enc(OpReply, 41, TLV{Type: 9, Value: []byte{7}}), true},
+		{"stale sequence number", fromSwitch, enc(wire.OpReply, 40), false},
+		{"our own discovery echoed back", fromSwitch, enc(wire.OpDiscovery, 41), false},
+		{"the awaited reply", fromSwitch, enc(wire.OpReply, 41, wire.TLV{Type: 9, Value: []byte{7}}), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -185,7 +187,7 @@ func TestAcceptFiltersForeignAndStaleDatagrams(t *testing.T) {
 			if ok != tt.ok {
 				t.Fatalf("accept = %v, want %v", ok, tt.ok)
 			}
-			if ok && (rep.op != OpReply || rep.err != 3 || len(rep.tlvs) != 1 || rep.tlvs[0].Value[0] != 7) {
+			if ok && (rep.op != wire.OpReply || rep.err != 3 || len(rep.tlvs) != 1 || rep.tlvs[0].Value[0] != 7) {
 				t.Fatalf("decoded reply wrong: %+v", rep)
 			}
 		})
@@ -194,7 +196,7 @@ func TestAcceptFiltersForeignAndStaleDatagrams(t *testing.T) {
 		t.Fatalf("the switch MAC must be learned from the first accepted reply, got %x (have=%v)", c.swMAC, c.haveSwMAC)
 	}
 	// a later reply with another MAC must not overwrite what we learned
-	c.accept(fromSwitch, rc4Static(marshal(header{Op: OpReply, Seq: 41, SwitchMAC: [6]byte{9, 9, 9, 9, 9, 9}}, nil)))
+	c.accept(fromSwitch, wire.RC4Static(wire.Marshal(wire.Header{Op: wire.OpReply, Seq: 41, SwitchMAC: [6]byte{9, 9, 9, 9, 9, 9}}, nil)))
 	if c.swMAC != [6]byte{1, 2, 3, 4, 5, 6} {
 		t.Fatalf("learned MAC was overwritten: %x", c.swMAC)
 	}
@@ -204,13 +206,13 @@ func TestInfoFromReplyToleratesMissingAndMalformedFields(t *testing.T) {
 	if got := infoFromReply(reply{}); got != (Info{}) {
 		t.Fatalf("an empty reply must give an empty Info, got %+v", got)
 	}
-	got := infoFromReply(reply{tlvs: []TLV{
-		{Type: TLVIP, Value: []byte{192, 168, 1}},           // 3 bytes: not an address
-		{Type: TLVNetmask, Value: []byte{255, 255, 255, 0}}, // fine
-		{Type: TLVMAC, Value: []byte{1, 2, 3}},              // 3 bytes: not a MAC
-		{Type: TLVDHCP, Value: []byte{1, 1}},                // 2 bytes: ignored
-		{Type: TLVFactoryDefault, Value: nil},               // empty: ignored
-		{Type: TLVModel, Value: []byte("TL-SG108E")},        // no NUL terminator
+	got := infoFromReply(reply{tlvs: []wire.TLV{
+		{Type: wire.TLVIP, Value: []byte{192, 168, 1}},           // 3 bytes: not an address
+		{Type: wire.TLVNetmask, Value: []byte{255, 255, 255, 0}}, // fine
+		{Type: wire.TLVMAC, Value: []byte{1, 2, 3}},              // 3 bytes: not a MAC
+		{Type: wire.TLVDHCP, Value: []byte{1, 1}},                // 2 bytes: ignored
+		{Type: wire.TLVFactoryDefault, Value: nil},               // empty: ignored
+		{Type: wire.TLVModel, Value: []byte("TL-SG108E")},        // no NUL terminator
 	}})
 	want := Info{Model: "TL-SG108E", Netmask: "255.255.255.0"}
 	if got != want {
@@ -335,7 +337,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		f := startFakeSwitch(t)
 		c := dialFast(t, f, "secret")
 		f.configure(func(f *fakeSwitch) {
-			f.getFn = func([]int16) ([]TLV, int32, bool) { return nil, 0, true }
+			f.getFn = func([]int16) ([]wire.TLV, int32, bool) { return nil, 0, true }
 		})
 		if _, err := c.GetLED(context.Background()); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
@@ -345,7 +347,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		f := startFakeSwitch(t)
 		c := dialFast(t, f, "secret")
 		f.configure(func(f *fakeSwitch) {
-			f.getFn = func([]int16) ([]TLV, int32, bool) { return []TLV{{Type: 99, Value: []byte{1}}}, 0, false }
+			f.getFn = func([]int16) ([]wire.TLV, int32, bool) { return []wire.TLV{{Type: 99, Value: []byte{1}}}, 0, false }
 		})
 		if _, err := c.GetLED(context.Background()); err == nil || !strings.Contains(err.Error(), "unexpected LED reply") {
 			t.Fatalf("want an unexpected-reply error, got %v", err)
@@ -355,7 +357,9 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		f := startFakeSwitch(t)
 		c := dialFast(t, f, "secret")
 		f.configure(func(f *fakeSwitch) {
-			f.getFn = func([]int16) ([]TLV, int32, bool) { return []TLV{{Type: TLVLED, Value: []byte{1, 1}}}, 0, false }
+			f.getFn = func([]int16) ([]wire.TLV, int32, bool) {
+				return []wire.TLV{{Type: wire.TLVLED, Value: []byte{1, 1}}}, 0, false
+			}
 		})
 		if _, err := c.GetLED(context.Background()); err == nil || !strings.Contains(err.Error(), "unexpected LED reply") {
 			t.Fatalf("want an unexpected-reply error, got %v", err)

@@ -3,13 +3,15 @@ package escp
 import (
 	"reflect"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestParsePortStats(t *testing.T) {
-	got, err := parsePortStats([]TLV{
-		tlvHex(t, TLVPortStats, "0101061434f1b7000000002873fb8a00000000"),
-		tlvHex(t, TLVPortStats, "03010000000000000000000000000000000000"),
-		tlvHex(t, TLVPortStats, "08010637b1c885000000001b4ae3f300000001"),
+	got, err := parsePortStats([]wire.TLV{
+		tlvHex(t, wire.TLVPortStats, "0101061434f1b7000000002873fb8a00000000"),
+		tlvHex(t, wire.TLVPortStats, "03010000000000000000000000000000000000"),
+		tlvHex(t, wire.TLVPortStats, "08010637b1c885000000001b4ae3f300000001"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -22,7 +24,7 @@ func TestParsePortStats(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v\nwant %+v", got, want)
 	}
-	if _, err := parsePortStats([]TLV{{Type: TLVPortStats, Value: make([]byte, 5)}}); err == nil {
+	if _, err := parsePortStats([]wire.TLV{{Type: wire.TLVPortStats, Value: make([]byte, 5)}}); err == nil {
 		t.Fatal("expected error for short TLV")
 	}
 }

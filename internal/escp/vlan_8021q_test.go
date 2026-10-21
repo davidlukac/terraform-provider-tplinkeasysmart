@@ -3,14 +3,16 @@ package escp
 import (
 	"reflect"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestParseDot1QDisabled(t *testing.T) {
 	// captured from a TL-SG108E v6 (fw 20230218): 802.1Q off, 32 VLANs max, every port PVID 1
-	var tl []TLV
-	tl = append(tl, tlvHex(t, TLVVLAN8021Q, "00"), tlvHex(t, TLVVLAN8021QMax, "20"))
+	var tl []wire.TLV
+	tl = append(tl, tlvHex(t, wire.TLVVLAN8021Q, "00"), tlvHex(t, wire.TLVVLAN8021QMax, "20"))
 	for p := 1; p <= 8; p++ {
-		tl = append(tl, TLV{Type: TLVVLAN8021QPVID, Value: []byte{byte(p), 0, 1}})
+		tl = append(tl, wire.TLV{Type: wire.TLVVLAN8021QPVID, Value: []byte{byte(p), 0, 1}})
 	}
 	got, err := parseDot1Q(tl)
 	if err != nil {
@@ -23,10 +25,10 @@ func TestParseDot1QDisabled(t *testing.T) {
 
 func TestParseDot1QVLANs(t *testing.T) {
 	// layout from the vendor code: VLAN 10 "iot", members 1,2,8, tagged 8
-	got, err := parseDot1Q([]TLV{
-		tlvHex(t, TLVVLAN8021Q, "01"),
-		tlvHex(t, TLVVLAN8021QVLAN, "000a"+"00000083"+"00000080"+"696f7400"),
-		tlvHex(t, TLVVLAN8021QVLAN, "0001"+"000000ff"+"00000000"+"44656661756c7400"),
+	got, err := parseDot1Q([]wire.TLV{
+		tlvHex(t, wire.TLVVLAN8021Q, "01"),
+		tlvHex(t, wire.TLVVLAN8021QVLAN, "000a"+"00000083"+"00000080"+"696f7400"),
+		tlvHex(t, wire.TLVVLAN8021QVLAN, "0001"+"000000ff"+"00000000"+"44656661756c7400"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -38,10 +40,10 @@ func TestParseDot1QVLANs(t *testing.T) {
 	if !reflect.DeepEqual(got.VLANs, want) || !got.Enabled {
 		t.Fatalf("got %+v", got)
 	}
-	if _, err := parseDot1Q([]TLV{tlvHex(t, TLVVLAN8021Q, "01"), {Type: TLVVLAN8021QVLAN, Value: []byte{0, 1}}}); err == nil {
+	if _, err := parseDot1Q([]wire.TLV{tlvHex(t, wire.TLVVLAN8021Q, "01"), {Type: wire.TLVVLAN8021QVLAN, Value: []byte{0, 1}}}); err == nil {
 		t.Fatal("expected short entry error")
 	}
-	if _, err := parseDot1Q([]TLV{{Type: TLVVLAN8021QPVID, Value: []byte{1}}}); err == nil {
+	if _, err := parseDot1Q([]wire.TLV{{Type: wire.TLVVLAN8021QPVID, Value: []byte{1}}}); err == nil {
 		t.Fatal("expected error (bad pvid / no state)")
 	}
 }

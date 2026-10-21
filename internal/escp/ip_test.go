@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func cfgOf(ip, mask, gw string) IPConfig {
@@ -79,10 +81,10 @@ func TestSetIPConfigWireLayoutAndReadBack(t *testing.T) {
 	if len(sets) != 1 {
 		t.Fatalf("want exactly one write, got %d", len(sets))
 	}
-	want := []TLV{
-		{TLVHostname, []byte("TL-SG108E-fake\x00")}, // kept as the switch reports it
-		{TLVDHCP, []byte{1}},                        // kept as the switch reports it
-		{TLVIP, []byte{127, 0, 0, 1}}, {TLVNetmask, []byte{255, 255, 0, 0}}, {TLVGateway, []byte{127, 0, 0, 2}},
+	want := []wire.TLV{
+		{Type: wire.TLVHostname, Value: []byte("TL-SG108E-fake\x00")}, // kept as the switch reports it
+		{Type: wire.TLVDHCP, Value: []byte{1}},                        // kept as the switch reports it
+		{Type: wire.TLVIP, Value: []byte{127, 0, 0, 1}}, {Type: wire.TLVNetmask, Value: []byte{255, 255, 0, 0}}, {Type: wire.TLVGateway, Value: []byte{127, 0, 0, 2}},
 	}
 	if len(sets[0]) != len(want) {
 		t.Fatalf("SET carries %d TLVs, want %d: %+v", len(sets[0]), len(want), sets[0])
@@ -112,7 +114,7 @@ func TestSetIPConfigValidatesBeforeTheNetwork(t *testing.T) {
 func TestSetIPConfigRefusesUnusableCurrentConfiguration(t *testing.T) {
 	f := startFakeSwitch(t)
 	f.configure(func(f *fakeSwitch) {
-		f.discoverTLVs = []TLV{{TLVModel, []byte("TL-SG108E\x00")}, {TLVMAC, []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
+		f.discoverTLVs = []wire.TLV{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
 	})
 	c := dialFake(t, f, "secret")
 	err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.255.255.0", "127.0.0.2"))
@@ -164,7 +166,7 @@ func TestAcceptsRepliesFromTheNewAddressWhileMoving(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := rc4Static(marshal(header{Op: OpSetReply, Seq: c.seq}, nil))
+	data := wire.RC4Static(wire.Marshal(wire.Header{Op: wire.OpSetReply, Seq: c.seq}, nil))
 	from := &net.UDPAddr{IP: net.ParseIP("127.0.0.2")}
 	if _, ok := c.accept(from, data); ok {
 		t.Fatal("a reply from another address must be dropped normally")
