@@ -40,6 +40,9 @@ jobs:
             build-mode: none
           - language: go
             build-mode: manual
+          - language: go
+            build-mode: manual
+            cold: true
           - language: python
             build-mode: none
     steps:
@@ -50,9 +53,31 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+      - if: matrix.cold
+        run: go clean -cache
       - if: matrix.build-mode == 'manual'
         name: Build
         run: go build ./...
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
-          category: "/language:${{ matrix.language }}"
+          category: "/language:${{ matrix.language }}${{ matrix.cold && '-cold' || '' }}"
+          output: sarif-out
+      - if: matrix.language == 'go'
+        name: Extraction summary (temporary)
+        run: |
+          python3 -I - <<'PY'
+          import glob, json
+          for f in glob.glob("sarif-out/*.sarif"):
+              r = json.load(open(f))["runs"][0]
+              print("sarif:", f, "results:", len(r.get("results", [])))
+              for m in r.get("properties", {}).get("metricResults", []):
+                  print("metric:", json.dumps(m)[:300])
+              files = set()
+              for inv in r.get("invocations", []):
+                  for n in inv.get("toolExecutionNotifications", []):
+                      for loc in n.get("locations", []):
+                          files.add(loc["physicalLocation"]["artifactLocation"]["uri"])
+              go = sorted(x for x in files if x.endswith(".go"))
+              print("extracted .go files:", len(go))
+              print("\n".join(go[:3]), "...", sep="\n")
+          PY
