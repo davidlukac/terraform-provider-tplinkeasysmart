@@ -46,7 +46,7 @@ type vlanModeResource struct {
 // vlanModeClient is the part of the switch API this resource needs.
 type vlanModeClient interface {
 	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
-	SetMTUVLAN(ctx context.Context, enabled bool, uplinkPort int) error
+	SetMTUVLAN(ctx context.Context, v escp.MTUVLAN) error
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
 	SetPortBasedVLANMode(ctx context.Context, enabled bool) error
 	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
@@ -174,7 +174,7 @@ func (r *vlanModeResource) applyBound(ctx context.Context, m *vlanModeModel, add
 func (r *vlanModeResource) write(ctx context.Context, want vlanState) error {
 	switch want.mode {
 	case vlanModeMTU:
-		return r.client.SetMTUVLAN(ctx, true, want.uplink)
+		return r.client.SetMTUVLAN(ctx, escp.MTUVLAN{Enabled: true, UplinkPort: want.uplink})
 	case vlanModePortBased:
 		return r.client.SetPortBasedVLANMode(ctx, true)
 	default:

@@ -1,6 +1,7 @@
 package escp
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -29,5 +30,36 @@ func TestParseIGMP(t *testing.T) {
 	}
 	if _, err := parseIGMP([]wire.TLV{{Type: wire.TLVIGMPGroups, Value: make([]byte, 7)}}); err == nil {
 		t.Fatal("expected length error")
+	}
+}
+
+// The state and the report-suppression flag travel as two TLVs in one request. Setting one at a
+// time tells a swapped pair apart, which setting both could not.
+func TestSetIGMPWire(t *testing.T) {
+	cases := []struct {
+		name                string
+		cfg                 IGMPConfig
+		wantState, wantSupp byte
+	}{
+		{"snooping only", IGMPConfig{Enabled: true}, 1, 0},
+		{"suppression only", IGMPConfig{ReportSuppression: true}, 0, 1},
+		{"both", IGMPConfig{Enabled: true, ReportSuppression: true}, 1, 1},
+		{"neither", IGMPConfig{}, 0, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := startFakeSwitch(t)
+			c := dialFake(t, f, "secret")
+			if err := c.SetIGMP(context.Background(), tc.cfg); err != nil {
+				t.Fatal(err)
+			}
+			want := []wire.TLV{
+				{Type: wire.TLVIGMPEnabled, Value: []byte{tc.wantState}},
+				{Type: wire.TLVIGMPSuppression, Value: []byte{tc.wantSupp}},
+			}
+			if got := f.set(); !reflect.DeepEqual(got, want) {
+				t.Fatalf("wire %+v, want %+v", got, want)
+			}
+		})
 	}
 }

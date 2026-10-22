@@ -35,7 +35,7 @@ func TestLiveIGMPSameValueWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("before: %+v", before)
-	if err := c.SetIGMP(ctx, before.Enabled, before.ReportSuppression); err != nil {
+	if err := c.SetIGMP(ctx, IGMPConfig{Enabled: before.Enabled, ReportSuppression: before.ReportSuppression}); err != nil {
 		t.Fatalf("same-value write rejected: %v", err)
 	}
 	after, err := c.IGMP(ctx)
@@ -67,11 +67,11 @@ func TestLiveIGMPToggle(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := c.SetIGMP(ctx, orig.Enabled, orig.ReportSuppression); err != nil {
+		if err := c.SetIGMP(ctx, IGMPConfig{Enabled: orig.Enabled, ReportSuppression: orig.ReportSuppression}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 	}()
-	if err := c.SetIGMP(ctx, !orig.Enabled, orig.ReportSuppression); err != nil {
+	if err := c.SetIGMP(ctx, IGMPConfig{Enabled: !orig.Enabled, ReportSuppression: orig.ReportSuppression}); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := c.IGMP(ctx); got.Enabled == orig.Enabled {
@@ -88,14 +88,14 @@ func TestLiveIGMPSuppressionToggle(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := c.SetIGMP(ctx, orig.Enabled, orig.ReportSuppression); err != nil {
+		if err := c.SetIGMP(ctx, IGMPConfig{Enabled: orig.Enabled, ReportSuppression: orig.ReportSuppression}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if now, _ := c.IGMP(ctx); now.Enabled != orig.Enabled || now.ReportSuppression != orig.ReportSuppression {
 			t.Errorf("not restored: %+v vs %+v", now, orig)
 		}
 	}()
-	if err := c.SetIGMP(ctx, orig.Enabled, !orig.ReportSuppression); err != nil {
+	if err := c.SetIGMP(ctx, IGMPConfig{Enabled: orig.Enabled, ReportSuppression: !orig.ReportSuppression}); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := c.IGMP(ctx)

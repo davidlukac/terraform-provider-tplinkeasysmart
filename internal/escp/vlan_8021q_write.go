@@ -163,14 +163,15 @@ func (c *Client) SetPortBasedVLANMode(ctx context.Context, enabled bool) error {
 }
 
 // SetMTUVLAN switches the MTU VLAN mode on or off: TLV 8192 with the enabled
-// flag and the uplink port. With the mode on, every port can only talk to the
-// uplink port. Same warning as SetVLAN8021QMode.
-func (c *Client) SetMTUVLAN(ctx context.Context, enabled bool, uplinkPort int) error {
-	if !enabled {
-		uplinkPort = mtuDisabledUplink
+// flag and the uplink port (the same type MTUVLAN reads; with the mode off the uplink
+// is ignored and 1 is sent, like the vendor utility). With the mode on, every port can
+// only talk to the uplink port. Same warning as SetVLAN8021QMode.
+func (c *Client) SetMTUVLAN(ctx context.Context, v MTUVLAN) error {
+	if !v.Enabled {
+		v.UplinkPort = mtuDisabledUplink
 	}
-	if err := ValidatePort(uplinkPort); err != nil {
+	if err := ValidatePort(v.UplinkPort); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{boolByte(enabled), byte(uplinkPort)}})
+	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{boolByte(v.Enabled), byte(v.UplinkPort)}})
 }

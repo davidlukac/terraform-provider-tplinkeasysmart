@@ -371,8 +371,10 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 
 func TestWrongPasswordIsRejectedForEverySetter(t *testing.T) {
 	setters := map[string]func(*Client, context.Context) error{
-		"SetLED":            func(c *Client, ctx context.Context) error { return c.SetLED(ctx, true) },
-		"SetIGMP":           func(c *Client, ctx context.Context) error { return c.SetIGMP(ctx, true, false) },
+		"SetLED": func(c *Client, ctx context.Context) error { return c.SetLED(ctx, true) },
+		"SetIGMP": func(c *Client, ctx context.Context) error {
+			return c.SetIGMP(ctx, IGMPConfig{Enabled: true, ReportSuppression: false})
+		},
 		"SetLoopPrevention": func(c *Client, ctx context.Context) error { return c.SetLoopPrevention(ctx, true) },
 		"SetPort": func(c *Client, ctx context.Context) error {
 			return c.SetPort(ctx, PortConfig{ID: 7, Enabled: true, Speed: "auto", FlowControl: false})

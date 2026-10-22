@@ -21,7 +21,9 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 	"SetBandwidth": func(ctx context.Context, c *Client) error {
 		return c.SetBandwidth(ctx, PortBandwidth{Port: 2, IngressKbps: 64, EgressKbps: 64})
 	},
-	"SetIGMP":           func(ctx context.Context, c *Client) error { return c.SetIGMP(ctx, true, false) },
+	"SetIGMP": func(ctx context.Context, c *Client) error {
+		return c.SetIGMP(ctx, IGMPConfig{Enabled: true, ReportSuppression: false})
+	},
 	"SetLAG":            func(ctx context.Context, c *Client) error { return c.SetLAG(ctx, 1, []int{2, 3}) },
 	"SetLoopPrevention": func(ctx context.Context, c *Client) error { return c.SetLoopPrevention(ctx, true) },
 	"SetPort": func(ctx context.Context, c *Client) error {
@@ -43,8 +45,10 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 	"SetPVIDs":             func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, map[int]int{2: 1}) },
 	"SetVLAN8021QMode":     func(ctx context.Context, c *Client) error { return c.SetVLAN8021QMode(ctx, true) },
 	"SetPortBasedVLANMode": func(ctx context.Context, c *Client) error { return c.SetPortBasedVLANMode(ctx, true) },
-	"SetMTUVLAN":           func(ctx context.Context, c *Client) error { return c.SetMTUVLAN(ctx, true, 8) },
-	"SetPortBasedVLAN":     func(ctx context.Context, c *Client) error { return c.SetPortBasedVLAN(ctx, 2, []int{3, 4}) },
+	"SetMTUVLAN": func(ctx context.Context, c *Client) error {
+		return c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 8})
+	},
+	"SetPortBasedVLAN": func(ctx context.Context, c *Client) error { return c.SetPortBasedVLAN(ctx, 2, []int{3, 4}) },
 	"SetIPConfig": func(ctx context.Context, c *Client) error {
 		// the address the fake switch already has, so an allowed write is confirmed at once
 		return c.SetIPConfig(ctx, IPConfig{IP: net.IPv4(127, 0, 0, 1), Netmask: net.IPv4(255, 0, 0, 0), Gateway: net.IPv4(127, 0, 0, 2)})
