@@ -38,7 +38,7 @@ resource "tplinkeasysmart_port" "unused" {
 
 - `allow_disruptive` (Boolean) Allow changing a port that has a link up or is a LAG member. Defaults to false.
 - `enabled` (Boolean) Administrative state. Defaults to true.
-- `flow_control` (Boolean) Flow control. Defaults to false.
+- `flow_control` (Boolean) Flow control. Defaults to false. It can be true only with speed `auto` or `1000Mbps-full`: at a fixed 10 or 100 Mbps speed the switch accepts the setting but keeps flow control off, so that combination is refused while planning.
 - `speed` (String) One of: auto, 10Mbps-half, 10Mbps-full, 100Mbps-half, 100Mbps-full, 1000Mbps-full. Defaults to auto.
 - `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
 

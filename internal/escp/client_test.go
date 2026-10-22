@@ -126,11 +126,12 @@ func TestSetHostnameKeepsIPConfiguration(t *testing.T) {
 func TestSetPortWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
-	if err := c.SetPort(context.Background(), PortConfig{ID: 7, Enabled: true, Speed: "100Mbps-full", FlowControl: true}); err != nil {
+	// 1000Mbps-full: flow control with a fixed 10 or 100 Mbps speed is refused (TestSetPortRefusesFlowControlAtAFixedSpeed).
+	if err := c.SetPort(context.Background(), PortConfig{ID: 7, Enabled: true, Speed: Speed1000Full, FlowControl: true}); err != nil {
 		t.Fatal(err)
 	}
 	got := f.Port7Setting()
-	want := []byte{7, 1, 0, 5, 0, 1, 0}
+	want := []byte{7, 1, 0, 6, 0, 1, 0}
 	if string(got) != string(want) {
 		t.Fatalf("wire bytes %v, want %v", got, want)
 	}
