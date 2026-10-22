@@ -39,15 +39,15 @@ var (
 	ErrNoReply = errors.New("escp: no reply from switch")
 	// ErrReplyTooLarge means a fragmented reply grew past the sane limit.
 	ErrReplyTooLarge = errors.New("escp: fragmented reply is larger than any switch sends")
-	// ErrAuth means the switch rejected a write. Wrong credentials are one reason, but
+	// ErrRejected means the switch rejected a write. Wrong credentials are one reason, but
 	// any non-zero reply code lands here (a LAG with ports outside its group's range, for
 	// example, is refused with code 4 although the credentials are fine); the
 	// *RejectedError that wraps it carries the code.
-	ErrAuth = errors.New("escp: switch rejected the request")
+	ErrRejected = errors.New("escp: switch rejected the request")
 )
 
 // RejectedError is a write the switch answered with a non-zero code. It matches
-// ErrAuth (errors.Is) for callers that treat every refusal alike, and names the
+// ErrRejected (errors.Is) for callers that treat every refusal alike, and names the
 // code for those that want to know which one it was. Reason, when set, says why
 // the switch refused (only for codes whose cause has been established).
 type RejectedError struct {
@@ -57,13 +57,13 @@ type RejectedError struct {
 
 func (e *RejectedError) Error() string {
 	if e.Reason != "" {
-		return fmt.Sprintf("%s (error code %d): %s", ErrAuth.Error(), e.Code, e.Reason)
+		return fmt.Sprintf("%s (error code %d): %s", ErrRejected.Error(), e.Code, e.Reason)
 	}
-	return fmt.Sprintf("%s (error code %d): wrong credentials, or the switch refuses this setting or value", ErrAuth.Error(), e.Code)
+	return fmt.Sprintf("%s (error code %d): wrong credentials, or the switch refuses this setting or value", ErrRejected.Error(), e.Code)
 }
 
-// Is makes errors.Is(err, ErrAuth) true for every rejected write.
-func (e *RejectedError) Is(target error) bool { return target == ErrAuth }
+// Is makes errors.Is(err, ErrRejected) true for every rejected write.
+func (e *RejectedError) Is(target error) bool { return target == ErrRejected }
 
 // Config configures a Client. Zero values select sensible defaults.
 type Config struct {
@@ -387,7 +387,11 @@ func (c *Client) discover(ctx context.Context) (Info, error) {
 
 // infoFromReply maps the TLVs of a discovery reply to Info; absent or
 // malformed fields stay empty.
-func infoFromReply(r reply) Info {
+func infoFromReply(r reply) Info { return infoFromTLVs(r.tlvs) }
+
+// infoFromTLVs is infoFromReply for a bare TLV list, which Discover also has.
+func infoFromTLVs(tlvs []wire.TLV) Info {
+	r := reply{tlvs: tlvs}
 	str := func(t int16) string { v, _ := r.tlv(t); return wire.CString(v) }
 	ip := func(t int16) string {
 		if v, ok := r.tlv(t); ok && len(v) == 4 {

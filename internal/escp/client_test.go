@@ -66,8 +66,8 @@ func TestLEDRoundTrip(t *testing.T) {
 func TestBadPassword(t *testing.T) {
 	f := startFakeSwitch(t)
 	c := dialFake(t, f, "wrong")
-	if err := c.SetLED(context.Background(), false); !errors.Is(err, ErrAuth) {
-		t.Fatalf("want ErrAuth, got %v", err)
+	if err := c.SetLED(context.Background(), false); !errors.Is(err, ErrRejected) {
+		t.Fatalf("want ErrRejected, got %v", err)
 	}
 	if led, _, sets := f.state(); !led || sets != 0 {
 		t.Fatal("switch must be untouched after a rejected SET")
@@ -145,8 +145,8 @@ func TestSetPortWire(t *testing.T) {
 
 func TestRejectedErrorNamesTheCodeAndMatchesErrAuth(t *testing.T) {
 	err := error(&RejectedError{Code: 4})
-	if !errors.Is(err, ErrAuth) {
-		t.Fatal("a rejected write must match ErrAuth")
+	if !errors.Is(err, ErrRejected) {
+		t.Fatal("a rejected write must match ErrRejected")
 	}
 	if errors.Is(err, ErrNoReply) {
 		t.Fatal("a rejected write is not a missing reply")
@@ -165,8 +165,8 @@ func TestRejectedErrorNamesTheCodeAndMatchesErrAuth(t *testing.T) {
 
 func TestRejectedErrorWithAReasonReplacesTheGenericHint(t *testing.T) {
 	err := &RejectedError{Code: 7404, Reason: "a member port has storm control enabled"}
-	if !errors.Is(err, ErrAuth) {
-		t.Fatal("must still match ErrAuth")
+	if !errors.Is(err, ErrRejected) {
+		t.Fatal("must still match ErrRejected")
 	}
 	want := "escp: switch rejected the request (error code 7404): a member port has storm control enabled"
 	if err.Error() != want {

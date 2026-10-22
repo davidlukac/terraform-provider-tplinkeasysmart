@@ -138,8 +138,8 @@ func TestSetIPConfigErrorsDoNotMoveTheClient(t *testing.T) {
 	t.Run("wrong credentials", func(t *testing.T) {
 		f := startFakeSwitch(t)
 		c := dialFake(t, f, "wrong")
-		if err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.255.255.0", "127.0.0.2")); !errors.Is(err, ErrAuth) {
-			t.Fatalf("want ErrAuth, got %v", err)
+		if err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.255.255.0", "127.0.0.2")); !errors.Is(err, ErrRejected) {
+			t.Fatalf("want ErrRejected, got %v", err)
 		}
 		if !c.dest.IP.Equal(net.ParseIP("127.0.0.1")) || c.alsoFrom != nil {
 			t.Fatalf("a rejected write must leave the client where it was: dest=%v alsoFrom=%v", c.dest.IP, c.alsoFrom)

@@ -210,7 +210,7 @@ func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 		f := startFakeSwitch(t)
 		f.configure(func(f *fakeSwitch) { f.rejectSetsFrom = 1 })
 		c := dialFast(t, f, "secret")
-		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrAuth) {
+		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrRejected) {
 			t.Fatalf("got %v", err)
 		}
 		if n := len(f.allSets()); n != 0 {
@@ -221,7 +221,7 @@ func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 		f := startFakeSwitch(t)
 		f.configure(func(f *fakeSwitch) { f.rejectSetsFrom = 2 })
 		c := dialFast(t, f, "secret")
-		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrAuth) {
+		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrRejected) {
 			t.Fatalf("got %v", err)
 		}
 		if h := f.allSets(); len(h) != 1 || h[0][0].Type != wire.TLVBandwidthIngress {
