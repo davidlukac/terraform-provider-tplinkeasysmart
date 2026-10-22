@@ -8,9 +8,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// shareSocket lets several processes (several provider instances, the vendor
-// utility) bind the reply port at once. The switch broadcasts its replies, so
-// every one of them receives every reply and keeps the ones addressed to it.
+// shareSocket lets several sockets (several clients, Discover, other processes) bind the
+// reply port at once. Every socket sharing the port receives the replies, and each keeps
+// only those from its own switch. This was observed on macOS: clients for two switches
+// got all of theirs, and so did Discover next to a client. Whether a switch addresses its
+// replies to the broadcast address or to the host was not captured.
 func shareSocket(_, _ string, c syscall.RawConn) error {
 	var sockErr error
 	if err := c.Control(func(fd uintptr) { sockErr = setReuse(int(fd)) }); err != nil {
