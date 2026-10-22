@@ -44,7 +44,26 @@ var (
 	// example, is refused with code 4 although the credentials are fine); the
 	// *RejectedError that wraps it carries the code.
 	ErrRejected = errors.New("escp: switch rejected the request")
+	// ErrInvalid means the caller's argument was refused before anything was sent: a port or
+	// id out of range, a rate that is not a multiple of the step, a combination the switch
+	// cannot keep. The message names the value and what is allowed; test for the class with
+	// errors.Is(err, ErrInvalid). It is never returned for a reply the client cannot parse,
+	// nor for a failure of the switch.
+	ErrInvalid = errors.New("escp: invalid argument")
 )
+
+// invalidError is an ErrInvalid with its own message.
+type invalidError struct{ msg string }
+
+func (e *invalidError) Error() string { return e.msg }
+
+// Is makes errors.Is(err, ErrInvalid) true for every refused argument.
+func (e *invalidError) Is(target error) bool { return target == ErrInvalid }
+
+// invalidf builds an error that matches ErrInvalid and reads as the formatted message.
+func invalidf(format string, args ...any) error {
+	return &invalidError{msg: fmt.Sprintf(format, args...)}
+}
 
 // RejectedError is a write the switch answered with a non-zero code. It matches
 // ErrRejected (errors.Is) for callers that treat every refusal alike, and names the

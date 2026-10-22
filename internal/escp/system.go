@@ -54,7 +54,7 @@ var hostnameRE = regexp.MustCompile(HostnamePattern)
 // ValidateHostname applies the web UI's rules for the device description.
 func ValidateHostname(name string) error {
 	if len(name) > MaxHostnameLen || !hostnameRE.MatchString(name) {
-		return fmt.Errorf("escp: invalid device description %q: 1-%d letters, digits and hyphens, not starting or ending with a hyphen", name, MaxHostnameLen)
+		return invalidf("escp: invalid device description %q: 1-%d letters, digits and hyphens, not starting or ending with a hyphen", name, MaxHostnameLen)
 	}
 	return nil
 }

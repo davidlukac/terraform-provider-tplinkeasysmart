@@ -63,8 +63,9 @@
 // Test errors with errors.Is and errors.As, never by message: ErrNoReply (the switch did
 // not answer in time), ErrRejected and *RejectedError (the switch refused a write),
 // ErrNoInterface (Discover has nowhere to send), ErrMoveUnconfirmed (SetIPConfig lost
-// track of the switch) and ErrInvalidConfig (a configuration backup that is not one).
-// Validation errors are plain messages that name the value and what is allowed.
+// track of the switch), ErrInvalidConfig (a configuration backup that is not one) and
+// ErrInvalid (an argument refused before anything was sent; the message names the value and
+// what is allowed).
 //
 // # Security
 //

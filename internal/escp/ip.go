@@ -56,22 +56,22 @@ func ValidateIPConfig(cfg IPConfig) error { return validateIPConfig(cfg, false) 
 func validateIPConfig(cfg IPConfig, allowLoopback bool) error {
 	ip, mask, gw := cfg.IP.To4(), cfg.Netmask.To4(), cfg.Gateway.To4()
 	if ip == nil || mask == nil || gw == nil {
-		return fmt.Errorf("escp: IP address, subnet mask and gateway must all be IPv4 addresses (%s)", cfg)
+		return invalidf("escp: IP address, subnet mask and gateway must all be IPv4 addresses (%s)", cfg)
 	}
 	m := net.IPMask(mask)
 	ones, bits := m.Size()
 	if bits == 0 || ones < 8 || ones > 30 {
-		return fmt.Errorf("escp: subnet mask %s is not a contiguous prefix between /8 and /30", mask)
+		return invalidf("escp: subnet mask %s is not a contiguous prefix between /8 and /30", mask)
 	}
 	subnet := net.IPNet{IP: ip.Mask(m), Mask: m}
 	if ip.IsUnspecified() || (ip.IsLoopback() && !allowLoopback) || ip.IsMulticast() || ip.Equal(subnet.IP) || ip.Equal(broadcastOf(subnet)) {
-		return fmt.Errorf("escp: %s is not a usable host address in %s", ip, subnet.String())
+		return invalidf("escp: %s is not a usable host address in %s", ip, subnet.String())
 	}
 	if gw.IsUnspecified() {
 		return nil
 	}
 	if !subnet.Contains(gw) || gw.Equal(subnet.IP) || gw.Equal(broadcastOf(subnet)) || gw.Equal(ip) {
-		return fmt.Errorf("escp: gateway %s must be another host address in %s", gw, subnet.String())
+		return invalidf("escp: gateway %s must be another host address in %s", gw, subnet.String())
 	}
 	return nil
 }

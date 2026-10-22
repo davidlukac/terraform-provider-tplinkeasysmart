@@ -64,11 +64,11 @@ func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
 			return err
 		}
 		if len(m.IngressPorts)+len(m.EgressPorts) == 0 {
-			return fmt.Errorf("escp: port mirroring needs at least one ingress or egress source port")
+			return invalidf("escp: port mirroring needs at least one ingress or egress source port")
 		}
 		for _, p := range append(append([]int{}, m.IngressPorts...), m.EgressPorts...) {
 			if p == m.MirrorPort {
-				return fmt.Errorf("escp: port %d cannot mirror itself", p)
+				return invalidf("escp: port %d cannot mirror itself", p)
 			}
 		}
 		in, err := maskFromPorts(m.IngressPorts)
@@ -83,7 +83,7 @@ func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
 		copy(v[mirrorOffIngress:], in)
 		copy(v[mirrorOffEgress:], eg)
 	} else if m.MirrorPort != 0 || len(m.IngressPorts) != 0 || len(m.EgressPorts) != 0 {
-		return fmt.Errorf("escp: a disabled mirror must have no destination or source ports")
+		return invalidf("escp: a disabled mirror must have no destination or source ports")
 	}
 	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVMirror, Value: v})
 }
