@@ -56,7 +56,9 @@
 // aggregation group?) and verifying the result are the caller's job. The doc comment of
 // each write says what it can disturb, and the safety package answers the common question
 // of what a port is used for. A few writes read the current settings first so they can
-// send the rest unchanged (SetHostname, SetPortPriorities); their comments say so.
+// send the rest unchanged (SetHostname, SetPortPriorities); their comments say so. Every write
+// that names a port also refuses ports the switch does not have (ErrInvalid): the client reads
+// the switch's port count once, on the first such write, and keeps it.
 //
 // # Errors
 //

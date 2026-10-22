@@ -166,6 +166,9 @@ type Client struct {
 	haveSwMAC      bool
 	seq            uint16
 	session        []byte
+	// switchPorts is the switch's number of ports, read on the first write that names a port
+	// (zero until then) and kept: it is hardware. Guarded by mu.
+	switchPorts int
 }
 
 // Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
