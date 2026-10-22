@@ -33,6 +33,24 @@ const (
 	BackupFlood      BackupMode = "flood"      // fragments that never end
 )
 
+// SystemSetBehaviour is what the switch does after it applies a system SET, the write that
+// carries the hostname and the management address.
+type SystemSetBehaviour int
+
+// The behaviours after a system SET. SystemSetReplies is the well-behaved switch.
+const (
+	// SystemSetReplies answers the SET and carries on.
+	SystemSetReplies SystemSetBehaviour = iota
+	// SystemSetLeaves applies the SET without answering it, then ignores every packet except
+	// discovery, which it still answers: a switch that has moved to its new address, seen from
+	// the old one. The fake cannot change its source address, so discovery still reports the
+	// new settings from the same address.
+	SystemSetLeaves
+	// SystemSetVanishes applies the SET without answering it, then ignores everything,
+	// discovery included: a switch that moved and cannot be found.
+	SystemSetVanishes
+)
+
 // Switch is the fake. Create it with Start; change its behaviour with Configure.
 // It can decrypt the session key because the switch's 64-bit RSA modulus factors
 // trivially (p=3443843009, q=3765816959), which is also why ESCP offers no real secrecy.
@@ -58,6 +76,7 @@ type Switch struct {
 	recv             int
 	mute             bool // swallow everything (switch gone)
 	backupMode       BackupMode
+	departed         bool // a system SET was applied under OnSystemSet and the switch has left
 
 	// Programmable misbehaviour. Set these inside Configure, which holds the lock.
 
@@ -77,6 +96,8 @@ type Switch struct {
 	RejectCode int32
 	// StaleAfterSet makes the next n discoveries after a system SET still report the old address.
 	StaleAfterSet int
+	// OnSystemSet is what the switch does after applying a system SET; the default replies.
+	OnSystemSet SystemSetBehaviour
 }
 
 var (
@@ -253,6 +274,12 @@ func (f *Switch) send(to *net.UDPAddr, op byte, req wire.Header, errCode int32, 
 }
 
 func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
+	f.mu.Lock()
+	gone := f.departed && (h.Op != wire.OpDiscovery || f.OnSystemSet == SystemSetVanishes)
+	f.mu.Unlock()
+	if gone {
+		return
+	}
 	find := func(t int16) ([]byte, bool) {
 		for _, x := range tlvs {
 			if x.Type == t {
@@ -403,6 +430,15 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 			f.led = v[0] == 1
 			f.sets++
 			f.mu.Unlock()
+		}
+		if _, isSystem := find(wire.TLVHostname); isSystem {
+			f.mu.Lock()
+			leaves := f.OnSystemSet != SystemSetReplies
+			f.departed = f.departed || leaves
+			f.mu.Unlock()
+			if leaves {
+				return
+			}
 		}
 		f.send(from, wire.OpSetReply, h, 0, nil, true)
 	case wire.OpGet:

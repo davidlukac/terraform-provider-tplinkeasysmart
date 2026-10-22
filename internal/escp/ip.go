@@ -15,8 +15,9 @@ const (
 	ipMovePoll = 500 * time.Millisecond
 )
 
-// ErrMoveUnconfirmed means the switch was told to move but did not answer at
-// the new address in time. Its address is then unknown: look at both.
+// ErrMoveUnconfirmed means the switch was told to move but it is not known whether it did:
+// it did not answer at the new address in time, or it did not answer the write and a probe
+// found nothing, or something else answered. Its address is then unknown: look at both.
 var ErrMoveUnconfirmed = errors.New("escp: the switch did not answer at its new address")
 
 // IPConfig is the static management address of the switch (System > IP Setting).
@@ -27,6 +28,11 @@ type IPConfig struct {
 // String formats the triple for messages.
 func (cfg IPConfig) String() string {
 	return fmt.Sprintf("ip %s mask %s gateway %s", cfg.IP, cfg.Netmask, cfg.Gateway)
+}
+
+// equal reports whether two configurations have the same three addresses.
+func (cfg IPConfig) equal(other IPConfig) bool {
+	return cfg.IP.Equal(other.IP) && cfg.Netmask.Equal(other.Netmask) && cfg.Gateway.Equal(other.Gateway)
 }
 
 // ipConfigFromInfo parses the address triple of a discovery reply. It refuses
@@ -83,10 +89,18 @@ func broadcastOf(n net.IPNet) net.IP {
 //
 // DANGER: this moves the switch. The request is answered from the old or the
 // new address, so the client accepts replies from both and, once the switch
-// confirms, follows it: later calls on this client go to the new address. If
-// no reply arrives the new state is unknown (ErrNoReply); the caller must look
-// at both addresses before it believes either. Callers must guard: a wrong
-// address, mask or gateway can cut the management path for good.
+// confirms, follows it: later calls on this client go to the new address.
+//
+// A switch that applies the write may never answer it from the old address, so
+// when the write gets no reply the client probes both addresses and compares
+// what answers with what was asked and with what was there before (by MAC
+// address, so a different device does not count). The outcomes: the switch
+// has the new settings, and the call succeeds as if the reply had arrived; the
+// switch is unchanged, and the error matches ErrNoReply and says the write was
+// not applied; or nothing can be established, and the error matches
+// ErrMoveUnconfirmed. In that last case the state is unknown and the caller
+// must look at both addresses before it believes either. Callers must guard: a
+// wrong address, mask or gateway can cut the management path for good.
 func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	if err := validateIPConfig(cfg, c.allowLoopback); err != nil {
 		return err
@@ -95,7 +109,8 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	if err != nil {
 		return err
 	}
-	if _, err := ipConfigFromInfo(info); err != nil {
+	before, err := ipConfigFromInfo(info)
+	if err != nil {
 		return err
 	}
 	c.mu.Lock()
@@ -104,6 +119,11 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	err = c.writeSystem(ctx, info.Hostname, info.DHCP, cfg)
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if errors.Is(err, ErrNoReply) {
+		// The write may have been applied. alsoFrom is still set, so a probe is answered
+		// from either address.
+		err = c.settleLostReply(ctx, info.MAC, before, cfg, err)
+	}
 	c.alsoFrom = nil
 	if err != nil {
 		return err
@@ -111,6 +131,60 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	c.dest = &net.UDPAddr{IP: cfg.IP.To4(), Port: c.dest.Port}
 	c.session = nil
 	return c.awaitAddress(ctx, cfg)
+}
+
+// lostReplyOutcome is what a probe shows after a write that got no reply.
+type lostReplyOutcome int
+
+const (
+	// lostReplyApplied: the switch has the settings that were asked for.
+	lostReplyApplied lostReplyOutcome = iota + 1
+	// lostReplyUnchanged: the switch still has the settings it had before.
+	lostReplyUnchanged
+	// lostReplyOtherDevice: a different device answered.
+	lostReplyOtherDevice
+	// lostReplyUnexpected: the switch answered with settings that are neither.
+	lostReplyUnexpected
+)
+
+// classifyLostReply compares what answered a probe after an unanswered write with the
+// switch it was sent to (its MAC address) and with the settings before and wanted. When
+// the wanted settings equal the old ones the switch is where it was asked to be either way.
+func classifyLostReply(mac string, before, want IPConfig, after Info) lostReplyOutcome {
+	if after.MAC != mac {
+		return lostReplyOtherDevice
+	}
+	got, err := ipConfigFromInfo(after)
+	switch {
+	case err != nil:
+		return lostReplyUnexpected
+	case got.equal(want):
+		return lostReplyApplied
+	case got.equal(before):
+		return lostReplyUnchanged
+	default:
+		return lostReplyUnexpected
+	}
+}
+
+// settleLostReply is called when the write got no reply. It returns nil when a probe shows
+// that the switch has the new settings, and otherwise an error that says what is known.
+// Callers hold c.mu.
+func (c *Client) settleLostReply(ctx context.Context, mac string, before, want IPConfig, lost error) error {
+	after, err := c.discover(ctx)
+	if err != nil {
+		return fmt.Errorf("%w: the write got no reply and a probe found nothing at %s or %s", ErrMoveUnconfirmed, before.IP, want.IP)
+	}
+	switch classifyLostReply(mac, before, want, after) {
+	case lostReplyApplied:
+		return nil
+	case lostReplyUnchanged:
+		return fmt.Errorf("%w; a probe shows the switch unchanged at %s, so the write was not applied", lost, before.IP)
+	case lostReplyOtherDevice:
+		return fmt.Errorf("%w: the write got no reply and a different device (MAC %s) answers a probe", ErrMoveUnconfirmed, after.MAC)
+	default:
+		return fmt.Errorf("%w: the write got no reply and the switch now reports ip %s mask %s gateway %s, which is neither the old nor the new settings", ErrMoveUnconfirmed, after.IP, after.Netmask, after.Gateway)
+	}
 }
 
 // awaitAddress probes the new address until the switch reports it, because
