@@ -134,6 +134,9 @@ func (c *Client) SetLAG(ctx context.Context, group int, ports []int) error {
 	if err := ValidateLAG(group, ports); err != nil {
 		return err
 	}
+	if err := c.requirePorts(ctx, ports...); err != nil {
+		return err
+	}
 	return nameRefusal(c.setTLVs(ctx, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(group)}, mask...)}), lagRefusals)
 }
 

@@ -83,6 +83,9 @@ func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
 	case !any && cfg.RateKbps != 0:
 		return invalidf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.RateKbps)
 	}
+	if err := c.requirePorts(ctx, cfg.Port); err != nil {
+		return err
+	}
 	v := make([]byte, stormEntryLen)
 	v[stormOffPort] = byte(cfg.Port)
 	v[stormOffEnabled] = boolByte(any)

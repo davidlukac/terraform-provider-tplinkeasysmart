@@ -156,6 +156,9 @@ func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
 	if cfg.FlowControl && !cfg.Speed.AllowsFlowControl() {
 		return invalidf("escp: port %d: flow control needs speed %s or %s, not %s (the switch keeps it off at a fixed 10 or 100 Mbps speed)", cfg.ID, SpeedAuto, Speed1000Full, cfg.Speed)
 	}
+	if err := c.requirePorts(ctx, cfg.ID); err != nil {
+		return err
+	}
 	entry := make([]byte, portEntryLen)
 	entry[portOffPort], entry[portOffState], entry[portOffCfgSpeed], entry[portOffCfgFlow] = byte(cfg.ID), boolByte(cfg.Enabled), code, boolByte(cfg.FlowControl)
 	return nameRefusal(c.setTLVs(ctx, wire.TLV{Type: wire.TLVPorts, Value: entry}), portRefusals)

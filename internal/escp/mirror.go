@@ -79,6 +79,9 @@ func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
 		if err != nil {
 			return err
 		}
+		if err := c.requirePorts(ctx, append(append([]int{m.MirrorPort}, m.IngressPorts...), m.EgressPorts...)...); err != nil {
+			return err
+		}
 		v[mirrorOffEnabled], v[mirrorOffPort] = 1, byte(m.MirrorPort)
 		copy(v[mirrorOffIngress:], in)
 		copy(v[mirrorOffEgress:], eg)

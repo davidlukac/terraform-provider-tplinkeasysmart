@@ -109,6 +109,9 @@ func (c *Client) SetVLAN8021Q(ctx context.Context, v VLAN8021Q) error {
 	if err != nil {
 		return err
 	}
+	if err := c.requirePorts(ctx, append(append([]int{}, v.Tagged...), v.Untagged...)...); err != nil {
+		return err
+	}
 	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: value})
 }
 
@@ -140,6 +143,9 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids map[int]int) error {
 		ports = append(ports, p)
 	}
 	sort.Ints(ports)
+	if err := c.requirePorts(ctx, ports...); err != nil {
+		return err
+	}
 	tlvs := make([]wire.TLV, 0, len(ports))
 	for _, p := range ports {
 		value := binary.BigEndian.AppendUint16([]byte{byte(p)}, uint16(pvids[p])) //nolint:gosec // bounded by the validation above
@@ -171,6 +177,11 @@ func (c *Client) SetMTUVLAN(ctx context.Context, v MTUVLAN) error {
 	}
 	if err := ValidatePort(v.UplinkPort); err != nil {
 		return err
+	}
+	if v.Enabled { // port 1, sent when the mode is off, exists on every switch
+		if err := c.requirePorts(ctx, v.UplinkPort); err != nil {
+			return err
+		}
 	}
 	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{boolByte(v.Enabled), byte(v.UplinkPort)}})
 }
