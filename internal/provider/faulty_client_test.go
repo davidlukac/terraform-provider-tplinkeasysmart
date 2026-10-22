@@ -220,11 +220,11 @@ func (w *faultyClient) QoS(ctx context.Context) (escp.QoS, error) {
 	return w.SwitchClient.QoS(ctx)
 }
 
-func (w *faultyClient) SetQoSMode(ctx context.Context, mode int) error {
+func (w *faultyClient) SetQoSMode(ctx context.Context, mode escp.QoSMode) error {
 	return w.write("SetQoSMode", func() error { return w.SwitchClient.SetQoSMode(ctx, mode) })
 }
 
-func (w *faultyClient) SetPortPriorities(ctx context.Context, changes map[int]int) error {
+func (w *faultyClient) SetPortPriorities(ctx context.Context, changes map[int]escp.Priority) error {
 	return w.write("SetPortPriorities", func() error { return w.SwitchClient.SetPortPriorities(ctx, changes) })
 }
 

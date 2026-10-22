@@ -35,8 +35,8 @@ type SwitchClient interface {
 	DeleteVLAN8021Q(ctx context.Context, id int) error
 	SetPVIDs(ctx context.Context, pvids map[int]int) error
 	QoS(ctx context.Context) (escp.QoS, error)
-	SetQoSMode(ctx context.Context, mode int) error
-	SetPortPriorities(ctx context.Context, changes map[int]int) error
+	SetQoSMode(ctx context.Context, mode escp.QoSMode) error
+	SetPortPriorities(ctx context.Context, changes map[int]escp.Priority) error
 	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
 	SetBandwidth(ctx context.Context, limit escp.PortBandwidth) error
 	StormControl(ctx context.Context) ([]escp.PortStorm, error)

@@ -7,19 +7,65 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
-// QoSModeNames maps the switch's mode byte to the web UI names.
-var QoSModeNames = map[int]string{0: "port-based", 1: "802.1p", 2: "dscp-802.1p"}
+// QoSMode is the switch's QoS mode. The number is the wire byte; the name is the web UI's
+// and the Terraform provider's spelling and is part of the provider's state: do not change it.
+type QoSMode int
 
-// PortPriority is a port's priority queue as shown in the web UI: 1 (lowest) to 4 (highest).
+// The QoS modes the switch knows. Per-port priorities only take effect in QoSPortBased.
+const (
+	QoSPortBased QoSMode = 0
+	QoS8021p     QoSMode = 1
+	QoSDSCP8021p QoSMode = 2
+)
+
+var qosModeNames = [...]string{QoSPortBased: "port-based", QoS8021p: "802.1p", QoSDSCP8021p: "dscp-802.1p"}
+
+// QoSModes lists the modes SetQoSMode accepts, in the order of their codes.
+func QoSModes() []QoSMode { return []QoSMode{QoSPortBased, QoS8021p, QoSDSCP8021p} }
+
+// Valid reports whether the switch knows the mode.
+func (m QoSMode) Valid() bool { return m >= 0 && int(m) < len(qosModeNames) }
+
+// String returns the web UI's name of the mode, or unknown(n) for a code this client does not know.
+func (m QoSMode) String() string {
+	if !m.Valid() {
+		return fmt.Sprintf("unknown(%d)", int(m))
+	}
+	return qosModeNames[m]
+}
+
+// ParseQoSMode converts a mode name as String spells it.
+func ParseQoSMode(name string) (QoSMode, error) {
+	for _, m := range QoSModes() {
+		if m.String() == name {
+			return m, nil
+		}
+	}
+	return 0, fmt.Errorf("escp: unknown QoS mode %q (valid: %v)", name, QoSModes())
+}
+
+// Priority is a port's priority queue as the web UI shows it: PriorityLowest (1) to PriorityHighest (4).
+// On the wire it is one less.
+type Priority int
+
+// The bounds of Priority.
+const (
+	PriorityLowest  Priority = 1
+	PriorityHighest Priority = 4
+)
+
+// Valid reports whether the priority is within PriorityLowest..PriorityHighest.
+func (p Priority) Valid() bool { return p >= PriorityLowest && p <= PriorityHighest }
+
+// PortPriority is a port's priority queue.
 type PortPriority struct {
 	Port     int
-	Priority int
+	Priority Priority
 }
 
 // QoS is QoS > QoS Basic.
 type QoS struct {
-	Mode       int
-	ModeName   string
+	Mode       QoSMode
 	Priorities []PortPriority
 }
 
@@ -32,16 +78,12 @@ func parseQoS(tlvs []wire.TLV) (QoS, error) {
 			if len(t.Value) != 1 {
 				return out, fmt.Errorf("escp: QoS mode TLV has %d bytes", len(t.Value))
 			}
-			out.Mode, seen = int(t.Value[0]), true
-			out.ModeName = QoSModeNames[out.Mode]
-			if out.ModeName == "" {
-				out.ModeName = fmt.Sprintf("unknown(%d)", out.Mode)
-			}
+			out.Mode, seen = QoSMode(t.Value[0]), true
 		case wire.TLVQoSPriority:
 			if len(t.Value) != 2 {
 				return out, fmt.Errorf("escp: QoS priority entry has %d bytes, want 2", len(t.Value))
 			}
-			out.Priorities = append(out.Priorities, PortPriority{Port: int(t.Value[0]), Priority: int(t.Value[1]) + 1})
+			out.Priorities = append(out.Priorities, PortPriority{Port: int(t.Value[0]), Priority: Priority(t.Value[1]) + PriorityLowest})
 		}
 	}
 	if !seen {
@@ -64,23 +106,22 @@ func (c *Client) QoS(ctx context.Context) (QoS, error) {
 	return parseQoS(append(mode, pri...))
 }
 
-// SetQoSMode selects the QoS mode: 0 port-based, 1 802.1p, 2 DSCP/802.1p.
-func (c *Client) SetQoSMode(ctx context.Context, mode int) error {
-	if _, ok := QoSModeNames[mode]; !ok {
-		return fmt.Errorf("escp: invalid QoS mode %d (valid: 0, 1, 2)", mode)
+// SetQoSMode selects the QoS mode.
+func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error {
+	if !mode.Valid() {
+		return fmt.Errorf("escp: invalid QoS mode %d (valid: 0, 1, 2)", int(mode))
 	}
 	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
 }
 
-// SetPortPriorities changes the priority (1 lowest .. 4 highest) of the given
-// ports. As in the vendor utility the request carries the priority of every
+// SetPortPriorities changes the priority of the given ports. As in the vendor utility the request carries the priority of every
 // port, so the other ports are re-sent with their current value.
-func (c *Client) SetPortPriorities(ctx context.Context, changes map[int]int) error {
+func (c *Client) SetPortPriorities(ctx context.Context, changes map[int]Priority) error {
 	cur, err := c.QoS(ctx)
 	if err != nil {
 		return err
 	}
-	prio := map[int]int{}
+	prio := map[int]Priority{}
 	for _, p := range cur.Priorities {
 		prio[p.Port] = p.Priority
 	}
@@ -88,14 +129,14 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes map[int]int) err
 		if _, ok := prio[port]; !ok {
 			return fmt.Errorf("escp: port %d does not exist", port)
 		}
-		if v < 1 || v > 4 {
-			return fmt.Errorf("escp: invalid priority %d for port %d (valid: 1-4)", v, port)
+		if !v.Valid() {
+			return fmt.Errorf("escp: invalid priority %d for port %d (valid: %d-%d)", int(v), port, int(PriorityLowest), int(PriorityHighest))
 		}
 		prio[port] = v
 	}
 	tlvs := make([]wire.TLV, 0, len(prio))
 	for _, p := range cur.Priorities { // keep the switch's port order
-		tlvs = append(tlvs, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p.Port), byte(prio[p.Port] - 1)}})
+		tlvs = append(tlvs, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p.Port), byte(prio[p.Port] - PriorityLowest)}})
 	}
 	return c.setTLVs(ctx, tlvs...)
 }

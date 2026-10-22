@@ -133,7 +133,7 @@ func readCases() []readCase {
 			},
 			requests: [][]int16{{wire.TLVQoSMode}, {wire.TLVQoSPriority}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.QoS(ctx) },
-			want:     QoS{Mode: 2, ModeName: "dscp-802.1p", Priorities: []PortPriority{{1, 1}, {2, 4}}},
+			want:     QoS{Mode: QoSDSCP8021p, Priorities: []PortPriority{{1, 1}, {2, 4}}},
 			bad: map[int16][]wire.TLV{
 				wire.TLVQoSMode:     {th(wire.TLVQoSMode, "02")},
 				wire.TLVQoSPriority: {{Type: wire.TLVQoSPriority, Value: []byte{1}}},

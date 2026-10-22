@@ -88,7 +88,7 @@ func (d *qosDataSource) readBound(ctx context.Context, _ datasource.ReadRequest,
 		resp.Diagnostics.AddError("Reading QoS failed", err.Error())
 		return
 	}
-	state := qosModel{ID: qualifiedID(d.sw, "qos"), Mode: types.Int64Value(int64(q.Mode)), ModeName: types.StringValue(q.ModeName),
+	state := qosModel{ID: qualifiedID(d.sw, "qos"), Mode: types.Int64Value(int64(q.Mode)), ModeName: types.StringValue(q.Mode.String()),
 		Priorities: make([]portPriorityModel, 0, len(q.Priorities))}
 	for _, p := range q.Priorities {
 		state.Priorities = append(state.Priorities, portPriorityModel{Port: types.Int64Value(int64(p.Port)), Priority: types.Int64Value(int64(p.Priority))})

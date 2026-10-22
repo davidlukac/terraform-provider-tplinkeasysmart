@@ -203,14 +203,14 @@ func TestLiveQoS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var origPrio int
+	var origPrio Priority
 	for _, p := range orig.Priorities {
 		if p.Port == id {
 			origPrio = p.Priority
 		}
 	}
 	defer func() {
-		if err := c.SetPortPriorities(ctx, map[int]int{id: origPrio}); err != nil {
+		if err := c.SetPortPriorities(ctx, map[int]Priority{id: origPrio}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if err := c.SetQoSMode(ctx, orig.Mode); err != nil {
@@ -225,11 +225,11 @@ func TestLiveQoS(t *testing.T) {
 	}
 	// Per-port priorities only take effect in port-based mode (0). With every
 	// port at priority 1 that is equivalent to the current traffic handling.
-	if err := c.SetQoSMode(ctx, 0); err != nil {
+	if err := c.SetQoSMode(ctx, QoSPortBased); err != nil {
 		t.Fatal(err)
 	}
-	want := origPrio%4 + 1
-	if err := c.SetPortPriorities(ctx, map[int]int{id: want}); err != nil {
+	want := origPrio%PriorityHighest + PriorityLowest
+	if err := c.SetPortPriorities(ctx, map[int]Priority{id: want}); err != nil {
 		t.Fatal(err)
 	}
 	now, _ := c.QoS(ctx)
@@ -243,7 +243,7 @@ func TestLiveQoS(t *testing.T) {
 	}
 }
 
-func priorityOf(q QoS, port int) int {
+func priorityOf(q QoS, port int) Priority {
 	for _, p := range q.Priorities {
 		if p.Port == port {
 			return p.Priority
