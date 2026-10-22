@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -18,9 +19,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = &portResource{}
-	_ resource.ResourceWithConfigure   = &portResource{}
-	_ resource.ResourceWithImportState = &portResource{}
+	_ resource.Resource                   = &portResource{}
+	_ resource.ResourceWithConfigure      = &portResource{}
+	_ resource.ResourceWithImportState    = &portResource{}
+	_ resource.ResourceWithValidateConfig = &portResource{}
 )
 
 // NewPortResource returns the tplinkeasysmart_port resource.
@@ -70,7 +72,8 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"enabled": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true), Description: "Administrative state. Defaults to true."},
 			"speed": schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("auto"),
 				Validators: []validator.String{validSpeed()}, Description: "One of: " + joinSpeeds() + ". Defaults to auto."},
-			"flow_control":      schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Flow control. Defaults to false."},
+			"flow_control": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false),
+				Description: "Flow control. Defaults to false. It can be true only with speed `auto` or `1000Mbps-full`: at a fixed 10 or 100 Mbps speed the switch accepts the setting but keeps flow control off, so that combination is refused while planning."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing a port that has a link up or is a LAG member. Defaults to false."),
 			"actual_speed":      schema.StringAttribute{Computed: true, Description: "Currently negotiated speed, or link-down."},
 		},
@@ -176,6 +179,37 @@ func (r *portResource) Delete(context.Context, resource.DeleteRequest, *resource
 func (r *portResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if importPositiveInt(ctx, req, resp, "a port number", "port") {
 		resetAllowDisruptive(ctx, resp)
+	}
+}
+
+// portFlowControlProblem says why a configuration asks for flow control at a speed that cannot
+// hold it, or returns "" when it is fine. An omitted speed or flow control takes its schema
+// default (auto, false); a value that is not known yet, or a speed the speed validator rejects
+// anyway, is not judged here.
+func portFlowControlProblem(speed types.String, flow types.Bool) string {
+	if speed.IsUnknown() || flow.IsUnknown() || !flow.ValueBool() {
+		return ""
+	}
+	s := escp.SpeedAuto
+	if !speed.IsNull() {
+		parsed, err := escp.ParseSpeed(speed.ValueString())
+		if err != nil {
+			return ""
+		}
+		s = parsed
+	}
+	if s.AllowsFlowControl() {
+		return ""
+	}
+	return fmt.Sprintf("flow_control = true needs speed = %q or %q, not %q. The switch accepts the setting but keeps flow control off at a fixed 10 or 100 Mbps speed, so the port would be left changed and the apply would then fail; the vendor utility refuses the same combination.", escp.SpeedAuto, escp.Speed1000Full, s)
+}
+
+// ValidateConfig rejects, at plan time, flow control together with a fixed 10 or 100 Mbps speed.
+func (r *portResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var m portResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if problem := portFlowControlProblem(m.Speed, m.FlowControl); problem != "" {
+		resp.Diagnostics.AddAttributeError(path.Root("flow_control"), "Invalid port configuration", problem)
 	}
 }
 

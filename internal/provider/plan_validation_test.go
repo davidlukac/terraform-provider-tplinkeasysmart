@@ -34,6 +34,10 @@ func TestInvalidConfigurationIsRejectedWhilePlanning(t *testing.T) {
 		{"port number zero", portConfig(0, ""), `(?s)port.*between 1 and 32`},
 		{"port number above the maximum", portConfig(33, ""), `(?s)port.*between 1 and 32`},
 		{"unknown speed", portConfig(7, "  speed = \"warp\"\n"), `must be one of`},
+		{"flow control at 100 Mbps full", portConfig(7, "  speed = \"100Mbps-full\"\n  flow_control = true\n"), `(?s)flow_control\s+=\s+true\s+needs\s+speed`},
+		{"flow control at 100 Mbps half", portConfig(7, "  speed = \"100Mbps-half\"\n  flow_control = true\n"), `(?s)flow_control\s+=\s+true\s+needs\s+speed`},
+		{"flow control at 10 Mbps full", portConfig(7, "  speed = \"10Mbps-full\"\n  flow_control = true\n"), `(?s)flow_control\s+=\s+true\s+needs\s+speed`},
+		{"flow control at 10 Mbps half", portConfig(7, "  speed = \"10Mbps-half\"\n  flow_control = true\n"), `(?s)flow_control\s+=\s+true\s+needs\s+speed`},
 		{"bandwidth rate not a multiple of 64", bwConfig(7, "  ingress_kbps = 100\n"), `multiple of 64`},
 		{"bandwidth rate above the maximum", bwConfig(7, "  egress_kbps = 1000064\n"), `multiple of 64`},
 		{"bandwidth port out of range", bwConfig(40, ""), `between 1 and 32`},
@@ -92,6 +96,10 @@ func TestValuesUnknownWhilePlanningAreValidatedBeforeAnythingIsWritten(t *testin
 			"resource \"tplinkeasysmart_lag\" \"l\" {\n  group = 2\n  ports = terraform_data.p.output\n}\n", `at least 2`},
 		{"VLAN members decided later and empty", providerBlock + "resource \"terraform_data\" \"p\" {\n  input = []\n}\n" +
 			"resource \"tplinkeasysmart_vlan_port_based_group\" \"v\" {\n  vlan = 2\n  ports = terraform_data.p.output\n}\n", `at least 1`},
+		{"port speed decided later and fixed, with flow control", providerBlock + "resource \"terraform_data\" \"s\" {\n  input = \"100Mbps-full\"\n}\n" +
+			"resource \"tplinkeasysmart_port\" \"p\" {\n  port = 7\n  speed = terraform_data.s.output\n  flow_control = true\n}\n", `(?s)flow_control\s+=\s+true\s+needs\s+speed`},
+		{"flow control decided later and on, with a fixed speed", providerBlock + "resource \"terraform_data\" \"f\" {\n  input = true\n}\n" +
+			"resource \"tplinkeasysmart_port\" \"p\" {\n  port = 7\n  speed = \"10Mbps-full\"\n  flow_control = terraform_data.f.output\n}\n", `(?s)flow_control\s+=\s+true\s+needs\s+speed`},
 		{"QoS mode decided later and invalid", providerBlock + "resource \"terraform_data\" \"m\" {\n  input = \"turbo\"\n}\n" +
 			"resource \"tplinkeasysmart_qos\" \"q\" {\n  mode = terraform_data.m.output\n}\n", `must be one of`},
 		{"QoS priorities decided later outside port-based mode", providerBlock + "resource \"terraform_data\" \"m\" {\n  input = \"802.1p\"\n}\n" +

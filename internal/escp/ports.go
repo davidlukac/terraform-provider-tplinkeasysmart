@@ -56,6 +56,14 @@ func ConfigurableSpeeds() []Speed { return append([]Speed(nil), configurableSpee
 // String returns the speed as spelled in the web UI.
 func (s Speed) String() string { return string(s) }
 
+// AllowsFlowControl reports whether flow control can be switched on at this speed. The switch
+// keeps it only with auto-negotiation or at 1000Mbps-full; at a fixed 10 or 100 Mbps speed it
+// accepts the write but stores flow control as off (measured on firmware 20250710, every
+// fixed speed below 1000 Mbps). The vendor utility enforces the same rule: its flow control
+// choice is forced to off and disabled unless the speed is auto or 1000 Mbps full, with the
+// message "Failed to enable flow control when speed in Force mode".
+func (s Speed) AllowsFlowControl() bool { return s == SpeedAuto || s == Speed1000Full }
+
 // ParseSpeed converts a configurable speed name; SpeedLinkDown and unknown names are errors.
 func ParseSpeed(name string) (Speed, error) {
 	for _, s := range configurableSpeeds {
@@ -119,6 +127,7 @@ func (c *Client) Ports(ctx context.Context) ([]Port, error) {
 
 // PortConfig is what SetPort writes to one port. All fields are required: the switch
 // takes the whole entry, so a caller changing one field passes the others as read.
+// FlowControl can only be true with a speed for which Speed.AllowsFlowControl is true.
 type PortConfig struct {
 	ID          int
 	Enabled     bool
@@ -127,8 +136,11 @@ type PortConfig struct {
 }
 
 // SetPort writes the configuration of one port: admin state, speed and flow
-// control (7-byte TLV 4096 as sent by the vendor utility). Changing a port that
-// carries traffic can cut connectivity; callers must guard against that.
+// control (7-byte TLV 4096 as sent by the vendor utility). Flow control can only be
+// on with speed auto or 1000Mbps-full (see Speed.AllowsFlowControl): any other
+// combination is refused before anything is sent, because the switch would accept
+// it and silently keep flow control off. Changing a port that carries traffic can
+// cut connectivity; callers must guard against that.
 func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
 	code, err := cfg.Speed.code()
 	if err != nil {
@@ -136,6 +148,9 @@ func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
 	}
 	if err := ValidatePort(cfg.ID); err != nil {
 		return err
+	}
+	if cfg.FlowControl && !cfg.Speed.AllowsFlowControl() {
+		return fmt.Errorf("escp: port %d: flow control needs speed %s or %s, not %s (the switch keeps it off at a fixed 10 or 100 Mbps speed)", cfg.ID, SpeedAuto, Speed1000Full, cfg.Speed)
 	}
 	entry := make([]byte, portEntryLen)
 	entry[portOffPort], entry[portOffState], entry[portOffCfgSpeed], entry[portOffCfgFlow] = byte(cfg.ID), boolByte(cfg.Enabled), code, boolByte(cfg.FlowControl)
