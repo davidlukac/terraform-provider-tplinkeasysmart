@@ -1,12 +1,3 @@
-// Package escptest is an in-process TL-SG108E that speaks ESCP over loopback UDP, for
-// tests of code that uses the escp client. It imports only the wire codec, never the
-// client, so the escp package's own tests can use it without an import cycle.
-//
-// It models firmware 20230218 closely enough for the client's reads and writes (key
-// exchange, credentials on every SET, fragmented configuration backup) and offers
-// switches for the failures the client must survive: silence, dropped packets, rejected
-// writes and stale discovery replies. It is a test double: it keeps almost no settings
-// state, and it is no substitute for the real switch.
 package escptest
 
 import (
