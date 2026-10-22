@@ -114,7 +114,9 @@ type Info struct {
 }
 
 // Client talks ESCP to one switch. It is safe for concurrent use; requests
-// are serialized because the switch answers one client at a time.
+// are serialized because the switch answers one request at a time. Use one Client per
+// switch: two Clients for the same switch were measured to fail completely, apparently
+// because the switch keeps a single session (see the package documentation).
 type Client struct {
 	cfg  Config
 	mu   sync.Mutex

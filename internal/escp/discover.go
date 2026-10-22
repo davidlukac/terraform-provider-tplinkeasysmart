@@ -47,9 +47,11 @@ type DiscoverOptions struct {
 // If the context ends early, Discover returns the replies collected so far together with the
 // context's error. A failure to bind the socket, or to send on every interface, is an error.
 //
-// Switches always reply to UDP port 29809 whatever the sender's port, so Discover cannot
-// run while a Client or the vendor utility is working on the same host: replies would be
-// shared out between the sockets unpredictably. Run it on its own.
+// Switches always reply to UDP port 29809 whatever the sender's port. The port is shared
+// (see Client), so Discover can run while a Client of the same host is working: on macOS it
+// found both switches three times out of three while a Client was reading at the same
+// time. Where the system offers no port sharing, or another program holds the port
+// exclusively (an old Easy Smart utility), binding fails and Discover returns that error.
 func Discover(ctx context.Context, opts DiscoverOptions) ([]Info, error) {
 	return discoverWith(ctx, opts, discoverEnv{interfaces: hostInterfaces, switchPort: defaultSwitchPort, hostPort: defaultHostPort})
 }

@@ -23,8 +23,15 @@
 //	ports, err := c.Ports(ctx)
 //
 // A Client is safe for concurrent use, but it sends one request at a time because the
-// switch answers one request at a time. Switches always reply to UDP port 29809, so only
-// one Client (or Discover, or the vendor's utility) can work on a host at once.
+// switch answers one request at a time. Use one Client per switch and share it between
+// goroutines. Clients for different switches work side by side, in one process or on one
+// host: switches always reply to UDP port 29809, the clients share that port, and each
+// keeps only the replies from its own switch. Two Clients for the same switch do not work
+// at all (measured: 30 reads out of 30 failed, and the switch dropped pings meanwhile).
+// The switch appears to keep a single session, so that each key exchange invalidates the
+// other client's. Discover can run next to a Client. This was measured on macOS; port
+// sharing on other systems was not, and where the system offers none the second bind
+// fails with an error.
 //
 // Discover finds the switches on the network without credentials and without knowing
 // their addresses.
