@@ -70,7 +70,9 @@ func (r *lagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"destroy a group when any port involved (old or new members) has a link up or belongs to another LAG, because that can cut the uplink; set " +
 			"`allow_disruptive = true` to override. The existing router uplink (usually LAG1) should be imported and protected with `lifecycle { prevent_destroy = true }`. " +
 			"The group number decides the ports: " + lagRangeNote + ". The switch itself rejects ports that conflict with the port mirror (source or destination), a port-based VLAN other than the default, " +
-			"a bandwidth limit or storm control; the error then names the conflict.",
+			"a bandwidth limit or storm control, and member ports that differ in speed, flow control or enabled state, mix auto-negotiation with a fixed speed, are half duplex " +
+			"or (in port-based QoS mode) differ in QoS priority; the error then names the conflict. The switch checks this only when the group is written and does not keep the members alike afterwards, " +
+			"so change the members together.",
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: resourceSwitchAttribute(),
 			"group": schema.Int64Attribute{Required: true, Description: "Group number: 1 (ports 1-4) or 2 (ports 5-8).",

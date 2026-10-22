@@ -93,8 +93,9 @@ func TestValidateLAG(t *testing.T) {
 	}
 }
 
-// Every code below was provoked on a real TL-SG108E (firmware 20250710); the
-// error must name the conflict instead of blaming the credentials.
+// Every code below was provoked on a real TL-SG108E (firmware 20250710), the member rules
+// (7405 to 7418) on free ports 3 and 4 of switch 03; the error must name the conflict instead
+// of blaming the credentials.
 func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 	for _, tc := range []struct {
 		code int32
@@ -107,6 +108,12 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 		{7205, "destination of the port mirror"},
 		{7206, "is mirrored"},
 		{7415, "at least two ports"},
+		{7405, "different QoS priorities"},
+		{7406, "do not have the same speed"},
+		{7407, "half duplex; LAG members must be full duplex"},
+		{7410, "mix auto-negotiation with a fixed speed"},
+		{7417, "same flow control setting"},
+		{7418, "all enabled or all disabled"},
 	} {
 		t.Run(fmt.Sprint(tc.code), func(t *testing.T) {
 			f := escptest.Start(t)

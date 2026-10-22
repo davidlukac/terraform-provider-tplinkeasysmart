@@ -2,12 +2,12 @@
 page_title: "tplinkeasysmart_port Resource - tplinkeasysmart"
 subcategory: "Switching"
 description: |-
-  Configuration of one physical port (Switching > Port Setting): admin state, speed and flow control. Import with the port number. Safety: by default the provider refuses to change a port that has a link up or is in a LAG, because that can cut the uplink or the management path; set allow_disruptive = true to override. Destroying only removes it from state.
+  Configuration of one physical port (Switching > Port Setting): admin state, speed and flow control. Import with the port number. Safety: by default the provider refuses to change a port that has a link up or is in a LAG, because that can cut the uplink or the management path; set allow_disruptive = true to override. On a LAG member the switch refuses half duplex but does not keep the members' speed, flow control or enabled state alike, so change all members together. Destroying only removes it from state.
 ---
 
 # tplinkeasysmart_port (Resource)
 
-Configuration of one physical port (Switching > Port Setting): admin state, speed and flow control. Import with the port number. **Safety:** by default the provider refuses to change a port that has a link up or is in a LAG, because that can cut the uplink or the management path; set `allow_disruptive = true` to override. Destroying only removes it from state.
+Configuration of one physical port (Switching > Port Setting): admin state, speed and flow control. Import with the port number. **Safety:** by default the provider refuses to change a port that has a link up or is in a LAG, because that can cut the uplink or the management path; set `allow_disruptive = true` to override. On a LAG member the switch refuses half duplex but does not keep the members' speed, flow control or enabled state alike, so change all members together. Destroying only removes it from state.
 
 ~> **Safety** The provider refuses to change a port that has a link up or belongs to a LAG unless `allow_disruptive = true`. Disabling or re-negotiating the port that carries Terraform's own connection, or the LAG to the router, cuts access to the switch and needs a physical reset to recover.
 
