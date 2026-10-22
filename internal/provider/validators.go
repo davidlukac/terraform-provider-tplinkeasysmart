@@ -78,11 +78,24 @@ func validPriorities() []validator.Map {
 	}
 }
 
+// Limits as the descriptions state them, built from the client's constants so the text cannot
+// drift from what is validated.
+func rateRangeText() string {
+	return fmt.Sprintf("0 (unlimited) or a multiple of %d up to %d", escp.RateStepKbps, escp.MaxBandwidthKbps)
+}
+
+// stormRateRangeText is the rate a storm control with traffic types needs.
+func stormRateRangeText() string {
+	return fmt.Sprintf("%d..%d kbps, multiple of %d", escp.RateStepKbps, escp.MaxBandwidthKbps, escp.RateStepKbps)
+}
+
+func vlanIDRangeText() string { return fmt.Sprintf("%d-%d", escp.MinVLANID, escp.MaxVLANID) }
+
 // rateKbps accepts 0 (unlimited) or a multiple of 64 up to the maximum.
 type rateKbps struct{}
 
 func (rateKbps) Description(context.Context) string {
-	return fmt.Sprintf("0 (unlimited) or a multiple of %d up to %d kbps", escp.RateStepKbps, escp.MaxBandwidthKbps)
+	return rateRangeText() + " kbps"
 }
 
 func (v rateKbps) MarkdownDescription(ctx context.Context) string { return v.Description(ctx) }

@@ -10,12 +10,16 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
-// VerifiedFirmwareBuilds are the firmware builds (the date in "1.0.0 Build
+// verifiedFirmwareBuilds is the allow-list behind VerifiedFirmwareBuilds. It is unexported so
+// that no code in the process can append to it and weaken the gate.
+var verifiedFirmwareBuilds = []string{"20230218", "20250710"}
+
+// VerifiedFirmwareBuilds returns the firmware builds (the date in "1.0.0 Build
 // 20230218 Rel.50633") whose protocol behaviour this client was tested
 // against on real switches: reads, and writes on unused ports. Any other build
 // may have changed layouts or authentication, so writes to it are refused
-// unless the user opts in.
-var VerifiedFirmwareBuilds = []string{"20230218", "20250710"}
+// unless the user opts in. The result is a copy: changing it changes nothing.
+func VerifiedFirmwareBuilds() []string { return slices.Clone(verifiedFirmwareBuilds) }
 
 var firmwareBuildPattern = regexp.MustCompile(`Build (\d{8})`)
 
@@ -73,10 +77,10 @@ func (e *FirmwareError) Unwrap() error { return e.Err }
 func CheckFirmware(version string) error {
 	build, ok := FirmwareBuild(version)
 	if !ok {
-		return &FirmwareError{Reason: FirmwareNoBuildDate, Version: version, Verified: slices.Clone(VerifiedFirmwareBuilds)}
+		return &FirmwareError{Reason: FirmwareNoBuildDate, Version: version, Verified: VerifiedFirmwareBuilds()}
 	}
-	if !slices.Contains(VerifiedFirmwareBuilds, build) {
-		return &FirmwareError{Reason: FirmwareUnverified, Version: version, Build: build, Verified: slices.Clone(VerifiedFirmwareBuilds)}
+	if !slices.Contains(verifiedFirmwareBuilds, build) {
+		return &FirmwareError{Reason: FirmwareUnverified, Version: version, Build: build, Verified: VerifiedFirmwareBuilds()}
 	}
 	return nil
 }

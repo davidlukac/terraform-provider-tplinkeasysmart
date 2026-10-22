@@ -121,7 +121,7 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 }
 
 // verifiedBuilds lists the verified firmware builds for the attribute description.
-func verifiedBuilds() string { return strings.Join(safety.VerifiedFirmwareBuilds, ", ") }
+func verifiedBuilds() string { return strings.Join(safety.VerifiedFirmwareBuilds(), ", ") }
 
 func envOr(v types.String, env string) string {
 	if !v.IsNull() && !v.IsUnknown() {

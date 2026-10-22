@@ -73,6 +73,7 @@ type Switch struct {
 	gets             int
 	sets             int
 	dropNth          int // drop the nth received packet (1-based) to test retries
+	dropFirst        int // drop the first n received packets
 	recv             int
 	mute             bool // swallow everything (switch gone)
 	backupMode       BackupMode
@@ -135,6 +136,11 @@ func (f *Switch) Port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
 
 // DropPacket makes the switch ignore the nth packet it receives (1-based), to test retries.
 func (f *Switch) DropPacket(n int) { f.mu.Lock(); f.dropNth = n; f.mu.Unlock() }
+
+// DropFirst makes the switch ignore the first n packets it receives. A discovery probe is sent
+// twice per attempt (to the switch and to the broadcast address, which a test points at the same
+// fake), so DropFirst(2) loses exactly one whole attempt of a probe.
+func (f *Switch) DropFirst(n int) { f.mu.Lock(); f.dropFirst = n; f.mu.Unlock() }
 
 // Mute makes the switch ignore everything from now on, as if it had gone away.
 func (f *Switch) Mute() { f.mu.Lock(); f.mute = true; f.mu.Unlock() }
@@ -224,7 +230,7 @@ func (f *Switch) serve() {
 		}
 		f.mu.Lock()
 		f.recv++
-		drop := f.mute || f.recv == f.dropNth
+		drop := f.mute || f.recv == f.dropNth || f.recv <= f.dropFirst
 		f.mu.Unlock()
 		if drop {
 			continue

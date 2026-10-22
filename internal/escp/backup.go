@@ -3,13 +3,14 @@ package escp
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 // ErrInvalidConfig means the reply was not a switch configuration file.
-var ErrInvalidConfig = fmt.Errorf("escp: reply is not a switch configuration file")
+var ErrInvalidConfig = errors.New("escp: reply is not a switch configuration file")
 
 // ConfigBackup downloads the switch's binary configuration file (the same
 // bytes as System Tools > Backup Config in the web UI). The vendor utility

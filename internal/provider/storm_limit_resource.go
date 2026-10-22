@@ -61,7 +61,7 @@ func (r *stormLimitResource) Metadata(_ context.Context, req resource.MetadataRe
 
 func (r *stormLimitResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Storm control of one port (QoS > Storm Control). Selecting traffic types requires a rate (64..1000000 kbps, multiple of 64); selecting none disables it with rate 0. Import with the port number. **Safety:** a rate drops excess traffic of the chosen types, so by default " +
+		Description: "Storm control of one port (QoS > Storm Control). Selecting traffic types requires a rate (" + stormRateRangeText() + "); selecting none disables it with rate 0. Import with the port number. **Safety:** a rate drops excess traffic of the chosen types, so by default " +
 			"the provider refuses to change a port that has a link up or is in a LAG; set `allow_disruptive = true` to override. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: resourceSwitchAttribute(),
@@ -72,7 +72,7 @@ func (r *stormLimitResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"multicast":       schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Limit multicast traffic."},
 			"broadcast":       schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Limit broadcast traffic."},
 			"rate_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{rateKbps{}},
-				Description: "Rate in kbps (multiple of 64, 64..1000000) when a traffic type is selected, otherwise 0."},
+				Description: fmt.Sprintf("Rate in kbps (multiple of %d, %d..%d) when a traffic type is selected, otherwise 0.", escp.RateStepKbps, escp.RateStepKbps, escp.MaxBandwidthKbps)},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing a port that has a link up or is a LAG member. Defaults to false."),
 		},
 	}
