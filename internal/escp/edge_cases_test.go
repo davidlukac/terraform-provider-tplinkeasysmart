@@ -264,7 +264,7 @@ func TestSetPortPrioritiesStopsWhenTheCurrentStateCannotBeRead(t *testing.T) {
 	f := startFakeSwitch(t)
 	c := dialFast(t, f, "secret")
 	f.configure(func(f *fakeSwitch) { f.getFn = func([]int16) ([]wire.TLV, int32, bool) { return nil, 0, true } })
-	if err := c.SetPortPriorities(context.Background(), map[int]int{3: 2}); !errors.Is(err, ErrNoReply) {
+	if err := c.SetPortPriorities(context.Background(), map[int]Priority{3: 2}); !errors.Is(err, ErrNoReply) {
 		t.Fatalf("got %v", err)
 	}
 	if n := len(f.allSets()); n != 0 {

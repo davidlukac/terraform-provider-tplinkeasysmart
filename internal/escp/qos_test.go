@@ -19,14 +19,14 @@ func TestParseQoS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := QoS{Mode: 2, ModeName: "dscp-802.1p", Priorities: []PortPriority{{1, 1}, {2, 1}, {3, 1}, {4, 4}}}
+	want := QoS{Mode: QoSDSCP8021p, Priorities: []PortPriority{{1, 1}, {2, 1}, {3, 1}, {4, 4}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v", got)
 	}
 	if _, err := parseQoS([]wire.TLV{{Type: wire.TLVQoSMode, Value: []byte{9}}, {Type: wire.TLVQoSPriority, Value: []byte{1}}}); err == nil {
 		t.Fatal("expected error for short priority")
 	}
-	if q, err := parseQoS([]wire.TLV{tlvHex(t, wire.TLVQoSMode, "09")}); err != nil || q.ModeName != "unknown(9)" {
+	if q, err := parseQoS([]wire.TLV{tlvHex(t, wire.TLVQoSMode, "09")}); err != nil || q.Mode.String() != "unknown(9)" {
 		t.Fatalf("unknown mode: %+v %v", q, err)
 	}
 }
@@ -44,7 +44,7 @@ func TestSetQoSWire(t *testing.T) {
 	if err := c.SetQoSMode(ctx, 7); err == nil {
 		t.Fatal("invalid mode must be rejected")
 	}
-	if err := c.SetPortPriorities(ctx, map[int]int{3: 4}); err != nil {
+	if err := c.SetPortPriorities(ctx, map[int]Priority{3: 4}); err != nil {
 		t.Fatal(err)
 	}
 	got := f.set()
@@ -60,10 +60,74 @@ func TestSetQoSWire(t *testing.T) {
 			t.Fatalf("entry %d: %+v", i, tl)
 		}
 	}
-	if err := c.SetPortPriorities(ctx, map[int]int{3: 9}); err == nil {
+	if err := c.SetPortPriorities(ctx, map[int]Priority{3: 9}); err == nil {
 		t.Fatal("priority 9 must be rejected")
 	}
-	if err := c.SetPortPriorities(ctx, map[int]int{99: 2}); err == nil {
+	if err := c.SetPortPriorities(ctx, map[int]Priority{99: 2}); err == nil {
 		t.Fatal("unknown port must be rejected")
+	}
+}
+
+// The names are part of the provider's Terraform state and of the web UI: they must not drift,
+// and the codes are the wire bytes.
+func TestQoSModeSpellingsAndCodes(t *testing.T) {
+	want := []struct {
+		mode QoSMode
+		code int
+		name string
+	}{{QoSPortBased, 0, "port-based"}, {QoS8021p, 1, "802.1p"}, {QoSDSCP8021p, 2, "dscp-802.1p"}}
+	got := QoSModes()
+	if len(got) != len(want) {
+		t.Fatalf("got %v", got)
+	}
+	for i, w := range want {
+		if got[i] != w.mode || int(w.mode) != w.code || w.mode.String() != w.name || !w.mode.Valid() {
+			t.Errorf("mode %d: %v (%d) %q valid=%v, want code %d name %q", i, got[i], int(got[i]), got[i], got[i].Valid(), w.code, w.name)
+		}
+		if parsed, err := ParseQoSMode(w.name); err != nil || parsed != w.mode {
+			t.Errorf("ParseQoSMode(%q) = %v, %v", w.name, parsed, err)
+		}
+	}
+}
+
+func TestQoSModeUnknownValues(t *testing.T) {
+	for _, bad := range []QoSMode{-1, 3, 255} {
+		if bad.Valid() {
+			t.Errorf("%d must not be valid", int(bad))
+		}
+	}
+	if got := QoSMode(9).String(); got != "unknown(9)" {
+		t.Errorf("String of an unknown code = %q", got)
+	}
+	for _, name := range []string{"", "unknown(9)", "DSCP-802.1P", "dscp"} {
+		if _, err := ParseQoSMode(name); err == nil {
+			t.Errorf("ParseQoSMode(%q) succeeded", name)
+		}
+	}
+}
+
+// A mode the client does not know is refused before anything is sent, negative values included.
+func TestSetQoSModeRefusesUnknownModesWithoutSending(t *testing.T) {
+	f := startFakeSwitch(t)
+	c := dialFake(t, f, "secret")
+	n := len(f.allSets())
+	for _, bad := range []QoSMode{-1, 3, 256} {
+		if err := c.SetQoSMode(context.Background(), bad); err == nil {
+			t.Errorf("mode %d accepted", int(bad))
+		}
+	}
+	if len(f.allSets()) != n {
+		t.Fatal("a refused mode reached the switch")
+	}
+}
+
+func TestPriorityBounds(t *testing.T) {
+	for p, valid := range map[Priority]bool{0: false, 1: true, 2: true, 3: true, 4: true, 5: false, -1: false} {
+		if p.Valid() != valid {
+			t.Errorf("Priority(%d).Valid() = %v", int(p), p.Valid())
+		}
+	}
+	if PriorityLowest != 1 || PriorityHighest != 4 {
+		t.Fatalf("bounds are %d..%d, the web UI shows 1..4", int(PriorityLowest), int(PriorityHighest))
 	}
 }

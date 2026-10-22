@@ -226,15 +226,15 @@ func (f *fakeClient) VLAN8021Q(context.Context) (escp.Dot1Q, error) {
 		PVIDs: []escp.PortPVID{{Port: 1, PVID: 10}, {Port: 8, PVID: 1}}}, nil
 }
 
-func (f *fakeClient) SetQoSMode(_ context.Context, mode int) error {
+func (f *fakeClient) SetQoSMode(_ context.Context, mode escp.QoSMode) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.qos.Mode, f.qos.ModeName = mode, escp.QoSModeNames[mode]
+	f.qos.Mode = mode
 	f.sets++
 	return nil
 }
 
-func (f *fakeClient) SetPortPriorities(_ context.Context, ch map[int]int) error {
+func (f *fakeClient) SetPortPriorities(_ context.Context, ch map[int]escp.Priority) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.qos.Mode != 0 {
@@ -256,7 +256,7 @@ func (f *fakeClient) QoS(context.Context) (escp.QoS, error) {
 		q.Priorities = append([]escp.PortPriority(nil), f.qos.Priorities...)
 		return q, nil
 	}
-	return escp.QoS{Mode: 2, ModeName: "dscp-802.1p", Priorities: []escp.PortPriority{{Port: 1, Priority: 1}, {Port: 2, Priority: 4}}}, nil
+	return escp.QoS{Mode: escp.QoSDSCP8021p, Priorities: []escp.PortPriority{{Port: 1, Priority: 1}, {Port: 2, Priority: 4}}}, nil
 }
 
 func (f *fakeClient) SetBandwidth(_ context.Context, limit escp.PortBandwidth) error {
@@ -715,7 +715,7 @@ func TestAccPortGuardOverride(t *testing.T) {
 }
 
 func newFakeQoS() *fakeClient {
-	q := escp.QoS{Mode: 2, ModeName: "dscp-802.1p"}
+	q := escp.QoS{Mode: escp.QoSDSCP8021p}
 	for p := 1; p <= 8; p++ {
 		q.Priorities = append(q.Priorities, escp.PortPriority{Port: p, Priority: 1})
 	}

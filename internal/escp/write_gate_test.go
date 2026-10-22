@@ -31,7 +31,7 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 		return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 2, IngressPorts: []int{3}})
 	},
 	"SetQoSMode":        func(ctx context.Context, c *Client) error { return c.SetQoSMode(ctx, 1) },
-	"SetPortPriorities": func(ctx context.Context, c *Client) error { return c.SetPortPriorities(ctx, map[int]int{2: 1}) },
+	"SetPortPriorities": func(ctx context.Context, c *Client) error { return c.SetPortPriorities(ctx, map[int]Priority{2: 1}) },
 	"SetStormControl": func(ctx context.Context, c *Client) error {
 		return c.SetStormControl(ctx, StormConfig{Port: 2, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64})
 	},

@@ -138,14 +138,14 @@ func (g *gatedClient) SetPVIDs(ctx context.Context, pvids map[int]int) error {
 	return g.SwitchClient.SetPVIDs(ctx, pvids)
 }
 
-func (g *gatedClient) SetQoSMode(ctx context.Context, mode int) error {
+func (g *gatedClient) SetQoSMode(ctx context.Context, mode escp.QoSMode) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetQoSMode(ctx, mode)
 }
 
-func (g *gatedClient) SetPortPriorities(ctx context.Context, changes map[int]int) error {
+func (g *gatedClient) SetPortPriorities(ctx context.Context, changes map[int]escp.Priority) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}

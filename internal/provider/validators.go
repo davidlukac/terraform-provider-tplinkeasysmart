@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"sort"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -62,14 +61,9 @@ func validHostname() []validator.String {
 
 // qosModeNames lists the QoS mode names in mode-number order.
 func qosModeNames() []string {
-	codes := make([]int, 0, len(escp.QoSModeNames))
-	for code := range escp.QoSModeNames {
-		codes = append(codes, code)
-	}
-	sort.Ints(codes)
-	names := make([]string, 0, len(codes))
-	for _, code := range codes {
-		names = append(names, escp.QoSModeNames[code])
+	var names []string
+	for _, m := range escp.QoSModes() {
+		names = append(names, m.String())
 	}
 	return names
 }
@@ -183,7 +177,7 @@ func qosProblem(mode types.String, priorities types.Map) string {
 	if mode.IsUnknown() || priorities.IsUnknown() || len(priorities.Elements()) == 0 {
 		return ""
 	}
-	if mode.ValueString() != escp.QoSModeNames[0] {
+	if mode.ValueString() != escp.QoSPortBased.String() {
 		return "per-port priorities only take effect when mode is port-based; remove port_priorities or set mode = \"port-based\""
 	}
 	return ""
