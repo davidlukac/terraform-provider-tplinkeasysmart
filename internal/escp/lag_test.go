@@ -43,7 +43,7 @@ func TestSetLAGWire(t *testing.T) {
 	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0}) {
 		t.Fatalf("delete wire %v", got[0].Value)
 	}
-	n := len(f.AllSets())
+	n := f.WriteCount()
 	for _, bad := range []struct {
 		group int
 		ports []int
@@ -52,7 +52,7 @@ func TestSetLAGWire(t *testing.T) {
 			t.Errorf("LAG %d with ports %v must be rejected", bad.group, bad.ports)
 		}
 	}
-	if len(f.AllSets()) != n {
+	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }

@@ -200,7 +200,7 @@ func TestBandwidthValidationHappensBeforeAnythingIsSent(t *testing.T) {
 			t.Errorf("%s must be rejected", name)
 		}
 	}
-	if n := len(f.AllSets()); n != 0 {
+	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("an invalid egress rate must stop the request before the ingress SET is sent, %d SET(s) reached the switch", n)
 	}
 }
@@ -213,7 +213,7 @@ func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrRejected) {
 			t.Fatalf("got %v", err)
 		}
-		if n := len(f.AllSets()); n != 0 {
+		if n := f.WriteCount(); n != 0 {
 			t.Fatalf("%d SET(s) applied", n)
 		}
 	})
@@ -238,7 +238,7 @@ func TestStormControlRejectsInvalidPortBeforeSending(t *testing.T) {
 			t.Errorf("port %d must be rejected", port)
 		}
 	}
-	if n := len(f.AllSets()); n != 0 {
+	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("%d SET(s) reached the switch", n)
 	}
 }
@@ -255,7 +255,7 @@ func TestMirrorRejectsInvalidSourcePortsBeforeSending(t *testing.T) {
 			t.Errorf("%s must be rejected", name)
 		}
 	}
-	if n := len(f.AllSets()); n != 0 {
+	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("%d SET(s) reached the switch", n)
 	}
 }
@@ -263,11 +263,13 @@ func TestMirrorRejectsInvalidSourcePortsBeforeSending(t *testing.T) {
 func TestSetPortPrioritiesStopsWhenTheCurrentStateCannotBeRead(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")
-	f.Configure(func(f *escptest.Switch) { f.GetFn = func([]int16) ([]wire.TLV, int32, bool) { return nil, 0, true } })
+	f.Configure(func(f *escptest.Switch) {
+		f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) { return nil, 0, true }
+	})
 	if err := c.SetPortPriorities(context.Background(), map[int]Priority{3: 2}); !errors.Is(err, ErrNoReply) {
 		t.Fatalf("got %v", err)
 	}
-	if n := len(f.AllSets()); n != 0 {
+	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("priorities must not be written blind: %d SET(s)", n)
 	}
 }
@@ -281,7 +283,7 @@ func TestSetHostnameRefusesToWriteWithoutAUsableIPConfiguration(t *testing.T) {
 			t.Fatalf("got %v", err)
 		}
 	})
-	bad := map[string][]wire.TLV{
+	bad := map[string][]escptest.Setting{
 		"missing IP":      {{Type: wire.TLVNetmask, Value: []byte{255, 255, 255, 0}}, {Type: wire.TLVGateway, Value: []byte{10, 0, 0, 1}}},
 		"missing netmask": {{Type: wire.TLVIP, Value: []byte{10, 0, 0, 5}}, {Type: wire.TLVGateway, Value: []byte{10, 0, 0, 1}}},
 		"missing gateway": {{Type: wire.TLVIP, Value: []byte{10, 0, 0, 5}}, {Type: wire.TLVNetmask, Value: []byte{255, 255, 255, 0}}},
@@ -290,13 +292,13 @@ func TestSetHostnameRefusesToWriteWithoutAUsableIPConfiguration(t *testing.T) {
 	for name, tlvs := range bad {
 		t.Run(name, func(t *testing.T) {
 			f := escptest.Start(t)
-			f.Configure(func(f *escptest.Switch) { f.DiscoverTLVs = tlvs })
+			f.Configure(func(f *escptest.Switch) { f.DiscoverReply = tlvs })
 			c := dialFast(t, f, "secret")
 			err := c.SetHostname(context.Background(), "new-name")
 			if err == nil || !strings.Contains(err.Error(), "unusable IP configuration") {
 				t.Fatalf("want a refusal, got %v", err)
 			}
-			if n := len(f.AllSets()); n != 0 {
+			if n := f.WriteCount(); n != 0 {
 				t.Fatalf("the management IP must never be written from a half-known state, %d SET(s) sent", n)
 			}
 		})

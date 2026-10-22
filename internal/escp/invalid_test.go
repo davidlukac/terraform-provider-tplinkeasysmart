@@ -90,7 +90,7 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 			if errors.Is(err, ErrNoReply) || errors.Is(err, ErrRejected) {
 				t.Errorf("an argument error must not look like a switch failure: %v", err)
 			}
-			if n := len(f.AllSets()); n != 0 {
+			if n := f.WriteCount(); n != 0 {
 				t.Errorf("a refused argument must send no write, the switch received %d", n)
 			}
 		})

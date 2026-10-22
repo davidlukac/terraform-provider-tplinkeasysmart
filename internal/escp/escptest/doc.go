@@ -17,7 +17,8 @@
 //	})
 //
 // Faults are set inside Configure, which holds the switch's lock; what the switch
-// received is read back through AllSets, LastSet and the other accessors.
+// received is read back through WriteCount, AllSets, LastSet and the other accessors, in
+// the package's own Setting type.
 //
 // # Stability
 //

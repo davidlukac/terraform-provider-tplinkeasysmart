@@ -45,11 +45,11 @@ func TestSetPortBasedVLANWire(t *testing.T) {
 	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0}) {
 		t.Fatalf("delete wire %v", got[0].Value)
 	}
-	n := len(f.AllSets())
+	n := f.WriteCount()
 	if c.SetPortBasedVLAN(ctx, 0, []int{1}) == nil || c.SetPortBasedVLAN(ctx, 2, []int{99}) == nil {
 		t.Fatal("invalid id or port must be rejected")
 	}
-	if len(f.AllSets()) != n {
+	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }

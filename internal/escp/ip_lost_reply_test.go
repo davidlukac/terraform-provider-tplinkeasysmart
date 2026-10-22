@@ -27,7 +27,7 @@ func TestSetIPConfigSucceedsWhenTheReplyIsLostButTheSwitchMoved(t *testing.T) {
 	if err := c.SetIPConfig(context.Background(), lostReplyWanted); err != nil {
 		t.Fatalf("the switch has the new settings, so the call must succeed: %v", err)
 	}
-	if n := len(f.AllSets()); n != 1 {
+	if n := f.WriteCount(); n != 1 {
 		t.Fatalf("the write must be sent once and not repeated, got %d writes", n)
 	}
 	if !c.dest.IP.Equal(lostReplyWanted.IP) || c.alsoFrom != nil || c.session != nil {
@@ -54,7 +54,7 @@ func TestSetIPConfigReportsAWriteThatWasNotApplied(t *testing.T) {
 	if !strings.Contains(err.Error(), "not applied") || !strings.Contains(err.Error(), "127.0.0.1") {
 		t.Errorf("the error must say the write was not applied, and where the switch is: %v", err)
 	}
-	if n := len(f.AllSets()); n != 0 {
+	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("nothing was applied, got %d writes", n)
 	}
 	if !c.dest.IP.Equal(lostReplyBefore.IP) || c.alsoFrom != nil {
@@ -75,7 +75,7 @@ func TestSetIPConfigReportsAMoveThatCannotBeConfirmed(t *testing.T) {
 	if !strings.Contains(err.Error(), "found nothing") {
 		t.Errorf("the error must say that a probe found nothing: %v", err)
 	}
-	if n := len(f.AllSets()); n != 1 {
+	if n := f.WriteCount(); n != 1 {
 		t.Fatalf("the write was applied once, got %d", n)
 	}
 	if c.alsoFrom != nil {

@@ -81,16 +81,16 @@ type Switch struct {
 
 	// Programmable misbehaviour. Set these inside Configure, which holds the lock.
 
-	// GetFn scripts the reply to GETs: the TLVs, the error code, and whether to stay silent.
-	GetFn func(types []int16) (tlvs []wire.TLV, code int32, drop bool)
+	// GetFn scripts the reply to GETs: the settings, the error code, and whether to stay silent.
+	GetFn func(types []int16) (settings []Setting, code int32, drop bool)
 	// RSADrop makes the switch ignore the key exchange.
 	RSADrop bool
 	// RSACode answers the key exchange with this code instead of the success code.
 	RSACode int32
 	// DropSets makes the switch ignore authenticated SETs.
 	DropSets bool
-	// DiscoverTLVs replaces the discovery reply; nil keeps the default TL-SG108E reply.
-	DiscoverTLVs []wire.TLV
+	// DiscoverReply replaces the discovery reply; nil keeps the default TL-SG108E reply.
+	DiscoverReply []Setting
 	// RejectSetsFrom rejects the nth and every later authenticated SET (1-based); 0 accepts all.
 	RejectSetsFrom int
 	// RejectCode is the reply code of a rejected SET; 0 means 9.
@@ -158,18 +158,53 @@ func (f *Switch) SetBackupMode(mode BackupMode) {
 	f.mu.Unlock()
 }
 
-// AllSets returns the settings of every accepted SET in order, credentials removed.
-func (f *Switch) AllSets() [][]wire.TLV {
+// Setting is one entry of a request or a reply: a protocol type number (the numbers of
+// docs/escp-protocol.md) and its value. It is the fake's own type, so a test outside the
+// escp module needs nothing from the client's internals to read or script traffic.
+type Setting struct {
+	Type  int16
+	Value []byte
+}
+
+func toTLVs(in []Setting) []wire.TLV {
+	out := make([]wire.TLV, len(in))
+	for i, s := range in {
+		out[i] = wire.TLV{Type: s.Type, Value: s.Value}
+	}
+	return out
+}
+
+func toSettings(in []wire.TLV) []Setting {
+	out := make([]Setting, len(in))
+	for i, t := range in {
+		out[i] = Setting{Type: t.Type, Value: append([]byte(nil), t.Value...)}
+	}
+	return out
+}
+
+// WriteCount is the number of SETs the switch accepted: the answer to "was anything written?".
+func (f *Switch) WriteCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([][]wire.TLV(nil), f.history...)
+	return len(f.history)
+}
+
+// AllSets returns the settings of every accepted SET in order, credentials removed.
+func (f *Switch) AllSets() [][]Setting {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([][]Setting, len(f.history))
+	for i, h := range f.history {
+		out[i] = toSettings(h)
+	}
+	return out
 }
 
 // LastSet returns the settings of the most recent accepted SET, credentials removed.
-func (f *Switch) LastSet() []wire.TLV {
+func (f *Switch) LastSet() []Setting {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]wire.TLV(nil), f.lastSet...)
+	return toSettings(f.lastSet)
 }
 
 // State returns the LED state and how many LED/hostname/port-7 writes and LED reads
@@ -297,10 +332,10 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 	switch h.Op {
 	case wire.OpDiscovery:
 		f.mu.Lock()
-		override := f.DiscoverTLVs
+		override := f.DiscoverReply
 		f.mu.Unlock()
 		if override != nil {
-			f.send(from, wire.OpReply, h, 0, override, false)
+			f.send(from, wire.OpReply, h, 0, toTLVs(override), false)
 			return
 		}
 		f.mu.Lock()
@@ -458,7 +493,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 			}
 			reply, code, drop := GetFn(types)
 			if !drop {
-				f.send(from, wire.OpReply, h, code, reply, true)
+				f.send(from, wire.OpReply, h, code, toTLVs(reply), true)
 			}
 			return
 		}

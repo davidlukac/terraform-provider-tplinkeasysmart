@@ -15,14 +15,14 @@ import (
 // how often the port count was asked for.
 func countingPorts(f *escptest.Switch, n int, reads *atomic.Int32) {
 	f.Configure(func(f *escptest.Switch) {
-		f.GetFn = func(types []int16) ([]wire.TLV, int32, bool) {
+		f.GetFn = func(types []int16) ([]escptest.Setting, int32, bool) {
 			for _, typ := range types {
 				if typ == wire.TLVPortCount {
 					reads.Add(1)
 					if n == 0 {
 						return nil, 0, false
 					}
-					return []wire.TLV{{Type: wire.TLVPortCount, Value: []byte{byte(n)}}}, 0, false
+					return []escptest.Setting{{Type: wire.TLVPortCount, Value: []byte{byte(n)}}}, 0, false
 				}
 			}
 			return nil, 0, false
@@ -74,7 +74,7 @@ func TestWritersRefusePortsTheSwitchDoesNotHave(t *testing.T) {
 			if !strings.Contains(err.Error(), "port 9 does not exist: this switch has 8 ports") {
 				t.Errorf("the message must name the port and the port count: %v", err)
 			}
-			if n := len(f.AllSets()); n != 0 {
+			if n := f.WriteCount(); n != 0 {
 				t.Errorf("nothing may be sent for a port that does not exist, the switch received %d writes", n)
 			}
 		})
@@ -92,7 +92,7 @@ func TestSetLAGRefusesPortsBeyondASmallerSwitch(t *testing.T) {
 	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "port 5 does not exist: this switch has 4 ports") {
 		t.Fatalf("got %v", err)
 	}
-	if n := len(f.AllSets()); n != 0 {
+	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("the switch received %d writes", n)
 	}
 }
@@ -107,7 +107,7 @@ func TestPortCountIsTheSwitchsOwn(t *testing.T) {
 		if err := c.SetPort(ctx, PortConfig{ID: 8, Enabled: true, Speed: SpeedAuto}); err != nil {
 			t.Fatal(err)
 		}
-		if n := len(f.AllSets()); n != 1 {
+		if n := f.WriteCount(); n != 1 {
 			t.Fatalf("want the one write, got %d", n)
 		}
 	})
@@ -173,7 +173,7 @@ func TestWriteNeedsThePortCount(t *testing.T) {
 		if errors.Is(err, ErrInvalid) {
 			t.Errorf("a switch that does not answer is not the caller's mistake: %v", err)
 		}
-		if n := len(f.AllSets()); n != 0 {
+		if n := f.WriteCount(); n != 0 {
 			t.Fatalf("the switch received %d writes", n)
 		}
 		// nothing was remembered: the next write asks again
@@ -185,8 +185,8 @@ func TestWriteNeedsThePortCount(t *testing.T) {
 	t.Run("the switch reports zero ports", func(t *testing.T) {
 		f := escptest.Start(t)
 		f.Configure(func(f *escptest.Switch) {
-			f.GetFn = func([]int16) ([]wire.TLV, int32, bool) {
-				return []wire.TLV{{Type: wire.TLVPortCount, Value: []byte{0}}}, 0, false
+			f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) {
+				return []escptest.Setting{{Type: wire.TLVPortCount, Value: []byte{0}}}, 0, false
 			}
 		})
 		c := dialFake(t, f, "secret")
@@ -194,19 +194,21 @@ func TestWriteNeedsThePortCount(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "did not report its number of ports") {
 			t.Fatalf("a count of zero is no count, got %v", err)
 		}
-		if n := len(f.AllSets()); n != 0 {
+		if n := f.WriteCount(); n != 0 {
 			t.Fatalf("the switch received %d writes", n)
 		}
 	})
 	t.Run("the switch is silent", func(t *testing.T) {
 		f := escptest.Start(t)
-		f.Configure(func(f *escptest.Switch) { f.GetFn = func([]int16) ([]wire.TLV, int32, bool) { return nil, 0, true } })
+		f.Configure(func(f *escptest.Switch) {
+			f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) { return nil, 0, true }
+		})
 		c := dialFast(t, f, "secret")
 		err := c.SetPort(ctx, PortConfig{ID: 2, Enabled: true, Speed: SpeedAuto})
 		if !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
 		}
-		if n := len(f.AllSets()); n != 0 {
+		if n := f.WriteCount(); n != 0 {
 			t.Fatalf("the switch received %d writes", n)
 		}
 	})

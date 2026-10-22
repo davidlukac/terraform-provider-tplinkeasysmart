@@ -50,7 +50,7 @@ func TestSetStormWire(t *testing.T) {
 	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{7, 0, 0, 0, 0, 0, 0, 0, 0}) {
 		t.Fatalf("disable wire %v", got[0].Value)
 	}
-	n := len(f.AllSets())
+	n := f.WriteCount()
 	for _, bad := range []struct {
 		uu, mc, bc bool
 		rate       int
@@ -59,7 +59,7 @@ func TestSetStormWire(t *testing.T) {
 			t.Errorf("%+v must be rejected", bad)
 		}
 	}
-	if len(f.AllSets()) != n {
+	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }

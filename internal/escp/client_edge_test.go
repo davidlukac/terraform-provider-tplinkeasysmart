@@ -375,7 +375,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
 		f.Configure(func(f *escptest.Switch) {
-			f.GetFn = func([]int16) ([]wire.TLV, int32, bool) { return nil, 0, true }
+			f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) { return nil, 0, true }
 		})
 		if _, err := c.GetLED(context.Background()); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
@@ -385,7 +385,9 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
 		f.Configure(func(f *escptest.Switch) {
-			f.GetFn = func([]int16) ([]wire.TLV, int32, bool) { return []wire.TLV{{Type: 99, Value: []byte{1}}}, 0, false }
+			f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) {
+				return []escptest.Setting{{Type: 99, Value: []byte{1}}}, 0, false
+			}
 		})
 		if _, err := c.GetLED(context.Background()); err == nil || !strings.Contains(err.Error(), "unexpected LED reply") {
 			t.Fatalf("want an unexpected-reply error, got %v", err)
@@ -395,8 +397,8 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
 		f.Configure(func(f *escptest.Switch) {
-			f.GetFn = func([]int16) ([]wire.TLV, int32, bool) {
-				return []wire.TLV{{Type: wire.TLVLED, Value: []byte{1, 1}}}, 0, false
+			f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) {
+				return []escptest.Setting{{Type: wire.TLVLED, Value: []byte{1, 1}}}, 0, false
 			}
 		})
 		if _, err := c.GetLED(context.Background()); err == nil || !strings.Contains(err.Error(), "unexpected LED reply") {
