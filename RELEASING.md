@@ -7,12 +7,13 @@ How a version of the provider is cut and published. Maintainers only.
 - All changes go through a pull request: branch, commit, push, wait for green CI, **squash merge**. Nothing is pushed to `main` directly.
 - Commit messages and PR titles follow [Conventional Commits](https://www.conventionalcommits.org/), which drives the semantic version: `feat:` minor, `fix:` patch, `feat!:` / `BREAKING CHANGE:` major; `docs:`, `ci:`, `test:`, `chore:`, `build(deps):` do not release.
 - One new setting is one minor version. `CHANGELOG.md` gets an entry and `main.go` gets the new `version`.
+- **Which kind of version:** a new setting or resource is a minor version (`feat:`). A bug fix is a patch (`fix:`). Internal changes (`refactor:`, `docs:`, `test:`, `ci:`, `chore:`) do not release by themselves: they ride along in the next version. When enough of them have piled up to be worth a version, cut a patch whose PR only bumps `main.go` and adds a `CHANGELOG.md` line saying what changed for users (for an internal restructure: "no change in behaviour"), titled `chore: ...`. A release never claims more than it contains.
 
 ## Cutting a version
 
 1. On a feature branch: bump `var version` in `main.go`, add the `CHANGELOG.md` entry, run `make test lint docs-check validate-examples`.
 2. Open the PR, wait for CI, squash merge.
-3. On `main`: `git tag -a vX.Y.Z -m vX.Y.Z` and push **that one tag**.
+3. On `main`, once the release PR is merged and pulled: check that `main.go` and the `CHANGELOG.md` entry both say `X.Y.Z`, then `git tag -a vX.Y.Z -m vX.Y.Z` and push **that one tag**.
 
 ## Publishing to the Terraform Registry
 
