@@ -72,9 +72,16 @@ func (c *Client) IGMP(ctx context.Context) (IGMP, error) {
 	return parseIGMP(append(state, groups...))
 }
 
+// IGMPConfig is what SetIGMP writes. It is separate from IGMP (a reading) because the
+// learned groups cannot be set.
+type IGMPConfig struct {
+	Enabled           bool
+	ReportSuppression bool
+}
+
 // SetIGMP writes IGMP snooping state and report suppression together, as the vendor utility does.
-func (c *Client) SetIGMP(ctx context.Context, enabled, suppression bool) error {
+func (c *Client) SetIGMP(ctx context.Context, cfg IGMPConfig) error {
 	return c.setTLVs(ctx,
-		wire.TLV{Type: wire.TLVIGMPEnabled, Value: []byte{boolByte(enabled)}},
-		wire.TLV{Type: wire.TLVIGMPSuppression, Value: []byte{boolByte(suppression)}})
+		wire.TLV{Type: wire.TLVIGMPEnabled, Value: []byte{boolByte(cfg.Enabled)}},
+		wire.TLV{Type: wire.TLVIGMPSuppression, Value: []byte{boolByte(cfg.ReportSuppression)}})
 }

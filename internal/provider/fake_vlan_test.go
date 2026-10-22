@@ -112,7 +112,8 @@ func (f *fakeClient) SetPortBasedVLANMode(_ context.Context, enabled bool) error
 	})
 }
 
-func (f *fakeClient) SetMTUVLAN(_ context.Context, enabled bool, uplink int) error {
+func (f *fakeClient) SetMTUVLAN(_ context.Context, mtu escp.MTUVLAN) error {
+	enabled, uplink := mtu.Enabled, mtu.UplinkPort
 	return f.vlanWrite(func(v *fakeVLANs) error {
 		if v.ignoreModeWrites {
 			return nil

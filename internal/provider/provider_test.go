@@ -111,10 +111,10 @@ func (f *fakeClient) IGMP(context.Context) (escp.IGMP, error) {
 	return g, nil
 }
 
-func (f *fakeClient) SetIGMP(_ context.Context, enabled, suppression bool) error {
+func (f *fakeClient) SetIGMP(_ context.Context, cfg escp.IGMPConfig) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.igmp = escp.IGMP{Enabled: enabled, ReportSuppression: suppression}
+	f.igmp = escp.IGMP{Enabled: cfg.Enabled, ReportSuppression: cfg.ReportSuppression}
 	f.sets++
 	return nil
 }

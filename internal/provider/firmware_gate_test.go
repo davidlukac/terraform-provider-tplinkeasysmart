@@ -68,11 +68,11 @@ func (g *gatedClient) SetLAG(ctx context.Context, group int, ports []int) error 
 	return g.SwitchClient.SetLAG(ctx, group, ports)
 }
 
-func (g *gatedClient) SetIGMP(ctx context.Context, enabled, suppression bool) error {
+func (g *gatedClient) SetIGMP(ctx context.Context, cfg escp.IGMPConfig) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
-	return g.SwitchClient.SetIGMP(ctx, enabled, suppression)
+	return g.SwitchClient.SetIGMP(ctx, cfg)
 }
 
 func (g *gatedClient) SetLoopPrevention(ctx context.Context, on bool) error {
@@ -89,11 +89,11 @@ func (g *gatedClient) SetPortMirror(ctx context.Context, m escp.Mirror) error {
 	return g.SwitchClient.SetPortMirror(ctx, m)
 }
 
-func (g *gatedClient) SetMTUVLAN(ctx context.Context, enabled bool, uplinkPort int) error {
+func (g *gatedClient) SetMTUVLAN(ctx context.Context, v escp.MTUVLAN) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
-	return g.SwitchClient.SetMTUVLAN(ctx, enabled, uplinkPort)
+	return g.SwitchClient.SetMTUVLAN(ctx, v)
 }
 
 func (g *gatedClient) SetPortBasedVLAN(ctx context.Context, id int, ports []int) error {

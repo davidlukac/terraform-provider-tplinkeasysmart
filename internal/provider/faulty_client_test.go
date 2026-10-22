@@ -162,8 +162,8 @@ func (w *faultyClient) IGMP(ctx context.Context) (escp.IGMP, error) {
 	return w.SwitchClient.IGMP(ctx)
 }
 
-func (w *faultyClient) SetIGMP(ctx context.Context, enabled, suppression bool) error {
-	return w.write("SetIGMP", func() error { return w.SwitchClient.SetIGMP(ctx, enabled, suppression) })
+func (w *faultyClient) SetIGMP(ctx context.Context, cfg escp.IGMPConfig) error {
+	return w.write("SetIGMP", func() error { return w.SwitchClient.SetIGMP(ctx, cfg) })
 }
 
 func (w *faultyClient) LoopPrevention(ctx context.Context) (bool, error) {
@@ -250,8 +250,8 @@ func (w *faultyClient) SetStormControl(ctx context.Context, cfg escp.StormConfig
 	return w.write("SetStormControl", func() error { return w.SwitchClient.SetStormControl(ctx, cfg) })
 }
 
-func (w *faultyClient) SetMTUVLAN(ctx context.Context, enabled bool, uplink int) error {
-	return w.write("SetMTUVLAN", func() error { return w.SwitchClient.SetMTUVLAN(ctx, enabled, uplink) })
+func (w *faultyClient) SetMTUVLAN(ctx context.Context, v escp.MTUVLAN) error {
+	return w.write("SetMTUVLAN", func() error { return w.SwitchClient.SetMTUVLAN(ctx, v) })
 }
 
 func (w *faultyClient) SetPortBasedVLANMode(ctx context.Context, enabled bool) error {

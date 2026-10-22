@@ -19,7 +19,7 @@ type SwitchClient interface {
 	LAGs(ctx context.Context) ([]escp.LAG, error)
 	SetLAG(ctx context.Context, group int, ports []int) error
 	IGMP(ctx context.Context) (escp.IGMP, error)
-	SetIGMP(ctx context.Context, enabled, suppression bool) error
+	SetIGMP(ctx context.Context, cfg escp.IGMPConfig) error
 	LoopPrevention(ctx context.Context) (bool, error)
 	SetLoopPrevention(ctx context.Context, on bool) error
 	PortMirror(ctx context.Context) (escp.Mirror, error)
@@ -27,7 +27,7 @@ type SwitchClient interface {
 	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
 	SetPortBasedVLAN(ctx context.Context, id int, ports []int) error
-	SetMTUVLAN(ctx context.Context, enabled bool, uplinkPort int) error
+	SetMTUVLAN(ctx context.Context, v escp.MTUVLAN) error
 	SetPortBasedVLANMode(ctx context.Context, enabled bool) error
 	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
 	SetVLAN8021QMode(ctx context.Context, enabled bool) error

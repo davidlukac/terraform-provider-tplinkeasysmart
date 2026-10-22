@@ -149,8 +149,8 @@ func TestVLANModeWires(t *testing.T) {
 		{"802.1Q off", func() error { return c.SetVLAN8021QMode(ctx, false) }, wire.TLV{Type: wire.TLVVLAN8021Q, Value: []byte{0}}},
 		{"port-based on", func() error { return c.SetPortBasedVLANMode(ctx, true) }, wire.TLV{Type: wire.TLVVLANPortBased, Value: []byte{1}}},
 		{"port-based off", func() error { return c.SetPortBasedVLANMode(ctx, false) }, wire.TLV{Type: wire.TLVVLANPortBased, Value: []byte{0}}},
-		{"MTU on, uplink 3", func() error { return c.SetMTUVLAN(ctx, true, 3) }, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{1, 3}}},
-		{"MTU off ignores the uplink", func() error { return c.SetMTUVLAN(ctx, false, 7) }, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{0, 1}}},
+		{"MTU on, uplink 3", func() error { return c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 3}) }, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{1, 3}}},
+		{"MTU off ignores the uplink", func() error { return c.SetMTUVLAN(ctx, MTUVLAN{Enabled: false, UplinkPort: 7}) }, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{0, 1}}},
 	}
 	for _, s := range steps {
 		if err := s.do(); err != nil {
@@ -161,7 +161,7 @@ func TestVLANModeWires(t *testing.T) {
 		}
 	}
 	n := len(f.allSets())
-	if c.SetMTUVLAN(ctx, true, 0) == nil || c.SetMTUVLAN(ctx, true, 33) == nil {
+	if c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 0}) == nil || c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 33}) == nil {
 		t.Fatal("an invalid uplink port must be rejected")
 	}
 	if len(f.allSets()) != n {

@@ -35,7 +35,7 @@ type igmpResource struct {
 // igmpClient is the part of the switch API this resource needs.
 type igmpClient interface {
 	IGMP(ctx context.Context) (escp.IGMP, error)
-	SetIGMP(ctx context.Context, enabled, suppression bool) error
+	SetIGMP(ctx context.Context, cfg escp.IGMPConfig) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -111,7 +111,7 @@ func (r *igmpResource) apply(ctx context.Context, plan *igmpModel, add func(stri
 
 func (r *igmpResource) applyBound(ctx context.Context, plan *igmpModel, add func(string, string)) bool {
 	want := escp.IGMP{Enabled: plan.Enabled.ValueBool(), ReportSuppression: plan.ReportSuppression.ValueBool()}
-	if err := r.client.SetIGMP(ctx, want.Enabled, want.ReportSuppression); err != nil {
+	if err := r.client.SetIGMP(ctx, escp.IGMPConfig{Enabled: want.Enabled, ReportSuppression: want.ReportSuppression}); err != nil {
 		add("Setting IGMP snooping failed", err.Error())
 		return false
 	}
