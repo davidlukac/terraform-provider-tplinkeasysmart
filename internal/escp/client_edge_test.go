@@ -374,10 +374,16 @@ func TestWrongPasswordIsRejectedForEverySetter(t *testing.T) {
 		"SetLED":            func(c *Client, ctx context.Context) error { return c.SetLED(ctx, true) },
 		"SetIGMP":           func(c *Client, ctx context.Context) error { return c.SetIGMP(ctx, true, false) },
 		"SetLoopPrevention": func(c *Client, ctx context.Context) error { return c.SetLoopPrevention(ctx, true) },
-		"SetPort":           func(c *Client, ctx context.Context) error { return c.SetPort(ctx, 7, true, "auto", false) },
-		"SetQoSMode":        func(c *Client, ctx context.Context) error { return c.SetQoSMode(ctx, 0) },
-		"SetBandwidth":      func(c *Client, ctx context.Context) error { return c.SetBandwidth(ctx, 7, 64, 64) },
-		"SetStormControl":   func(c *Client, ctx context.Context) error { return c.SetStormControl(ctx, 7, true, false, false, 64) },
+		"SetPort": func(c *Client, ctx context.Context) error {
+			return c.SetPort(ctx, PortConfig{ID: 7, Enabled: true, Speed: "auto", FlowControl: false})
+		},
+		"SetQoSMode": func(c *Client, ctx context.Context) error { return c.SetQoSMode(ctx, 0) },
+		"SetBandwidth": func(c *Client, ctx context.Context) error {
+			return c.SetBandwidth(ctx, PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64})
+		},
+		"SetStormControl": func(c *Client, ctx context.Context) error {
+			return c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64})
+		},
 		"SetPortMirror": func(c *Client, ctx context.Context) error {
 			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 7, IngressPorts: []int{4}})
 		},

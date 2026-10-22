@@ -35,7 +35,7 @@ type portResource struct {
 // portClient is the part of the switch API this resource needs.
 type portClient interface {
 	Ports(ctx context.Context) ([]escp.Port, error)
-	SetPort(ctx context.Context, id int, enabled bool, speed string, flowControl bool) error
+	SetPort(ctx context.Context, cfg escp.PortConfig) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -79,7 +79,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 
 func joinSpeeds() string {
 	out := ""
-	for i, s := range escp.SpeedNames {
+	for i, s := range speedNames() {
 		if i > 0 {
 			out += ", "
 		}
@@ -117,7 +117,7 @@ func (r *portResource) applyBound(ctx context.Context, m *portResourceModel, add
 		add("Refusing to change port", err.Error())
 		return false
 	}
-	if err := r.client.SetPort(ctx, id, m.Enabled.ValueBool(), m.Speed.ValueString(), m.FlowControl.ValueBool()); err != nil {
+	if err := r.client.SetPort(ctx, escp.PortConfig{ID: id, Enabled: m.Enabled.ValueBool(), Speed: escp.Speed(m.Speed.ValueString()), FlowControl: m.FlowControl.ValueBool()}); err != nil {
 		add("Setting port failed", err.Error())
 		return false
 	}
@@ -126,11 +126,11 @@ func (r *portResource) applyBound(ctx context.Context, m *portResourceModel, add
 		add("Reading port back failed", fmt.Sprintf("port %d: found=%t err=%v", id, ok, err))
 		return false
 	}
-	if got.Enabled != m.Enabled.ValueBool() || got.ConfiguredSpeed != m.Speed.ValueString() || got.ConfiguredFlowControl != m.FlowControl.ValueBool() {
+	if got.Enabled != m.Enabled.ValueBool() || got.ConfiguredSpeed.String() != m.Speed.ValueString() || got.ConfiguredFlowControl != m.FlowControl.ValueBool() {
 		add("Port did not change as requested", fmt.Sprintf("switch reports enabled=%t speed=%s flow_control=%t", got.Enabled, got.ConfiguredSpeed, got.ConfiguredFlowControl))
 		return false
 	}
-	m.ActualSpeed = types.StringValue(got.ActualSpeed)
+	m.ActualSpeed = types.StringValue(got.ActualSpeed.String())
 	return true
 }
 
@@ -166,8 +166,8 @@ func (r *portResource) readBound(ctx context.Context, req resource.ReadRequest, 
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	state.Enabled, state.Speed = types.BoolValue(got.Enabled), types.StringValue(got.ConfiguredSpeed)
-	state.FlowControl, state.ActualSpeed = types.BoolValue(got.ConfiguredFlowControl), types.StringValue(got.ActualSpeed)
+	state.Enabled, state.Speed = types.BoolValue(got.Enabled), types.StringValue(got.ConfiguredSpeed.String())
+	state.FlowControl, state.ActualSpeed = types.BoolValue(got.ConfiguredFlowControl), types.StringValue(got.ActualSpeed.String())
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 

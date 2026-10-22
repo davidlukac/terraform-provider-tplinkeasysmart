@@ -14,7 +14,7 @@ type SwitchClient interface {
 	GetLED(ctx context.Context) (bool, error)
 	SetLED(ctx context.Context, on bool) error
 	Ports(ctx context.Context) ([]escp.Port, error)
-	SetPort(ctx context.Context, id int, enabled bool, speed string, flowControl bool) error
+	SetPort(ctx context.Context, cfg escp.PortConfig) error
 	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
 	LAGs(ctx context.Context) ([]escp.LAG, error)
 	SetLAG(ctx context.Context, group int, ports []int) error
@@ -38,9 +38,9 @@ type SwitchClient interface {
 	SetQoSMode(ctx context.Context, mode int) error
 	SetPortPriorities(ctx context.Context, changes map[int]int) error
 	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
-	SetBandwidth(ctx context.Context, port, ingressKbps, egressKbps int) error
+	SetBandwidth(ctx context.Context, limit escp.PortBandwidth) error
 	StormControl(ctx context.Context) ([]escp.PortStorm, error)
-	SetStormControl(ctx context.Context, port int, unknownUnicast, multicast, broadcast bool, rateKbps int) error
+	SetStormControl(ctx context.Context, cfg escp.StormConfig) error
 	System(ctx context.Context) (escp.System, error)
 	SetHostname(ctx context.Context, name string) error
 	SetIPConfig(ctx context.Context, cfg escp.IPConfig) error

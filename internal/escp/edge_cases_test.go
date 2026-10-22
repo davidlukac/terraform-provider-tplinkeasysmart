@@ -76,10 +76,10 @@ func TestParsersRejectMalformedState(t *testing.T) {
 func second[T any](_ T, err error) error { return err }
 
 func TestSpeedNameUnknownCode(t *testing.T) {
-	if got := speedName(9); got != "unknown(9)" {
+	if got := speedFromCode(9); got != "unknown(9)" {
 		t.Fatalf("got %q", got)
 	}
-	if got := speedName(0); got != "link-down" {
+	if got := speedFromCode(0); got != "link-down" {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -191,10 +191,10 @@ func TestBandwidthValidationHappensBeforeAnythingIsSent(t *testing.T) {
 	c := dialFast(t, f, "secret")
 	ctx := context.Background()
 	for name, call := range map[string]func() error{
-		"port 0":                   func() error { return c.SetBandwidth(ctx, 0, 64, 64) },
-		"port 33":                  func() error { return c.SetBandwidth(ctx, 33, 64, 64) },
-		"bad ingress":              func() error { return c.SetBandwidth(ctx, 7, 100, 64) },
-		"bad egress after good in": func() error { return c.SetBandwidth(ctx, 7, 64, 100) },
+		"port 0":                   func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 0, IngressKbps: 64, EgressKbps: 64}) },
+		"port 33":                  func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 33, IngressKbps: 64, EgressKbps: 64}) },
+		"bad ingress":              func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 7, IngressKbps: 100, EgressKbps: 64}) },
+		"bad egress after good in": func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 100}) },
 	} {
 		if err := call(); err == nil {
 			t.Errorf("%s must be rejected", name)
@@ -210,7 +210,7 @@ func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 		f := startFakeSwitch(t)
 		f.configure(func(f *fakeSwitch) { f.rejectSetsFrom = 1 })
 		c := dialFast(t, f, "secret")
-		if err := c.SetBandwidth(context.Background(), 7, 64, 64); !errors.Is(err, ErrAuth) {
+		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrAuth) {
 			t.Fatalf("got %v", err)
 		}
 		if n := len(f.allSets()); n != 0 {
@@ -221,7 +221,7 @@ func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 		f := startFakeSwitch(t)
 		f.configure(func(f *fakeSwitch) { f.rejectSetsFrom = 2 })
 		c := dialFast(t, f, "secret")
-		if err := c.SetBandwidth(context.Background(), 7, 64, 64); !errors.Is(err, ErrAuth) {
+		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrAuth) {
 			t.Fatalf("got %v", err)
 		}
 		if h := f.allSets(); len(h) != 1 || h[0][0].Type != wire.TLVBandwidthIngress {
@@ -234,7 +234,7 @@ func TestStormControlRejectsInvalidPortBeforeSending(t *testing.T) {
 	f := startFakeSwitch(t)
 	c := dialFast(t, f, "secret")
 	for _, port := range []int{0, 33} {
-		if err := c.SetStormControl(context.Background(), port, true, false, false, 64); err == nil {
+		if err := c.SetStormControl(context.Background(), StormConfig{Port: port, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64}); err == nil {
 			t.Errorf("port %d must be rejected", port)
 		}
 	}

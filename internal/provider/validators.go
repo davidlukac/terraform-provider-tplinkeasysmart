@@ -40,7 +40,16 @@ func validPortSet() validator.Set {
 func validByteID() validator.Int64 { return int64validator.Between(1, escp.MaxByteID) }
 
 // validSpeed accepts the speeds the switch can be configured to.
-func validSpeed() validator.String { return stringvalidator.OneOf(escp.SpeedNames...) }
+// speedNames are the configurable port speeds as Terraform spells them.
+func speedNames() []string {
+	var out []string
+	for _, s := range escp.ConfigurableSpeeds() {
+		out = append(out, s.String())
+	}
+	return out
+}
+
+func validSpeed() validator.String { return stringvalidator.OneOf(speedNames()...) }
 
 // validHostname accepts what the switch accepts as a device description.
 func validHostname() []validator.String {

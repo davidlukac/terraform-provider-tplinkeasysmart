@@ -17,19 +17,25 @@ var errGateRefused = errors.New("test gate: refused")
 // below finds the write methods by reflection and fails when one is missing from
 // this table, so a new Set* or Delete* method cannot skip the gate unnoticed.
 var writeCalls = map[string]func(context.Context, *Client) error{
-	"SetLED":            func(ctx context.Context, c *Client) error { return c.SetLED(ctx, false) },
-	"SetBandwidth":      func(ctx context.Context, c *Client) error { return c.SetBandwidth(ctx, 2, 64, 64) },
+	"SetLED": func(ctx context.Context, c *Client) error { return c.SetLED(ctx, false) },
+	"SetBandwidth": func(ctx context.Context, c *Client) error {
+		return c.SetBandwidth(ctx, PortBandwidth{Port: 2, IngressKbps: 64, EgressKbps: 64})
+	},
 	"SetIGMP":           func(ctx context.Context, c *Client) error { return c.SetIGMP(ctx, true, false) },
 	"SetLAG":            func(ctx context.Context, c *Client) error { return c.SetLAG(ctx, 1, []int{2, 3}) },
 	"SetLoopPrevention": func(ctx context.Context, c *Client) error { return c.SetLoopPrevention(ctx, true) },
-	"SetPort":           func(ctx context.Context, c *Client) error { return c.SetPort(ctx, 2, true, "auto", false) },
+	"SetPort": func(ctx context.Context, c *Client) error {
+		return c.SetPort(ctx, PortConfig{ID: 2, Enabled: true, Speed: "auto", FlowControl: false})
+	},
 	"SetPortMirror": func(ctx context.Context, c *Client) error {
 		return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 2, IngressPorts: []int{3}})
 	},
 	"SetQoSMode":        func(ctx context.Context, c *Client) error { return c.SetQoSMode(ctx, 1) },
 	"SetPortPriorities": func(ctx context.Context, c *Client) error { return c.SetPortPriorities(ctx, map[int]int{2: 1}) },
-	"SetStormControl":   func(ctx context.Context, c *Client) error { return c.SetStormControl(ctx, 2, true, false, false, 64) },
-	"SetHostname":       func(ctx context.Context, c *Client) error { return c.SetHostname(ctx, "sw-test") },
+	"SetStormControl": func(ctx context.Context, c *Client) error {
+		return c.SetStormControl(ctx, StormConfig{Port: 2, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64})
+	},
+	"SetHostname": func(ctx context.Context, c *Client) error { return c.SetHostname(ctx, "sw-test") },
 	"SetVLAN8021Q": func(ctx context.Context, c *Client) error {
 		return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 10, Name: "test", Untagged: []int{2}})
 	},
