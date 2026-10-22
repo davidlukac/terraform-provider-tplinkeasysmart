@@ -29,15 +29,24 @@ const (
 )
 
 // Reply codes of a refused LAG write, found by provoking each conflict on a
-// real TL-SG108E (firmware 20250710) and reading the code.
+// real TL-SG108E (firmware 20250710) and reading the code. The member rules
+// (speed, duplex, negotiation, flow control, enabled state, QoS priority) are the
+// ones the vendor utility checks before it sends the write; the switch enforces
+// them itself when the LAG is created.
 const (
 	lagRefusedPortRange    int32 = 4    // ports outside the group's range
 	lagRefusedPortVLAN     int32 = 7401 // a port is in a port-based VLAN other than the default
 	lagRefusedBandwidth    int32 = 7403 // a port has a bandwidth limit
 	lagRefusedStorm        int32 = 7404 // a port has storm control
+	lagRefusedQoS          int32 = 7405 // member ports have different QoS priorities (checked in port-based QoS mode only)
+	lagRefusedSpeed        int32 = 7406 // member ports have different fixed speeds
+	lagRefusedHalfDuplex   int32 = 7407 // a member port is set to half duplex (also refused when a port write would make a member half duplex)
+	lagRefusedNegotiation  int32 = 7410 // member ports mix auto-negotiation with a fixed speed
+	lagRefusedSinglePort   int32 = 7415 // fewer than two ports
+	lagRefusedFlowControl  int32 = 7417 // member ports have different flow control settings
+	lagRefusedEnabled      int32 = 7418 // member ports are not all enabled or all disabled
 	lagRefusedMirrorTarget int32 = 7205 // a port is the mirror destination
 	lagRefusedMirrorSource int32 = 7206 // a port is mirrored
-	lagRefusedSinglePort   int32 = 7415 // fewer than two ports
 )
 
 var lagRefusals = map[int32]string{
@@ -45,9 +54,15 @@ var lagRefusals = map[int32]string{
 	lagRefusedPortVLAN:     "a member port belongs to a port-based VLAN other than the default one",
 	lagRefusedBandwidth:    "a member port has a bandwidth limit",
 	lagRefusedStorm:        "a member port has storm control enabled",
+	lagRefusedQoS:          "the member ports have different QoS priorities",
+	lagRefusedSpeed:        "the member ports do not have the same speed",
+	lagRefusedHalfDuplex:   "a member port is set to half duplex; LAG members must be full duplex",
+	lagRefusedNegotiation:  "the member ports mix auto-negotiation with a fixed speed",
 	lagRefusedMirrorTarget: "a member port is the destination of the port mirror",
 	lagRefusedMirrorSource: "a member port is mirrored (a source of the port mirror)",
 	lagRefusedSinglePort:   "a LAG needs at least two ports",
+	lagRefusedFlowControl:  "the member ports do not have the same flow control setting",
+	lagRefusedEnabled:      "the member ports are not all enabled or all disabled",
 }
 
 // ValidateLAG checks a group number and member ports against the limits
@@ -105,9 +120,12 @@ func (c *Client) LAGs(ctx context.Context) ([]LAG, error) {
 // id and the member port mask. An empty port list removes the group. Group
 // and ports are checked against ValidateLAG first. The switch itself refuses
 // ports that conflict with mirroring, a port-based VLAN, a bandwidth limit or
-// storm control; such a refusal comes back as a *RejectedError that names the
-// conflict. Changing a group whose ports carry traffic can cut the uplink;
-// callers must guard against that.
+// storm control, and member ports that differ in speed, negotiation, flow control,
+// enabled state or (in port-based QoS mode) QoS priority, or that are half duplex;
+// such a refusal comes back as a *RejectedError that names the conflict. The switch
+// checks these only when the group is written: it does not keep members alike
+// afterwards (see SetPort). Changing a group whose ports carry traffic can cut the
+// uplink; callers must guard against that.
 func (c *Client) SetLAG(ctx context.Context, group int, ports []int) error {
 	mask, err := maskFromPorts(ports)
 	if err != nil {
@@ -116,10 +134,15 @@ func (c *Client) SetLAG(ctx context.Context, group int, ports []int) error {
 	if err := ValidateLAG(group, ports); err != nil {
 		return err
 	}
-	err = c.setTLVs(ctx, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(group)}, mask...)})
+	return nameRefusal(c.setTLVs(ctx, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(group)}, mask...)}), lagRefusals)
+}
+
+// nameRefusal adds the reason to a *RejectedError whose code is in reasons; any other
+// error, and a refusal with an unknown code, is returned as it is.
+func nameRefusal(err error, reasons map[int32]string) error {
 	var rejected *RejectedError
 	if errors.As(err, &rejected) {
-		if reason, ok := lagRefusals[rejected.Code]; ok {
+		if reason, ok := reasons[rejected.Code]; ok {
 			return &RejectedError{Code: rejected.Code, Reason: reason}
 		}
 	}

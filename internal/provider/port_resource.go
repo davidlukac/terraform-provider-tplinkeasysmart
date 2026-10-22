@@ -63,7 +63,8 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 	resp.Schema = schema.Schema{
 		Description: "Configuration of one physical port (Switching > Port Setting): admin state, speed and flow control. " +
 			"Import with the port number. **Safety:** by default the provider refuses to change a port that has a link up or is in a LAG, " +
-			"because that can cut the uplink or the management path; set `allow_disruptive = true` to override. Destroying only removes it from state.",
+			"because that can cut the uplink or the management path; set `allow_disruptive = true` to override. On a LAG member the switch refuses half duplex " +
+			"but does not keep the members' speed, flow control or enabled state alike, so change all members together. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: resourceSwitchAttribute(),
 			"port": schema.Int64Attribute{Required: true, Description: "Port number (1-based).",

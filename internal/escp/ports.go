@@ -141,6 +141,10 @@ type PortConfig struct {
 // combination is refused before anything is sent, because the switch would accept
 // it and silently keep flow control off. Changing a port that carries traffic can
 // cut connectivity; callers must guard against that.
+//
+// For a port that is a member of a LAG the switch refuses half duplex (the error names
+// that), but it accepts a different speed, flow control or admin state and so lets
+// the members drift apart: keep them alike, or change the whole group.
 func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
 	code, err := cfg.Speed.code()
 	if err != nil {
@@ -154,5 +158,12 @@ func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
 	}
 	entry := make([]byte, portEntryLen)
 	entry[portOffPort], entry[portOffState], entry[portOffCfgSpeed], entry[portOffCfgFlow] = byte(cfg.ID), boolByte(cfg.Enabled), code, boolByte(cfg.FlowControl)
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVPorts, Value: entry})
+	return nameRefusal(c.setTLVs(ctx, wire.TLV{Type: wire.TLVPorts, Value: entry}), portRefusals)
+}
+
+// portRefusals names the refusals of a port write that were provoked on a real switch
+// (firmware 20250710): half duplex on a port that is a member of a LAG. Half duplex on a
+// port that is not a member is accepted.
+var portRefusals = map[int32]string{
+	lagRefusedHalfDuplex: "the port is a member of a LAG, and LAG members must be full duplex",
 }
