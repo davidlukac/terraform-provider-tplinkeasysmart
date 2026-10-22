@@ -1,8 +1,3 @@
-// Package wire is the byte level of the ESCP protocol: the 32-byte packet header, the
-// type-length-value elements, the catalogue of TLV types, and the RC4 and RSA
-// primitives that protect them. It knows nothing about settings, sockets or
-// switches. The package is internal: the settings code in the parent package
-// and the fake switch use it, nobody else.
 package wire
 
 import (

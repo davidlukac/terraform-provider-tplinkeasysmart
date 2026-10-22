@@ -65,17 +65,23 @@ func (e *RejectedError) Error() string {
 // Is makes errors.Is(err, ErrRejected) true for every rejected write.
 func (e *RejectedError) Is(target error) bool { return target == ErrRejected }
 
-// Config configures a Client. Zero values select sensible defaults.
+// Config configures a Client. Zero values select sensible defaults, except Host, which is
+// required. A Config holds the switch's password: keep it out of logs and error messages.
 type Config struct {
-	Host     string // switch IPv4 address or hostname
+	Host string // switch IPv4 address or hostname (required)
+	// Username and Password are sent with every write and every authenticated read.
 	Username string
 	Password string
-	Timeout  time.Duration // per attempt, default 3s
-	Retries  int           // additional attempts, default 2
+	Timeout  time.Duration // how long to wait for a reply per attempt, default 3s
+	Retries  int           // additional attempts after the first, default 2
 
-	SwitchPort int // default 29808
-	HostPort   int // default 29809
-	// BroadcastAddr is only used as discovery fallback, default 255.255.255.255.
+	// SwitchPort and HostPort are the UDP ports of the switch (29808) and of this host
+	// (29809). A real switch always replies to 29809 whatever port the request came from,
+	// so change them only to talk to a fake switch.
+	SwitchPort int
+	HostPort   int
+	// BroadcastAddr is where discovery probes go besides the switch's own address;
+	// default 255.255.255.255.
 	BroadcastAddr string
 
 	// WriteGate, when set, is consulted before every write; see WriteGate.
@@ -128,8 +134,11 @@ type Client struct {
 	session        []byte
 }
 
-// Dial prepares a client. The local UDP port is bound on first use, so merely
-// configuring a provider (e.g. `terraform validate`) never touches the network.
+// Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
+// name that resolves to one (a name is looked up now). It sends nothing to the switch and
+// binds no socket: the local UDP port is bound on first use, so merely configuring a
+// provider (e.g. `terraform validate`) has no side effects on the switch. Close the client
+// when done.
 func Dial(cfg Config) (*Client, error) {
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 3 * time.Second
@@ -159,7 +168,8 @@ func Dial(cfg Config) (*Client, error) {
 	return c, nil
 }
 
-// Close releases the UDP socket, if it was opened.
+// Close releases the UDP socket, if it was opened, so that another client or Discover can
+// use the reply port. A closed client opens the socket again if it is used afterwards.
 func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -370,7 +380,11 @@ func (c *Client) discoverTargets() []*net.UDPAddr {
 	return []*net.UDPAddr{c.dest, {IP: net.ParseIP(c.cfg.BroadcastAddr), Port: c.cfg.SwitchPort}}
 }
 
-// Info performs an (unauthenticated) discovery and returns the switch details.
+// Info asks the switch to describe itself with a discovery probe: model, firmware, hardware,
+// hostname, MAC and its network settings. It needs no credentials and works on any firmware,
+// which is why a WriteGate reads the firmware through it. Each attempt is sent to the
+// switch's address and to Config.BroadcastAddr, and repeated up to Config.Retries times; if
+// nothing answers the error is ErrNoReply.
 func (c *Client) Info(ctx context.Context) (Info, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -482,7 +496,8 @@ func (c *Client) GetLED(ctx context.Context) (bool, error) {
 	return on, err
 }
 
-// SetLED switches the LEDs on or off. Credentials accompany every SET.
+// SetLED switches the LEDs on or off. It is cosmetic: it does not touch traffic or
+// configuration, and it is the one write that is safe to try on any switch.
 func (c *Client) SetLED(ctx context.Context, on bool) error {
 	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVLED, Value: []byte{boolByte(on)}})
 }

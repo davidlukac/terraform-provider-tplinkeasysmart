@@ -25,7 +25,9 @@ func parseLoopPrevention(tlvs []wire.TLV) (bool, error) {
 	return false, fmt.Errorf("escp: no loop prevention TLV in reply")
 }
 
-// SetLoopPrevention enables or disables loop prevention.
+// SetLoopPrevention enables or disables loop prevention. With it off the switch no longer
+// detects a cabling loop, which can flood the network; turning it on is the safe direction.
+// Toggling it was verified on a live switch without interrupting traffic.
 func (c *Client) SetLoopPrevention(ctx context.Context, on bool) error {
 	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVLoopPrevention, Value: []byte{boolByte(on)}})
 }

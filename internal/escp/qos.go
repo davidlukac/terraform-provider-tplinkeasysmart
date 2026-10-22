@@ -106,7 +106,9 @@ func (c *Client) QoS(ctx context.Context) (QoS, error) {
 	return parseQoS(append(mode, pri...))
 }
 
-// SetQoSMode selects the QoS mode.
+// SetQoSMode selects the QoS mode, which changes how traffic is queued on every port. The
+// mode must be one of QoSModes. Per-port priorities (SetPortPriorities) only take effect in
+// QoSPortBased; the switch accepts them in the other modes and ignores them.
 func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error {
 	if !mode.Valid() {
 		return fmt.Errorf("escp: invalid QoS mode %d (valid: 0, 1, 2)", int(mode))
@@ -114,8 +116,12 @@ func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error {
 	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
 }
 
-// SetPortPriorities changes the priority of the given ports. As in the vendor utility the request carries the priority of every
-// port, so the other ports are re-sent with their current value.
+// SetPortPriorities changes the priority of the given ports (port -> priority). Every port
+// must exist and every priority be within PriorityLowest..PriorityHighest, or nothing is
+// sent. As in the vendor utility the request carries the priority of every port, so the
+// current values are read first (a QoS read, which the write gate does not see) and the
+// ports not mentioned are re-sent unchanged. The priorities only take effect in
+// QoSPortBased mode.
 func (c *Client) SetPortPriorities(ctx context.Context, changes map[int]Priority) error {
 	cur, err := c.QoS(ctx)
 	if err != nil {
