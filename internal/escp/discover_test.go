@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -93,7 +94,7 @@ var (
 )
 
 func TestDiscoverReturnsEveryDistinctSwitchSortedByAddress(t *testing.T) {
-	hostPort := freeUDPPort(t)
+	hostPort := escptest.FreeUDPPort(t)
 	macA, macB := [6]byte{0xa8, 0x42, 0xa1, 0, 0, 0x30}, [6]byte{0xc0, 0x3a, 0x55, 0, 0, 0x09}
 	r := startResponder(t, hostPort, func(h wire.Header) [][]byte {
 		noMAC := []wire.TLV{{Type: wire.TLVHostname, Value: []byte("no-mac\x00")}, {Type: wire.TLVIP, Value: []byte{192, 0, 2, 50}}}
@@ -130,7 +131,7 @@ func TestDiscoverReturnsEveryDistinctSwitchSortedByAddress(t *testing.T) {
 // The probe is sent again halfway through the window, carrying the same sequence number, and
 // each interface puts its own MAC in it.
 func TestDiscoverProbesEveryInterfaceTwice(t *testing.T) {
-	hostPort := freeUDPPort(t)
+	hostPort := escptest.FreeUDPPort(t)
 	r := startResponder(t, hostPort, nil)
 	_, err := discoverWith(context.Background(), DiscoverOptions{Window: 200 * time.Millisecond}, loopbackEnv(t, r, hostPort,
 		netInterface{Name: "en0", MAC: macOne, Broadcasts: lo}, netInterface{Name: "en1", MAC: macTwo, Broadcasts: lo}))
@@ -158,7 +159,7 @@ func TestDiscoverProbesEveryInterfaceTwice(t *testing.T) {
 }
 
 func TestDiscoverCanBeLimitedToOneInterface(t *testing.T) {
-	hostPort := freeUDPPort(t)
+	hostPort := escptest.FreeUDPPort(t)
 	r := startResponder(t, hostPort, nil)
 	_, err := discoverWith(context.Background(), DiscoverOptions{Interface: "en1", Window: 100 * time.Millisecond}, loopbackEnv(t, r, hostPort,
 		netInterface{Name: "en0", MAC: macOne, Broadcasts: lo}, netInterface{Name: "en1", MAC: macTwo, Broadcasts: lo}))
@@ -178,7 +179,7 @@ func TestDiscoverCanBeLimitedToOneInterface(t *testing.T) {
 }
 
 func TestDiscoverWithNoAnswerIsEmptyNotAnError(t *testing.T) {
-	hostPort := freeUDPPort(t)
+	hostPort := escptest.FreeUDPPort(t)
 	r := startResponder(t, hostPort, nil)
 	got, err := discoverWith(context.Background(), DiscoverOptions{Window: 100 * time.Millisecond},
 		loopbackEnv(t, r, hostPort, netInterface{Name: "en0", MAC: macOne, Broadcasts: lo}))
@@ -188,7 +189,7 @@ func TestDiscoverWithNoAnswerIsEmptyNotAnError(t *testing.T) {
 }
 
 func TestDiscoverStopsWhenTheContextIsCancelled(t *testing.T) {
-	hostPort := freeUDPPort(t)
+	hostPort := escptest.FreeUDPPort(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	r := startResponder(t, hostPort, func(wire.Header) [][]byte { cancel(); return nil })
@@ -206,7 +207,7 @@ func TestDiscoverStopsWhenTheContextIsCancelled(t *testing.T) {
 }
 
 func TestDiscoverWithACancelledContextReturnsAtOnce(t *testing.T) {
-	hostPort := freeUDPPort(t)
+	hostPort := escptest.FreeUDPPort(t)
 	r := startResponder(t, hostPort, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -219,7 +220,7 @@ func TestDiscoverWithACancelledContextReturnsAtOnce(t *testing.T) {
 }
 
 func TestDiscoverSurvivesOneInterfaceThatCannotSend(t *testing.T) {
-	hostPort := freeUDPPort(t)
+	hostPort := escptest.FreeUDPPort(t)
 	r := startResponder(t, hostPort, func(h wire.Header) [][]byte {
 		return [][]byte{packet(wire.OpReply, h.Seq, discoverTLVs([6]byte{1, 2, 3, 4, 5, 6}, [4]byte{192, 0, 2, 7}, "sw"))}
 	})
@@ -240,7 +241,7 @@ func TestDiscoverSurvivesOneInterfaceThatCannotSend(t *testing.T) {
 }
 
 func TestDiscoverFailsWhenNoProbeCanBeSent(t *testing.T) {
-	hostPort := freeUDPPort(t)
+	hostPort := escptest.FreeUDPPort(t)
 	r := startResponder(t, hostPort, nil)
 	cause := errors.New("network is unreachable")
 	env := loopbackEnv(t, r, hostPort, netInterface{Name: "en0", MAC: macOne, Broadcasts: lo})
@@ -252,7 +253,7 @@ func TestDiscoverFailsWhenNoProbeCanBeSent(t *testing.T) {
 }
 
 func TestDiscoverReportsABusyReplyPort(t *testing.T) {
-	busy, err := net.ListenUDP("udp4", &net.UDPAddr{Port: freeUDPPort(t)}) // does not share the port
+	busy, err := net.ListenUDP("udp4", &net.UDPAddr{Port: escptest.FreeUDPPort(t)}) // does not share the port
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +289,7 @@ func TestDiscoverRefusesWhatCannotWork(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := discoverWith(context.Background(), tc.opts, discoverEnv{interfaces: tc.ifaces, switchPort: 1, hostPort: freeUDPPort(t)})
+			_, err := discoverWith(context.Background(), tc.opts, discoverEnv{interfaces: tc.ifaces, switchPort: 1, hostPort: escptest.FreeUDPPort(t)})
 			if err == nil || (tc.is != nil && !errors.Is(err, tc.is)) || !strings.Contains(err.Error(), tc.message) {
 				t.Fatalf("err = %v", err)
 			}

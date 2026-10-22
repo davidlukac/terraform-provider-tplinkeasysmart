@@ -7,12 +7,14 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 )
 
-func dialFake(t *testing.T, f *fakeSwitch, pass string) *Client {
+func dialFake(t *testing.T, f *escptest.Switch, pass string) *Client {
 	t.Helper()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 300 * time.Millisecond,
-		SwitchPort: f.port(), BroadcastAddr: "127.0.0.1"})
+		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
 	c.allowLoopback = true
 	t.Cleanup(func() { c.Close() })
 	return c
@@ -20,17 +22,17 @@ func dialFake(t *testing.T, f *fakeSwitch, pass string) *Client {
 
 // dialFast is dialFake with short timeouts and a single retry, for tests that
 // deliberately make the switch stay silent.
-func dialFast(t *testing.T, f *fakeSwitch, pass string) *Client {
+func dialFast(t *testing.T, f *escptest.Switch, pass string) *Client {
 	t.Helper()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 80 * time.Millisecond, Retries: 1,
-		SwitchPort: f.port(), BroadcastAddr: "127.0.0.1"})
+		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
 	c.allowLoopback = true
 	t.Cleanup(func() { c.Close() })
 	return c
 }
 
 func TestInfo(t *testing.T) {
-	c := dialFake(t, startFakeSwitch(t), "secret")
+	c := dialFake(t, escptest.Start(t), "secret")
 	info, err := c.Info(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +44,7 @@ func TestInfo(t *testing.T) {
 }
 
 func TestLEDRoundTrip(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	on, err := c.GetLED(ctx)
@@ -58,25 +60,25 @@ func TestLEDRoundTrip(t *testing.T) {
 	if err := c.SetLED(ctx, true); err != nil {
 		t.Fatal(err)
 	}
-	if led, _, sets := f.state(); !led || sets != 2 {
+	if led, _, sets := f.State(); !led || sets != 2 {
 		t.Fatalf("fake state led=%v sets=%d", led, sets)
 	}
 }
 
 func TestBadPassword(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "wrong")
 	if err := c.SetLED(context.Background(), false); !errors.Is(err, ErrRejected) {
 		t.Fatalf("want ErrRejected, got %v", err)
 	}
-	if led, _, sets := f.state(); !led || sets != 0 {
+	if led, _, sets := f.State(); !led || sets != 0 {
 		t.Fatal("switch must be untouched after a rejected SET")
 	}
 }
 
 func TestRetryOnLostPacket(t *testing.T) {
-	f := startFakeSwitch(t)
-	f.dropPacket(1) // lose the very first datagram
+	f := escptest.Start(t)
+	f.DropPacket(1) // lose the very first datagram
 	c := dialFake(t, f, "secret")
 	if _, err := c.Info(context.Background()); err != nil {
 		t.Fatalf("expected retry to recover: %v", err)
@@ -84,8 +86,8 @@ func TestRetryOnLostPacket(t *testing.T) {
 }
 
 func TestNoReply(t *testing.T) {
-	f := startFakeSwitch(t)
-	f.goMute()
+	f := escptest.Start(t)
+	f.Mute()
 	c := dialFake(t, f, "secret")
 	c.cfg.Retries = 1
 	if _, err := c.Info(context.Background()); !errors.Is(err, ErrNoReply) {
@@ -94,28 +96,27 @@ func TestNoReply(t *testing.T) {
 }
 
 func TestSessionRecoversAfterSwitchRestart(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	if _, err := c.GetLED(ctx); err != nil {
 		t.Fatal(err)
 	}
-	f.clearSession() // the switch forgets the session key
+	f.ClearSession() // the switch forgets the session key
 	if _, err := c.GetLED(ctx); err != nil {
 		t.Fatalf("client should re-establish the session: %v", err)
 	}
 }
 
 func TestSetHostnameKeepsIPConfiguration(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if err := c.SetHostname(context.Background(), "new-name"); err != nil {
 		t.Fatal(err)
 	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.hostname != "new-name" || len(f.setIP) != 4 || f.setIP[0] != 127 || f.setIP[3] != 1 {
-		t.Fatalf("hostname=%q ip=%v: the current IP must be re-sent unchanged", f.hostname, f.setIP)
+	ip := f.IPSent()
+	if f.Hostname() != "new-name" || len(ip) != 4 || ip[0] != 127 || ip[3] != 1 {
+		t.Fatalf("hostname=%q ip=%v: the current IP must be re-sent unchanged", f.Hostname(), ip)
 	}
 	if err := c.SetHostname(context.Background(), "bad name"); err == nil {
 		t.Fatal("invalid name must be rejected before any packet is sent")
@@ -123,14 +124,12 @@ func TestSetHostnameKeepsIPConfiguration(t *testing.T) {
 }
 
 func TestSetPortWire(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if err := c.SetPort(context.Background(), PortConfig{ID: 7, Enabled: true, Speed: "100Mbps-full", FlowControl: true}); err != nil {
 		t.Fatal(err)
 	}
-	f.mu.Lock()
-	got := f.port7
-	f.mu.Unlock()
+	got := f.Port7Setting()
 	want := []byte{7, 1, 0, 5, 0, 1, 0}
 	if string(got) != string(want) {
 		t.Fatalf("wire bytes %v, want %v", got, want)
@@ -187,14 +186,12 @@ func TestSetPortWireStateAndFlowControlAreNotSwapped(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			f := startFakeSwitch(t)
+			f := escptest.Start(t)
 			c := dialFake(t, f, "secret")
 			if err := c.SetPort(context.Background(), tc.cfg); err != nil {
 				t.Fatal(err)
 			}
-			f.mu.Lock()
-			got := f.port7
-			f.mu.Unlock()
+			got := f.Port7Setting()
 			if string(got) != string(tc.want) {
 				t.Fatalf("wire bytes %v, want %v", got, tc.want)
 			}

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -64,7 +65,7 @@ func TestVLAN8021QValidation(t *testing.T) {
 		{"both tagged and untagged", VLAN8021Q{ID: 2, Tagged: []int{3}, Untagged: []int{3}}, "port 3 is both tagged and untagged"},
 		{"no members", VLAN8021Q{ID: 2}, "no member ports"},
 	}
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -80,64 +81,64 @@ func TestVLAN8021QValidation(t *testing.T) {
 	if err := c.SetVLAN8021Q(context.Background(), VLAN8021Q{ID: 2, Tagged: []int{33}}); err == nil {
 		t.Fatal("tagged port 33 does not fit in the mask")
 	}
-	if n := len(f.allSets()); n != 0 {
+	if n := len(f.AllSets()); n != 0 {
 		t.Fatalf("rejected requests reached the switch (%d sets)", n)
 	}
 }
 
 func TestSetVLAN8021QWire(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	if err := c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 2, Name: "iot", Untagged: []int{4, 5}}); err != nil {
 		t.Fatal(err)
 	}
-	got := f.set()
+	got := f.LastSet()
 	if len(got) != 1 || got[0].Type != wire.TLVVLAN8021QVLAN || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0x18, 0, 0, 0, 0, 'i', 'o', 't', 0}) {
 		t.Fatalf("wire %+v", got)
 	}
 	if err := c.DeleteVLAN8021Q(ctx, 2); err != nil {
 		t.Fatal(err)
 	}
-	got = f.set()
+	got = f.LastSet()
 	if len(got) != 1 || got[0].Type != wire.TLVVLAN8021QVLAN || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
 		t.Fatalf("delete wire %+v", got)
 	}
-	n := len(f.allSets())
+	n := len(f.AllSets())
 	if c.DeleteVLAN8021Q(ctx, 0) == nil || c.DeleteVLAN8021Q(ctx, 4095) == nil {
 		t.Fatal("invalid ids must be rejected")
 	}
-	if len(f.allSets()) != n {
+	if len(f.AllSets()) != n {
 		t.Fatal("rejected deletes must not reach the switch")
 	}
 }
 
 func TestSetPVIDsWire(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	if err := c.SetPVIDs(ctx, map[int]int{5: 300, 4: 2}); err != nil {
 		t.Fatal(err)
 	}
-	got := f.set()
+	got := f.LastSet()
 	// One TLV per port, in port order, each port (1 byte) and pvid (2 bytes, big endian).
 	want := []wire.TLV{{Type: wire.TLVVLAN8021QPVID, Value: []byte{4, 0, 2}}, {Type: wire.TLVVLAN8021QPVID, Value: []byte{5, 1, 0x2c}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("wire %+v, want %+v", got, want)
 	}
-	n := len(f.allSets())
+	n := len(f.AllSets())
 	for name, bad := range map[string]map[int]int{"empty": {}, "port 0": {0: 2}, "port 33": {33: 2}, "pvid 0": {4: 0}, "pvid 4095": {4: 4095}} {
 		if c.SetPVIDs(ctx, bad) == nil {
 			t.Fatalf("%s must be rejected", name)
 		}
 	}
-	if len(f.allSets()) != n {
+	if len(f.AllSets()) != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }
 
 func TestVLANModeWires(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	steps := []struct {
@@ -156,15 +157,15 @@ func TestVLANModeWires(t *testing.T) {
 		if err := s.do(); err != nil {
 			t.Fatalf("%s: %v", s.name, err)
 		}
-		if got := f.set(); len(got) != 1 || !reflect.DeepEqual(got[0], s.want) {
+		if got := f.LastSet(); len(got) != 1 || !reflect.DeepEqual(got[0], s.want) {
 			t.Fatalf("%s: wire %+v, want %+v", s.name, got, s.want)
 		}
 	}
-	n := len(f.allSets())
+	n := len(f.AllSets())
 	if c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 0}) == nil || c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 33}) == nil {
 		t.Fatal("an invalid uplink port must be rejected")
 	}
-	if len(f.allSets()) != n {
+	if len(f.AllSets()) != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }

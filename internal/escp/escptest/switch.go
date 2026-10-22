@@ -1,4 +1,13 @@
-package escp
+// Package escptest is an in-process TL-SG108E that speaks ESCP over loopback UDP, for
+// tests of code that uses the escp client. It imports only the wire codec, never the
+// client, so the escp package's own tests can use it without an import cycle.
+//
+// It models firmware 20230218 closely enough for the client's reads and writes (key
+// exchange, credentials on every SET, fragmented configuration backup) and offers
+// switches for the failures the client must survive: silence, dropped packets, rejected
+// writes and stale discovery replies. It is a test double: it keeps almost no settings
+// state, and it is no substitute for the real switch.
+package escptest
 
 import (
 	"math/big"
@@ -9,11 +18,30 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
-// fakeSwitch is a minimal in-process TL-SG108E speaking ESCP. It can decrypt
-// the session key because the switch's 64-bit RSA modulus factors trivially
-// (p=3443843009, q=3765816959), which is also why ESCP offers no real secrecy.
-type fakeSwitch struct {
-	t        *testing.T
+// Credentials the switch accepts.
+const (
+	Username = "admin"
+	Password = "secret"
+)
+
+// BackupMode selects how the switch misbehaves when the configuration is read.
+type BackupMode string
+
+// The ways a configuration backup can go wrong; BackupOK is the well-behaved switch.
+const (
+	BackupOK         BackupMode = ""
+	BackupBadMagic   BackupMode = "badmagic"   // the file does not start with the configuration magic
+	BackupShort      BackupMode = "short"      // only the magic, no body
+	BackupDropSecond BackupMode = "dropsecond" // the last fragment never arrives
+	BackupDropFirst  BackupMode = "dropfirst"  // only the last fragment arrives
+	BackupSilent     BackupMode = "silent"     // no reply at all
+	BackupFlood      BackupMode = "flood"      // fragments that never end
+)
+
+// Switch is the fake. Create it with Start; change its behaviour with Configure.
+// It can decrypt the session key because the switch's 64-bit RSA modulus factors
+// trivially (p=3443843009, q=3765816959), which is also why ESCP offers no real secrecy.
+type Switch struct {
 	conn     *net.UDPConn
 	user     string
 	password string
@@ -24,7 +52,6 @@ type fakeSwitch struct {
 	lastSet          []wire.TLV   // settings TLVs (credentials stripped) of the most recent accepted SET
 	port7            []byte
 	setIP            []byte
-	staleAfterSet    int              // after a System SET, the next n discoveries are stale
 	staleDiscoveries int              // the next n discoveries still report 127.0.0.9, like a network whose caches have not caught up
 	addr             map[int16][]byte // IP, mask and gateway as last set; discovery reports them instead of the defaults
 	led              bool
@@ -34,17 +61,26 @@ type fakeSwitch struct {
 	dropNth          int // drop the nth received packet (1-based) to test retries
 	recv             int
 	mute             bool // swallow everything (switch gone)
+	backupMode       BackupMode
 
-	backupMode string // config backup misbehaviour: "", "badmagic", "short", "dropsecond", "dropfirst", "silent", "flood"
+	// Programmable misbehaviour. Set these inside Configure, which holds the lock.
 
-	// Programmable misbehaviour, set through configure().
-	getFn          func(types []int16) (tlvs []wire.TLV, code int32, drop bool) // scripted GET replies
-	rsaDrop        bool                                                         // never answer the key exchange
-	rsaCode        int32                                                        // answer the key exchange with this code instead of ErrCodeKeyAccepted
-	dropSets       bool                                                         // never answer authenticated SETs
-	discoverTLVs   []wire.TLV                                                   // replace the discovery reply (nil: the default TL-SG108E reply)
-	rejectSetsFrom int                                                          // reject the nth and later authenticated SETs (1-based)
-	rejectCode     int32                                                        // reply code of a rejected SET (default 9)
+	// GetFn scripts the reply to GETs: the TLVs, the error code, and whether to stay silent.
+	GetFn func(types []int16) (tlvs []wire.TLV, code int32, drop bool)
+	// RSADrop makes the switch ignore the key exchange.
+	RSADrop bool
+	// RSACode answers the key exchange with this code instead of the success code.
+	RSACode int32
+	// DropSets makes the switch ignore authenticated SETs.
+	DropSets bool
+	// DiscoverTLVs replaces the discovery reply; nil keeps the default TL-SG108E reply.
+	DiscoverTLVs []wire.TLV
+	// RejectSetsFrom rejects the nth and every later authenticated SET (1-based); 0 accepts all.
+	RejectSetsFrom int
+	// RejectCode is the reply code of a rejected SET; 0 means 9.
+	RejectCode int32
+	// StaleAfterSet makes the next n discoveries after a system SET still report the old address.
+	StaleAfterSet int
 }
 
 var (
@@ -52,88 +88,98 @@ var (
 	fakeQ = big.NewInt(3765816959)
 )
 
-// freeUDPPort returns a currently unused UDP port so tests never bind the
+// FreeUDPPort returns a currently unused UDP port so tests never bind the
 // protocol's real client port 29809.
-func freeUDPPort(t *testing.T) int {
+func FreeUDPPort(t testing.TB) int {
 	t.Helper()
 	c, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }() // best effort: only the port number is kept
 	return c.LocalAddr().(*net.UDPAddr).Port
 }
 
-// newBoundClient dials a client on a free local port and binds its socket
-// immediately, retrying with another port if something grabbed the first one
-// in the meantime. Once it returns, the port is held by the client, so two
-// tests can never end up on the same port.
-func newBoundClient(t *testing.T, cfg Config) *Client {
-	t.Helper()
-	var lastErr error
-	for attempt := 0; attempt < 20; attempt++ {
-		cfg.HostPort = freeUDPPort(t)
-		c, err := Dial(cfg)
-		if err != nil {
-			t.Fatal(err)
-		}
-		c.mu.Lock()
-		lastErr = c.open()
-		c.mu.Unlock()
-		if lastErr == nil {
-			return c
-		}
-	}
-	t.Fatalf("no free UDP port after 20 attempts: %v", lastErr)
-	return nil
-}
-
-func startFakeSwitch(t *testing.T) *fakeSwitch {
+// Start runs a fake switch on a free loopback UDP port until the test ends. The LED starts on.
+func Start(t testing.TB) *Switch {
 	t.Helper()
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &fakeSwitch{t: t, conn: conn, user: "admin", password: "secret", led: true}
-	t.Cleanup(func() { conn.Close() })
+	f := &Switch{conn: conn, user: Username, password: Password, led: true}
+	t.Cleanup(func() { _ = conn.Close() }) // best effort at the end of the test
 	go f.serve()
 	return f
 }
 
-func (f *fakeSwitch) dropPacket(n int) { f.mu.Lock(); f.dropNth = n; f.mu.Unlock() }
-func (f *fakeSwitch) goMute()          { f.mu.Lock(); f.mute = true; f.mu.Unlock() }
-func (f *fakeSwitch) clearSession()    { f.mu.Lock(); f.session = nil; f.mu.Unlock() }
+// Port is the UDP port the switch listens on; give it to the client as its switch port.
+func (f *Switch) Port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
 
-// configure changes the fake's behaviour under its lock.
-func (f *fakeSwitch) configure(fn func(f *fakeSwitch)) { f.mu.Lock(); fn(f); f.mu.Unlock() }
+// DropPacket makes the switch ignore the nth packet it receives (1-based), to test retries.
+func (f *Switch) DropPacket(n int) { f.mu.Lock(); f.dropNth = n; f.mu.Unlock() }
 
-func (f *fakeSwitch) port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
+// Mute makes the switch ignore everything from now on, as if it had gone away.
+func (f *Switch) Mute() { f.mu.Lock(); f.mute = true; f.mu.Unlock() }
 
-func (f *fakeSwitch) setBackupMode(mode string) {
+// ClearSession forgets the session key, as after a reboot: the client must exchange keys again.
+func (f *Switch) ClearSession() { f.mu.Lock(); f.session = nil; f.mu.Unlock() }
+
+// Configure changes the fake's behaviour under its lock.
+func (f *Switch) Configure(fn func(f *Switch)) { f.mu.Lock(); fn(f); f.mu.Unlock() }
+
+// SetBackupMode chooses how the configuration backup misbehaves.
+func (f *Switch) SetBackupMode(mode BackupMode) {
 	f.mu.Lock()
 	f.backupMode = mode
 	f.mu.Unlock()
 }
 
-func (f *fakeSwitch) allSets() [][]wire.TLV {
+// AllSets returns the settings of every accepted SET in order, credentials removed.
+func (f *Switch) AllSets() [][]wire.TLV {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([][]wire.TLV(nil), f.history...)
 }
 
-func (f *fakeSwitch) set() []wire.TLV {
+// LastSet returns the settings of the most recent accepted SET, credentials removed.
+func (f *Switch) LastSet() []wire.TLV {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]wire.TLV(nil), f.lastSet...)
 }
 
-func (f *fakeSwitch) state() (led bool, gets, sets int) {
+// State returns the LED state and how many LED/hostname/port-7 writes and LED reads
+// the switch has handled (sets counts writes of those three settings only).
+func (f *Switch) State() (led bool, gets, sets int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.led, f.gets, f.sets
 }
 
-func (f *fakeSwitch) decryptSessionKey(v []byte) []byte {
+// Hostname is the device description set by the last hostname SET ("" before any).
+func (f *Switch) Hostname() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.hostname
+}
+
+// IPSent is the IP address carried by the last hostname SET (nil before any).
+func (f *Switch) IPSent() []byte {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]byte(nil), f.setIP...)
+}
+
+// Port7Setting is the value of the last port SET addressed to port 7 (nil before any).
+func (f *Switch) Port7Setting() []byte {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]byte(nil), f.port7...)
+}
+
+// DecryptSessionKey recovers the session key from the RSA key-exchange value a client sent.
+func DecryptSessionKey(v []byte) []byte {
 	words := new(big.Int)
 	for i := 3; i >= 0; i-- {
 		words.Lsh(words, 16)
@@ -145,7 +191,7 @@ func (f *fakeSwitch) decryptSessionKey(v []byte) []byte {
 	return wire.ReverseBytes(m.FillBytes(make([]byte, wire.SessionKeyLen)))
 }
 
-func (f *fakeSwitch) serve() {
+func (f *Switch) serve() {
 	buf := make([]byte, 4096)
 	for {
 		n, from, err := f.conn.ReadFromUDP(buf)
@@ -178,17 +224,17 @@ func (f *fakeSwitch) serve() {
 	}
 }
 
-// fakeConfig is a 2258-byte stand-in for the switch's configuration file.
-func fakeConfig() []byte {
+// ConfigFile is a 2258-byte stand-in for the switch's configuration file.
+func ConfigFile() []byte {
 	b := make([]byte, 2258)
-	copy(b, configMagic)
+	copy(b, wire.ConfigMagic)
 	for i := 4; i < len(b); i++ {
 		b[i] = byte(i * 7)
 	}
 	return b
 }
 
-func (f *fakeSwitch) send(to *net.UDPAddr, op byte, req wire.Header, errCode int32, tlvs []wire.TLV, useSession bool) {
+func (f *Switch) send(to *net.UDPAddr, op byte, req wire.Header, errCode int32, tlvs []wire.TLV, useSession bool) {
 	req.Op, req.ErrCode = op, errCode
 	req.SwitchMAC = [6]byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}
 	b := wire.Marshal(req, tlvs)
@@ -203,7 +249,7 @@ func (f *fakeSwitch) send(to *net.UDPAddr, op byte, req wire.Header, errCode int
 	_, _ = f.conn.WriteToUDP(b, to)
 }
 
-func (f *fakeSwitch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
+func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 	find := func(t int16) ([]byte, bool) {
 		for _, x := range tlvs {
 			if x.Type == t {
@@ -215,7 +261,7 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 	switch h.Op {
 	case wire.OpDiscovery:
 		f.mu.Lock()
-		override := f.discoverTLVs
+		override := f.DiscoverTLVs
 		f.mu.Unlock()
 		if override != nil {
 			f.send(from, wire.OpReply, h, 0, override, false)
@@ -250,10 +296,10 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 			f.mu.Lock()
 			mode := f.backupMode
 			f.mu.Unlock()
-			if mode == "silent" {
+			if mode == BackupSilent {
 				return
 			}
-			if mode == "flood" {
+			if mode == BackupFlood {
 				// A sender that never clears the fragment flag.
 				h1 := h
 				h1.Fragment = 1
@@ -262,11 +308,11 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 				}
 				return
 			}
-			cfg := fakeConfig()
+			cfg := ConfigFile()
 			switch mode {
-			case "badmagic":
+			case BackupBadMagic:
 				cfg[0] = 0
-			case "short":
+			case BackupShort:
 				cfg = cfg[:4]
 			}
 			first, second := cfg, []byte(nil)
@@ -278,19 +324,19 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 			if second == nil {
 				h1.Fragment = 0
 			}
-			if mode != "dropfirst" {
+			if mode != BackupDropFirst {
 				f.send(from, wire.OpSetReply, h1, 0, []wire.TLV{{Type: wire.TLVConfigFile, Value: first}}, true)
 			}
-			if second != nil && mode != "dropsecond" {
+			if second != nil && mode != BackupDropSecond {
 				f.send(from, wire.OpSetReply, h, 0, []wire.TLV{{Type: wire.TLVConfigFile, Value: second}}, true)
 			}
 			return
 		}
 		if v, ok := find(wire.TLVRSAKey); ok {
 			f.mu.Lock()
-			drop, code := f.rsaDrop, f.rsaCode
+			drop, code := f.RSADrop, f.RSACode
 			if !drop {
-				f.session = f.decryptSessionKey(v)
+				f.session = DecryptSessionKey(v)
 			}
 			f.mu.Unlock()
 			if drop {
@@ -303,9 +349,9 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 			return
 		}
 		f.mu.Lock()
-		dropSets, rejectFrom, rejectCode, accepted := f.dropSets, f.rejectSetsFrom, f.rejectCode, len(f.history)
+		DropSets, rejectFrom, RejectCode, accepted := f.DropSets, f.RejectSetsFrom, f.RejectCode, len(f.history)
 		f.mu.Unlock()
-		if dropSets {
+		if DropSets {
 			return
 		}
 		u, _ := find(wire.TLVUsername)
@@ -315,10 +361,10 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 			return
 		}
 		if rejectFrom > 0 && accepted+1 >= rejectFrom {
-			if rejectCode == 0 {
-				rejectCode = 9
+			if RejectCode == 0 {
+				RejectCode = 9
 			}
-			f.send(from, wire.OpSetReply, h, rejectCode, nil, true)
+			f.send(from, wire.OpSetReply, h, RejectCode, nil, true)
 			return
 		}
 		f.mu.Lock()
@@ -340,7 +386,7 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 			f.mu.Lock()
 			f.hostname = wire.CString(v)
 			f.setIP, _ = find(wire.TLVIP)
-			f.staleDiscoveries = f.staleAfterSet
+			f.staleDiscoveries = f.StaleAfterSet
 			if ip, ok := find(wire.TLVIP); ok {
 				mask, _ := find(wire.TLVNetmask)
 				gw, _ := find(wire.TLVGateway)
@@ -358,14 +404,14 @@ func (f *fakeSwitch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 		f.send(from, wire.OpSetReply, h, 0, nil, true)
 	case wire.OpGet:
 		f.mu.Lock()
-		getFn := f.getFn
+		GetFn := f.GetFn
 		f.mu.Unlock()
-		if getFn != nil {
+		if GetFn != nil {
 			types := make([]int16, len(tlvs))
 			for i, t := range tlvs {
 				types[i] = t.Type
 			}
-			reply, code, drop := getFn(types)
+			reply, code, drop := GetFn(types)
 			if !drop {
 				f.send(from, wire.OpReply, h, code, reply, true)
 			}

@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -31,22 +32,22 @@ func TestParseMirror(t *testing.T) {
 }
 
 func TestSetMirrorWire(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	if err := c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 7, IngressPorts: []int{4}, EgressPorts: []int{1, 2}}); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.set(); !reflect.DeepEqual(got[0].Value, []byte{1, 7, 0, 0, 0, 8, 0, 0, 0, 3}) {
+	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{1, 7, 0, 0, 0, 8, 0, 0, 0, 3}) {
 		t.Fatalf("wire %v", got[0].Value)
 	}
 	if err := c.SetPortMirror(ctx, Mirror{}); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.set(); !reflect.DeepEqual(got[0].Value, make([]byte, 10)) {
+	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, make([]byte, 10)) {
 		t.Fatalf("disable wire %v", got[0].Value)
 	}
-	n := len(f.allSets())
+	n := len(f.AllSets())
 	for _, bad := range []Mirror{
 		{Enabled: true, MirrorPort: 7},
 		{Enabled: true, MirrorPort: 7, IngressPorts: []int{7}},
@@ -58,7 +59,7 @@ func TestSetMirrorWire(t *testing.T) {
 			t.Errorf("%+v must be rejected", bad)
 		}
 	}
-	if len(f.allSets()) != n {
+	if len(f.AllSets()) != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }

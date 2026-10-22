@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -26,12 +27,12 @@ func TestParseBandwidth(t *testing.T) {
 }
 
 func TestSetBandwidthWire(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 1024, EgressKbps: 0}); err != nil {
 		t.Fatal(err)
 	}
-	h := f.allSets()
+	h := f.AllSets()
 	if len(h) != 2 {
 		t.Fatalf("want 2 SETs (ingress, egress), got %d", len(h))
 	}
@@ -46,7 +47,7 @@ func TestSetBandwidthWire(t *testing.T) {
 			t.Errorf("rate %d must be rejected", bad)
 		}
 	}
-	if len(f.allSets()) != 2 {
+	if len(f.AllSets()) != 2 {
 		t.Fatal("rejected rates must not reach the switch")
 	}
 }

@@ -3,12 +3,14 @@ package escp
 import (
 	"testing"
 	"time"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 )
 
 // An attempt whose deadline has already passed must give up at once instead of
 // blocking on the socket: no reply, and no waiting.
 func TestRecvWithExpiredDeadlineReturnsImmediately(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if err := c.open(); err != nil {
 		t.Fatal(err)

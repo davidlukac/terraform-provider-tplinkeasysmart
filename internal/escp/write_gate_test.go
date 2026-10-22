@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 )
 
 var errGateRefused = errors.New("test gate: refused")
@@ -90,10 +92,10 @@ func TestWriteGateRefusalSendsNothingForAnyWriteMethod(t *testing.T) {
 			continue // reported by TestEveryWriteMethodIsInTheGateTable
 		}
 		t.Run(name, func(t *testing.T) {
-			f := startFakeSwitch(t)
+			f := escptest.Start(t)
 			var consulted int
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-				SwitchPort: f.port(), BroadcastAddr: "127.0.0.1",
+				SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
 				WriteGate: func(context.Context, InfoReader) error { consulted++; return errGateRefused }})
 			c.allowLoopback = true
 			t.Cleanup(func() { c.Close() })
@@ -103,7 +105,7 @@ func TestWriteGateRefusalSendsNothingForAnyWriteMethod(t *testing.T) {
 			if consulted == 0 {
 				t.Fatal("the gate was not consulted")
 			}
-			if sets := f.allSets(); len(sets) != 0 {
+			if sets := f.AllSets(); len(sets) != 0 {
 				t.Fatalf("the switch received %d write(s) despite the refusal: %v", len(sets), sets)
 			}
 		})
@@ -119,16 +121,16 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 			continue
 		}
 		t.Run(name, func(t *testing.T) {
-			f := startFakeSwitch(t)
+			f := escptest.Start(t)
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-				SwitchPort: f.port(), BroadcastAddr: "127.0.0.1",
+				SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
 				WriteGate: func(context.Context, InfoReader) error { return nil }})
 			c.allowLoopback = true
 			t.Cleanup(func() { c.Close() })
 			if err := call(context.Background(), c); err != nil {
 				t.Fatalf("an allowed write failed: %v", err)
 			}
-			if len(f.allSets()) == 0 {
+			if len(f.AllSets()) == 0 {
 				t.Fatal("the write never reached the switch")
 			}
 		})
@@ -137,9 +139,9 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 
 // Reads are never gated: a gate that refuses everything must not stop a read.
 func TestWriteGateDoesNotAffectReads(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-		SwitchPort: f.port(), BroadcastAddr: "127.0.0.1",
+		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
 		WriteGate: func(context.Context, InfoReader) error { return errGateRefused }})
 	t.Cleanup(func() { c.Close() })
 	ctx := context.Background()
@@ -157,10 +159,10 @@ func TestWriteGateDoesNotAffectReads(t *testing.T) {
 // The gate reads through the client it guards, so it must run outside the
 // client's lock; this would deadlock otherwise.
 func TestWriteGateMayReadThroughTheClient(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	var firmware string
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-		SwitchPort: f.port(), BroadcastAddr: "127.0.0.1",
+		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
 		WriteGate: func(ctx context.Context, sw InfoReader) error {
 			info, err := sw.Info(ctx)
 			firmware = info.Firmware

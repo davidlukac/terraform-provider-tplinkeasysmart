@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -29,26 +30,26 @@ func TestParsePortBasedVLAN(t *testing.T) {
 }
 
 func TestSetPortBasedVLANWire(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	if err := c.SetPortBasedVLAN(ctx, 2, []int{6, 7}); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.set(); got[0].Type != wire.TLVVLANPortBasedVID || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
+	if got := f.LastSet(); got[0].Type != wire.TLVVLANPortBasedVID || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
 		t.Fatalf("wire %+v", got)
 	}
 	if err := c.SetPortBasedVLAN(ctx, 2, nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.set(); !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0}) {
+	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0}) {
 		t.Fatalf("delete wire %v", got[0].Value)
 	}
-	n := len(f.allSets())
+	n := len(f.AllSets())
 	if c.SetPortBasedVLAN(ctx, 0, []int{1}) == nil || c.SetPortBasedVLAN(ctx, 2, []int{99}) == nil {
 		t.Fatal("invalid id or port must be rejected")
 	}
-	if len(f.allSets()) != n {
+	if len(f.AllSets()) != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }

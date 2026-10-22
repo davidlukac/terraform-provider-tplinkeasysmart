@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -72,12 +73,12 @@ func TestIPConfigFromInfoRefusesUnusableReplies(t *testing.T) {
 // The fake answers from 127.0.0.1, so the "move" keeps the address and changes
 // the mask and gateway; the wire layout is what matters here.
 func TestSetIPConfigWireLayoutAndReadBack(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.255.0.0", "127.0.0.2")); err != nil {
 		t.Fatal(err)
 	}
-	sets := f.allSets()
+	sets := f.AllSets()
 	if len(sets) != 1 {
 		t.Fatalf("want exactly one write, got %d", len(sets))
 	}
@@ -101,42 +102,42 @@ func TestSetIPConfigWireLayoutAndReadBack(t *testing.T) {
 }
 
 func TestSetIPConfigValidatesBeforeTheNetwork(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.0.255.0", "127.0.0.2")); err == nil {
 		t.Fatal("an invalid mask must be refused")
 	}
-	if n := len(f.allSets()); n != 0 {
+	if n := len(f.AllSets()); n != 0 {
 		t.Fatalf("an invalid request must not write, got %d writes", n)
 	}
 }
 
 func TestSetIPConfigRefusesUnusableCurrentConfiguration(t *testing.T) {
-	f := startFakeSwitch(t)
-	f.configure(func(f *fakeSwitch) {
-		f.discoverTLVs = []wire.TLV{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
+	f := escptest.Start(t)
+	f.Configure(func(f *escptest.Switch) {
+		f.DiscoverTLVs = []wire.TLV{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
 	})
 	c := dialFake(t, f, "secret")
 	err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.255.255.0", "127.0.0.2"))
 	if err == nil || !strings.Contains(err.Error(), "unusable IP configuration") {
 		t.Fatalf("want a refusal, got %v", err)
 	}
-	if n := len(f.allSets()); n != 0 {
+	if n := len(f.AllSets()); n != 0 {
 		t.Fatalf("nothing may be written, got %d writes", n)
 	}
 }
 
 func TestSetIPConfigErrorsDoNotMoveTheClient(t *testing.T) {
 	t.Run("silent switch", func(t *testing.T) {
-		f := startFakeSwitch(t)
-		f.goMute()
+		f := escptest.Start(t)
+		f.Mute()
 		c := dialFast(t, f, "secret")
 		if err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.255.255.0", "127.0.0.2")); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
 		}
 	})
 	t.Run("wrong credentials", func(t *testing.T) {
-		f := startFakeSwitch(t)
+		f := escptest.Start(t)
 		c := dialFake(t, f, "wrong")
 		if err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.255.255.0", "127.0.0.2")); !errors.Is(err, ErrRejected) {
 			t.Fatalf("want ErrRejected, got %v", err)
@@ -148,7 +149,7 @@ func TestSetIPConfigErrorsDoNotMoveTheClient(t *testing.T) {
 }
 
 func TestSetIPConfigReportsAnUnconfirmedMove(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")
 	c.moveWait = 300 * time.Millisecond
 	// 127.0.0.2 is where the client looks after the write; the fake stays at 127.0.0.1.
@@ -178,8 +179,8 @@ func TestAcceptsRepliesFromTheNewAddressWhileMoving(t *testing.T) {
 }
 
 func TestSetIPConfigWaitsUntilTheSwitchAnswersAtTheNewAddress(t *testing.T) {
-	f := startFakeSwitch(t)
-	f.configure(func(f *fakeSwitch) { f.staleAfterSet = 2 }) // two probes still see the old address
+	f := escptest.Start(t)
+	f.Configure(func(f *escptest.Switch) { f.StaleAfterSet = 2 }) // two probes still see the old address
 	c := dialFake(t, f, "secret")
 	start := time.Now()
 	if err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.255.0.0", "127.0.0.2")); err != nil {

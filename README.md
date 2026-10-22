@@ -233,7 +233,7 @@ provider_installation {
 
 The coverage badge is the **measured** statement coverage of the module, computed by CI on every push to `main` (exclusions are counted as not covered). The *policy* below is stricter than a number: it fails the build on any uncovered statement.
 
-Policy: **every statement is covered**, except inside functions whose doc comment says `// coverage: ignore - <reason>` (the reason is mandatory; `scripts/covercheck.py` fails the build without it and lists every exclusion). A test must fail when the behaviour it names is broken; safety checks are never removed to raise a number.
+Policy: **every statement is covered**, except inside functions whose doc comment says `// coverage: ignore - <reason>` (the reason is mandatory; `scripts/covercheck.py` fails the build without it and lists every exclusion). A test must fail when the behaviour it names is broken; safety checks are never removed to raise a number. Test files and the fake switch (`internal/escp/escptest`) are not measured: the library's tests exercise the fake, and a branch no test reaches there is a gap in the fake, not in the product.
 
 Failure paths are exercised without hardware:
 

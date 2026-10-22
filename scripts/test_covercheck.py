@@ -30,6 +30,15 @@ class CoverCheck(unittest.TestCase):
         blocks = covercheck.parse_profile(profile(("a.go", 1, 2, 3, 0), ("a.go", 1, 2, 3, 5)))
         self.assertEqual(blocks[("a.go", 1, 2)], (3, 5))
 
+    def test_test_support_packages_are_not_measured(self):
+        blocks = covercheck.parse_profile(profile(
+            ("internal/escp/escptest/switch.go", 1, 2, 9, 0), ("internal/escp/client.go", 1, 2, 3, 1)))
+        self.assertEqual(blocks, {("internal/escp/client.go", 1, 2): (3, 1)})
+
+    def test_a_package_that_only_looks_like_test_support_is_measured(self):
+        blocks = covercheck.parse_profile(profile(("internal/escp/escptestx/a.go", 1, 2, 3, 0)))
+        self.assertEqual(list(blocks), [("internal/escp/escptestx/a.go", 1, 2)])
+
     def test_a_malformed_profile_is_an_error(self):
         with self.assertRaises(ValueError):
             covercheck.parse_profile(PROFILE + "garbage\n")
