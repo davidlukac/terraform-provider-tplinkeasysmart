@@ -65,6 +65,13 @@ func (e *RejectedError) Error() string {
 // Is makes errors.Is(err, ErrRejected) true for every rejected write.
 func (e *RejectedError) Is(target error) bool { return target == ErrRejected }
 
+// NoRetries is the Config.Retries value that asks for a single attempt per request. (Zero
+// cannot mean that: it selects the default.)
+const NoRetries = -1
+
+// defaultRetries is the number of additional attempts when Config.Retries is zero.
+const defaultRetries = 2
+
 // Config configures a Client. Zero values select sensible defaults, except Host, which is
 // required. A Config holds the switch's password: keep it out of logs and error messages.
 type Config struct {
@@ -73,7 +80,13 @@ type Config struct {
 	Username string
 	Password string
 	Timeout  time.Duration // how long to wait for a reply per attempt, default 3s
-	Retries  int           // additional attempts after the first, default 2
+	// Retries is the number of additional attempts after the first when the switch stays
+	// silent: zero selects the default (2), NoRetries (any negative value) selects none.
+	// One request is therefore sent up to Retries+1 times, each waiting up to Timeout. A call
+	// that needs a session makes up to four such requests (the key exchange and the request,
+	// then both again if the switch stops answering mid-call), plus the discovery that learns
+	// the switch's MAC on a client's first call: with the defaults 36 seconds, 45 on the first.
+	Retries int
 
 	// SwitchPort and HostPort are the UDP ports of the switch (29808) and of this host
 	// (29809). A real switch always replies to 29809 whatever port the request came from,
@@ -145,8 +158,11 @@ func Dial(cfg Config) (*Client, error) {
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 3 * time.Second
 	}
-	if cfg.Retries == 0 {
-		cfg.Retries = 2
+	switch {
+	case cfg.Retries == 0:
+		cfg.Retries = defaultRetries
+	case cfg.Retries < 0:
+		cfg.Retries = 0
 	}
 	if cfg.SwitchPort == 0 {
 		cfg.SwitchPort = defaultSwitchPort

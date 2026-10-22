@@ -65,9 +65,9 @@ func (r *bandwidthLimitResource) Schema(_ context.Context, _ resource.SchemaRequ
 				Validators:    []validator.Int64{validPortNumber()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
 			"ingress_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{rateKbps{}},
-				Description: "Ingress limit in kbps: 0 (unlimited) or a multiple of 64 up to 1000000."},
+				Description: "Ingress limit in kbps: " + rateRangeText() + "."},
 			"egress_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{rateKbps{}},
-				Description: "Egress limit in kbps: 0 (unlimited) or a multiple of 64 up to 1000000."},
+				Description: "Egress limit in kbps: " + rateRangeText() + "."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing a port that has a link up or is a LAG member. Defaults to false."),
 		},
 	}

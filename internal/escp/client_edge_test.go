@@ -42,6 +42,41 @@ func TestDialKeepsExplicitValues(t *testing.T) {
 	}
 }
 
+// Zero selects the default, a negative value selects "no retry"; a positive one is kept.
+func TestDialRetriesSemantics(t *testing.T) {
+	for _, tc := range []struct{ in, want int }{{0, 2}, {NoRetries, 0}, {-7, 0}, {1, 1}, {5, 5}} {
+		c, err := Dial(Config{Host: "127.0.0.1", Retries: tc.in})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.cfg.Retries != tc.want {
+			t.Errorf("Retries %d became %d, want %d", tc.in, c.cfg.Retries, tc.want)
+		}
+	}
+}
+
+// With NoRetries the first lost packet is the answer; with one retry the same loss is absorbed.
+func TestNoRetriesSendsEachRequestOnce(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		retries int
+		wantErr error
+	}{{"no retries", NoRetries, ErrNoReply}, {"one retry", 1, nil}} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := escptest.Start(t)
+			f.DropFirst(2) // both datagrams of the first attempt are lost
+			c := newBoundClient(t, Config{Host: "127.0.0.1", Timeout: 80 * time.Millisecond, Retries: tc.retries,
+				SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
+			c.allowLoopback = true
+			t.Cleanup(func() { c.Close() })
+			_, err := c.Info(context.Background())
+			if !errors.Is(err, tc.wantErr) { // errors.Is(nil, nil) is true
+				t.Fatalf("got %v, want %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestDialRejectsHostThatIsNotIPv4(t *testing.T) {
 	_, err := Dial(Config{Host: "::1"})
 	if err == nil || !strings.Contains(err.Error(), `resolving "::1"`) {

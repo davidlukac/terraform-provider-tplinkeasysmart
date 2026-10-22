@@ -66,7 +66,7 @@ func (r *vlan8021QPVIDResource) Schema(_ context.Context, _ resource.SchemaReque
 			"port": schema.Int64Attribute{Required: true, Description: "Port number (1-based).",
 				Validators:    []validator.Int64{validPortNumber()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
-			"pvid":              schema.Int64Attribute{Required: true, Validators: []validator.Int64{validVLANID()}, Description: "The port's default VLAN id, 1-4094."},
+			"pvid":              schema.Int64Attribute{Required: true, Validators: []validator.Int64{validVLANID()}, Description: "The port's default VLAN id, " + vlanIDRangeText() + "."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing a port that has a link up or is a LAG member. Defaults to false."),
 		},
 	}

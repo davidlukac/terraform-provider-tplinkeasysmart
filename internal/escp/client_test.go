@@ -78,7 +78,7 @@ func TestBadPassword(t *testing.T) {
 
 func TestRetryOnLostPacket(t *testing.T) {
 	f := escptest.Start(t)
-	f.DropPacket(1) // lose the very first datagram
+	f.DropFirst(2) // lose both datagrams of the first attempt (the probe goes to the switch and to the broadcast address)
 	c := dialFake(t, f, "secret")
 	if _, err := c.Info(context.Background()); err != nil {
 		t.Fatalf("expected retry to recover: %v", err)

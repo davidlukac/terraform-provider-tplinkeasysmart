@@ -53,8 +53,8 @@ func TestCheckFirmware(t *testing.T) {
 		if !errors.As(err, &fe) || fe.Reason != tt.reason || fe.Build != tt.build || fe.Version != tt.version || !strings.Contains(err.Error(), tt.frag) {
 			t.Errorf("CheckFirmware(%q) = %#v, want reason %d build %q containing %q", tt.version, err, tt.reason, tt.build, tt.frag)
 		}
-		if !slices.Equal(fe.Verified, VerifiedFirmwareBuilds) {
-			t.Errorf("CheckFirmware(%q) lists %v, want %v", tt.version, fe.Verified, VerifiedFirmwareBuilds)
+		if !slices.Equal(fe.Verified, VerifiedFirmwareBuilds()) {
+			t.Errorf("CheckFirmware(%q) lists %v, want %v", tt.version, fe.Verified, VerifiedFirmwareBuilds())
 		}
 	}
 }
@@ -66,8 +66,23 @@ func TestFirmwareErrorDoesNotExposeTheAllowList(t *testing.T) {
 		t.Fatal("want a FirmwareError")
 	}
 	fe.Verified[0] = "tampered"
-	if VerifiedFirmwareBuilds[0] == "tampered" {
+	if VerifiedFirmwareBuilds()[0] == "tampered" {
 		t.Fatal("the allow-list was modified through the error")
+	}
+}
+
+// The accessor hands out a copy too, and the allow-list is what the gate decides by.
+func TestVerifiedFirmwareBuildsIsACopy(t *testing.T) {
+	got := VerifiedFirmwareBuilds()
+	if !slices.Contains(got, "20230218") || !slices.Contains(got, "20250710") {
+		t.Fatalf("the two builds tested on real switches must be listed, got %v", got)
+	}
+	got[0] = "20990101" // overwrite an entry of the copy with a build nobody verified
+	if err := CheckFirmware("1.0.0 Build 20990101 Rel.1"); err == nil {
+		t.Error("a build written into the copy passed the gate")
+	}
+	if err := CheckFirmware("1.0.0 Build 20230218 Rel.50633"); err != nil {
+		t.Errorf("a verified build was refused after the copy was changed: %v", err)
 	}
 }
 

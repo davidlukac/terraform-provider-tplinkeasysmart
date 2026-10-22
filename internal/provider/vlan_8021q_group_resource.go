@@ -72,7 +72,7 @@ func (r *vlan8021QGroupResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"that can cut connectivity or management access; set `allow_disruptive = true` to override. Keep VLAN 1 (the default) under `lifecycle { prevent_destroy = true }`.",
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: resourceSwitchAttribute(),
-			"vlan": schema.Int64Attribute{Required: true, Description: "VLAN id, 1-4094.",
+			"vlan": schema.Int64Attribute{Required: true, Description: "VLAN id, " + vlanIDRangeText() + ".",
 				Validators:    []validator.Int64{validVLANID()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
 			"name": schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString(""),

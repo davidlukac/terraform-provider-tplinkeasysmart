@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 
@@ -62,7 +63,7 @@ func (r *systemResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"id": schema.StringAttribute{Computed: true, Description: "Always `system`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"hostname": schema.StringAttribute{Required: true, Validators: validHostname(),
-				Description: "Device description: 1-32 letters, digits and hyphens, not starting or ending with a hyphen (dots and underscores are rejected by the switch)."},
+				Description: "Device description: 1-" + strconv.Itoa(escp.MaxHostnameLen) + " letters, digits and hyphens, not starting or ending with a hyphen (dots and underscores are rejected by the switch)."},
 		},
 	}
 }
