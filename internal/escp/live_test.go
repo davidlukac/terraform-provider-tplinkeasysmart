@@ -730,31 +730,44 @@ func TestLiveIPChange(t *testing.T) {
 			*o.dst = o.val.To4()
 		}
 	}
-	// The restore comes first: it asks at the new address, then at the old one, whichever answers.
-	defer func() {
-		for _, host := range []string{moved.IP.String(), orig.IP.String()} {
-			r, err := Dial(Config{Host: host, Username: os.Getenv("TPLINK_EASYSMART_USERNAME"),
-				Password: os.Getenv("TPLINK_EASYSMART_PASSWORD"), Timeout: 3 * time.Second})
-			if err != nil {
-				t.Errorf("RESTORE dial %s: %v", host, err)
-				continue
-			}
-			defer r.Close()
-			cur, err := r.Info(ctx)
-			if err != nil {
-				continue
-			}
-			if cur.IP != orig.IP.String() || cur.Netmask != orig.Netmask.String() || cur.Gateway != orig.Gateway.String() {
-				if err := r.SetIPConfig(ctx, orig); err != nil {
-					t.Errorf("RESTORE FAILED via %s: %v", host, err)
+	// The restore comes first. The switch may be at either address, or have moved while the reply
+	// was lost, so it is found by its MAC address wherever it answers, not at an expected address.
+	// A single probe right after a move can come back empty (seen once on switch 03 while the
+	// neighbour caches were still catching up), so the lookup tries a few times.
+	findSwitch := func() (Info, bool) {
+		for attempt := 1; attempt <= 5; attempt++ {
+			infos, err := Discover(ctx, DiscoverOptions{})
+			t.Logf("discovery %d during the restore: %d switch(es), err=%v", attempt, len(infos), err)
+			for _, in := range infos {
+				t.Logf("    %s %s", in.IP, in.MAC)
+				if in.MAC == before.MAC {
+					return in, true
 				}
 			}
-			if now, err := r.Info(ctx); err != nil || now != before {
-				t.Errorf("not restored: %+v vs %+v err=%v", now, before, err)
-			}
+		}
+		return Info{}, false
+	}
+	defer func() {
+		cur, ok := findSwitch()
+		if !ok {
+			t.Errorf("RESTORE FAILED: the switch (MAC %s) answers nowhere; TestLiveIPSet is the manual way back", before.MAC)
 			return
 		}
-		t.Errorf("RESTORE FAILED: the switch answers at neither %s nor %s", moved.IP, orig.IP)
+		if cur.IP != orig.IP.String() || cur.Netmask != orig.Netmask.String() || cur.Gateway != orig.Gateway.String() {
+			r, err := Dial(Config{Host: cur.IP, Username: os.Getenv("TPLINK_EASYSMART_USERNAME"),
+				Password: os.Getenv("TPLINK_EASYSMART_PASSWORD"), Timeout: 3 * time.Second})
+			if err != nil {
+				t.Errorf("RESTORE dial %s: %v", cur.IP, err)
+				return
+			}
+			defer r.Close()
+			if err := r.SetIPConfig(ctx, orig); err != nil {
+				t.Errorf("RESTORE FAILED via %s: %v", cur.IP, err)
+			}
+		}
+		if now, ok := findSwitch(); !ok || now != before {
+			t.Errorf("not restored: %+v (found %v) vs %+v", now, ok, before)
+		}
 	}()
 	start := time.Now()
 	if err := c.SetIPConfig(ctx, moved); err != nil {
