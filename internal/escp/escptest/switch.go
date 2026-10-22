@@ -24,6 +24,10 @@ const (
 	Password = "secret"
 )
 
+// DefaultFirmware is the firmware version the switch reports until SetFirmware changes it:
+// the build the client and the provider were verified against.
+const DefaultFirmware = "1.0.0 Build 20230218 Rel.50633"
+
 // BackupMode selects how the switch misbehaves when the configuration is read.
 type BackupMode string
 
@@ -55,6 +59,7 @@ type Switch struct {
 	staleDiscoveries int              // the next n discoveries still report 127.0.0.9, like a network whose caches have not caught up
 	addr             map[int16][]byte // IP, mask and gateway as last set; discovery reports them instead of the defaults
 	led              bool
+	firmware         string
 	session          []byte
 	gets             int
 	sets             int
@@ -107,7 +112,7 @@ func Start(t testing.TB) *Switch {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &Switch{conn: conn, user: Username, password: Password, led: true}
+	f := &Switch{conn: conn, user: Username, password: Password, led: true, firmware: DefaultFirmware}
 	t.Cleanup(func() { _ = conn.Close() }) // best effort at the end of the test
 	go f.serve()
 	return f
@@ -155,6 +160,13 @@ func (f *Switch) State() (led bool, gets, sets int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.led, f.gets, f.sets
+}
+
+// SetFirmware changes the firmware version the switch reports in discovery replies.
+func (f *Switch) SetFirmware(version string) {
+	f.mu.Lock()
+	f.firmware = version
+	f.mu.Unlock()
 }
 
 // Hostname is the device description set by the last hostname SET ("" before any).
@@ -268,7 +280,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 			return
 		}
 		f.mu.Lock()
-		addr := f.addr
+		addr, firmware := f.addr, f.firmware
 		if f.staleDiscoveries > 0 {
 			f.staleDiscoveries--
 			addr = map[int16][]byte{wire.TLVIP: {127, 0, 0, 9}, wire.TLVNetmask: {255, 255, 255, 0}, wire.TLVGateway: {127, 0, 0, 254}}
@@ -282,7 +294,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 			{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte("TL-SG108E-fake\x00")},
 			{Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}, {Type: wire.TLVIP, Value: ip},
 			{Type: wire.TLVNetmask, Value: mask}, {Type: wire.TLVGateway, Value: gw},
-			{Type: wire.TLVFirmware, Value: []byte("1.0.0 Build 20230218 Rel.50633\x00")}, {Type: wire.TLVHardware, Value: []byte("TL-SG108E 6.0\x00")},
+			{Type: wire.TLVFirmware, Value: []byte(firmware + "\x00")}, {Type: wire.TLVHardware, Value: []byte("TL-SG108E 6.0\x00")},
 			{Type: wire.TLVDHCP, Value: []byte{1}}, {Type: wire.TLVFactoryDefault, Value: []byte{1}},
 		}, false)
 	case wire.OpSet:
@@ -427,6 +439,14 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 				rows = append(rows, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p), 0}})
 			}
 			f.send(from, wire.OpReply, h, 0, rows, true)
+			return
+		}
+		if _, ok := find(wire.TLVPortCount); ok {
+			f.send(from, wire.OpReply, h, 0, []wire.TLV{{Type: wire.TLVPortCount, Value: []byte{8}}}, true)
+			return
+		}
+		if _, ok := find(wire.TLVAutoSave); ok {
+			f.send(from, wire.OpReply, h, 0, []wire.TLV{{Type: wire.TLVAutoSave, Value: []byte{1}}}, true)
 			return
 		}
 		if _, ok := find(wire.TLVLED); ok {
