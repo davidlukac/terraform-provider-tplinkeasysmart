@@ -40,8 +40,8 @@ func TestSetHostnameFailsWhenSwitchIsSilent(t *testing.T) {
 func TestSetHostnameRejectsWrongCredentials(t *testing.T) {
 	f := startFakeSwitch(t)
 	c := dialFake(t, f, "wrong")
-	if err := c.SetHostname(context.Background(), "sw01"); !errors.Is(err, ErrAuth) {
-		t.Fatalf("want ErrAuth, got %v", err)
+	if err := c.SetHostname(context.Background(), "sw01"); !errors.Is(err, ErrRejected) {
+		t.Fatalf("want ErrRejected, got %v", err)
 	}
 }
 

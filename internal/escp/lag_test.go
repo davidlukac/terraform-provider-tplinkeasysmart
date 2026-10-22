@@ -113,8 +113,8 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 			c := dialFast(t, f, "secret")
 			err := c.SetLAG(context.Background(), 1, []int{2, 3})
 			var rejected *RejectedError
-			if !errors.Is(err, ErrAuth) || !errors.As(err, &rejected) || rejected.Code != tc.code {
-				t.Fatalf("got %v, want a RejectedError with code %d that matches ErrAuth", err, tc.code)
+			if !errors.Is(err, ErrRejected) || !errors.As(err, &rejected) || rejected.Code != tc.code {
+				t.Fatalf("got %v, want a RejectedError with code %d that matches ErrRejected", err, tc.code)
 			}
 			if !strings.Contains(err.Error(), tc.want) || strings.Contains(err.Error(), "wrong credentials") {
 				t.Fatalf("message %q must contain %q and not blame the credentials", err, tc.want)
@@ -126,7 +126,7 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 		f.configure(func(f *fakeSwitch) { f.rejectSetsFrom = 1 })
 		c := dialFast(t, f, "secret")
 		err := c.SetLAG(context.Background(), 1, []int{2, 3})
-		if !errors.Is(err, ErrAuth) || !strings.Contains(err.Error(), "error code 9") || !strings.Contains(err.Error(), "wrong credentials") {
+		if !errors.Is(err, ErrRejected) || !strings.Contains(err.Error(), "error code 9") || !strings.Contains(err.Error(), "wrong credentials") {
 			t.Fatalf("got %v", err)
 		}
 	})

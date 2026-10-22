@@ -396,8 +396,8 @@ func TestWrongPasswordIsRejectedForEverySetter(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := startFakeSwitch(t)
 			c := dialFast(t, f, "wrong-password")
-			if err := call(c, context.Background()); !errors.Is(err, ErrAuth) {
-				t.Fatalf("want ErrAuth, got %v", err)
+			if err := call(c, context.Background()); !errors.Is(err, ErrRejected) {
+				t.Fatalf("want ErrRejected, got %v", err)
 			}
 			if got := f.allSets(); len(got) != 0 {
 				t.Fatalf("a rejected SET must not be applied, fake recorded %d", len(got))
