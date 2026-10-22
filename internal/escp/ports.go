@@ -71,7 +71,7 @@ func ParseSpeed(name string) (Speed, error) {
 			return s, nil
 		}
 	}
-	return "", fmt.Errorf("escp: unknown speed %q (valid: %v)", name, configurableSpeeds)
+	return "", invalidf("escp: unknown speed %q (valid: %v)", name, configurableSpeeds)
 }
 
 // speedFromCode names a speed code of a read reply (0 = no link).
@@ -92,7 +92,7 @@ func (s Speed) code() (byte, error) {
 			return byte(i + 1), nil
 		}
 	}
-	return 0, fmt.Errorf("escp: unknown speed %q (valid: %v)", string(s), configurableSpeeds)
+	return 0, invalidf("escp: unknown speed %q (valid: %v)", string(s), configurableSpeeds)
 }
 
 // parsePorts decodes TLV 4096 values: port, state, lag, cfg speed, actual
@@ -154,7 +154,7 @@ func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
 		return err
 	}
 	if cfg.FlowControl && !cfg.Speed.AllowsFlowControl() {
-		return fmt.Errorf("escp: port %d: flow control needs speed %s or %s, not %s (the switch keeps it off at a fixed 10 or 100 Mbps speed)", cfg.ID, SpeedAuto, Speed1000Full, cfg.Speed)
+		return invalidf("escp: port %d: flow control needs speed %s or %s, not %s (the switch keeps it off at a fixed 10 or 100 Mbps speed)", cfg.ID, SpeedAuto, Speed1000Full, cfg.Speed)
 	}
 	entry := make([]byte, portEntryLen)
 	entry[portOffPort], entry[portOffState], entry[portOffCfgSpeed], entry[portOffCfgFlow] = byte(cfg.ID), boolByte(cfg.Enabled), code, boolByte(cfg.FlowControl)

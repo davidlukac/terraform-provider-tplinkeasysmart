@@ -72,7 +72,7 @@ const MaxBandwidthKbps = 1000000
 
 func bandwidthTLV(typ int16, port, kbps int) (wire.TLV, error) {
 	if !validateRateKbps(kbps) {
-		return wire.TLV{}, fmt.Errorf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", kbps, port, RateStepKbps, MaxBandwidthKbps)
+		return wire.TLV{}, invalidf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", kbps, port, RateStepKbps, MaxBandwidthKbps)
 	}
 	v := make([]byte, bwEntryLen)
 	v[bwOffPort] = byte(port)

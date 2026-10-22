@@ -69,18 +69,18 @@ var lagRefusals = map[int32]string{
 // above. An empty port list (removing the group) only needs a valid group.
 func ValidateLAG(group int, ports []int) error {
 	if group < 1 || group > LAGGroupCount {
-		return fmt.Errorf("escp: invalid LAG group %d (valid: 1-%d)", group, LAGGroupCount)
+		return invalidf("escp: invalid LAG group %d (valid: 1-%d)", group, LAGGroupCount)
 	}
 	if len(ports) == 0 {
 		return nil
 	}
 	if len(ports) < LAGMinPorts || len(ports) > LAGPortsPerGroup {
-		return fmt.Errorf("escp: a LAG takes %d to %d ports, got %d", LAGMinPorts, LAGPortsPerGroup, len(ports))
+		return invalidf("escp: a LAG takes %d to %d ports, got %d", LAGMinPorts, LAGPortsPerGroup, len(ports))
 	}
 	first, last := (group-1)*LAGPortsPerGroup+1, group*LAGPortsPerGroup
 	for _, p := range ports {
 		if p < first || p > last {
-			return fmt.Errorf("escp: port %d cannot be in LAG %d (LAG %d takes ports %d-%d)", p, group, group, first, last)
+			return invalidf("escp: port %d cannot be in LAG %d (LAG %d takes ports %d-%d)", p, group, group, first, last)
 		}
 	}
 	return nil

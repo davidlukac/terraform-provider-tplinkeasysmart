@@ -3,7 +3,6 @@ package escp
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"regexp"
 	"sort"
 
@@ -38,7 +37,7 @@ var vlanNamePattern = regexp.MustCompile(VLANNamePattern)
 // ValidateVLANID checks an 802.1Q VLAN id or PVID.
 func ValidateVLANID(id int) error {
 	if id < MinVLANID || id > MaxVLANID {
-		return fmt.Errorf("escp: invalid VLAN id %d (valid: %d-%d)", id, MinVLANID, MaxVLANID)
+		return invalidf("escp: invalid VLAN id %d (valid: %d-%d)", id, MinVLANID, MaxVLANID)
 	}
 	return nil
 }
@@ -46,7 +45,7 @@ func ValidateVLANID(id int) error {
 // ValidateVLANName checks an 802.1Q VLAN name: empty, or up to MaxVLANNameLen letters, digits, hyphens and underscores.
 func ValidateVLANName(name string) error {
 	if len(name) > MaxVLANNameLen || !vlanNamePattern.MatchString(name) {
-		return fmt.Errorf("escp: invalid VLAN name %q (at most %d letters, digits, hyphens or underscores)", name, MaxVLANNameLen)
+		return invalidf("escp: invalid VLAN name %q (at most %d letters, digits, hyphens or underscores)", name, MaxVLANNameLen)
 	}
 	return nil
 }
@@ -66,11 +65,11 @@ func (v VLAN8021Q) validate() error {
 	}
 	for _, p := range v.Tagged {
 		if seen[p] {
-			return fmt.Errorf("escp: port %d is both tagged and untagged in VLAN %d", p, v.ID)
+			return invalidf("escp: port %d is both tagged and untagged in VLAN %d", p, v.ID)
 		}
 	}
 	if len(v.Tagged)+len(v.Untagged) == 0 {
-		return fmt.Errorf("escp: VLAN %d has no member ports; delete it instead", v.ID)
+		return invalidf("escp: VLAN %d has no member ports; delete it instead", v.ID)
 	}
 	return nil
 }
@@ -128,7 +127,7 @@ func (c *Client) DeleteVLAN8021Q(ctx context.Context, id int) error {
 // exist and the 802.1Q mode must be on; callers must guard linked ports.
 func (c *Client) SetPVIDs(ctx context.Context, pvids map[int]int) error {
 	if len(pvids) == 0 {
-		return fmt.Errorf("escp: no PVIDs to set")
+		return invalidf("escp: no PVIDs to set")
 	}
 	ports := make([]int, 0, len(pvids))
 	for p, id := range pvids {

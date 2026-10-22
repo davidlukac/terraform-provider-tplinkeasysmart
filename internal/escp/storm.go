@@ -79,9 +79,9 @@ func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
 	any := cfg.UnknownUnicast || cfg.Multicast || cfg.Broadcast
 	switch {
 	case any && (cfg.RateKbps < RateStepKbps || !validateRateKbps(cfg.RateKbps)):
-		return fmt.Errorf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", cfg.Port, RateStepKbps, RateStepKbps, MaxBandwidthKbps, cfg.RateKbps)
+		return invalidf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", cfg.Port, RateStepKbps, RateStepKbps, MaxBandwidthKbps, cfg.RateKbps)
 	case !any && cfg.RateKbps != 0:
-		return fmt.Errorf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.RateKbps)
+		return invalidf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.RateKbps)
 	}
 	v := make([]byte, stormEntryLen)
 	v[stormOffPort] = byte(cfg.Port)

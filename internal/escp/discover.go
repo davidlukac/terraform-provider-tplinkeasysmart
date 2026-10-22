@@ -152,7 +152,7 @@ type probe struct {
 
 func discoverWith(ctx context.Context, opts DiscoverOptions, env discoverEnv) ([]Info, error) {
 	if opts.Window < 0 {
-		return nil, fmt.Errorf("escp: negative discovery window %v", opts.Window)
+		return nil, invalidf("escp: negative discovery window %v", opts.Window)
 	}
 	window := opts.Window
 	if window == 0 {
