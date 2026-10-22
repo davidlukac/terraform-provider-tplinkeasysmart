@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -32,13 +33,13 @@ func TestParseStorm(t *testing.T) {
 }
 
 func TestSetStormWire(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	if err := c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: false, Multicast: true, Broadcast: true, RateKbps: 1024}); err != nil {
 		t.Fatal(err)
 	}
-	got := f.set()
+	got := f.LastSet()
 	want := []byte{7, 1, 0, 1, 1, 0, 0, 4, 0}
 	if len(got) != 1 || got[0].Type != wire.TLVStormControl || !reflect.DeepEqual(got[0].Value, want) {
 		t.Fatalf("wire %+v, want %v", got, want)
@@ -46,10 +47,10 @@ func TestSetStormWire(t *testing.T) {
 	if err := c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: false, Multicast: false, Broadcast: false, RateKbps: 0}); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.set(); !reflect.DeepEqual(got[0].Value, []byte{7, 0, 0, 0, 0, 0, 0, 0, 0}) {
+	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{7, 0, 0, 0, 0, 0, 0, 0, 0}) {
 		t.Fatalf("disable wire %v", got[0].Value)
 	}
-	n := len(f.allSets())
+	n := len(f.AllSets())
 	for _, bad := range []struct {
 		uu, mc, bc bool
 		rate       int
@@ -58,7 +59,7 @@ func TestSetStormWire(t *testing.T) {
 			t.Errorf("%+v must be rejected", bad)
 		}
 	}
-	if len(f.allSets()) != n {
+	if len(f.AllSets()) != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }
@@ -77,12 +78,12 @@ func TestSetStormWireOneTrafficTypeAtATime(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			f := startFakeSwitch(t)
+			f := escptest.Start(t)
 			c := dialFake(t, f, "secret")
 			if err := c.SetStormControl(context.Background(), tc.cfg); err != nil {
 				t.Fatal(err)
 			}
-			if got := f.set(); len(got) != 1 || !reflect.DeepEqual(got[0].Value, tc.want) {
+			if got := f.LastSet(); len(got) != 1 || !reflect.DeepEqual(got[0].Value, tc.want) {
 				t.Fatalf("wire %+v, want %v", got, tc.want)
 			}
 		})

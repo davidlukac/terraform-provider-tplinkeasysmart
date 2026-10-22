@@ -6,34 +6,36 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 )
 
 func TestConfigBackupReassemblesFragments(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	got, err := c.ConfigBackup(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := fakeConfig(); !bytes.Equal(got, want) {
+	if want := escptest.ConfigFile(); !bytes.Equal(got, want) {
 		t.Fatalf("reassembled %d bytes, want %d identical bytes", len(got), len(want))
 	}
 }
 
 func TestConfigBackupDoesNotWriteSettings(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if _, err := c.ConfigBackup(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	led, _, sets := f.state()
+	led, _, sets := f.State()
 	if !led || sets != 0 {
 		t.Fatalf("a backup must not change anything: led=%v sets=%d", led, sets)
 	}
 }
 
 func TestConfigBackupRejectsWrongCredentials(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "wrong")
 	_, err := c.ConfigBackup(context.Background())
 	if err == nil {
@@ -42,11 +44,11 @@ func TestConfigBackupRejectsWrongCredentials(t *testing.T) {
 }
 
 func TestConfigBackupRejectsNonConfigData(t *testing.T) {
-	// "dropfirst" delivers only the final fragment: a partial file must not pass for a backup.
-	for _, mode := range []string{"badmagic", "short", "dropfirst"} {
-		t.Run(mode, func(t *testing.T) {
-			f := startFakeSwitch(t)
-			f.setBackupMode(mode)
+	// escptest.BackupDropFirst delivers only the final fragment: a partial file must not pass for a backup.
+	for _, mode := range []escptest.BackupMode{escptest.BackupBadMagic, escptest.BackupShort, escptest.BackupDropFirst} {
+		t.Run(string(mode), func(t *testing.T) {
+			f := escptest.Start(t)
+			f.SetBackupMode(mode)
 			c := dialFake(t, f, "secret")
 			if _, err := c.ConfigBackup(context.Background()); !errors.Is(err, ErrInvalidConfig) {
 				t.Errorf("want ErrInvalidConfig, got %v", err)
@@ -57,8 +59,8 @@ func TestConfigBackupRejectsNonConfigData(t *testing.T) {
 
 func TestConfigBackupMissingFragmentIsAnError(t *testing.T) {
 	// The second fragment never arrives: the request is retried, then fails.
-	f := startFakeSwitch(t)
-	f.setBackupMode("dropsecond")
+	f := escptest.Start(t)
+	f.SetBackupMode(escptest.BackupDropSecond)
 	c := dialFake(t, f, "secret")
 	c.cfg.Retries = 1
 	c.cfg.Timeout = 150 * time.Millisecond
@@ -68,8 +70,8 @@ func TestConfigBackupMissingFragmentIsAnError(t *testing.T) {
 }
 
 func TestConfigBackupNoReply(t *testing.T) {
-	f := startFakeSwitch(t)
-	f.setBackupMode("silent")
+	f := escptest.Start(t)
+	f.SetBackupMode(escptest.BackupSilent)
 	c := dialFake(t, f, "secret")
 	c.cfg.Retries = 0
 	c.cfg.Timeout = 150 * time.Millisecond
@@ -82,10 +84,10 @@ func TestConfigBackupNoReply(t *testing.T) {
 // unanswered until the context expires, which must end the call with the
 // context's error instead of retrying for the full per-attempt timeout.
 func TestConfigBackupHonoursContext(t *testing.T) {
-	f := startFakeSwitch(t)
-	f.setBackupMode("silent")
+	f := escptest.Start(t)
+	f.SetBackupMode(escptest.BackupSilent)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 30 * time.Second,
-		SwitchPort: f.port(), BroadcastAddr: "127.0.0.1"})
+		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	start := time.Now()
@@ -101,8 +103,8 @@ func TestConfigBackupHonoursContext(t *testing.T) {
 func TestConfigBackupRefusesAnEndlessFragmentedReply(t *testing.T) {
 	// A sender that keeps the fragment flag set must not make the client buffer
 	// without limit.
-	f := startFakeSwitch(t)
-	f.setBackupMode("flood")
+	f := escptest.Start(t)
+	f.SetBackupMode(escptest.BackupFlood)
 	c := dialFake(t, f, "secret")
 	c.cfg.Timeout = 2 * time.Second
 	if _, err := c.ConfigBackup(context.Background()); !errors.Is(err, ErrReplyTooLarge) {

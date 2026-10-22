@@ -3,6 +3,8 @@ package escp
 import (
 	"strconv"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 )
 
 func itoa(n int) string { return strconv.Itoa(n) }
@@ -10,7 +12,7 @@ func itoa(n int) string { return strconv.Itoa(n) }
 // Several clients (several provider instances, one per switch) must be able to
 // hold the reply port at the same time.
 func TestSeveralClientsShareTheReplyPort(t *testing.T) {
-	port := freeUDPPort(t)
+	port := escptest.FreeUDPPort(t)
 	var clients []*Client
 	for i := 0; i < 3; i++ {
 		c, err := Dial(Config{Host: "127.0.0.1", HostPort: port})

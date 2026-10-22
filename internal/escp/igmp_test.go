@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -48,7 +49,7 @@ func TestSetIGMPWire(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			f := startFakeSwitch(t)
+			f := escptest.Start(t)
 			c := dialFake(t, f, "secret")
 			if err := c.SetIGMP(context.Background(), tc.cfg); err != nil {
 				t.Fatal(err)
@@ -57,7 +58,7 @@ func TestSetIGMPWire(t *testing.T) {
 				{Type: wire.TLVIGMPEnabled, Value: []byte{tc.wantState}},
 				{Type: wire.TLVIGMPSuppression, Value: []byte{tc.wantSupp}},
 			}
-			if got := f.set(); !reflect.DeepEqual(got, want) {
+			if got := f.LastSet(); !reflect.DeepEqual(got, want) {
 				t.Fatalf("wire %+v, want %+v", got, want)
 			}
 		})

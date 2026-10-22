@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -32,13 +33,13 @@ func TestParseQoS(t *testing.T) {
 }
 
 func TestSetQoSWire(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	if err := c.SetQoSMode(ctx, 1); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.set(); len(got) != 1 || got[0].Type != wire.TLVQoSMode || got[0].Value[0] != 1 {
+	if got := f.LastSet(); len(got) != 1 || got[0].Type != wire.TLVQoSMode || got[0].Value[0] != 1 {
 		t.Fatalf("mode wire: %+v", got)
 	}
 	if err := c.SetQoSMode(ctx, 7); err == nil {
@@ -47,7 +48,7 @@ func TestSetQoSWire(t *testing.T) {
 	if err := c.SetPortPriorities(ctx, map[int]Priority{3: 4}); err != nil {
 		t.Fatal(err)
 	}
-	got := f.set()
+	got := f.LastSet()
 	if len(got) != 8 {
 		t.Fatalf("want all 8 ports re-sent, got %d TLVs", len(got))
 	}
@@ -108,15 +109,15 @@ func TestQoSModeUnknownValues(t *testing.T) {
 
 // A mode the client does not know is refused before anything is sent, negative values included.
 func TestSetQoSModeRefusesUnknownModesWithoutSending(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
-	n := len(f.allSets())
+	n := len(f.AllSets())
 	for _, bad := range []QoSMode{-1, 3, 256} {
 		if err := c.SetQoSMode(context.Background(), bad); err == nil {
 			t.Errorf("mode %d accepted", int(bad))
 		}
 	}
-	if len(f.allSets()) != n {
+	if len(f.AllSets()) != n {
 		t.Fatal("a refused mode reached the switch")
 	}
 }

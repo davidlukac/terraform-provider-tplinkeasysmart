@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -180,14 +181,13 @@ func TestRSASessionTLVTrimsLeadingZeroWords(t *testing.T) {
 	if got[1] != 3 {
 		t.Fatalf("word count must be trimmed to 3, got %d", got[1])
 	}
-	f := &fakeSwitch{}
-	if back := f.decryptSessionKey(got); !bytes.Equal(back, key) {
+	if back := escptest.DecryptSessionKey(got); !bytes.Equal(back, key) {
 		t.Fatalf("the trimmed TLV must still decrypt to the key, got %q", back)
 	}
 }
 
 func TestBandwidthValidationHappensBeforeAnythingIsSent(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")
 	ctx := context.Background()
 	for name, call := range map[string]func() error{
@@ -200,51 +200,51 @@ func TestBandwidthValidationHappensBeforeAnythingIsSent(t *testing.T) {
 			t.Errorf("%s must be rejected", name)
 		}
 	}
-	if n := len(f.allSets()); n != 0 {
+	if n := len(f.AllSets()); n != 0 {
 		t.Fatalf("an invalid egress rate must stop the request before the ingress SET is sent, %d SET(s) reached the switch", n)
 	}
 }
 
 func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 	t.Run("ingress rejected: nothing applied", func(t *testing.T) {
-		f := startFakeSwitch(t)
-		f.configure(func(f *fakeSwitch) { f.rejectSetsFrom = 1 })
+		f := escptest.Start(t)
+		f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom = 1 })
 		c := dialFast(t, f, "secret")
 		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrRejected) {
 			t.Fatalf("got %v", err)
 		}
-		if n := len(f.allSets()); n != 0 {
+		if n := len(f.AllSets()); n != 0 {
 			t.Fatalf("%d SET(s) applied", n)
 		}
 	})
 	t.Run("egress rejected: ingress was applied and the error says so", func(t *testing.T) {
-		f := startFakeSwitch(t)
-		f.configure(func(f *fakeSwitch) { f.rejectSetsFrom = 2 })
+		f := escptest.Start(t)
+		f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom = 2 })
 		c := dialFast(t, f, "secret")
 		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrRejected) {
 			t.Fatalf("got %v", err)
 		}
-		if h := f.allSets(); len(h) != 1 || h[0][0].Type != wire.TLVBandwidthIngress {
+		if h := f.AllSets(); len(h) != 1 || h[0][0].Type != wire.TLVBandwidthIngress {
 			t.Fatalf("exactly the ingress SET should have been applied: %+v", h)
 		}
 	})
 }
 
 func TestStormControlRejectsInvalidPortBeforeSending(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")
 	for _, port := range []int{0, 33} {
 		if err := c.SetStormControl(context.Background(), StormConfig{Port: port, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64}); err == nil {
 			t.Errorf("port %d must be rejected", port)
 		}
 	}
-	if n := len(f.allSets()); n != 0 {
+	if n := len(f.AllSets()); n != 0 {
 		t.Fatalf("%d SET(s) reached the switch", n)
 	}
 }
 
 func TestMirrorRejectsInvalidSourcePortsBeforeSending(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")
 	ctx := context.Background()
 	for name, m := range map[string]Mirror{
@@ -255,27 +255,27 @@ func TestMirrorRejectsInvalidSourcePortsBeforeSending(t *testing.T) {
 			t.Errorf("%s must be rejected", name)
 		}
 	}
-	if n := len(f.allSets()); n != 0 {
+	if n := len(f.AllSets()); n != 0 {
 		t.Fatalf("%d SET(s) reached the switch", n)
 	}
 }
 
 func TestSetPortPrioritiesStopsWhenTheCurrentStateCannotBeRead(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")
-	f.configure(func(f *fakeSwitch) { f.getFn = func([]int16) ([]wire.TLV, int32, bool) { return nil, 0, true } })
+	f.Configure(func(f *escptest.Switch) { f.GetFn = func([]int16) ([]wire.TLV, int32, bool) { return nil, 0, true } })
 	if err := c.SetPortPriorities(context.Background(), map[int]Priority{3: 2}); !errors.Is(err, ErrNoReply) {
 		t.Fatalf("got %v", err)
 	}
-	if n := len(f.allSets()); n != 0 {
+	if n := len(f.AllSets()); n != 0 {
 		t.Fatalf("priorities must not be written blind: %d SET(s)", n)
 	}
 }
 
 func TestSetHostnameRefusesToWriteWithoutAUsableIPConfiguration(t *testing.T) {
 	t.Run("switch does not answer discovery", func(t *testing.T) {
-		f := startFakeSwitch(t)
-		f.goMute()
+		f := escptest.Start(t)
+		f.Mute()
 		c := dialFast(t, f, "secret")
 		if err := c.SetHostname(context.Background(), "new-name"); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("got %v", err)
@@ -289,14 +289,14 @@ func TestSetHostnameRefusesToWriteWithoutAUsableIPConfiguration(t *testing.T) {
 	}
 	for name, tlvs := range bad {
 		t.Run(name, func(t *testing.T) {
-			f := startFakeSwitch(t)
-			f.configure(func(f *fakeSwitch) { f.discoverTLVs = tlvs })
+			f := escptest.Start(t)
+			f.Configure(func(f *escptest.Switch) { f.DiscoverTLVs = tlvs })
 			c := dialFast(t, f, "secret")
 			err := c.SetHostname(context.Background(), "new-name")
 			if err == nil || !strings.Contains(err.Error(), "unusable IP configuration") {
 				t.Fatalf("want a refusal, got %v", err)
 			}
-			if n := len(f.allSets()); n != 0 {
+			if n := len(f.AllSets()); n != 0 {
 				t.Fatalf("the management IP must never be written from a half-known state, %d SET(s) sent", n)
 			}
 		})

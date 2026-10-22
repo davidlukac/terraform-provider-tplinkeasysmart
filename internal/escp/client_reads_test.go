@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -193,9 +194,9 @@ func (s *scriptedGETs) snapshot() [][]int16 {
 
 // install makes the fake answer GETs from script. A request whose types equal
 // failOn is answered with failCode instead, or not at all when drop is set.
-func (s *scriptedGETs) install(f *fakeSwitch, script map[int16][]wire.TLV, failOn []int16, failCode int32, drop bool) {
-	f.configure(func(f *fakeSwitch) {
-		f.getFn = func(types []int16) ([]wire.TLV, int32, bool) {
+func (s *scriptedGETs) install(f *escptest.Switch, script map[int16][]wire.TLV, failOn []int16, failCode int32, drop bool) {
+	f.Configure(func(f *escptest.Switch) {
+		f.GetFn = func(types []int16) ([]wire.TLV, int32, bool) {
 			s.mu.Lock()
 			s.requests = append(s.requests, append([]int16(nil), types...))
 			s.mu.Unlock()
@@ -214,7 +215,7 @@ func (s *scriptedGETs) install(f *fakeSwitch, script map[int16][]wire.TLV, failO
 func TestReadMethodsSendTheExpectedRequestsAndDecodeTheReplies(t *testing.T) {
 	for _, tc := range readCases() {
 		t.Run(tc.name, func(t *testing.T) {
-			f := startFakeSwitch(t)
+			f := escptest.Start(t)
 			c := dialFast(t, f, "secret")
 			var log scriptedGETs
 			log.install(f, tc.script, nil, 0, false)
@@ -237,7 +238,7 @@ func TestReadMethodsReportEachFailingRequestStage(t *testing.T) {
 		for stage, failOn := range tc.requests {
 			stageName := tc.name + " request " + string(rune('1'+stage))
 			t.Run(stageName+" unanswered", func(t *testing.T) {
-				f := startFakeSwitch(t)
+				f := escptest.Start(t)
 				c := dialFast(t, f, "secret")
 				var log scriptedGETs
 				log.install(f, tc.script, failOn, 0, true)
@@ -246,7 +247,7 @@ func TestReadMethodsReportEachFailingRequestStage(t *testing.T) {
 				}
 			})
 			t.Run(stageName+" answered with an error code", func(t *testing.T) {
-				f := startFakeSwitch(t)
+				f := escptest.Start(t)
 				c := dialFast(t, f, "secret")
 				var log scriptedGETs
 				log.install(f, tc.script, failOn, 7, false)
@@ -267,7 +268,7 @@ func TestReadMethodsSurfaceParserErrors(t *testing.T) {
 	// into a partial value.
 	for _, tc := range readCases() {
 		t.Run(tc.name, func(t *testing.T) {
-			f := startFakeSwitch(t)
+			f := escptest.Start(t)
 			c := dialFast(t, f, "secret")
 			var log scriptedGETs
 			log.install(f, tc.bad, nil, 0, false)

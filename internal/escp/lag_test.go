@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -27,22 +28,22 @@ func TestParseLAGs(t *testing.T) {
 }
 
 func TestSetLAGWire(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	if err := c.SetLAG(ctx, 2, []int{6, 7}); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.set(); got[0].Type != wire.TLVLAG || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
+	if got := f.LastSet(); got[0].Type != wire.TLVLAG || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
 		t.Fatalf("wire %+v", got)
 	}
 	if err := c.SetLAG(ctx, 2, nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.set(); !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0}) {
+	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0}) {
 		t.Fatalf("delete wire %v", got[0].Value)
 	}
-	n := len(f.allSets())
+	n := len(f.AllSets())
 	for _, bad := range []struct {
 		group int
 		ports []int
@@ -51,7 +52,7 @@ func TestSetLAGWire(t *testing.T) {
 			t.Errorf("LAG %d with ports %v must be rejected", bad.group, bad.ports)
 		}
 	}
-	if len(f.allSets()) != n {
+	if len(f.AllSets()) != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }
@@ -108,8 +109,8 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 		{7415, "at least two ports"},
 	} {
 		t.Run(fmt.Sprint(tc.code), func(t *testing.T) {
-			f := startFakeSwitch(t)
-			f.configure(func(f *fakeSwitch) { f.rejectSetsFrom, f.rejectCode = 1, tc.code })
+			f := escptest.Start(t)
+			f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom, f.RejectCode = 1, tc.code })
 			c := dialFast(t, f, "secret")
 			err := c.SetLAG(context.Background(), 1, []int{2, 3})
 			var rejected *RejectedError
@@ -122,8 +123,8 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 		})
 	}
 	t.Run("an unknown code keeps the generic message", func(t *testing.T) {
-		f := startFakeSwitch(t)
-		f.configure(func(f *fakeSwitch) { f.rejectSetsFrom = 1 })
+		f := escptest.Start(t)
+		f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom = 1 })
 		c := dialFast(t, f, "secret")
 		err := c.SetLAG(context.Background(), 1, []int{2, 3})
 		if !errors.Is(err, ErrRejected) || !strings.Contains(err.Error(), "error code 9") || !strings.Contains(err.Error(), "wrong credentials") {

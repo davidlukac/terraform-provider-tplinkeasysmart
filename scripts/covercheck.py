@@ -3,7 +3,9 @@
 
 Policy: every statement of the module is covered, except inside functions whose
 doc comment contains `coverage: ignore - <reason>`. The reason is mandatory.
-Test files are not measured.
+Test files are not measured, and neither is test-support code (NOT_MEASURED): the
+fake switch in escptest is exercised by the library's own tests, so a branch of it
+that no test reaches is a gap in that fake, not in the product.
 
 Usage: covercheck.py cover.out [module-root]   (exit 1 when the policy is violated)
 """
@@ -13,6 +15,9 @@ import re
 import sys
 
 MODULE = "github.com/davidlukac/terraform-provider-tplinkeasysmart/"
+# Path prefixes (relative to the module root) of test-support packages. Their statements
+# are dropped from the profile, so neither the policy nor the badge counts them.
+NOT_MEASURED = ("internal/escp/escptest/",)
 MARKER = re.compile(r"^\s*//\s*coverage:\s*ignore\b(?P<rest>.*)$")
 BLOCK = re.compile(r"^(?P<file>.+):(?P<sl>\d+)\.\d+,(?P<el>\d+)\.\d+ (?P<n>\d+) (?P<count>\d+)$")
 
@@ -24,7 +29,10 @@ def parse_profile(text):
         m = BLOCK.match(line)
         if not m:
             raise ValueError("unparseable cover profile line: " + line)
-        key = (m["file"].removeprefix(MODULE), int(m["sl"]), int(m["el"]))
+        name = m["file"].removeprefix(MODULE)
+        if name.startswith(NOT_MEASURED):
+            continue
+        key = (name, int(m["sl"]), int(m["el"]))
         n, hits = blocks.get(key, (int(m["n"]), 0))
         blocks[key] = (n, hits + int(m["count"]))
     return blocks

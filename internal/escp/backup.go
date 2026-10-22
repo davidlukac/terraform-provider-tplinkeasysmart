@@ -8,9 +8,6 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
-// configMagic is the 4-byte prefix of the switch's configuration file.
-var configMagic = []byte{0x23, 0x89, 0x23, 0x89}
-
 // ErrInvalidConfig means the reply was not a switch configuration file.
 var ErrInvalidConfig = fmt.Errorf("escp: reply is not a switch configuration file")
 
@@ -38,7 +35,7 @@ func (c *Client) ConfigBackup(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(out) <= len(configMagic) || !bytes.HasPrefix(out, configMagic) {
+	if len(out) <= len(wire.ConfigMagic) || !bytes.HasPrefix(out, wire.ConfigMagic) {
 		return nil, fmt.Errorf("%w (%d bytes)", ErrInvalidConfig, len(out))
 	}
 	return out, nil

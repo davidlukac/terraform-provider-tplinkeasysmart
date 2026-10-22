@@ -8,27 +8,28 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 func TestSetHostnameRefusesUnusableIPConfiguration(t *testing.T) {
-	f := startFakeSwitch(t)
-	f.configure(func(f *fakeSwitch) {
-		f.discoverTLVs = []wire.TLV{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte("TL-SG108E-fake\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
+	f := escptest.Start(t)
+	f.Configure(func(f *escptest.Switch) {
+		f.DiscoverTLVs = []wire.TLV{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte("TL-SG108E-fake\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
 	})
 	c := dialFake(t, f, "secret")
 	err := c.SetHostname(context.Background(), "sw01")
 	if err == nil || !strings.Contains(err.Error(), "unusable IP configuration") {
 		t.Fatalf("want a refusal because the IP config is unusable, got %v", err)
 	}
-	if n := len(f.allSets()); n != 0 {
+	if n := len(f.AllSets()); n != 0 {
 		t.Fatalf("nothing may be written when the IP config cannot be re-sent, got %d writes", n)
 	}
 }
 
 func TestSetHostnameFailsWhenSwitchIsSilent(t *testing.T) {
-	f := startFakeSwitch(t)
-	f.goMute()
+	f := escptest.Start(t)
+	f.Mute()
 	c := dialFake(t, f, "secret")
 	c.cfg.Retries = 0
 	c.cfg.Timeout = 100 * time.Millisecond
@@ -38,7 +39,7 @@ func TestSetHostnameFailsWhenSwitchIsSilent(t *testing.T) {
 }
 
 func TestSetHostnameRejectsWrongCredentials(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "wrong")
 	if err := c.SetHostname(context.Background(), "sw01"); !errors.Is(err, ErrRejected) {
 		t.Fatalf("want ErrRejected, got %v", err)
@@ -46,7 +47,7 @@ func TestSetHostnameRejectsWrongCredentials(t *testing.T) {
 }
 
 func TestSendFailureOnClosedSocketAffectsReadsAndBackup(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if _, err := c.GetLED(context.Background()); err != nil { // opens the socket and establishes the session
 		t.Fatal(err)

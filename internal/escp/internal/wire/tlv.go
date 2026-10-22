@@ -25,6 +25,9 @@ const (
 	TLVConfigFile     = 768 // configuration backup (read through an authenticated SET)
 )
 
+// ConfigMagic is the 4-byte prefix of the switch's configuration file.
+var ConfigMagic = []byte{0x23, 0x89, 0x23, 0x89}
+
 // ErrCodeKeyAccepted is returned in the reply to a successful RSA key exchange.
 const ErrCodeKeyAccepted = 4098
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -49,7 +50,7 @@ func TestDialRejectsHostThatIsNotIPv4(t *testing.T) {
 }
 
 func TestCloseReleasesTheSocket(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if _, err := c.Info(context.Background()); err != nil {
 		t.Fatal(err)
@@ -70,15 +71,15 @@ func TestCloseReleasesTheSocket(t *testing.T) {
 }
 
 func TestBusyHostPortIsReportedOnFirstUse(t *testing.T) {
-	f := startFakeSwitch(t)
-	busy, err := net.ListenUDP("udp4", &net.UDPAddr{Port: freeUDPPort(t)})
+	f := escptest.Start(t)
+	busy, err := net.ListenUDP("udp4", &net.UDPAddr{Port: escptest.FreeUDPPort(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer busy.Close()
 	port := busy.LocalAddr().(*net.UDPAddr).Port
 	c, err := Dial(Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 80 * time.Millisecond,
-		SwitchPort: f.port(), HostPort: port, BroadcastAddr: "127.0.0.1"})
+		SwitchPort: f.Port(), HostPort: port, BroadcastAddr: "127.0.0.1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +224,7 @@ func TestInfoFromReplyToleratesMissingAndMalformedFields(t *testing.T) {
 }
 
 func TestSendFailureIsReported(t *testing.T) {
-	f := startFakeSwitch(t)
+	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if err := c.open(); err != nil {
 		t.Fatal(err)
@@ -236,9 +237,9 @@ func TestSendFailureIsReported(t *testing.T) {
 }
 
 func TestContextDeadlineBeatsTheConfiguredTimeout(t *testing.T) {
-	f := startFakeSwitch(t)
-	f.goMute()
-	c := newBoundClient(t, Config{Host: "127.0.0.1", Timeout: 5 * time.Second, SwitchPort: f.port(), BroadcastAddr: "127.0.0.1"})
+	f := escptest.Start(t)
+	f.Mute()
+	c := newBoundClient(t, Config{Host: "127.0.0.1", Timeout: 5 * time.Second, SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
 	defer c.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
@@ -253,8 +254,8 @@ func TestContextDeadlineBeatsTheConfiguredTimeout(t *testing.T) {
 }
 
 func TestCancelledContextStopsRetrying(t *testing.T) {
-	f := startFakeSwitch(t)
-	f.goMute()
+	f := escptest.Start(t)
+	f.Mute()
 	c := dialFast(t, f, "secret")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -265,16 +266,16 @@ func TestCancelledContextStopsRetrying(t *testing.T) {
 
 func TestSessionSetupFailures(t *testing.T) {
 	t.Run("switch does not answer discovery", func(t *testing.T) {
-		f := startFakeSwitch(t)
-		f.goMute()
+		f := escptest.Start(t)
+		f.Mute()
 		c := dialFast(t, f, "secret")
 		if _, err := c.GetLED(context.Background()); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
 		}
 	})
 	t.Run("switch does not answer the key exchange", func(t *testing.T) {
-		f := startFakeSwitch(t)
-		f.configure(func(f *fakeSwitch) { f.rsaDrop = true })
+		f := escptest.Start(t)
+		f.Configure(func(f *escptest.Switch) { f.RSADrop = true })
 		c := dialFast(t, f, "secret")
 		err := c.SetLED(context.Background(), true)
 		if !errors.Is(err, ErrNoReply) || !strings.Contains(err.Error(), "session key exchange") {
@@ -285,8 +286,8 @@ func TestSessionSetupFailures(t *testing.T) {
 		}
 	})
 	t.Run("switch refuses the key", func(t *testing.T) {
-		f := startFakeSwitch(t)
-		f.configure(func(f *fakeSwitch) { f.rsaCode = 77 })
+		f := escptest.Start(t)
+		f.Configure(func(f *escptest.Switch) { f.RSACode = 77 })
 		c := dialFast(t, f, "secret")
 		err := c.SetLED(context.Background(), true)
 		if err == nil || !strings.Contains(err.Error(), "unexpected error code 77") {
@@ -296,13 +297,13 @@ func TestSessionSetupFailures(t *testing.T) {
 			t.Fatal("a refused key must not leave a session behind")
 		}
 		// the next call tries again and succeeds once the switch cooperates
-		f.configure(func(f *fakeSwitch) { f.rsaCode = 0 })
+		f.Configure(func(f *escptest.Switch) { f.RSACode = 0 })
 		if err := c.SetLED(context.Background(), true); err != nil {
 			t.Fatalf("retry after the switch recovered: %v", err)
 		}
 	})
 	t.Run("entropy source fails", func(t *testing.T) {
-		f := startFakeSwitch(t)
+		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
 		orig := randReader
 		randReader = failingReader{}
@@ -322,44 +323,44 @@ func (failingReader) Read([]byte) (int, error) { return 0, errors.New("entropy u
 
 func TestAuthenticatedRequestFailures(t *testing.T) {
 	t.Run("SET gets no answer", func(t *testing.T) {
-		f := startFakeSwitch(t)
+		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
 		if _, err := c.GetLED(context.Background()); err != nil { // establish the session first
 			t.Fatal(err)
 		}
-		f.configure(func(f *fakeSwitch) { f.dropSets = true })
+		f.Configure(func(f *escptest.Switch) { f.DropSets = true })
 		if err := c.SetLED(context.Background(), false); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
 		}
-		if led, _, sets := f.state(); !led || sets != 0 {
+		if led, _, sets := f.State(); !led || sets != 0 {
 			t.Fatal("an unanswered SET must not have been applied by the fake")
 		}
 	})
 	t.Run("GET gets no answer", func(t *testing.T) {
-		f := startFakeSwitch(t)
+		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
-		f.configure(func(f *fakeSwitch) {
-			f.getFn = func([]int16) ([]wire.TLV, int32, bool) { return nil, 0, true }
+		f.Configure(func(f *escptest.Switch) {
+			f.GetFn = func([]int16) ([]wire.TLV, int32, bool) { return nil, 0, true }
 		})
 		if _, err := c.GetLED(context.Background()); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
 		}
 	})
 	t.Run("LED reply without the LED TLV", func(t *testing.T) {
-		f := startFakeSwitch(t)
+		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
-		f.configure(func(f *fakeSwitch) {
-			f.getFn = func([]int16) ([]wire.TLV, int32, bool) { return []wire.TLV{{Type: 99, Value: []byte{1}}}, 0, false }
+		f.Configure(func(f *escptest.Switch) {
+			f.GetFn = func([]int16) ([]wire.TLV, int32, bool) { return []wire.TLV{{Type: 99, Value: []byte{1}}}, 0, false }
 		})
 		if _, err := c.GetLED(context.Background()); err == nil || !strings.Contains(err.Error(), "unexpected LED reply") {
 			t.Fatalf("want an unexpected-reply error, got %v", err)
 		}
 	})
 	t.Run("LED reply with the wrong length", func(t *testing.T) {
-		f := startFakeSwitch(t)
+		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
-		f.configure(func(f *fakeSwitch) {
-			f.getFn = func([]int16) ([]wire.TLV, int32, bool) {
+		f.Configure(func(f *escptest.Switch) {
+			f.GetFn = func([]int16) ([]wire.TLV, int32, bool) {
 				return []wire.TLV{{Type: wire.TLVLED, Value: []byte{1, 1}}}, 0, false
 			}
 		})
@@ -394,12 +395,12 @@ func TestWrongPasswordIsRejectedForEverySetter(t *testing.T) {
 	}
 	for name, call := range setters {
 		t.Run(name, func(t *testing.T) {
-			f := startFakeSwitch(t)
+			f := escptest.Start(t)
 			c := dialFast(t, f, "wrong-password")
 			if err := call(c, context.Background()); !errors.Is(err, ErrRejected) {
 				t.Fatalf("want ErrRejected, got %v", err)
 			}
-			if got := f.allSets(); len(got) != 0 {
+			if got := f.AllSets(); len(got) != 0 {
 				t.Fatalf("a rejected SET must not be applied, fake recorded %d", len(got))
 			}
 		})
