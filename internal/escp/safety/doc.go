@@ -20,10 +20,13 @@
 //
 // UseOf turns a reading of the ports into facts about one port: does it exist, does it
 // have a link, is it in a link aggregation group. A port with a link may carry the
-// management path or the uplink, so writes to it need an explicit decision. The package
-// states facts and leaves the verdict to the caller, because the rules differ per write
-// (editing a link aggregation group tolerates the ports of that group, a VLAN edit does
-// not).
+// management path or the uplink, so writes to it need an explicit decision.
+//
+// CheckPorts applies the one rule every front end shares to the ports a write names: each
+// must exist, have no link and belong to no LAG (an edit of a LAG tolerates the members of
+// that group, through PortRule). The first offender comes back as a *PortUseError; branch on
+// its Reason and word the refusal, and the way to proceed, for your users. Whether to run the
+// check at all (an opt-in such as allow_disruptive) stays with the caller.
 //
 // # Stability
 //

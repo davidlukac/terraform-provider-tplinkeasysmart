@@ -251,7 +251,7 @@ func TestAccVLAN8021QGroupGuardBlocksUsedPorts(t *testing.T) {
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
 			{Config: groupConfig8021Q(20, "  untagged_ports = [4]\n"), ExpectError: regexp.MustCompile(`port 4 has a link up`)},
-			{Config: groupConfig8021Q(20, "  tagged_ports = [1]\n"), ExpectError: regexp.MustCompile(`port 1 is a member of LAG1`)},
+			{Config: groupConfig8021Q(20, "  tagged_ports = [1]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
 			{Config: groupConfig8021Q(20, "  untagged_ports = [6, 8]\n"), ExpectError: regexp.MustCompile(`port 8 has a link up`)},
 			// VLAN 1 holds every port, linked ones included
 			{Config: groupConfig8021Q(1, "  name = \"Default\"\n  untagged_ports = [3, 5]\n"), ExpectError: regexp.MustCompile(`has a link up|member of LAG`)},
@@ -596,7 +596,7 @@ func TestAccVLAN8021QPVIDRefusals(t *testing.T) {
 			ProtoV6ProviderFactories: factories(f),
 			Steps: []resource.TestStep{
 				{Config: pvidConfig(4, 20, ""), ExpectError: regexp.MustCompile(`port 4 has a link up`)},
-				{Config: pvidConfig(1, 20, ""), ExpectError: regexp.MustCompile(`port 1 is a member of LAG1`)},
+				{Config: pvidConfig(1, 20, ""), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
 			},
 		})
 		if err := expectPVID(f, 4, 1); err != nil {

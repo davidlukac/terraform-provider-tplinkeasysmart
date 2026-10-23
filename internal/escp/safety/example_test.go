@@ -56,3 +56,26 @@ func ExampleUseOf() {
 	// port 7: exists=true link=false lag=false
 	// port 9: exists=false link=false lag=false
 }
+
+// CheckPorts names the first port a write should not touch; the caller words the refusal.
+func ExampleCheckPorts() {
+	ports := []escp.Port{
+		{ID: 1, ActualSpeed: escp.Speed1000Full, LAG: 1},
+		{ID: 2, ActualSpeed: escp.SpeedLinkDown, LAG: 1},
+		{ID: 7, ActualSpeed: escp.SpeedLinkDown},
+	}
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{}, 7))
+	err := safety.CheckPorts(ports, safety.PortRule{}, 7, 2)
+	var used *safety.PortUseError
+	if errors.As(err, &used) && used.Reason == safety.PortInLAG {
+		fmt.Printf("port %d is in LAG %d\n", used.Port, used.LAG)
+	}
+	// Editing LAG 1 itself tolerates its idle members, but never a link.
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, 2))
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, 1))
+	// Output:
+	// <nil>
+	// port 2 is in LAG 1
+	// <nil>
+	// port 1 has a link up (1000Mbps-full)
+}

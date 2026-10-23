@@ -269,7 +269,7 @@ func TestGuardedResourcesRefuseUsedPortsWithoutWriting(t *testing.T) {
 		fake            func() *fakeClient
 	}{
 		{"port on a linked port", portConfig(4, "  enabled = false\n"), `has a link up`, func() *fakeClient { return &fakeClient{ports: testPorts()} }},
-		{"bandwidth on a LAG member", bwConfig(1, "  ingress_kbps = 64\n"), `member of LAG1`, func() *fakeClient { return &fakeClient{ports: testPorts(), bw: map[int][2]int{}} }},
+		{"bandwidth on a LAG member with a link", bwConfig(1, "  ingress_kbps = 64\n"), `port 1 has a link up`, func() *fakeClient { return &fakeClient{ports: testPorts(), bw: map[int][2]int{}} }},
 		{"storm on a linked port", stormConfig(4, "  broadcast = true\n  rate_kbps = 64\n"), `has a link up`, func() *fakeClient { return &fakeClient{ports: testPorts(), storm: map[int]escp.PortStorm{}} }},
 		{"mirror destination on a linked port", mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [7]\n"), `has a link up`, func() *fakeClient { return &fakeClient{ports: testPorts(), mirror: &escp.Mirror{}} }},
 	}

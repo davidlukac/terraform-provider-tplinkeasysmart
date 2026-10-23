@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -29,15 +30,15 @@ func guardPorts(ctx context.Context, c portLister, allowDisruptive bool, ports .
 	if err != nil {
 		return fmt.Errorf("cannot check whether the port is in use: %w", err)
 	}
-	for _, want := range ports {
-		use := safety.UseOf(all, want)
-		switch {
-		case !use.Exists:
-			return fmt.Errorf("port %d does not exist on this switch", want)
-		case use.InLAG():
-			return fmt.Errorf("port %d is a member of LAG%d; set allow_disruptive = true to change it anyway", want, use.LAG)
-		case use.LinkUp():
-			return fmt.Errorf("port %d has a link up (%s) and may carry traffic or management access; set allow_disruptive = true to change it anyway", want, use.Speed)
+	var used *safety.PortUseError
+	if errors.As(safety.CheckPorts(all, safety.PortRule{}, ports...), &used) {
+		switch used.Reason {
+		case safety.PortMissing:
+			return errors.New(used.Error())
+		case safety.PortLinkUp:
+			return fmt.Errorf("port %d has a link up (%s) and may carry traffic or management access; set allow_disruptive = true to change it anyway", used.Port, used.Speed)
+		default:
+			return fmt.Errorf("port %d is a member of LAG%d; set allow_disruptive = true to change it anyway", used.Port, used.LAG)
 		}
 	}
 	return nil
