@@ -115,11 +115,11 @@ func (w *faultyClient) System(ctx context.Context) (escp.System, error) {
 	return w.SwitchClient.System(ctx)
 }
 
-func (w *faultyClient) GetLED(ctx context.Context) (bool, error) {
-	if err := w.check("GetLED"); err != nil {
+func (w *faultyClient) LED(ctx context.Context) (bool, error) {
+	if err := w.check("LED"); err != nil {
 		return false, err
 	}
-	return w.SwitchClient.GetLED(ctx)
+	return w.SwitchClient.LED(ctx)
 }
 
 func (w *faultyClient) SetLED(ctx context.Context, on bool) error {
@@ -206,11 +206,11 @@ func (w *faultyClient) SetPortBasedVLAN(ctx context.Context, id int, ports []int
 	return w.write("SetPortBasedVLAN", func() error { return w.SwitchClient.SetPortBasedVLAN(ctx, id, ports) })
 }
 
-func (w *faultyClient) VLAN8021Q(ctx context.Context) (escp.Dot1Q, error) {
-	if err := w.check("VLAN8021Q"); err != nil {
+func (w *faultyClient) Dot1Q(ctx context.Context) (escp.Dot1Q, error) {
+	if err := w.check("Dot1Q"); err != nil {
 		return escp.Dot1Q{}, err
 	}
-	return w.SwitchClient.VLAN8021Q(ctx)
+	return w.SwitchClient.Dot1Q(ctx)
 }
 
 func (w *faultyClient) QoS(ctx context.Context) (escp.QoS, error) {

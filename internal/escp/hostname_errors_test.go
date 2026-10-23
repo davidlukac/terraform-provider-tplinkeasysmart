@@ -49,7 +49,7 @@ func TestSetHostnameRejectsWrongCredentials(t *testing.T) {
 func TestSendFailureOnClosedSocketAffectsReadsAndBackup(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
-	if _, err := c.GetLED(context.Background()); err != nil { // opens the socket and establishes the session
+	if _, err := c.LED(context.Background()); err != nil { // opens the socket and establishes the session
 		t.Fatal(err)
 	}
 	if err := c.conn.Close(); err != nil {

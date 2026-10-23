@@ -11,11 +11,19 @@
 // Where something outside the code depends on a spelling (the names of Speed and QoSMode
 // values are part of the provider's Terraform state), the doc comment of that name says so.
 //
+// # Naming
+//
+// A field that holds a port number is named for what the record is. A record that is a
+// port (Port, PortConfig, PortStats) calls it ID; a record that refers to a port (PortBandwidth,
+// PortStorm, StormConfig, PortPVID, PortPriority) calls it Port; a port with a role in
+// the record is named for the role (MTUVLAN.UplinkPort, Mirror.MirrorPort). Readers are
+// named for what they return (Ports, QoS, LED, Dot1Q), writers Set... and Delete....
+//
 // # Using a client
 //
 // Dial prepares a Client for one switch; nothing is sent to it until the first call.
-// Reads (Ports, VLAN8021Q, QoS and the rest) cannot change the switch. Writes are the
-// methods named Set... and Delete...:
+// Reads (Ports, Dot1Q, QoS and the rest; named for what they return) cannot change the
+// switch. Writes are the methods named Set... and Delete...:
 //
 //	c, err := escp.Dial(escp.Config{Host: "192.168.77.11", Username: "admin", Password: pw})
 //	if err != nil { ... }

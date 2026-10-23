@@ -21,7 +21,7 @@ func TestDataSourcesReportASwitchThatCannotBeRead(t *testing.T) {
 		{"tplinkeasysmart_port_mirror", "PortMirror", "Reading port mirror failed"},
 		{"tplinkeasysmart_vlan_mtu", "MTUVLAN", "Reading MTU VLAN failed"},
 		{"tplinkeasysmart_vlan_port_based", "PortBasedVLAN", "Reading port-based VLAN failed"},
-		{"tplinkeasysmart_vlan_8021q", "VLAN8021Q", "Reading 802.1Q VLAN failed"},
+		{"tplinkeasysmart_vlan_8021q", "Dot1Q", "Reading 802.1Q VLAN failed"},
 		{"tplinkeasysmart_qos", "QoS", "Reading QoS failed"},
 		{"tplinkeasysmart_bandwidth_control", "Bandwidth", "Reading bandwidth control failed"},
 		{"tplinkeasysmart_storm_control", "StormControl", "Reading storm control failed"},

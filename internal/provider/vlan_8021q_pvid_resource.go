@@ -34,7 +34,7 @@ type vlan8021QPVIDResource struct {
 
 // vlan8021QPVIDClient is the part of the switch API this resource needs.
 type vlan8021QPVIDClient interface {
-	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
+	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
 	SetPVIDs(ctx context.Context, pvids map[int]int) error
 	Ports(ctx context.Context) ([]escp.Port, error)
 }
@@ -78,7 +78,7 @@ func (r *vlan8021QPVIDResource) Configure(_ context.Context, req resource.Config
 
 // state reads the 802.1Q state; the mode must be active, because the switch does not apply PVIDs otherwise.
 func (r *vlan8021QPVIDResource) state(ctx context.Context) (escp.Dot1Q, error) {
-	q, err := r.client.VLAN8021Q(ctx)
+	q, err := r.client.Dot1Q(ctx)
 	if err != nil {
 		return q, err
 	}
@@ -181,7 +181,7 @@ func (r *vlan8021QPVIDResource) deleteBound(ctx context.Context, req resource.De
 		return
 	}
 	port := int(state.Port.ValueInt64())
-	q, err := r.client.VLAN8021Q(ctx)
+	q, err := r.client.Dot1Q(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading the 802.1Q state failed", err.Error())
 		return

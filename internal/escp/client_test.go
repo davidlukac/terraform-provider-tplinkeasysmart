@@ -47,14 +47,14 @@ func TestLEDRoundTrip(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	on, err := c.GetLED(ctx)
+	on, err := c.LED(ctx)
 	if err != nil || !on {
-		t.Fatalf("GetLED = %v, %v; want true", on, err)
+		t.Fatalf("LED = %v, %v; want true", on, err)
 	}
 	if err := c.SetLED(ctx, false); err != nil {
 		t.Fatal(err)
 	}
-	if on, _ := c.GetLED(ctx); on {
+	if on, _ := c.LED(ctx); on {
 		t.Fatal("LED should be off")
 	}
 	if err := c.SetLED(ctx, true); err != nil {
@@ -99,11 +99,11 @@ func TestSessionRecoversAfterSwitchRestart(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	if _, err := c.GetLED(ctx); err != nil {
+	if _, err := c.LED(ctx); err != nil {
 		t.Fatal(err)
 	}
 	f.ClearSession() // the switch forgets the session key
-	if _, err := c.GetLED(ctx); err != nil {
+	if _, err := c.LED(ctx); err != nil {
 		t.Fatalf("client should re-establish the session: %v", err)
 	}
 }

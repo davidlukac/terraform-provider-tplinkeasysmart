@@ -50,8 +50,8 @@ func faultScenarios() []faultScenario {
 			fake:   func() *fakeClient { return &fakeClient{led: true} },
 			create: ledConfig("false"), update: ledConfig("true"),
 			writeMethod: "SetLED", writeErr: "Setting LED failed",
-			backMethod: "GetLED", backCall: 1, backErr: "Reading LED back failed", noChgEr: "LED state did not change",
-			readMethod: "GetLED", readErr: "Reading LED failed",
+			backMethod: "LED", backCall: 1, backErr: "Reading LED back failed", noChgEr: "LED state did not change",
+			readMethod: "LED", readErr: "Reading LED failed",
 			importBad: "nope", importErr: "only valid id",
 		},
 		{

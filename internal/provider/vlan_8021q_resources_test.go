@@ -158,10 +158,10 @@ func TestAccVLANModeReportsFailures(t *testing.T) {
 	}{
 		{"mode read fails", func(w *faultyClient) { w.failAlways("PortBasedVLAN") }, `Reading the VLAN mode failed`},
 		{"mtu read fails", func(w *faultyClient) { w.failAlways("MTUVLAN") }, `Reading the VLAN mode failed`},
-		{"802.1Q read fails", func(w *faultyClient) { w.failAlways("VLAN8021Q") }, `Reading the VLAN mode failed`},
+		{"802.1Q read fails", func(w *faultyClient) { w.failAlways("Dot1Q") }, `Reading the VLAN mode failed`},
 		{"write fails", func(w *faultyClient) { w.failAlways("SetVLAN8021QMode") }, `Setting the VLAN mode failed`},
 		{"write is accepted but ignored", func(w *faultyClient) { w.ignoreOnly("SetVLAN8021QMode") }, `did not change as requested`},
-		{"read back fails", func(w *faultyClient) { w.failCalls("VLAN8021Q", 2, 0) }, `did not change as requested`},
+		{"read back fails", func(w *faultyClient) { w.failCalls("Dot1Q", 2, 0) }, `did not change as requested`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -412,11 +412,11 @@ func TestAccVLAN8021QGroupReportsFailures(t *testing.T) {
 		setup func(w *faultyClient)
 		want  string
 	}{
-		{"table read fails", func(w *faultyClient) { w.failAlways("VLAN8021Q") }, `Reading the 802.1Q VLANs failed`},
+		{"table read fails", func(w *faultyClient) { w.failAlways("Dot1Q") }, `Reading the 802.1Q VLANs failed`},
 		{"ports read fails", func(w *faultyClient) { w.failAlways("Ports") }, `cannot check whether the ports are in use|Refusing to change the 802.1Q VLAN`},
 		{"write fails", func(w *faultyClient) { w.failAlways("SetVLAN8021Q") }, `Setting the 802.1Q VLAN failed`},
 		{"write is accepted but ignored", func(w *faultyClient) { w.ignoreOnly("SetVLAN8021Q") }, `did not change as requested`},
-		{"read back fails", func(w *faultyClient) { w.failCalls("VLAN8021Q", 2, 0) }, `did not change as requested`},
+		{"read back fails", func(w *faultyClient) { w.failCalls("Dot1Q", 2, 0) }, `did not change as requested`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -467,7 +467,7 @@ func TestAccVLAN8021QGroupDeleteFailures(t *testing.T) {
 			Steps: []resource.TestStep{
 				{Config: cfg},
 				// the refresh before the destroy is the first read; the destroy itself is the second
-				{PreConfig: func() { w.heal(); w.failCalls("VLAN8021Q", 2, 2) }, Config: providerBlock, ExpectError: regexp.MustCompile(`Reading the 802.1Q VLANs failed`)},
+				{PreConfig: func() { w.heal(); w.failCalls("Dot1Q", 2, 2) }, Config: providerBlock, ExpectError: regexp.MustCompile(`Reading the 802.1Q VLANs failed`)},
 				{PreConfig: w.heal, Config: providerBlock},
 			},
 		})
@@ -479,7 +479,7 @@ func TestAccVLAN8021QGroupDeleteFailures(t *testing.T) {
 			ProtoV6ProviderFactories: factories(w),
 			Steps: []resource.TestStep{
 				{Config: cfg},
-				{PreConfig: func() { w.heal(); w.failAlways("VLAN8021Q") }, Config: cfg, PlanOnly: true, ExpectError: regexp.MustCompile(`Reading the 802.1Q VLANs failed`)},
+				{PreConfig: func() { w.heal(); w.failAlways("Dot1Q") }, Config: cfg, PlanOnly: true, ExpectError: regexp.MustCompile(`Reading the 802.1Q VLANs failed`)},
 				{PreConfig: w.heal, Config: providerBlock},
 			},
 		})
@@ -733,10 +733,10 @@ func TestAccVLAN8021QPVIDReportsFailures(t *testing.T) {
 		setup func(w *faultyClient)
 		want  string
 	}{
-		{"state read fails", func(w *faultyClient) { w.failAlways("VLAN8021Q") }, `Reading the 802.1Q state failed`},
+		{"state read fails", func(w *faultyClient) { w.failAlways("Dot1Q") }, `Reading the 802.1Q state failed`},
 		{"write fails", func(w *faultyClient) { w.failAlways("SetPVIDs") }, `Setting the PVID failed`},
 		{"write is accepted but ignored", func(w *faultyClient) { w.ignoreOnly("SetPVIDs") }, `did not change as requested`},
-		{"read back fails", func(w *faultyClient) { w.failCalls("VLAN8021Q", 2, 0) }, `did not change as requested`},
+		{"read back fails", func(w *faultyClient) { w.failCalls("Dot1Q", 2, 0) }, `did not change as requested`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -760,7 +760,7 @@ func TestAccVLAN8021QPVIDDestroyFailures(t *testing.T) {
 			Steps: []resource.TestStep{
 				{Config: pvidConfig(5, 20, "")},
 				// the refresh before the destroy is the first read; the destroy itself is the second
-				{PreConfig: func() { w.heal(); w.failCalls("VLAN8021Q", 2, 2) }, Config: providerBlock, ExpectError: regexp.MustCompile(`Reading the 802.1Q state failed`)},
+				{PreConfig: func() { w.heal(); w.failCalls("Dot1Q", 2, 2) }, Config: providerBlock, ExpectError: regexp.MustCompile(`Reading the 802.1Q state failed`)},
 				{PreConfig: w.heal, Config: providerBlock},
 			},
 		})
@@ -772,7 +772,7 @@ func TestAccVLAN8021QPVIDDestroyFailures(t *testing.T) {
 			ProtoV6ProviderFactories: factories(w),
 			Steps: []resource.TestStep{
 				{Config: pvidConfig(5, 20, "")},
-				{PreConfig: func() { w.heal(); w.failAlways("VLAN8021Q") }, Config: pvidConfig(5, 20, ""), PlanOnly: true, ExpectError: regexp.MustCompile(`Reading the 802.1Q state failed`)},
+				{PreConfig: func() { w.heal(); w.failAlways("Dot1Q") }, Config: pvidConfig(5, 20, ""), PlanOnly: true, ExpectError: regexp.MustCompile(`Reading the 802.1Q state failed`)},
 				{PreConfig: w.heal, Config: providerBlock},
 			},
 		})
