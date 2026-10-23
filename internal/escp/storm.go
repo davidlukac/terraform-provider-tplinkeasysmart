@@ -91,5 +91,5 @@ func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
 	v[stormOffEnabled] = boolByte(any)
 	v[stormOffUnknownUnicast], v[stormOffMulticast], v[stormOffBroadcast] = boolByte(cfg.UnknownUnicast), boolByte(cfg.Multicast), boolByte(cfg.Broadcast)
 	binary.BigEndian.PutUint32(v[stormOffRate:], uint32(cfg.RateKbps))
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVStormControl, Value: v})
+	return c.setTLVs(ctx, Operation{Name: "SetStormControl", Ports: []int{cfg.Port}, Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVStormControl, Value: v})
 }

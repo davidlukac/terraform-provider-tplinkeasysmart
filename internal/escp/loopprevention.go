@@ -29,5 +29,5 @@ func parseLoopPrevention(tlvs []wire.TLV) (bool, error) {
 // detects a cabling loop, which can flood the network; turning it on is the safe direction.
 // Toggling it was verified on a live switch without interrupting traffic.
 func (c *Client) SetLoopPrevention(ctx context.Context, on bool) error {
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVLoopPrevention, Value: []byte{boolByte(on)}})
+	return c.setTLVs(ctx, Operation{Name: "SetLoopPrevention", Impact: ImpactManagement}, wire.TLV{Type: wire.TLVLoopPrevention, Value: []byte{boolByte(on)}})
 }

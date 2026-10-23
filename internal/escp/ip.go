@@ -116,7 +116,7 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	c.mu.Lock()
 	c.alsoFrom = cfg.IP.To4()
 	c.mu.Unlock()
-	err = c.writeSystem(ctx, info.Hostname, info.DHCP, cfg)
+	err = c.writeSystem(ctx, Operation{Name: "SetIPConfig", Impact: ImpactManagement}, info.Hostname, info.DHCP, cfg)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if errors.Is(err, ErrNoReply) {

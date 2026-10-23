@@ -101,7 +101,7 @@ type firmwareGate struct {
 	verified bool
 }
 
-func (g *firmwareGate) check(ctx context.Context, sw escp.InfoReader) error {
+func (g *firmwareGate) check(ctx context.Context, sw escp.InfoReader, _ escp.Operation) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.verified {

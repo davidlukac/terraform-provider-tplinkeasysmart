@@ -77,5 +77,5 @@ func (c *Client) SetPortBasedVLAN(ctx context.Context, id int, ports []int) erro
 	if err := c.requirePorts(ctx, ports...); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(id)}, mask...)})
+	return c.setTLVs(ctx, Operation{Name: "SetPortBasedVLAN", Ports: ports, Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(id)}, mask...)})
 }

@@ -106,10 +106,11 @@ func (c *Client) SetVLAN8021Q(ctx context.Context, v VLAN8021Q) error {
 	if err != nil {
 		return err
 	}
-	if err := c.requirePorts(ctx, append(append([]int{}, v.Tagged...), v.Untagged...)...); err != nil {
+	members := append(append([]int{}, v.Tagged...), v.Untagged...)
+	if err := c.requirePorts(ctx, members...); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: value})
+	return c.setTLVs(ctx, Operation{Name: "SetVLAN8021Q", Ports: members, Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: value})
 }
 
 // DeleteVLAN8021Q removes an 802.1Q VLAN: TLV 8705 with both masks empty and an
@@ -119,7 +120,7 @@ func (c *Client) DeleteVLAN8021Q(ctx context.Context, id int) error {
 		return err
 	}
 	empty := make([]byte, maskLen)
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
+	return c.setTLVs(ctx, Operation{Name: "DeleteVLAN8021Q", Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
 }
 
 // SetPVIDs sets the default VLAN of the given ports (port -> pvid): one TLV
@@ -148,5 +149,5 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids map[int]int) error {
 		value := binary.BigEndian.AppendUint16([]byte{byte(p)}, uint16(pvids[p])) //nolint:gosec // bounded by the validation above
 		tlvs = append(tlvs, wire.TLV{Type: wire.TLVVLAN8021QPVID, Value: value})
 	}
-	return c.setTLVs(ctx, tlvs...)
+	return c.setTLVs(ctx, Operation{Name: "SetPVIDs", Ports: ports, Impact: ImpactManagement}, tlvs...)
 }

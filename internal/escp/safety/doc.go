@@ -16,6 +16,18 @@
 // A front end that offers an opt-in leaves the gate out (a nil WriteGate gates nothing).
 // A refusal is a *FirmwareError; branch on its Reason and word the message for your users.
 //
+// # What the write is
+//
+// A gate is also told the operation: the client method, the ports it names and its Impact
+// (cosmetic, traffic or management: the worst the method can do, not a judgement of one
+// particular write). MaxImpact refuses above a class with an *ImpactError, and DryRun
+// records the operations a front end would perform and refuses them all with ErrDryRun, so
+// a "--dry-run" is a gate and not a second code path. Chain combines gates; put the dry
+// run last so it only sees what the others allowed:
+//
+//	dry := safety.NewDryRun()
+//	gate := safety.Chain(safety.FirmwareGate(), safety.MaxImpact(escp.ImpactTraffic), dry.Gate())
+//
 // # Ports
 //
 // UseOf turns a reading of the ports into facts about one port: does it exist, does it

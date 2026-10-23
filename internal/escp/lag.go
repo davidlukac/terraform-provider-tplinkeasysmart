@@ -137,7 +137,7 @@ func (c *Client) SetLAG(ctx context.Context, group int, ports []int) error {
 	if err := c.requirePorts(ctx, ports...); err != nil {
 		return err
 	}
-	return nameRefusal(c.setTLVs(ctx, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(group)}, mask...)}), lagRefusals)
+	return nameRefusal(c.setTLVs(ctx, Operation{Name: "SetLAG", Ports: ports, Impact: ImpactManagement}, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(group)}, mask...)}), lagRefusals)
 }
 
 // nameRefusal adds the reason to a *RejectedError whose code is in reasons; any other

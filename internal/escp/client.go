@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -127,13 +128,16 @@ type InfoReader interface {
 
 // WriteGate decides whether the client may send a write to the switch. Every
 // method that changes the switch (each Set* and Delete*) calls it first, with
-// the client itself, and sends nothing when it returns an error: the method
-// returns that error unchanged. A gate may read from the switch through sw but
-// must never write, and must be safe for concurrent use. Reads are never gated.
+// the client itself and a description of the write (its method, the ports it
+// names and its Impact), and sends nothing when it returns an error: the
+// method returns that error unchanged. A gate may read from the switch through
+// sw but must never write, and must be safe for concurrent use. Reads are
+// never gated.
 //
-// A method that sends several writes consults the gate before each of them, so
-// a gate that is expensive should remember its verdict.
-type WriteGate func(ctx context.Context, sw InfoReader) error
+// A method that sends several writes consults the gate before each of them
+// with the same operation, so a gate that is expensive should remember its
+// verdict.
+type WriteGate func(ctx context.Context, sw InfoReader, op Operation) error
 
 // Info is what a discovery reply reports about the switch.
 type Info struct {
@@ -539,7 +543,7 @@ func (c *Client) LED(ctx context.Context) (bool, error) {
 // SetLED switches the LEDs on or off. It is cosmetic: it does not touch traffic or
 // configuration, and it is the one write that is safe to try on any switch.
 func (c *Client) SetLED(ctx context.Context, on bool) error {
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVLED, Value: []byte{boolByte(on)}})
+	return c.setTLVs(ctx, Operation{Name: "SetLED", Impact: ImpactCosmetic}, wire.TLV{Type: wire.TLVLED, Value: []byte{boolByte(on)}})
 }
 
 func boolByte(b bool) byte {
@@ -552,10 +556,12 @@ func boolByte(b bool) byte {
 // setTLVs sends a SET carrying the credentials plus the given settings. It is
 // the only place where the client writes, so the write gate sits here: no
 // setting can be added without passing it. The gate runs before the lock is
-// taken because it reads through the client.
-func (c *Client) setTLVs(ctx context.Context, tlvs ...wire.TLV) error {
+// taken because it reads through the client. op describes the write to the gate
+// (the gate gets a copy of its ports).
+func (c *Client) setTLVs(ctx context.Context, op Operation, tlvs ...wire.TLV) error {
 	if gate := c.cfg.WriteGate; gate != nil {
-		if err := gate(ctx, c); err != nil {
+		op.Ports = slices.Clone(op.Ports)
+		if err := gate(ctx, c, op); err != nil {
 			return err
 		}
 	}

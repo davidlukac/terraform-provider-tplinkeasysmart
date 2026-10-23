@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
@@ -113,7 +114,7 @@ func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error {
 	if !mode.Valid() {
 		return invalidf("escp: invalid QoS mode %d (valid: 0, 1, 2)", int(mode))
 	}
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
+	return c.setTLVs(ctx, Operation{Name: "SetQoSMode", Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
 }
 
 // SetPortPriorities changes the priority of the given ports (port -> priority). Every port
@@ -140,9 +141,14 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes map[int]Priority
 		}
 		prio[port] = v
 	}
+	named := make([]int, 0, len(changes))
+	for port := range changes {
+		named = append(named, port)
+	}
+	sort.Ints(named)
 	tlvs := make([]wire.TLV, 0, len(prio))
 	for _, p := range cur.Priorities { // keep the switch's port order
 		tlvs = append(tlvs, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p.Port), byte(prio[p.Port] - PriorityLowest)}})
 	}
-	return c.setTLVs(ctx, tlvs...)
+	return c.setTLVs(ctx, Operation{Name: "SetPortPriorities", Ports: named, Impact: ImpactTraffic}, tlvs...)
 }
