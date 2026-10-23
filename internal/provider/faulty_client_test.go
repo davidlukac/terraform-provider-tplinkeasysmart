@@ -250,16 +250,15 @@ func (w *faultyClient) SetStormControl(ctx context.Context, cfg escp.StormConfig
 	return w.write("SetStormControl", func() error { return w.SwitchClient.SetStormControl(ctx, cfg) })
 }
 
-func (w *faultyClient) SetMTUVLAN(ctx context.Context, v escp.MTUVLAN) error {
-	return w.write("SetMTUVLAN", func() error { return w.SwitchClient.SetMTUVLAN(ctx, v) })
+func (w *faultyClient) VLANMode(ctx context.Context) (escp.VLANModeSetting, error) {
+	if err := w.check("VLANMode"); err != nil {
+		return escp.VLANModeSetting{}, err
+	}
+	return w.SwitchClient.VLANMode(ctx)
 }
 
-func (w *faultyClient) SetPortBasedVLANMode(ctx context.Context, enabled bool) error {
-	return w.write("SetPortBasedVLANMode", func() error { return w.SwitchClient.SetPortBasedVLANMode(ctx, enabled) })
-}
-
-func (w *faultyClient) SetVLAN8021QMode(ctx context.Context, enabled bool) error {
-	return w.write("SetVLAN8021QMode", func() error { return w.SwitchClient.SetVLAN8021QMode(ctx, enabled) })
+func (w *faultyClient) SetVLANMode(ctx context.Context, s escp.VLANModeSetting) error {
+	return w.write("SetVLANMode", func() error { return w.SwitchClient.SetVLANMode(ctx, s) })
 }
 
 func (w *faultyClient) SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error {

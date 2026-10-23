@@ -44,12 +44,10 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 	"SetVLAN8021Q": func(ctx context.Context, c *Client) error {
 		return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 10, Name: "test", Untagged: []int{2}})
 	},
-	"DeleteVLAN8021Q":      func(ctx context.Context, c *Client) error { return c.DeleteVLAN8021Q(ctx, 10) },
-	"SetPVIDs":             func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, map[int]int{2: 1}) },
-	"SetVLAN8021QMode":     func(ctx context.Context, c *Client) error { return c.SetVLAN8021QMode(ctx, true) },
-	"SetPortBasedVLANMode": func(ctx context.Context, c *Client) error { return c.SetPortBasedVLANMode(ctx, true) },
-	"SetMTUVLAN": func(ctx context.Context, c *Client) error {
-		return c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 8})
+	"DeleteVLAN8021Q": func(ctx context.Context, c *Client) error { return c.DeleteVLAN8021Q(ctx, 10) },
+	"SetPVIDs":        func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, map[int]int{2: 1}) },
+	"SetVLANMode": func(ctx context.Context, c *Client) error {
+		return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 8})
 	},
 	"SetPortBasedVLAN": func(ctx context.Context, c *Client) error { return c.SetPortBasedVLAN(ctx, 2, []int{3, 4}) },
 	"SetIPConfig": func(ctx context.Context, c *Client) error {
@@ -71,7 +69,7 @@ func writeMethodNames() []string {
 
 func TestEveryWriteMethodIsInTheGateTable(t *testing.T) {
 	names := writeMethodNames()
-	if len(names) < 19 {
+	if len(names) < 17 { // a floor against a broken scan, not a count of the writers
 		t.Fatalf("found only %d write methods by reflection; the scan is broken", len(names))
 	}
 	for _, n := range names {

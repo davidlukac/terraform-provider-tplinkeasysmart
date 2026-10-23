@@ -89,13 +89,6 @@ func (g *gatedClient) SetPortMirror(ctx context.Context, m escp.Mirror) error {
 	return g.SwitchClient.SetPortMirror(ctx, m)
 }
 
-func (g *gatedClient) SetMTUVLAN(ctx context.Context, v escp.MTUVLAN) error {
-	if err := g.allow(ctx); err != nil {
-		return err
-	}
-	return g.SwitchClient.SetMTUVLAN(ctx, v)
-}
-
 func (g *gatedClient) SetPortBasedVLAN(ctx context.Context, id int, ports []int) error {
 	if err := g.allow(ctx); err != nil {
 		return err
@@ -103,18 +96,11 @@ func (g *gatedClient) SetPortBasedVLAN(ctx context.Context, id int, ports []int)
 	return g.SwitchClient.SetPortBasedVLAN(ctx, id, ports)
 }
 
-func (g *gatedClient) SetPortBasedVLANMode(ctx context.Context, enabled bool) error {
+func (g *gatedClient) SetVLANMode(ctx context.Context, s escp.VLANModeSetting) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
-	return g.SwitchClient.SetPortBasedVLANMode(ctx, enabled)
-}
-
-func (g *gatedClient) SetVLAN8021QMode(ctx context.Context, enabled bool) error {
-	if err := g.allow(ctx); err != nil {
-		return err
-	}
-	return g.SwitchClient.SetVLAN8021QMode(ctx, enabled)
+	return g.SwitchClient.SetVLANMode(ctx, s)
 }
 
 func (g *gatedClient) SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error {
@@ -210,7 +196,7 @@ func TestGatedTestClientCoversEveryWriteMethod(t *testing.T) {
 			}
 		})
 	}
-	if checked < 18 {
+	if checked < 16 { // a floor against a broken scan, not a count of the writers
 		t.Fatalf("found only %d write methods; the interface scan is broken", checked)
 	}
 }

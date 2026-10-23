@@ -629,7 +629,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 				}
 			}
 		}
-		if err := c.SetPortBasedVLANMode(ctx, true); err != nil {
+		if err := c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModePortBased}); err != nil {
 			t.Errorf("RESTORE FAILED: port-based mode: %v", err)
 		}
 		mtu, pb, q := vlanModes(t, c)
@@ -640,7 +640,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 	}
 	defer restore()
 
-	if err := c.SetVLAN8021QMode(ctx, true); err != nil {
+	if err := c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeDot1Q}); err != nil {
 		t.Fatal(err)
 	}
 	mtu, pb, q := vlanModes(t, c)

@@ -24,9 +24,6 @@ const (
 
 	// pvidEntryLen is a PVID entry (TLV 8706): port (1 byte), pvid (2 bytes).
 	pvidEntryLen = 3
-
-	// mtuDisabledUplink is the uplink port sent when the MTU VLAN is switched off (the switch reports 1 then).
-	mtuDisabledUplink = 1
 )
 
 // VLANNamePattern is what a VLAN name may consist of (see ValidateVLANName).
@@ -152,36 +149,4 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids map[int]int) error {
 		tlvs = append(tlvs, wire.TLV{Type: wire.TLVVLAN8021QPVID, Value: value})
 	}
 	return c.setTLVs(ctx, tlvs...)
-}
-
-// SetVLAN8021QMode switches the 802.1Q VLAN mode on or off: TLV 8704. The
-// vendor utility warns that the VLAN modes are mutually exclusive, so turning
-// it on discards the settings of the other modes. Callers must guard.
-func (c *Client) SetVLAN8021QMode(ctx context.Context, enabled bool) error {
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLAN8021Q, Value: []byte{boolByte(enabled)}})
-}
-
-// SetPortBasedVLANMode switches the port-based VLAN mode on or off: TLV 8448.
-// Same warning as SetVLAN8021QMode.
-func (c *Client) SetPortBasedVLANMode(ctx context.Context, enabled bool) error {
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLANPortBased, Value: []byte{boolByte(enabled)}})
-}
-
-// SetMTUVLAN switches the MTU VLAN mode on or off: TLV 8192 with the enabled
-// flag and the uplink port (the same type MTUVLAN reads; with the mode off the uplink
-// is ignored and 1 is sent, like the vendor utility). With the mode on, every port can
-// only talk to the uplink port. Same warning as SetVLAN8021QMode.
-func (c *Client) SetMTUVLAN(ctx context.Context, v MTUVLAN) error {
-	if !v.Enabled {
-		v.UplinkPort = mtuDisabledUplink
-	}
-	if err := ValidatePort(v.UplinkPort); err != nil {
-		return err
-	}
-	if v.Enabled { // port 1, sent when the mode is off, exists on every switch
-		if err := c.requirePorts(ctx, v.UplinkPort); err != nil {
-			return err
-		}
-	}
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{boolByte(v.Enabled), byte(v.UplinkPort)}})
 }
