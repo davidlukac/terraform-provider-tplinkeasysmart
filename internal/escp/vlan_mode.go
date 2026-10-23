@@ -103,5 +103,9 @@ func (c *Client) SetVLANMode(ctx context.Context, s VLANModeSetting) error {
 	default: // VLANModeDot1Q: ValidateVLANMode refused every other mode
 		tlv = wire.TLV{Type: wire.TLVVLAN8021Q, Value: []byte{boolByte(true)}}
 	}
-	return c.setTLVs(ctx, tlv)
+	op := Operation{Name: "SetVLANMode", Impact: ImpactManagement}
+	if s.Mode == VLANModeMTU {
+		op.Ports = []int{s.UplinkPort}
+	}
+	return c.setTLVs(ctx, op, tlv)
 }

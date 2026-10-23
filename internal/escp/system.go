@@ -75,13 +75,13 @@ func (c *Client) SetHostname(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	return c.writeSystem(ctx, name, info.DHCP, cur)
+	return c.writeSystem(ctx, Operation{Name: "SetHostname", Impact: ImpactCosmetic}, name, info.DHCP, cur)
 }
 
 // writeSystem sends the System-page SET: device description, DHCP flag and the
 // static address triple. The switch takes all of them in one request.
-func (c *Client) writeSystem(ctx context.Context, name string, dhcp bool, cfg IPConfig) error {
-	return c.setTLVs(ctx,
+func (c *Client) writeSystem(ctx context.Context, op Operation, name string, dhcp bool, cfg IPConfig) error {
+	return c.setTLVs(ctx, op,
 		wire.TLV{Type: wire.TLVHostname, Value: append([]byte(name), 0)},
 		wire.TLV{Type: wire.TLVDHCP, Value: []byte{boolByte(dhcp)}},
 		wire.TLV{Type: wire.TLVIP, Value: cfg.IP.To4()}, wire.TLV{Type: wire.TLVNetmask, Value: cfg.Netmask.To4()}, wire.TLV{Type: wire.TLVGateway, Value: cfg.Gateway.To4()})

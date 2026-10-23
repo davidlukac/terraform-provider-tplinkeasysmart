@@ -161,7 +161,7 @@ func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
 	}
 	entry := make([]byte, portEntryLen)
 	entry[portOffPort], entry[portOffState], entry[portOffCfgSpeed], entry[portOffCfgFlow] = byte(cfg.ID), boolByte(cfg.Enabled), code, boolByte(cfg.FlowControl)
-	return nameRefusal(c.setTLVs(ctx, wire.TLV{Type: wire.TLVPorts, Value: entry}), portRefusals)
+	return nameRefusal(c.setTLVs(ctx, Operation{Name: "SetPort", Ports: []int{cfg.ID}, Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVPorts, Value: entry}), portRefusals)
 }
 
 // portRefusals names the refusals of a port write that were provoked on a real switch

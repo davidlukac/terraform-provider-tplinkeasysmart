@@ -88,5 +88,9 @@ func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
 	} else if m.MirrorPort != 0 || len(m.IngressPorts) != 0 || len(m.EgressPorts) != 0 {
 		return invalidf("escp: a disabled mirror must have no destination or source ports")
 	}
-	return c.setTLVs(ctx, wire.TLV{Type: wire.TLVMirror, Value: v})
+	op := Operation{Name: "SetPortMirror", Impact: ImpactTraffic}
+	if m.Enabled {
+		op.Ports = append(append([]int{m.MirrorPort}, m.IngressPorts...), m.EgressPorts...)
+	}
+	return c.setTLVs(ctx, op, wire.TLV{Type: wire.TLVMirror, Value: v})
 }

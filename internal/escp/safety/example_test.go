@@ -18,10 +18,10 @@ func (f firmware) Info(context.Context) (escp.Info, error) {
 
 // A gate belongs to one switch: it remembers a verified build, so each switch gets its own.
 func ExampleFirmwareGate() {
-	err := safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20230218 Rel.50633"))
+	err := safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20230218 Rel.50633"), escp.Operation{})
 	fmt.Println("verified build:", err)
 
-	err = safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20990101 Rel.1"))
+	err = safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20990101 Rel.1"), escp.Operation{})
 	var refused *safety.FirmwareError
 	if errors.As(err, &refused) && refused.Reason == safety.FirmwareUnverified {
 		fmt.Println("refused build", refused.Build, "- verified:", refused.Verified)
@@ -78,4 +78,33 @@ func ExampleCheckPorts() {
 	// port 2 is in LAG 1
 	// <nil>
 	// port 1 has a link up (1000Mbps-full)
+}
+
+// A dry run records what a front end would write. The gates are chained so that the dry run only
+// sees what the others allowed; the client returns ErrDryRun for every write and sends nothing.
+func ExampleDryRun() {
+	dry := safety.NewDryRun()
+	gate := safety.Chain(safety.MaxImpact(escp.ImpactTraffic), dry.Gate())
+	ctx := context.Background()
+
+	for _, op := range []escp.Operation{
+		{Name: "SetLED", Impact: escp.ImpactCosmetic},
+		{Name: "SetPort", Ports: []int{7}, Impact: escp.ImpactTraffic},
+		{Name: "SetLAG", Ports: []int{5, 6}, Impact: escp.ImpactManagement},
+	} {
+		err := gate(ctx, firmware(""), op)
+		var tooMuch *safety.ImpactError
+		switch {
+		case errors.Is(err, safety.ErrDryRun):
+			fmt.Println("would write:", op.Name)
+		case errors.As(err, &tooMuch):
+			fmt.Println("refused:", tooMuch)
+		}
+	}
+	fmt.Println(len(dry.Operations()), "recorded")
+	// Output:
+	// would write: SetLED
+	// would write: SetPort
+	// refused: SetLAG has impact management, above the allowed traffic
+	// 2 recorded
 }

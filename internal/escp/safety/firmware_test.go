@@ -103,7 +103,7 @@ func TestFirmwareGateAllowsVerifiedBuildsAndReadsTheFirmwareOnce(t *testing.T) {
 		sw := &infoSource{firmware: version}
 		gate := FirmwareGate()
 		for i := 0; i < 3; i++ {
-			if err := gate(context.Background(), sw); err != nil {
+			if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
 				t.Fatalf("%s: %v", version, err)
 			}
 		}
@@ -117,11 +117,11 @@ func TestFirmwareGateRefusesAnUnverifiedBuildAndDoesNotRememberTheRefusal(t *tes
 	sw := &infoSource{firmware: "1.0.0 Build 20990101 Rel.1"}
 	gate := FirmwareGate()
 	var fe *FirmwareError
-	if err := gate(context.Background(), sw); !errors.As(err, &fe) || fe.Reason != FirmwareUnverified || fe.Build != "20990101" {
+	if err := gate(context.Background(), sw, escp.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareUnverified || fe.Build != "20990101" {
 		t.Fatalf("got %v", err)
 	}
 	sw.firmware = "1.0.0 Build 20230218 Rel.50633" // the switch now reports a verified build
-	if err := gate(context.Background(), sw); err != nil {
+	if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
 		t.Fatalf("a refusal must not stick: %v", err)
 	}
 }
@@ -131,19 +131,19 @@ func TestFirmwareGateRefusesWhenTheFirmwareCannotBeRead(t *testing.T) {
 	sw := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633", err: cause}
 	gate := FirmwareGate()
 	var fe *FirmwareError
-	err := gate(context.Background(), sw)
+	err := gate(context.Background(), sw, escp.Operation{})
 	if !errors.As(err, &fe) || fe.Reason != FirmwareUnreadable || !errors.Is(err, cause) || !strings.Contains(err.Error(), "cannot read the firmware version") {
 		t.Fatalf("got %v", err)
 	}
 	sw.err = nil
-	if err := gate(context.Background(), sw); err != nil {
+	if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
 		t.Fatalf("the check is retried once the switch answers: %v", err)
 	}
 }
 
 func TestFirmwareGateRefusesAFirmwareWithoutABuildDate(t *testing.T) {
 	var fe *FirmwareError
-	if err := FirmwareGate()(context.Background(), &infoSource{firmware: "custom"}); !errors.As(err, &fe) || fe.Reason != FirmwareNoBuildDate {
+	if err := FirmwareGate()(context.Background(), &infoSource{firmware: "custom"}, escp.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareNoBuildDate {
 		t.Fatalf("got %v", err)
 	}
 }
@@ -153,10 +153,10 @@ func TestFirmwareGatesDoNotShareState(t *testing.T) {
 	good := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633"}
 	bad := &infoSource{firmware: "1.0.0 Build 20990101 Rel.1"}
 	a, b := FirmwareGate(), FirmwareGate()
-	if err := a(context.Background(), good); err != nil {
+	if err := a(context.Background(), good, escp.Operation{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := b(context.Background(), bad); err == nil {
+	if err := b(context.Background(), bad, escp.Operation{}); err == nil {
 		t.Fatal("the second gate must check its own switch")
 	}
 }

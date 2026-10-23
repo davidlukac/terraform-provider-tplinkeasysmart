@@ -52,9 +52,11 @@
 //
 //  1. The arguments are validated (see the Validate functions) and a bad value is refused
 //     before anything is sent.
-//  2. The Config.WriteGate, if there is one, is consulted. When it refuses, the method
-//     returns the gate's error unchanged and sends nothing at all. The safety package
-//     provides a gate for firmware builds this client was not verified against.
+//  2. The Config.WriteGate, if there is one, is consulted with the write's Operation (the
+//     method, the ports it names and its Impact class). When it refuses, the method returns
+//     the gate's error unchanged and sends nothing at all. The safety package provides gates
+//     for firmware builds this client was not verified against, for a ceiling on the impact,
+//     and for a dry run, and Chain combines them.
 //  3. The write is sent with the credentials, which ride on every SET. If the switch
 //     answers with a non-zero code the error is a *RejectedError (it matches ErrRejected).
 //

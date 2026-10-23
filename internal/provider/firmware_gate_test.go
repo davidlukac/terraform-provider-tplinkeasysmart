@@ -45,7 +45,10 @@ func gated(c SwitchClient, cfg escp.Config) SwitchClient {
 	return &gatedClient{SwitchClient: c, gate: cfg.WriteGate}
 }
 
-func (g *gatedClient) allow(ctx context.Context) error { return g.gate(ctx, g.SwitchClient) }
+// allow consults the gate with no operation: the provider's firmware gate does not look at it.
+func (g *gatedClient) allow(ctx context.Context) error {
+	return g.gate(ctx, g.SwitchClient, escp.Operation{})
+}
 
 func (g *gatedClient) SetLED(ctx context.Context, on bool) error {
 	if err := g.allow(ctx); err != nil {
