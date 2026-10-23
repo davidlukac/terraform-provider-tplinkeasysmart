@@ -35,7 +35,7 @@ type vlan8021QGroupResource struct {
 
 // vlan8021QGroupClient is the part of the switch API this resource needs.
 type vlan8021QGroupClient interface {
-	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
+	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
 	SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error
 	DeleteVLAN8021Q(ctx context.Context, id int) error
 	Ports(ctx context.Context) ([]escp.Port, error)
@@ -90,7 +90,7 @@ func (r *vlan8021QGroupResource) Configure(_ context.Context, req resource.Confi
 
 // table reads the 802.1Q table; the mode must be active, because the switch ignores or rejects VLAN writes otherwise.
 func (r *vlan8021QGroupResource) table(ctx context.Context) ([]escp.VLAN8021Q, error) {
-	q, err := r.client.VLAN8021Q(ctx)
+	q, err := r.client.Dot1Q(ctx)
 	if err != nil {
 		return nil, err
 	}

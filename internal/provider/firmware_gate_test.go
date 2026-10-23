@@ -240,7 +240,7 @@ func TestFirmwareGateRefusesAnUnverifiedBuildButNotReads(t *testing.T) {
 	if _, err := client.Ports(context.Background()); err != nil {
 		t.Fatalf("reads must work on any firmware: %v", err)
 	}
-	if _, err := client.GetLED(context.Background()); err != nil {
+	if _, err := client.LED(context.Background()); err != nil {
 		t.Fatalf("reads must work on any firmware: %v", err)
 	}
 	// the verdict is not cached: a switch that later reports a verified build is accepted

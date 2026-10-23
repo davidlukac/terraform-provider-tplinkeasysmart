@@ -149,8 +149,8 @@ func TestWriteGateDoesNotAffectReads(t *testing.T) {
 	if _, err := c.Info(ctx); err != nil {
 		t.Fatalf("Info: %v", err)
 	}
-	if _, err := c.GetLED(ctx); err != nil {
-		t.Fatalf("GetLED: %v", err)
+	if _, err := c.LED(ctx); err != nil {
+		t.Fatalf("LED: %v", err)
 	}
 	if _, err := c.ConfigBackup(ctx); err != nil {
 		t.Fatalf("ConfigBackup (an authenticated SET that only reads): %v", err)

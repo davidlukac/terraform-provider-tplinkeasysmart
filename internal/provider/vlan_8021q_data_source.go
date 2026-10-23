@@ -26,7 +26,7 @@ type vlan8021QDataSource struct {
 
 // vlan8021QReader is the part of the switch API this data source reads.
 type vlan8021QReader interface {
-	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
+	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
 }
 
 // bound returns a copy of the data source wired to the client of the named switch.
@@ -99,7 +99,7 @@ func (d *vlan8021QDataSource) Read(ctx context.Context, req datasource.ReadReque
 }
 
 func (d *vlan8021QDataSource) readBound(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	v, err := d.client.VLAN8021Q(ctx)
+	v, err := d.client.Dot1Q(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading 802.1Q VLAN failed", err.Error())
 		return

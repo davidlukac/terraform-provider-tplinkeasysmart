@@ -120,7 +120,7 @@ func TestBusyHostPortIsReportedOnFirstUse(t *testing.T) {
 	}
 	for name, call := range map[string]func() error{
 		"Info":   func() error { _, err := c.Info(context.Background()); return err },
-		"GetLED": func() error { _, err := c.GetLED(context.Background()); return err },
+		"LED":    func() error { _, err := c.LED(context.Background()); return err },
 		"SetLED": func() error { return c.SetLED(context.Background(), true) },
 	} {
 		err := call()
@@ -304,7 +304,7 @@ func TestSessionSetupFailures(t *testing.T) {
 		f := escptest.Start(t)
 		f.Mute()
 		c := dialFast(t, f, "secret")
-		if _, err := c.GetLED(context.Background()); !errors.Is(err, ErrNoReply) {
+		if _, err := c.LED(context.Background()); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
 		}
 	})
@@ -360,7 +360,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 	t.Run("SET gets no answer", func(t *testing.T) {
 		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
-		if _, err := c.GetLED(context.Background()); err != nil { // establish the session first
+		if _, err := c.LED(context.Background()); err != nil { // establish the session first
 			t.Fatal(err)
 		}
 		f.Configure(func(f *escptest.Switch) { f.DropSets = true })
@@ -377,7 +377,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		f.Configure(func(f *escptest.Switch) {
 			f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) { return nil, 0, true }
 		})
-		if _, err := c.GetLED(context.Background()); !errors.Is(err, ErrNoReply) {
+		if _, err := c.LED(context.Background()); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
 		}
 	})
@@ -389,7 +389,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 				return []escptest.Setting{{Type: 99, Value: []byte{1}}}, 0, false
 			}
 		})
-		if _, err := c.GetLED(context.Background()); err == nil || !strings.Contains(err.Error(), "unexpected LED reply") {
+		if _, err := c.LED(context.Background()); err == nil || !strings.Contains(err.Error(), "unexpected LED reply") {
 			t.Fatalf("want an unexpected-reply error, got %v", err)
 		}
 	})
@@ -401,7 +401,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 				return []escptest.Setting{{Type: wire.TLVLED, Value: []byte{1, 1}}}, 0, false
 			}
 		})
-		if _, err := c.GetLED(context.Background()); err == nil || !strings.Contains(err.Error(), "unexpected LED reply") {
+		if _, err := c.LED(context.Background()); err == nil || !strings.Contains(err.Error(), "unexpected LED reply") {
 			t.Fatalf("want an unexpected-reply error, got %v", err)
 		}
 	})

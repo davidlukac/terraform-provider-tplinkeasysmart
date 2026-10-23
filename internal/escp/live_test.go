@@ -591,7 +591,7 @@ func vlanModes(t *testing.T, c *Client) (mtu MTUVLAN, portBased PortBasedVLAN, d
 	if portBased, err = c.PortBasedVLAN(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if dot1q, err = c.VLAN8021Q(ctx); err != nil {
+	if dot1q, err = c.Dot1Q(ctx); err != nil {
 		t.Fatal(err)
 	}
 	return mtu, portBased, dot1q

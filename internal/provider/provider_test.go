@@ -215,7 +215,7 @@ func (f *fakeClient) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) 
 	return escp.PortBasedVLAN{Enabled: true, MaxVLAN: 8, VLANs: []escp.PortVLAN{{ID: 1, Ports: []int{1, 2, 3}}}}, nil
 }
 
-func (f *fakeClient) VLAN8021Q(context.Context) (escp.Dot1Q, error) {
+func (f *fakeClient) Dot1Q(context.Context) (escp.Dot1Q, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.vlans != nil {
@@ -321,7 +321,7 @@ func (f *fakeClient) System(context.Context) (escp.System, error) {
 	return escp.System{PortCount: 8, AutoSave: true}, nil
 }
 
-func (f *fakeClient) GetLED(context.Context) (bool, error) {
+func (f *fakeClient) LED(context.Context) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.led, nil

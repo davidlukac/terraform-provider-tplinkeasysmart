@@ -11,7 +11,7 @@ import (
 // do not depend on it directly: each declares the small interface it needs.
 type SwitchClient interface {
 	Info(ctx context.Context) (escp.Info, error)
-	GetLED(ctx context.Context) (bool, error)
+	LED(ctx context.Context) (bool, error)
 	SetLED(ctx context.Context, on bool) error
 	Ports(ctx context.Context) ([]escp.Port, error)
 	SetPort(ctx context.Context, cfg escp.PortConfig) error
@@ -29,7 +29,7 @@ type SwitchClient interface {
 	SetPortBasedVLAN(ctx context.Context, id int, ports []int) error
 	SetMTUVLAN(ctx context.Context, v escp.MTUVLAN) error
 	SetPortBasedVLANMode(ctx context.Context, enabled bool) error
-	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
+	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
 	SetVLAN8021QMode(ctx context.Context, enabled bool) error
 	SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error
 	DeleteVLAN8021Q(ctx context.Context, id int) error

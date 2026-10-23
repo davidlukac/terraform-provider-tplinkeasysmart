@@ -80,8 +80,8 @@ func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
 	return out, nil
 }
 
-// VLAN8021Q reads the 802.1Q mode, VLAN table and per-port PVIDs.
-func (c *Client) VLAN8021Q(ctx context.Context) (Dot1Q, error) {
+// Dot1Q reads the 802.1Q mode, VLAN table and per-port PVIDs.
+func (c *Client) Dot1Q(ctx context.Context) (Dot1Q, error) {
 	// Separate requests, like the vendor utility (combined ones are rejected on some pages).
 	vlans, err := c.getTLVs(ctx, wire.TLVVLAN8021QVLAN)
 	if err != nil {

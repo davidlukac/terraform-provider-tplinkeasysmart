@@ -49,7 +49,7 @@ type vlanModeClient interface {
 	SetMTUVLAN(ctx context.Context, v escp.MTUVLAN) error
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
 	SetPortBasedVLANMode(ctx context.Context, enabled bool) error
-	VLAN8021Q(ctx context.Context) (escp.Dot1Q, error)
+	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
 	SetVLAN8021QMode(ctx context.Context, enabled bool) error
 }
 
@@ -109,7 +109,7 @@ func (r *vlanModeResource) current(ctx context.Context) (vlanState, error) {
 	if err != nil {
 		return vlanState{}, err
 	}
-	q, err := r.client.VLAN8021Q(ctx)
+	q, err := r.client.Dot1Q(ctx)
 	if err != nil {
 		return vlanState{}, err
 	}

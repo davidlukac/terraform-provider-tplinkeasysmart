@@ -516,8 +516,8 @@ func (c *Client) withSession(ctx context.Context, fn func() error) error {
 	}
 }
 
-// GetLED reports whether the switch LEDs are on.
-func (c *Client) GetLED(ctx context.Context) (bool, error) {
+// LED reports whether the switch LEDs are on.
+func (c *Client) LED(ctx context.Context) (bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var on bool

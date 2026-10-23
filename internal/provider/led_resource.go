@@ -30,7 +30,7 @@ type ledResource struct {
 
 // ledClient is the part of the switch API this resource needs.
 type ledClient interface {
-	GetLED(ctx context.Context) (bool, error)
+	LED(ctx context.Context) (bool, error)
 	SetLED(ctx context.Context, on bool) error
 }
 
@@ -87,7 +87,7 @@ func (r *ledResource) applyBound(ctx context.Context, plan *ledModel, add func(s
 		add("Setting LED failed", err.Error())
 		return false
 	}
-	got, err := r.client.GetLED(ctx)
+	got, err := r.client.LED(ctx)
 	if err != nil {
 		add("Reading LED back failed", err.Error())
 		return false
@@ -124,7 +124,7 @@ func (r *ledResource) readBound(ctx context.Context, req resource.ReadRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	on, err := r.client.GetLED(ctx)
+	on, err := r.client.LED(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading LED failed", err.Error())
 		return
