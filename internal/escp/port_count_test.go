@@ -61,7 +61,9 @@ func TestWritersRefusePortsTheSwitchDoesNotHave(t *testing.T) {
 			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Untagged: []int{9}})
 		}},
 		{"SetPVIDs", func(c *Client) error { return c.SetPVIDs(ctx, map[int]int{2: 1, 9: 1}) }},
-		{"SetMTUVLAN", func(c *Client) error { return c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 9}) }},
+		{"SetVLANMode", func(c *Client) error {
+			return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 9})
+		}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -126,7 +128,7 @@ func TestPortCountIsTheSwitchsOwn(t *testing.T) {
 }
 
 // The port count is hardware: it is read once per client, however many writes follow, and a
-// write that names no port (or the disabled MTU VLAN mode, which sends port 1) reads nothing.
+// write that names no port reads nothing.
 func TestPortCountIsReadOnce(t *testing.T) {
 	ctx := context.Background()
 	f := escptest.Start(t)
@@ -134,9 +136,6 @@ func TestPortCountIsReadOnce(t *testing.T) {
 	countingPorts(f, 8, &reads)
 	c := dialFake(t, f, "secret")
 	if err := c.SetLED(ctx, false); err != nil {
-		t.Fatal(err)
-	}
-	if err := c.SetMTUVLAN(ctx, MTUVLAN{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.SetLAG(ctx, 1, nil); err != nil { // removing a group names no ports

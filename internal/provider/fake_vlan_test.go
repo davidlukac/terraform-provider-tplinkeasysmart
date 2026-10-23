@@ -86,45 +86,27 @@ func (f *fakeClient) vlanWrite(do func(v *fakeVLANs) error) error {
 	return do(f.vlans)
 }
 
-func (f *fakeClient) SetVLAN8021QMode(_ context.Context, enabled bool) error {
+// VLANMode names the mode the way the library does, from the fake's three flags.
+func (f *fakeClient) VLANMode(ctx context.Context) (escp.VLANModeSetting, error) {
+	mtu, _ := f.MTUVLAN(ctx)
+	pb, _ := f.PortBasedVLAN(ctx)
+	q, _ := f.Dot1Q(ctx)
+	return escp.VLANModeFrom(mtu, pb.Enabled, q.Enabled), nil
+}
+
+func (f *fakeClient) SetVLANMode(_ context.Context, s escp.VLANModeSetting) error {
+	if err := escp.ValidateVLANMode(s); err != nil {
+		return err
+	}
 	return f.vlanWrite(func(v *fakeVLANs) error {
 		switch {
 		case v.ignoreModeWrites:
-		case enabled:
-			v.enable8021Q()
+		case s.Mode == escp.VLANModeMTU:
+			v.mtu, v.enabled, v.portBased = escp.MTUVLAN{Enabled: true, UplinkPort: s.UplinkPort}, false, false
+		case s.Mode == escp.VLANModePortBased:
+			v.portBased, v.enabled, v.mtu = true, false, escp.MTUVLAN{UplinkPort: 1}
 		default:
-			v.enabled = false
-		}
-		return nil
-	})
-}
-
-func (f *fakeClient) SetPortBasedVLANMode(_ context.Context, enabled bool) error {
-	return f.vlanWrite(func(v *fakeVLANs) error {
-		if v.ignoreModeWrites {
-			return nil
-		}
-		v.portBased = enabled
-		if enabled {
-			v.enabled, v.mtu = false, escp.MTUVLAN{UplinkPort: 1}
-		}
-		return nil
-	})
-}
-
-func (f *fakeClient) SetMTUVLAN(_ context.Context, mtu escp.MTUVLAN) error {
-	enabled, uplink := mtu.Enabled, mtu.UplinkPort
-	return f.vlanWrite(func(v *fakeVLANs) error {
-		if v.ignoreModeWrites {
-			return nil
-		}
-		if err := escp.ValidatePort(uplink); err != nil {
-			return err
-		}
-		if enabled {
-			v.mtu, v.enabled, v.portBased = escp.MTUVLAN{Enabled: true, UplinkPort: uplink}, false, false
-		} else {
-			v.mtu = escp.MTUVLAN{UplinkPort: 1}
+			v.enable8021Q()
 		}
 		return nil
 	})

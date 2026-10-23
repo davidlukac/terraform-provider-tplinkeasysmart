@@ -20,12 +20,21 @@ const vlanModeID = "vlan_mode"
 
 // The three VLAN modes of the switch. They exclude each other: the vendor
 // utility warns that switching discards the settings of the other modes.
+// writableVLANModes lists the modes the library can set, as the attribute spells them.
+func writableVLANModes() []string {
+	modes := escp.VLANModes()
+	names := make([]string, len(modes))
+	for i, m := range modes {
+		names[i] = string(m)
+	}
+	return names
+}
+
+// The spellings are the library's (they are part of the Terraform state).
 const (
-	vlanModeMTU       = "mtu"
-	vlanModePortBased = "port-based"
-	vlanMode8021Q     = "802.1q"
-	// vlanModeNone is reported when no mode is active; it cannot be configured.
-	vlanModeNone = "none"
+	vlanModeMTU       = string(escp.VLANModeMTU)
+	vlanModePortBased = string(escp.VLANModePortBased)
+	vlanMode8021Q     = string(escp.VLANModeDot1Q)
 )
 
 var (
@@ -45,12 +54,8 @@ type vlanModeResource struct {
 
 // vlanModeClient is the part of the switch API this resource needs.
 type vlanModeClient interface {
-	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
-	SetMTUVLAN(ctx context.Context, v escp.MTUVLAN) error
-	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
-	SetPortBasedVLANMode(ctx context.Context, enabled bool) error
-	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
-	SetVLAN8021QMode(ctx context.Context, enabled bool) error
+	VLANMode(ctx context.Context) (escp.VLANModeSetting, error)
+	SetVLANMode(ctx context.Context, s escp.VLANModeSetting) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -80,7 +85,7 @@ func (r *vlanModeResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"id": schema.StringAttribute{Computed: true, Description: "Always `vlan_mode`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"mode": schema.StringAttribute{Required: true, Description: "One of `mtu`, `port-based` or `802.1q`.",
-				Validators: []validator.String{stringvalidator.OneOf(vlanModeMTU, vlanModePortBased, vlanMode8021Q)}},
+				Validators: []validator.String{stringvalidator.OneOf(writableVLANModes()...)}},
 			"mtu_uplink_port": schema.Int64Attribute{Optional: true, Validators: []validator.Int64{validPortNumber()},
 				Description: "The uplink port of the MTU VLAN: every other port can only talk to it. Required with `mode = \"mtu\"`, not allowed with another mode."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing the VLAN mode. Defaults to false."),
@@ -92,51 +97,6 @@ func (r *vlanModeResource) Configure(_ context.Context, req resource.ConfigureRe
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-// vlanState is the VLAN mode of a switch and, for the MTU VLAN, its uplink port.
-type vlanState struct {
-	mode   string
-	uplink int
-}
-
-// current reads the three mode flags and names the active one. A switch with
-// several (or none) active reports a state the provider cannot configure.
-func (r *vlanModeResource) current(ctx context.Context) (vlanState, error) {
-	mtu, err := r.client.MTUVLAN(ctx)
-	if err != nil {
-		return vlanState{}, err
-	}
-	pb, err := r.client.PortBasedVLAN(ctx)
-	if err != nil {
-		return vlanState{}, err
-	}
-	q, err := r.client.Dot1Q(ctx)
-	if err != nil {
-		return vlanState{}, err
-	}
-	return vlanStateOf(mtu, pb.Enabled, q.Enabled), nil
-}
-
-// vlanStateOf names the active VLAN mode. A switch with no mode on, or with
-// several on (which the firmware should not allow), reports "none": a state
-// the provider cannot configure, so the plan shows the difference instead of hiding it.
-func vlanStateOf(mtu escp.MTUVLAN, portBased, dot1q bool) vlanState {
-	active := 0
-	st := vlanState{mode: vlanModeNone}
-	if mtu.Enabled {
-		active, st = active+1, vlanState{mode: vlanModeMTU, uplink: mtu.UplinkPort}
-	}
-	if portBased {
-		active, st = active+1, vlanState{mode: vlanModePortBased}
-	}
-	if dot1q {
-		active, st = active+1, vlanState{mode: vlanMode8021Q}
-	}
-	if active != 1 {
-		return vlanState{mode: vlanModeNone}
-	}
-	return st
-}
-
 // apply binds the resource to the switch the plan selects, then applies it.
 func (r *vlanModeResource) apply(ctx context.Context, m *vlanModeModel, add func(string, string)) bool {
 	b := r.bound(add, m.Switch)
@@ -144,8 +104,8 @@ func (r *vlanModeResource) apply(ctx context.Context, m *vlanModeModel, add func
 }
 
 func (r *vlanModeResource) applyBound(ctx context.Context, m *vlanModeModel, add func(string, string)) bool {
-	want := vlanState{mode: m.Mode.ValueString(), uplink: int(m.MTUUplinkPort.ValueInt64())}
-	have, err := r.current(ctx)
+	want := escp.VLANModeSetting{Mode: escp.VLANMode(m.Mode.ValueString()), UplinkPort: int(m.MTUUplinkPort.ValueInt64())}
+	have, err := r.client.VLANMode(ctx)
 	if err != nil {
 		add("Reading the VLAN mode failed", err.Error())
 		return false
@@ -153,14 +113,14 @@ func (r *vlanModeResource) applyBound(ctx context.Context, m *vlanModeModel, add
 	if have != want {
 		if !m.AllowDisruptive.ValueBool() {
 			add("Refusing to change the VLAN mode", fmt.Sprintf("the switch is in VLAN mode %q and %q was requested. Switching the mode discards the other "+
-				"modes' VLAN settings and can cut every connection, including the management path; set allow_disruptive = true to proceed", have.mode, want.mode))
+				"modes' VLAN settings and can cut every connection, including the management path; set allow_disruptive = true to proceed", have.Mode, want.Mode))
 			return false
 		}
-		if err := r.write(ctx, want); err != nil {
+		if err := r.client.SetVLANMode(ctx, want); err != nil {
 			add("Setting the VLAN mode failed", err.Error())
 			return false
 		}
-		got, err := r.current(ctx)
+		got, err := r.client.VLANMode(ctx)
 		if err != nil || got != want {
 			add("The VLAN mode did not change as requested", fmt.Sprintf("requested %+v, the switch reports %+v (err=%v)", want, got, err))
 			return false
@@ -168,18 +128,6 @@ func (r *vlanModeResource) applyBound(ctx context.Context, m *vlanModeModel, add
 	}
 	m.ID = qualifiedID(r.sw, vlanModeID)
 	return true
-}
-
-// write enables the requested mode; the switch turns the others off.
-func (r *vlanModeResource) write(ctx context.Context, want vlanState) error {
-	switch want.mode {
-	case vlanModeMTU:
-		return r.client.SetMTUVLAN(ctx, escp.MTUVLAN{Enabled: true, UplinkPort: want.uplink})
-	case vlanModePortBased:
-		return r.client.SetPortBasedVLANMode(ctx, true)
-	default:
-		return r.client.SetVLAN8021QMode(ctx, true)
-	}
 }
 
 func (r *vlanModeResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -205,14 +153,14 @@ func (r *vlanModeResource) readBound(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	have, err := r.current(ctx)
+	have, err := r.client.VLANMode(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading the VLAN mode failed", err.Error())
 		return
 	}
-	state.ID, state.Mode, state.MTUUplinkPort = qualifiedID(r.sw, vlanModeID), types.StringValue(have.mode), types.Int64Null()
-	if have.mode == vlanModeMTU {
-		state.MTUUplinkPort = types.Int64Value(int64(have.uplink))
+	state.ID, state.Mode, state.MTUUplinkPort = qualifiedID(r.sw, vlanModeID), types.StringValue(string(have.Mode)), types.Int64Null()
+	if have.Mode == escp.VLANModeMTU {
+		state.MTUUplinkPort = types.Int64Value(int64(have.UplinkPort))
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

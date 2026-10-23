@@ -156,12 +156,11 @@ func TestAccVLANModeReportsFailures(t *testing.T) {
 		setup func(w *faultyClient)
 		want  string
 	}{
-		{"mode read fails", func(w *faultyClient) { w.failAlways("PortBasedVLAN") }, `Reading the VLAN mode failed`},
-		{"mtu read fails", func(w *faultyClient) { w.failAlways("MTUVLAN") }, `Reading the VLAN mode failed`},
-		{"802.1Q read fails", func(w *faultyClient) { w.failAlways("Dot1Q") }, `Reading the VLAN mode failed`},
-		{"write fails", func(w *faultyClient) { w.failAlways("SetVLAN8021QMode") }, `Setting the VLAN mode failed`},
-		{"write is accepted but ignored", func(w *faultyClient) { w.ignoreOnly("SetVLAN8021QMode") }, `did not change as requested`},
-		{"read back fails", func(w *faultyClient) { w.failCalls("Dot1Q", 2, 0) }, `did not change as requested`},
+		// the library reads the three flags (its own tests make each of them fail)
+		{"mode read fails", func(w *faultyClient) { w.failAlways("VLANMode") }, `Reading the VLAN mode failed`},
+		{"write fails", func(w *faultyClient) { w.failAlways("SetVLANMode") }, `Setting the VLAN mode failed`},
+		{"write is accepted but ignored", func(w *faultyClient) { w.ignoreOnly("SetVLANMode") }, `did not change as requested`},
+		{"read back fails", func(w *faultyClient) { w.failCalls("VLANMode", 2, 0) }, `did not change as requested`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -184,32 +183,6 @@ func TestAccVLANModeImportRejectsOtherIDs(t *testing.T) {
 			{ResourceName: "tplinkeasysmart_vlan_mode.m", ImportState: true, ImportStateId: "mode", ExpectError: regexp.MustCompile(`the only valid id is "vlan_mode"`)},
 		},
 	})
-}
-
-func TestVLANStateOf(t *testing.T) {
-	mtu := escp.MTUVLAN{Enabled: true, UplinkPort: 8}
-	off := escp.MTUVLAN{UplinkPort: 1}
-	tests := []struct {
-		name      string
-		mtu       escp.MTUVLAN
-		portBased bool
-		dot1q     bool
-		want      vlanState
-	}{
-		{"MTU keeps its uplink", mtu, false, false, vlanState{mode: vlanModeMTU, uplink: 8}},
-		{"port-based", off, true, false, vlanState{mode: vlanModePortBased}},
-		{"802.1Q", off, false, true, vlanState{mode: vlanMode8021Q}},
-		{"no mode on", off, false, false, vlanState{mode: vlanModeNone}},
-		{"two modes on cannot be configured", mtu, true, false, vlanState{mode: vlanModeNone}},
-		{"all three on", mtu, true, true, vlanState{mode: vlanModeNone}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := vlanStateOf(tt.mtu, tt.portBased, tt.dot1q); got != tt.want {
-				t.Fatalf("got %+v, want %+v", got, tt.want)
-			}
-		})
-	}
 }
 
 // ---- tplinkeasysmart_vlan_8021q_group ----
@@ -830,7 +803,7 @@ func TestAccVLANModeReadFailsWhileRefreshing(t *testing.T) {
 		ProtoV6ProviderFactories: factories(w),
 		Steps: []resource.TestStep{
 			{Config: cfg},
-			{PreConfig: func() { w.heal(); w.failAlways("MTUVLAN") }, Config: cfg, PlanOnly: true, ExpectError: regexp.MustCompile(`Reading the VLAN mode failed`)},
+			{PreConfig: func() { w.heal(); w.failAlways("VLANMode") }, Config: cfg, PlanOnly: true, ExpectError: regexp.MustCompile(`Reading the VLAN mode failed`)},
 		},
 	})
 }

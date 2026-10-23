@@ -136,36 +136,3 @@ func TestSetPVIDsWire(t *testing.T) {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }
-
-func TestVLANModeWires(t *testing.T) {
-	f := escptest.Start(t)
-	c := dialFake(t, f, "secret")
-	ctx := context.Background()
-	steps := []struct {
-		name string
-		do   func() error
-		want escptest.Setting
-	}{
-		{"802.1Q on", func() error { return c.SetVLAN8021QMode(ctx, true) }, escptest.Setting{Type: wire.TLVVLAN8021Q, Value: []byte{1}}},
-		{"802.1Q off", func() error { return c.SetVLAN8021QMode(ctx, false) }, escptest.Setting{Type: wire.TLVVLAN8021Q, Value: []byte{0}}},
-		{"port-based on", func() error { return c.SetPortBasedVLANMode(ctx, true) }, escptest.Setting{Type: wire.TLVVLANPortBased, Value: []byte{1}}},
-		{"port-based off", func() error { return c.SetPortBasedVLANMode(ctx, false) }, escptest.Setting{Type: wire.TLVVLANPortBased, Value: []byte{0}}},
-		{"MTU on, uplink 3", func() error { return c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 3}) }, escptest.Setting{Type: wire.TLVVLANMTU, Value: []byte{1, 3}}},
-		{"MTU off ignores the uplink", func() error { return c.SetMTUVLAN(ctx, MTUVLAN{Enabled: false, UplinkPort: 7}) }, escptest.Setting{Type: wire.TLVVLANMTU, Value: []byte{0, 1}}},
-	}
-	for _, s := range steps {
-		if err := s.do(); err != nil {
-			t.Fatalf("%s: %v", s.name, err)
-		}
-		if got := f.LastSet(); len(got) != 1 || !reflect.DeepEqual(got[0], s.want) {
-			t.Fatalf("%s: wire %+v, want %+v", s.name, got, s.want)
-		}
-	}
-	n := f.WriteCount()
-	if c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 0}) == nil || c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 33}) == nil {
-		t.Fatal("an invalid uplink port must be rejected")
-	}
-	if f.WriteCount() != n {
-		t.Fatal("rejected requests must not reach the switch")
-	}
-}
