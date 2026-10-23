@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -100,20 +101,15 @@ func (r *lagResource) guardLAG(ctx context.Context, group int, allow bool, old, 
 	if err != nil {
 		return fmt.Errorf("cannot check whether the ports are in use: %w", err)
 	}
-	seen := map[int]bool{}
-	for _, p := range append(append([]int{}, old...), new...) {
-		if seen[p] {
-			continue
-		}
-		seen[p] = true
-		use := safety.UseOf(all, p)
-		switch {
-		case !use.Exists:
-			return fmt.Errorf("port %d does not exist on this switch", p)
-		case use.LinkUp():
-			return fmt.Errorf("port %d has a link up (%s); changing its LAG membership can cut traffic or management access. Set allow_disruptive = true to proceed anyway", p, use.Speed)
-		case use.InLAG() && use.LAG != group:
-			return fmt.Errorf("port %d already belongs to LAG%d", p, use.LAG)
+	var used *safety.PortUseError
+	if errors.As(safety.CheckPorts(all, safety.PortRule{TolerateLAG: group}, append(append([]int{}, old...), new...)...), &used) {
+		switch used.Reason {
+		case safety.PortMissing:
+			return errors.New(used.Error())
+		case safety.PortLinkUp:
+			return fmt.Errorf("port %d has a link up (%s); changing its LAG membership can cut traffic or management access. Set allow_disruptive = true to proceed anyway", used.Port, used.Speed)
+		default:
+			return fmt.Errorf("port %d already belongs to LAG%d", used.Port, used.LAG)
 		}
 	}
 	return nil

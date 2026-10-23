@@ -688,7 +688,7 @@ func TestAccPortGuardBlocksUsedPorts(t *testing.T) {
 	for _, tc := range []struct {
 		port int
 		want string
-	}{{1, `member of LAG1`}, {4, `has a link up`}} {
+	}{{1, `port 1 has a link up`}, {4, `port 4 has a link up`}} {
 		f := &fakeClient{ports: testPorts()}
 		resource.UnitTest(t, resource.TestCase{
 			ProtoV6ProviderFactories: factories(f),
@@ -793,7 +793,7 @@ func TestAccBandwidthLimitGuardAndValidation(t *testing.T) {
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
 			{Config: bwConfig(4, "  ingress_kbps = 1024\n"), ExpectError: regexp.MustCompile(`has a link up`)},
-			{Config: bwConfig(1, "  egress_kbps = 1024\n"), ExpectError: regexp.MustCompile(`member of LAG1`)},
+			{Config: bwConfig(1, "  egress_kbps = 1024\n"), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
 			{Config: bwConfig(7, "  ingress_kbps = 100\n"), ExpectError: regexp.MustCompile(`multiple of 64`)},
 		},
 	})
@@ -829,7 +829,7 @@ func TestAccStormLimitGuardAndValidation(t *testing.T) {
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
 			{Config: stormConfig(4, "  broadcast = true\n  rate_kbps = 1024\n"), ExpectError: regexp.MustCompile(`has a link up`)},
-			{Config: stormConfig(1, "  multicast = true\n  rate_kbps = 64\n"), ExpectError: regexp.MustCompile(`member of LAG1`)},
+			{Config: stormConfig(1, "  multicast = true\n  rate_kbps = 64\n"), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
 			{Config: stormConfig(7, "  broadcast = true\n"), ExpectError: regexp.MustCompile(`rate_kbps must be`)},
 		},
 	})
@@ -873,7 +873,7 @@ func TestAccPortMirrorGuard(t *testing.T) {
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
 			{Config: mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [7]\n"), ExpectError: regexp.MustCompile(`has a link up`)},
-			{Config: mirrorConfig("  enabled = true\n  mirror_port = 1\n  ingress_ports = [7]\n"), ExpectError: regexp.MustCompile(`member of LAG1`)},
+			{Config: mirrorConfig("  enabled = true\n  mirror_port = 1\n  ingress_ports = [7]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
 		},
 	})
 	if f.sets != 0 {
@@ -930,6 +930,19 @@ func TestAccLAGGuard(t *testing.T) {
 	}
 }
 
+// Editing a group tolerates its own idle members (the switch lists them as LAG members).
+func TestAccLAGGuardToleratesItsOwnIdleMembers(t *testing.T) {
+	ports := lagPorts()
+	ports[5].LAG, ports[6].LAG = 2, 2 // ports 6 and 7 are already LAG2 members, without a link
+	f := &fakeClient{ports: ports, lags: map[int][]int{1: {1, 2}, 2: {6, 7}}}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: lagConfig(2, "  ports = [5, 6, 7]\n"), Check: resource.TestCheckResourceAttr("tplinkeasysmart_lag.l", "ports.#", "3")},
+		},
+	})
+}
+
 func vlanGroupConfig(id int, body string) string {
 	return providerBlock + fmt.Sprintf("resource \"tplinkeasysmart_vlan_port_based_group\" \"v\" {\n  vlan = %d\n%s}\n", id, body)
 }
@@ -961,5 +974,21 @@ func TestAccVLANGroupGuard(t *testing.T) {
 	})
 	if f.sets != 0 {
 		t.Fatalf("guard must prevent any write, got %d", f.sets)
+	}
+}
+
+// A LAG member without a link is named as a LAG member (the link is named first when there is one:
+// the check order is shared with the LAG and VLAN guards).
+func TestAccPortGuardNamesAnIdleLAGMember(t *testing.T) {
+	f := &fakeClient{ports: append(testPorts(), escp.Port{ID: 5, Enabled: true, LAG: 2, ConfiguredSpeed: "auto", ActualSpeed: "link-down"})}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{{
+			Config:      portConfig(5, "  enabled = false\n"),
+			ExpectError: regexp.MustCompile(`port 5 is a member of LAG2; set allow_disruptive = true`),
+		}},
+	})
+	if f.sets != 0 {
+		t.Fatalf("nothing may be written, got %d writes", f.sets)
 	}
 }

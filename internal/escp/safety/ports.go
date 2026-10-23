@@ -1,6 +1,10 @@
 package safety
 
-import "github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+import (
+	"fmt"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+)
 
 // PortUse is what a write to one port could disturb. It states facts only: how a
 // caller orders its checks and what it says about them differs per front end (a LAG
@@ -45,4 +49,65 @@ func UseOf(ports []escp.Port, id int) PortUse {
 		}
 	}
 	return use
+}
+
+// PortReason says why a port check refused a port.
+type PortReason int
+
+// The reasons CheckPorts refuses. They are listed in the order the checks run.
+const (
+	// PortMissing: the switch has no such port.
+	PortMissing PortReason = iota + 1
+	// PortLinkUp: the port has a link, so it may carry traffic or the management path.
+	PortLinkUp
+	// PortInLAG: the port belongs to a link aggregation group.
+	PortInLAG
+)
+
+// PortUseError is the refusal of CheckPorts: the first port that a write should not touch
+// without an explicit decision, and why. Callers branch on Reason and word the message in their
+// own vocabulary, as with FirmwareError; Error is a neutral description.
+type PortUseError struct {
+	Port   int
+	Reason PortReason
+	Speed  escp.Speed // the negotiated speed (PortLinkUp)
+	LAG    int        // the group (PortInLAG)
+}
+
+// Error implements error.
+func (e *PortUseError) Error() string {
+	switch e.Reason {
+	case PortMissing:
+		return fmt.Sprintf("port %d does not exist on this switch", e.Port)
+	case PortLinkUp:
+		return fmt.Sprintf("port %d has a link up (%s)", e.Port, e.Speed)
+	default:
+		return fmt.Sprintf("port %d is a member of LAG %d", e.Port, e.LAG)
+	}
+}
+
+// PortRule says which uses CheckPorts tolerates. The zero value tolerates none.
+type PortRule struct {
+	// TolerateLAG is a group whose members are fine, for an edit of that very group; zero for
+	// none. A link is never tolerated.
+	TolerateLAG int
+}
+
+// CheckPorts returns a *PortUseError for the first of ports (in the order given) that does not exist, has a link up, or belongs to a LAG the rule does not tolerate, in
+// that order for each port. It returns nil when every port is free. all is a reading of the
+// ports (Client.Ports); a write to a port that fails the check can cut the management path or
+// the uplink, and the switch has no console to recover from that.
+func CheckPorts(all []escp.Port, rule PortRule, ports ...int) error {
+	for _, p := range ports {
+		use := UseOf(all, p)
+		switch {
+		case !use.Exists:
+			return &PortUseError{Port: p, Reason: PortMissing}
+		case use.LinkUp():
+			return &PortUseError{Port: p, Reason: PortLinkUp, Speed: use.Speed, LAG: use.LAG}
+		case use.InLAG() && use.LAG != rule.TolerateLAG:
+			return &PortUseError{Port: p, Reason: PortInLAG, LAG: use.LAG}
+		}
+	}
+	return nil
 }
