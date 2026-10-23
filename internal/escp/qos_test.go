@@ -111,13 +111,13 @@ func TestQoSModeUnknownValues(t *testing.T) {
 func TestSetQoSModeRefusesUnknownModesWithoutSending(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
-	n := len(f.AllSets())
+	n := f.WriteCount()
 	for _, bad := range []QoSMode{-1, 3, 256} {
 		if err := c.SetQoSMode(context.Background(), bad); err == nil {
 			t.Errorf("mode %d accepted", int(bad))
 		}
 	}
-	if len(f.AllSets()) != n {
+	if f.WriteCount() != n {
 		t.Fatal("a refused mode reached the switch")
 	}
 }

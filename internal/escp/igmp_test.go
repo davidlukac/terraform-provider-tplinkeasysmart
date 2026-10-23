@@ -54,7 +54,7 @@ func TestSetIGMPWire(t *testing.T) {
 			if err := c.SetIGMP(context.Background(), tc.cfg); err != nil {
 				t.Fatal(err)
 			}
-			want := []wire.TLV{
+			want := []escptest.Setting{
 				{Type: wire.TLVIGMPEnabled, Value: []byte{tc.wantState}},
 				{Type: wire.TLVIGMPSuppression, Value: []byte{tc.wantSupp}},
 			}

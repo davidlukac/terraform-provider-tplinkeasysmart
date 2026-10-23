@@ -107,7 +107,7 @@ func TestSetIPConfigValidatesBeforeTheNetwork(t *testing.T) {
 	if err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.0.255.0", "127.0.0.2")); err == nil {
 		t.Fatal("an invalid mask must be refused")
 	}
-	if n := len(f.AllSets()); n != 0 {
+	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("an invalid request must not write, got %d writes", n)
 	}
 }
@@ -115,14 +115,14 @@ func TestSetIPConfigValidatesBeforeTheNetwork(t *testing.T) {
 func TestSetIPConfigRefusesUnusableCurrentConfiguration(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Switch) {
-		f.DiscoverTLVs = []wire.TLV{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
+		f.DiscoverReply = []escptest.Setting{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
 	})
 	c := dialFake(t, f, "secret")
 	err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.255.255.0", "127.0.0.2"))
 	if err == nil || !strings.Contains(err.Error(), "unusable IP configuration") {
 		t.Fatalf("want a refusal, got %v", err)
 	}
-	if n := len(f.AllSets()); n != 0 {
+	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("nothing may be written, got %d writes", n)
 	}
 }

@@ -47,7 +47,7 @@ func TestSetBandwidthWire(t *testing.T) {
 			t.Errorf("rate %d must be rejected", bad)
 		}
 	}
-	if len(f.AllSets()) != 2 {
+	if f.WriteCount() != 2 {
 		t.Fatal("rejected rates must not reach the switch")
 	}
 }

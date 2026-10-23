@@ -47,7 +47,7 @@ func TestSetMirrorWire(t *testing.T) {
 	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, make([]byte, 10)) {
 		t.Fatalf("disable wire %v", got[0].Value)
 	}
-	n := len(f.AllSets())
+	n := f.WriteCount()
 	for _, bad := range []Mirror{
 		{Enabled: true, MirrorPort: 7},
 		{Enabled: true, MirrorPort: 7, IngressPorts: []int{7}},
@@ -59,7 +59,7 @@ func TestSetMirrorWire(t *testing.T) {
 			t.Errorf("%+v must be rejected", bad)
 		}
 	}
-	if len(f.AllSets()) != n {
+	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }

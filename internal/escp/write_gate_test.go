@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
 var errGateRefused = errors.New("test gate: refused")
@@ -130,7 +131,7 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 			if err := call(context.Background(), c); err != nil {
 				t.Fatalf("an allowed write failed: %v", err)
 			}
-			if len(f.AllSets()) == 0 {
+			if f.WriteCount() == 0 {
 				t.Fatal("the write never reached the switch")
 			}
 		})
@@ -174,5 +175,36 @@ func TestWriteGateMayReadThroughTheClient(t *testing.T) {
 	}
 	if firmware == "" {
 		t.Fatal("the gate did not see the firmware version")
+	}
+}
+
+// What the fake hands out is a copy, in its own type: changing it changes nothing in the fake,
+// and the count agrees with the list.
+func TestEscptestWriteRecordsAreCopies(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFake(t, f, "secret")
+	if f.WriteCount() != 0 || len(f.AllSets()) != 0 || len(f.LastSet()) != 0 {
+		t.Fatal("a switch nobody wrote to has no writes")
+	}
+	if err := c.SetLED(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SetLED(context.Background(), true); err != nil {
+		t.Fatal(err)
+	}
+	if f.WriteCount() != 2 || len(f.AllSets()) != 2 {
+		t.Fatalf("two writes, got count %d and %d records", f.WriteCount(), len(f.AllSets()))
+	}
+	last := f.LastSet()
+	if len(last) != 1 || last[0].Type != wire.TLVLED || string(last[0].Value) != "\x01" {
+		t.Fatalf("the last write was the LED on: %+v", last)
+	}
+	last[0].Value[0] = 9
+	f.AllSets()[0][0].Value[0] = 9
+	if got := f.LastSet()[0].Value[0]; got != 1 {
+		t.Errorf("changing the returned last write changed the fake: %d", got)
+	}
+	if got := f.AllSets()[0][0].Value[0]; got != 0 {
+		t.Errorf("changing a returned write changed the fake: %d", got)
 	}
 }

@@ -15,14 +15,14 @@ import (
 func TestSetHostnameRefusesUnusableIPConfiguration(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Switch) {
-		f.DiscoverTLVs = []wire.TLV{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte("TL-SG108E-fake\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
+		f.DiscoverReply = []escptest.Setting{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte("TL-SG108E-fake\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
 	})
 	c := dialFake(t, f, "secret")
 	err := c.SetHostname(context.Background(), "sw01")
 	if err == nil || !strings.Contains(err.Error(), "unusable IP configuration") {
 		t.Fatalf("want a refusal because the IP config is unusable, got %v", err)
 	}
-	if n := len(f.AllSets()); n != 0 {
+	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("nothing may be written when the IP config cannot be re-sent, got %d writes", n)
 	}
 }

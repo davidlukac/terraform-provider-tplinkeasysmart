@@ -81,7 +81,7 @@ func TestVLAN8021QValidation(t *testing.T) {
 	if err := c.SetVLAN8021Q(context.Background(), VLAN8021Q{ID: 2, Tagged: []int{33}}); err == nil {
 		t.Fatal("tagged port 33 does not fit in the mask")
 	}
-	if n := len(f.AllSets()); n != 0 {
+	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("rejected requests reached the switch (%d sets)", n)
 	}
 }
@@ -104,11 +104,11 @@ func TestSetVLAN8021QWire(t *testing.T) {
 	if len(got) != 1 || got[0].Type != wire.TLVVLAN8021QVLAN || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
 		t.Fatalf("delete wire %+v", got)
 	}
-	n := len(f.AllSets())
+	n := f.WriteCount()
 	if c.DeleteVLAN8021Q(ctx, 0) == nil || c.DeleteVLAN8021Q(ctx, 4095) == nil {
 		t.Fatal("invalid ids must be rejected")
 	}
-	if len(f.AllSets()) != n {
+	if f.WriteCount() != n {
 		t.Fatal("rejected deletes must not reach the switch")
 	}
 }
@@ -122,17 +122,17 @@ func TestSetPVIDsWire(t *testing.T) {
 	}
 	got := f.LastSet()
 	// One TLV per port, in port order, each port (1 byte) and pvid (2 bytes, big endian).
-	want := []wire.TLV{{Type: wire.TLVVLAN8021QPVID, Value: []byte{4, 0, 2}}, {Type: wire.TLVVLAN8021QPVID, Value: []byte{5, 1, 0x2c}}}
+	want := []escptest.Setting{{Type: wire.TLVVLAN8021QPVID, Value: []byte{4, 0, 2}}, {Type: wire.TLVVLAN8021QPVID, Value: []byte{5, 1, 0x2c}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("wire %+v, want %+v", got, want)
 	}
-	n := len(f.AllSets())
+	n := f.WriteCount()
 	for name, bad := range map[string]map[int]int{"empty": {}, "port 0": {0: 2}, "port 33": {33: 2}, "pvid 0": {4: 0}, "pvid 4095": {4: 4095}} {
 		if c.SetPVIDs(ctx, bad) == nil {
 			t.Fatalf("%s must be rejected", name)
 		}
 	}
-	if len(f.AllSets()) != n {
+	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }
@@ -144,14 +144,14 @@ func TestVLANModeWires(t *testing.T) {
 	steps := []struct {
 		name string
 		do   func() error
-		want wire.TLV
+		want escptest.Setting
 	}{
-		{"802.1Q on", func() error { return c.SetVLAN8021QMode(ctx, true) }, wire.TLV{Type: wire.TLVVLAN8021Q, Value: []byte{1}}},
-		{"802.1Q off", func() error { return c.SetVLAN8021QMode(ctx, false) }, wire.TLV{Type: wire.TLVVLAN8021Q, Value: []byte{0}}},
-		{"port-based on", func() error { return c.SetPortBasedVLANMode(ctx, true) }, wire.TLV{Type: wire.TLVVLANPortBased, Value: []byte{1}}},
-		{"port-based off", func() error { return c.SetPortBasedVLANMode(ctx, false) }, wire.TLV{Type: wire.TLVVLANPortBased, Value: []byte{0}}},
-		{"MTU on, uplink 3", func() error { return c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 3}) }, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{1, 3}}},
-		{"MTU off ignores the uplink", func() error { return c.SetMTUVLAN(ctx, MTUVLAN{Enabled: false, UplinkPort: 7}) }, wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{0, 1}}},
+		{"802.1Q on", func() error { return c.SetVLAN8021QMode(ctx, true) }, escptest.Setting{Type: wire.TLVVLAN8021Q, Value: []byte{1}}},
+		{"802.1Q off", func() error { return c.SetVLAN8021QMode(ctx, false) }, escptest.Setting{Type: wire.TLVVLAN8021Q, Value: []byte{0}}},
+		{"port-based on", func() error { return c.SetPortBasedVLANMode(ctx, true) }, escptest.Setting{Type: wire.TLVVLANPortBased, Value: []byte{1}}},
+		{"port-based off", func() error { return c.SetPortBasedVLANMode(ctx, false) }, escptest.Setting{Type: wire.TLVVLANPortBased, Value: []byte{0}}},
+		{"MTU on, uplink 3", func() error { return c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 3}) }, escptest.Setting{Type: wire.TLVVLANMTU, Value: []byte{1, 3}}},
+		{"MTU off ignores the uplink", func() error { return c.SetMTUVLAN(ctx, MTUVLAN{Enabled: false, UplinkPort: 7}) }, escptest.Setting{Type: wire.TLVVLANMTU, Value: []byte{0, 1}}},
 	}
 	for _, s := range steps {
 		if err := s.do(); err != nil {
@@ -161,11 +161,11 @@ func TestVLANModeWires(t *testing.T) {
 			t.Fatalf("%s: wire %+v, want %+v", s.name, got, s.want)
 		}
 	}
-	n := len(f.AllSets())
+	n := f.WriteCount()
 	if c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 0}) == nil || c.SetMTUVLAN(ctx, MTUVLAN{Enabled: true, UplinkPort: 33}) == nil {
 		t.Fatal("an invalid uplink port must be rejected")
 	}
-	if len(f.AllSets()) != n {
+	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")
 	}
 }

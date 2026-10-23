@@ -196,16 +196,18 @@ func (s *scriptedGETs) snapshot() [][]int16 {
 // failOn is answered with failCode instead, or not at all when drop is set.
 func (s *scriptedGETs) install(f *escptest.Switch, script map[int16][]wire.TLV, failOn []int16, failCode int32, drop bool) {
 	f.Configure(func(f *escptest.Switch) {
-		f.GetFn = func(types []int16) ([]wire.TLV, int32, bool) {
+		f.GetFn = func(types []int16) ([]escptest.Setting, int32, bool) {
 			s.mu.Lock()
 			s.requests = append(s.requests, append([]int16(nil), types...))
 			s.mu.Unlock()
 			if failOn != nil && reflect.DeepEqual(types, failOn) {
 				return nil, failCode, drop
 			}
-			var out []wire.TLV
+			var out []escptest.Setting
 			for _, t := range types {
-				out = append(out, script[t]...)
+				for _, x := range script[t] {
+					out = append(out, escptest.Setting{Type: x.Type, Value: x.Value})
+				}
 			}
 			return out, 0, false
 		}
