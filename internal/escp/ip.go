@@ -99,13 +99,14 @@ func broadcastOf(n net.IPNet) net.IP {
 // what answers with what was asked and with what was there before (by MAC
 // address, so a different device does not count). The outcomes: the switch
 // has the new settings, and the call succeeds as if the reply had arrived; the
-// switch is unchanged, and the error says the write was not applied (it matches
-// ErrNoReply, or the context error when the call was cancelled); or nothing can
-// be established, and the error matches ErrMoveUnconfirmed. In that last case the
-// state is unknown and the caller must look at both addresses before it believes
-// either. The same holds when ctx is cancelled or expires after the write was sent:
-// the probe still runs (for a bounded time), because "cancelled" would not say whether
-// the switch moved. A write the switch refuses, or the gate refuses, is not probed:
+// switch is unchanged after all the attempts went unanswered, and the error says the
+// write was not applied (it matches ErrNoReply); or nothing can be established, and the
+// error matches ErrMoveUnconfirmed. In that last case the state is unknown and the caller
+// must look at both addresses before it believes either. The same holds when ctx is
+// cancelled or expires after the write was sent: the probe still runs (for a bounded
+// time), because "cancelled" would not say whether the switch moved; a probe that still
+// shows the old settings then proves little (the write may be taking effect), so it is
+// reported as ErrMoveUnconfirmed, not as "not applied". A write the switch refuses, or the gate refuses, is not probed:
 // nothing was applied.
 //
 // A switch that has DHCP on keeps its leased address whatever it is written, so this
@@ -199,6 +200,12 @@ func (c *Client) settleLostReply(ctx context.Context, mac string, before, want I
 	case lostReplyApplied:
 		return nil
 	case lostReplyUnchanged:
+		if !errors.Is(lost, ErrNoReply) {
+			// The call ended (cancelled, expired, or a send failed) possibly moments after the
+			// write went out, before the switch had to answer it: "unchanged" is only how the
+			// switch looked at the probe, and the write may still take effect.
+			return fmt.Errorf("%w: %w; a probe still shows the switch unchanged at %s, but the write may not have taken effect yet", ErrMoveUnconfirmed, lost, before.IP)
+		}
 		return fmt.Errorf("%w; a probe shows the switch unchanged at %s, so the write was not applied", lost, before.IP)
 	case lostReplyOtherDevice:
 		return fmt.Errorf("%w: the write got no reply and a different device (MAC %s) answers a probe", ErrMoveUnconfirmed, after.MAC)

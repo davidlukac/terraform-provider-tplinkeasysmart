@@ -170,8 +170,8 @@ func TestSetIPConfigSettlesWhenTheCallIsCancelledAfterTheWrite(t *testing.T) {
 	}
 }
 
-// Cancelled after a write that did not take effect: the error says so, and still names the cause.
-func TestSetIPConfigReportsAWriteThatWasNotAppliedWhenCancelled(t *testing.T) {
+// Cancelled while the switch still shows the old settings: that proves nothing yet, and the error says so.
+func TestSetIPConfigDoesNotClaimTheWriteWasNotAppliedWhenCancelled(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Switch) { f.DropSets = true })
 	ctx, cancel := context.WithCancel(context.Background())
@@ -183,11 +183,13 @@ func TestSetIPConfigReportsAWriteThatWasNotAppliedWhenCancelled(t *testing.T) {
 	c.allowLoopback = true
 	t.Cleanup(func() { c.Close() })
 	err := c.SetIPConfig(ctx, lostReplyWanted)
-	if !errors.Is(err, context.Canceled) || !strings.Contains(err.Error(), "not applied") {
-		t.Fatalf("want the cancellation and 'not applied', got %v", err)
+	// The probe sees the old settings, but the call ended before the switch had to answer, so
+	// nothing is proven: the error names the cancellation and says the write may yet take effect.
+	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "context canceled") || !strings.Contains(err.Error(), "may not have taken effect yet") {
+		t.Fatalf("want ErrMoveUnconfirmed naming the cancellation and the doubt, got %v", err)
 	}
-	if errors.Is(err, ErrMoveUnconfirmed) {
-		t.Fatalf("the state is known (unchanged): %v", err)
+	if errors.Is(err, ErrNoReply) {
+		t.Fatalf("this is not the 'all attempts unanswered' case: %v", err)
 	}
 }
 
