@@ -26,14 +26,14 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 		{"ValidateLAG port outside its group", func(*Client) error { return ValidateLAG(1, []int{1, 9}) }, "cannot be in LAG 1"},
 		{"ValidateIPConfig not IPv4", func(*Client) error { return ValidateIPConfig(IPConfig{}) }, "must all be IPv4 addresses"},
 		{"ValidateIPConfig mask", func(*Client) error {
-			return ValidateIPConfig(cfgOf("192.168.77.13", "255.0.255.0", "192.168.77.1"))
+			return ValidateIPConfig(cfgOf("192.0.2.13", "255.0.255.0", "192.0.2.1"))
 		}, "is not a contiguous prefix"},
 		{"ValidateIPConfig host address", func(*Client) error {
-			return ValidateIPConfig(cfgOf("192.168.77.0", "255.255.255.0", "192.168.77.1"))
+			return ValidateIPConfig(cfgOf("192.0.2.0", "255.255.255.0", "192.0.2.1"))
 		}, "is not a usable host address"},
 		{"ValidateIPConfig gateway", func(*Client) error {
-			return ValidateIPConfig(cfgOf("192.168.77.13", "255.255.255.0", "192.168.77.13"))
-		}, "gateway 192.168.77.13 must be another host address"},
+			return ValidateIPConfig(cfgOf("192.0.2.13", "255.255.255.0", "192.0.2.13"))
+		}, "gateway 192.0.2.13 must be another host address"},
 		{"ValidateHostname", func(*Client) error { return ValidateHostname("-bad-") }, "invalid device description"},
 		{"ValidateVLANID", func(*Client) error { return ValidateVLANID(4095) }, "invalid VLAN id 4095"},
 		{"ValidateVLANName", func(*Client) error { return ValidateVLANName("way-too-long-name") }, "invalid VLAN name"},

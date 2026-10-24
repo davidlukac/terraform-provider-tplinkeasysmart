@@ -86,7 +86,7 @@ func TestCancellationInterruptsTheWaitForAReply(t *testing.T) {
 // password that way would fail here instead of passing unnoticed.
 func TestCredentialsMustTravelUnderTheSessionKey(t *testing.T) {
 	f := escptest.Start(t)
-	c := dialFast(t, f, "secret")
+	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	if _, err := c.LED(ctx); err != nil { // establishes the session
 		t.Fatal(err)
@@ -121,7 +121,7 @@ func TestDecryptSessionKeyRefusesAShortValue(t *testing.T) {
 // A wrong password is a refusal by the switch, for the backup as for every write.
 func TestConfigBackupRefusalIsARejection(t *testing.T) {
 	f := escptest.Start(t)
-	c := dialFast(t, f, "wrong")
+	c := dialFake(t, f, "wrong")
 	_, err := c.ConfigBackup(context.Background())
 	var refused *RejectedError
 	if !errors.Is(err, ErrRejected) || !errors.As(err, &refused) || refused.Code != 5 {

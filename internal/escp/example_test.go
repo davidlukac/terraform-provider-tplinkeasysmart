@@ -16,7 +16,7 @@ import (
 
 // Read a switch. Dial sends nothing; the first call opens the socket and does the key exchange.
 func ExampleDial() {
-	c, err := escp.Dial(escp.Config{Host: "192.168.77.11", Username: "admin", Password: "secret"})
+	c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: "secret"})
 	if err != nil {
 		panic(err)
 	}
@@ -36,7 +36,7 @@ func ExampleDial() {
 // sends nothing.
 func ExampleClient_SetLED() {
 	c, err := escp.Dial(escp.Config{
-		Host: "192.168.77.11", Username: "admin", Password: "secret",
+		Host: "192.0.2.11", Username: "admin", Password: "secret",
 		WriteGate: safety.FirmwareGate(),
 	})
 	if err != nil {

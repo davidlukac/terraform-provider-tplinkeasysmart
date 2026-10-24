@@ -12,8 +12,10 @@ import (
 	"time"
 )
 
-// Manual tests against a real switch. They only read, or write the value that
-// is already set. Run with:
+// Manual tests against a real switch. Most only read, or write the value that is already set;
+// the others change something on ports and settings they first prove unused, and put it back
+// (the restore is deferred before the first write and checked by reading back). The ones that
+// can cut access need an extra variable and say so. Run with:
 //
 //	export TPLINK_EASYSMART_HOST=... TPLINK_EASYSMART_USERNAME=... TPLINK_EASYSMART_PASSWORD=...
 //	go test -tags live -run Live ./internal/escp -v
@@ -176,15 +178,19 @@ func TestLivePortWrites(t *testing.T) {
 			t.Errorf("port %d not restored: %+v vs %+v", id, now, orig)
 		}
 	}()
-	for _, step := range []struct {
+	type portStep struct {
 		enabled bool
 		speed   Speed
 		flow    bool
-	}{
-		{orig.Enabled, orig.ConfiguredSpeed, !orig.ConfiguredFlowControl},
-		{orig.Enabled, "100Mbps-full", orig.ConfiguredFlowControl},
-		{!orig.Enabled, orig.ConfiguredSpeed, orig.ConfiguredFlowControl},
-	} {
+	}
+	// The switch keeps flow control only with auto or 1000Mbps-full, and the client refuses the
+	// other combinations, so no step asks for one: flow control is toggled only where the
+	// original speed keeps it (or the toggle turns it off), and the fixed speed runs without it.
+	steps := []portStep{{orig.Enabled, "100Mbps-full", false}, {!orig.Enabled, orig.ConfiguredSpeed, orig.ConfiguredFlowControl}}
+	if flow := !orig.ConfiguredFlowControl; !flow || orig.ConfiguredSpeed.AllowsFlowControl() {
+		steps = append([]portStep{{orig.Enabled, orig.ConfiguredSpeed, flow}}, steps...)
+	}
+	for _, step := range steps {
 		if err := c.SetPort(ctx, PortConfig{ID: id, Enabled: step.enabled, Speed: step.speed, FlowControl: step.flow}); err != nil {
 			t.Fatalf("%+v: %v", step, err)
 		}
@@ -583,18 +589,24 @@ func TestLiveTwoClientsShareThePort(t *testing.T) {
 // vlanModes reads the three VLAN mode flags and the port-based group of VLAN 1.
 func vlanModes(t *testing.T, c *Client) (mtu MTUVLAN, portBased PortBasedVLAN, dot1q Dot1Q) {
 	t.Helper()
-	ctx := context.Background()
-	var err error
-	if mtu, err = c.MTUVLAN(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if portBased, err = c.PortBasedVLAN(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if dot1q, err = c.Dot1Q(ctx); err != nil {
+	mtu, portBased, dot1q, err := vlanModesE(c)
+	if err != nil {
 		t.Fatal(err)
 	}
 	return mtu, portBased, dot1q
+}
+
+// vlanModesE is vlanModes for a restore, which must go on when a read fails.
+func vlanModesE(c *Client) (mtu MTUVLAN, portBased PortBasedVLAN, dot1q Dot1Q, err error) {
+	ctx := context.Background()
+	if mtu, err = c.MTUVLAN(ctx); err != nil {
+		return
+	}
+	if portBased, err = c.PortBasedVLAN(ctx); err != nil {
+		return
+	}
+	dot1q, err = c.Dot1Q(ctx)
+	return
 }
 
 // Switches the VLAN mode to 802.1Q, builds a test VLAN on two unused ports, changes
@@ -617,10 +629,15 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 	}
 	t.Logf("original: port-based groups %+v", pb0.VLANs)
 
+	// Every step of the restore is attempted whatever happened before it, and a failed read
+	// only means the cleanup of the test VLAN is tried blind: the switch must end in port-based mode.
 	restore := func() {
-		_, _, q := vlanModes(t, c)
-		if q.Enabled {
-			if _, ok := vlanByID(q, testVLAN); ok {
+		_, _, q, err := vlanModesE(c)
+		if err != nil {
+			t.Errorf("RESTORE: reading the VLAN state failed (%v); removing the test VLAN blind", err)
+		}
+		if err != nil || q.Enabled {
+			if _, ok := vlanByID(q, testVLAN); ok || err != nil {
 				if err := c.SetPVIDs(ctx, map[int]int{a: 1, b: 1}); err != nil {
 					t.Errorf("RESTORE: PVIDs: %v", err)
 				}
@@ -632,7 +649,11 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 		if err := c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModePortBased}); err != nil {
 			t.Errorf("RESTORE FAILED: port-based mode: %v", err)
 		}
-		mtu, pb, q := vlanModes(t, c)
+		mtu, pb, q, err := vlanModesE(c)
+		if err != nil {
+			t.Errorf("RESTORE: cannot verify, reading the VLAN state failed: %v", err)
+			return
+		}
 		t.Logf("after restore: mtu=%+v port-based=%+v 802.1Q enabled=%v", mtu, pb, q.Enabled)
 		if mtu.Enabled || !pb.Enabled || q.Enabled || !reflect.DeepEqual(pb.VLANs, pb0.VLANs) {
 			t.Errorf("NOT RESTORED: mtu=%+v port-based=%+v 802.1Q=%v, want port-based %+v", mtu, pb, q.Enabled, pb0.VLANs)
