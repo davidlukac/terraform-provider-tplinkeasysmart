@@ -50,7 +50,7 @@ func (e *ImpactError) Error() string {
 // closed. A max that is not an impact class refuses everything. The refusal is an *ImpactError.
 func MaxImpact(max escp.Impact) escp.WriteGate {
 	return func(_ context.Context, _ escp.InfoReader, op escp.Operation) error {
-		if op.Impact < escp.ImpactCosmetic || op.Impact > max {
+		if !max.Valid() || !op.Impact.Valid() || op.Impact > max {
 			return &ImpactError{Op: op, Max: max}
 		}
 		return nil
@@ -63,8 +63,10 @@ var ErrDryRun = errors.New("dry run: the write was recorded and not sent")
 
 // DryRun records the operations a front end would perform without sending any of them. Use its
 // Gate as the last gate of a client; run the commands as usual; read Operations. A method that
-// first reads from the switch (SetHostname, SetIPConfig, SetPortPriorities) still does, and a
-// method that would send several writes records its operation once: the first refusal ends it.
+// first reads from the switch (SetHostname, SetIPConfig, SetPortPriorities) still does, and so
+// does every method that names a port (it reads the switch's port count once, before the gate),
+// so a dry run needs a reachable switch. A method that would send several writes records its
+// operation once: the first refusal ends it.
 // A DryRun is safe for concurrent use.
 type DryRun struct {
 	mu  sync.Mutex

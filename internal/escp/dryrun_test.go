@@ -9,6 +9,7 @@ import (
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/safety"
 )
 
@@ -80,5 +81,56 @@ func TestDryRunOfAWriteThatReadsFirst(t *testing.T) {
 	}
 	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("the switch received %d writes", n)
+	}
+}
+
+// PortGate through the real client: the uplink cannot be touched, named or not, and a free port can.
+func TestPortGateThroughTheRealClient(t *testing.T) {
+	f := escptest.Start(t)
+	f.Configure(func(f *escptest.Switch) {
+		f.GetFn = func(types []int16) ([]escptest.Setting, int32, bool) {
+			var out []escptest.Setting
+			for _, typ := range types {
+				switch typ {
+				case wire.TLVPorts: // port 1 is the linked uplink in LAG 1, port 3 is free
+					out = append(out,
+						escptest.Setting{Type: wire.TLVPorts, Value: []byte{1, 1, 1, 1, 6, 0, 0}},
+						escptest.Setting{Type: wire.TLVPorts, Value: []byte{3, 1, 0, 1, 0, 0, 0}})
+				case wire.TLVLAG: // LAG 1 = ports 1 and 2
+					out = append(out, escptest.Setting{Type: wire.TLVLAG, Value: []byte{1, 0, 0, 0, 3}})
+				case wire.TLVPortCount:
+					out = append(out, escptest.Setting{Type: wire.TLVPortCount, Value: []byte{8}})
+				}
+			}
+			return out, 0, false
+		}
+	})
+	c, err := escp.Dial(escp.Config{
+		Host: "127.0.0.1", Username: escptest.Username, Password: escptest.Password,
+		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: "127.0.0.1",
+		WriteGate: safety.PortGate(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	ctx := context.Background()
+
+	var used *safety.PortUseError
+	if err := c.SetPort(ctx, escp.PortConfig{ID: 1, Enabled: false, Speed: escp.SpeedAuto}); !errors.As(err, &used) || used.Port != 1 || used.Reason != safety.PortLinkUp {
+		t.Fatalf("disabling the uplink: got %v, want a link-up refusal for port 1", err)
+	}
+	// removing LAG 1 names no port, yet its member carries the link
+	if err := c.SetLAG(ctx, 1, nil); !errors.As(err, &used) || used.Port != 1 {
+		t.Fatalf("removing LAG 1: got %v, want a refusal for port 1", err)
+	}
+	if n := f.WriteCount(); n != 0 {
+		t.Fatalf("the refusals must send nothing, the switch received %d writes", n)
+	}
+	if err := c.SetPort(ctx, escp.PortConfig{ID: 3, Enabled: true, Speed: escp.SpeedAuto}); err != nil {
+		t.Fatalf("a free port: %v", err)
+	}
+	if n := f.WriteCount(); n != 1 {
+		t.Fatalf("the free port is written once, got %d", n)
 	}
 }

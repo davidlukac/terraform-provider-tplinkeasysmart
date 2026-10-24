@@ -11,6 +11,9 @@ import (
 const (
 	// ipMoveWait is how long SetIPConfig waits for the switch to answer at its new address.
 	ipMoveWait = 20 * time.Second
+	// settleBudget bounds the probe after a write whose outcome is unknown when the caller's context
+	// is already done (cancelled or expired): the probe must still run, but not for ever.
+	settleBudget = 15 * time.Second
 	// ipMovePoll is the pause between discovery probes while waiting.
 	ipMovePoll = 500 * time.Millisecond
 )
@@ -96,11 +99,20 @@ func broadcastOf(n net.IPNet) net.IP {
 // what answers with what was asked and with what was there before (by MAC
 // address, so a different device does not count). The outcomes: the switch
 // has the new settings, and the call succeeds as if the reply had arrived; the
-// switch is unchanged, and the error matches ErrNoReply and says the write was
-// not applied; or nothing can be established, and the error matches
-// ErrMoveUnconfirmed. In that last case the state is unknown and the caller
-// must look at both addresses before it believes either. Callers must guard: a
-// wrong address, mask or gateway can cut the management path for good.
+// switch is unchanged after all the attempts went unanswered, and the error says the
+// write was not applied (it matches ErrNoReply); or nothing can be established, and the
+// error matches ErrMoveUnconfirmed. In that last case the state is unknown and the caller
+// must look at both addresses before it believes either. The same holds when ctx is
+// cancelled or expires after the write was sent: the probe still runs (for a bounded
+// time), because "cancelled" would not say whether the switch moved; a probe that still
+// shows the old settings then proves little (the write may be taking effect), so it is
+// reported as ErrMoveUnconfirmed, not as "not applied". A write the switch refuses, or the gate refuses, is not probed:
+// nothing was applied.
+//
+// A switch that has DHCP on keeps its leased address whatever it is written, so this
+// is not meant for it (the Terraform provider refuses it); writing a static address
+// to such a switch was never tried on hardware. Callers must guard: a wrong address,
+// mask or gateway can cut the management path for good.
 func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	if err := validateIPConfig(cfg, c.allowLoopback); err != nil {
 		return err
@@ -116,12 +128,21 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	c.mu.Lock()
 	c.alsoFrom = cfg.IP.To4()
 	c.mu.Unlock()
-	err = c.writeSystem(ctx, Operation{Name: "SetIPConfig", Impact: ImpactManagement}, info.Hostname, info.DHCP, cfg)
+	sent, err := c.writeSystem(ctx, Operation{Name: "SetIPConfig", Impact: ImpactManagement}, info.Hostname, info.DHCP, cfg)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if errors.Is(err, ErrNoReply) {
-		// The write may have been applied. alsoFrom is still set, so a probe is answered
-		// from either address.
+	var refused *RejectedError
+	if err != nil && sent && !errors.As(err, &refused) {
+		// The write may have been applied: no reply came, or the call was cancelled, or the
+		// request could not be sent in full. Only a refusal by the switch (or by the gate, which
+		// sends nothing) says it was not. alsoFrom is still set, so a probe is answered from
+		// either address; and the probe must run even if ctx is done, because the answer is what
+		// the caller needs most.
+		if ctx.Err() != nil {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), settleBudget)
+			defer cancel()
+		}
 		err = c.settleLostReply(ctx, info.MAC, before, cfg, err)
 	}
 	c.alsoFrom = nil
@@ -179,6 +200,12 @@ func (c *Client) settleLostReply(ctx context.Context, mac string, before, want I
 	case lostReplyApplied:
 		return nil
 	case lostReplyUnchanged:
+		if !errors.Is(lost, ErrNoReply) {
+			// The call ended (cancelled, expired, or a send failed) possibly moments after the
+			// write went out, before the switch had to answer it: "unchanged" is only how the
+			// switch looked at the probe, and the write may still take effect.
+			return fmt.Errorf("%w: %w; a probe still shows the switch unchanged at %s, but the write may not have taken effect yet", ErrMoveUnconfirmed, lost, before.IP)
+		}
 		return fmt.Errorf("%w; a probe shows the switch unchanged at %s, so the write was not applied", lost, before.IP)
 	case lostReplyOtherDevice:
 		return fmt.Errorf("%w: the write got no reply and a different device (MAC %s) answers a probe", ErrMoveUnconfirmed, after.MAC)

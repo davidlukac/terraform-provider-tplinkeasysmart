@@ -21,7 +21,11 @@ func TestFirmwareBuild(t *testing.T) {
 		{"1.0.0 Build 20230218", "20230218", true},
 		{"1.0.0", "", false},
 		{"", "", false},
-		{"Build 2023021", "", false}, // seven digits is not a date
+		{"Build 2023021", "", false},                // seven digits is not a date
+		{"1.0.0 Build 2025071012 Rel.1", "", false}, // ten digits are not a verified date with a tail
+		{"1.0.0 Build 202302189 Rel.1", "", false},
+		{"1.0.0 Build 20230218Rel.50633", "", false}, // glued to a letter is not the format the switch reports
+		{"1.0.0 Build 20230218.", "20230218", true},
 	}
 	for _, tt := range tests {
 		got, ok := FirmwareBuild(tt.version)

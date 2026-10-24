@@ -59,10 +59,10 @@ const (
 	TLVQoSPriority = 12289 // one TLV per port: port(1) priority(1), raw 0..3
 
 	// TLVStormControl is QoS > Storm Control: one TLV per port, 9 bytes:
-	// port(1) reserved(1) unknown-unicast(1) multicast(1) broadcast(1) rate(4, kbps).
+	// port(1) enabled(1) unknown-unicast(1) multicast(1) broadcast(1) rate(4, kbps).
 	TLVStormControl = 12800
 
-	TLVBandwidthIngress = 12544 // one TLV per port: port(1) reserved(1) rate(4, kbps; 0 = unlimited)
+	TLVBandwidthIngress = 12544 // one TLV per port: port(1) enabled(1) rate(4, kbps; 0 = unlimited)
 	TLVBandwidthEgress  = 12545
 
 	// TLVPortStats is Monitoring > Port Statistics: one 19-byte TLV per port.

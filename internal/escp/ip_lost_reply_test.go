@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 )
@@ -142,6 +143,83 @@ func TestSettleLostReplyNamesWhatAnswered(t *testing.T) {
 		c.mu.Unlock()
 		if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "neither the old nor the new") {
 			t.Fatalf("got %v", err)
+		}
+	})
+}
+
+// The caller's context ends right after the write was applied: the call must not report
+// "cancelled" as if nothing happened. The probe runs anyway and finds the move.
+func TestSetIPConfigSettlesWhenTheCallIsCancelledAfterTheWrite(t *testing.T) {
+	f := escptest.Start(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f.Configure(func(f *escptest.Switch) {
+		f.OnSystemSet = escptest.SystemSetLeaves
+		f.AfterSystemSet = cancel // the switch has applied the write; the caller gives up
+	})
+	c := dialFast(t, f, "secret")
+	if err := c.SetIPConfig(ctx, lostReplyWanted); err != nil {
+		t.Fatalf("the switch has the new settings, so the call must succeed: %v", err)
+	}
+	if n := f.WriteCount(); n != 1 {
+		t.Fatalf("the write must be sent once, got %d", n)
+	}
+	info, err := c.Info(context.Background())
+	if err != nil || info.Netmask != "255.255.0.0" || info.Gateway != "127.0.0.2" {
+		t.Fatalf("after the move: %+v err=%v", info, err)
+	}
+}
+
+// Cancelled while the switch still shows the old settings: that proves nothing yet, and the error says so.
+func TestSetIPConfigDoesNotClaimTheWriteWasNotAppliedWhenCancelled(t *testing.T) {
+	f := escptest.Start(t)
+	f.Configure(func(f *escptest.Switch) { f.DropSets = true })
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 5 * time.Second,
+		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
+		// the gate lets the write go, then the caller gives up before it is sent
+		WriteGate: func(context.Context, InfoReader, Operation) error { cancel(); return nil }})
+	c.allowLoopback = true
+	t.Cleanup(func() { c.Close() })
+	err := c.SetIPConfig(ctx, lostReplyWanted)
+	// The probe sees the old settings, but the call ended before the switch had to answer, so
+	// nothing is proven: the error names the cancellation and says the write may yet take effect.
+	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "context canceled") || !strings.Contains(err.Error(), "may not have taken effect yet") {
+		t.Fatalf("want ErrMoveUnconfirmed naming the cancellation and the doubt, got %v", err)
+	}
+	if errors.Is(err, ErrNoReply) {
+		t.Fatalf("this is not the 'all attempts unanswered' case: %v", err)
+	}
+}
+
+// A refusal by the switch or by the gate means nothing was applied: no probe, no guessing.
+func TestSetIPConfigDoesNotProbeAfterARefusal(t *testing.T) {
+	t.Run("the switch refuses", func(t *testing.T) {
+		f := escptest.Start(t)
+		f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom = 1 })
+		c := dialFast(t, f, "secret")
+		err := c.SetIPConfig(context.Background(), lostReplyWanted)
+		var refused *RejectedError
+		if !errors.As(err, &refused) || strings.Contains(err.Error(), "probe") {
+			t.Fatalf("want the refusal as it is, got %v", err)
+		}
+		if !c.dest.IP.Equal(lostReplyBefore.IP) || c.alsoFrom != nil {
+			t.Fatalf("the client must stay where it was: dest=%v alsoFrom=%v", c.dest.IP, c.alsoFrom)
+		}
+	})
+	t.Run("the gate refuses", func(t *testing.T) {
+		f := escptest.Start(t)
+		c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
+			SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
+			WriteGate: func(context.Context, InfoReader, Operation) error { return errGateRefused }})
+		c.allowLoopback = true
+		t.Cleanup(func() { c.Close() })
+		if err := c.SetIPConfig(context.Background(), lostReplyWanted); err != errGateRefused { //nolint:errorlint // the contract is the gate's error unchanged
+			t.Fatalf("the gate's error must come back unchanged, got %v", err)
+		}
+		if f.WriteCount() != 0 || c.alsoFrom != nil {
+			t.Fatalf("nothing was sent and the client stays: writes=%d alsoFrom=%v", f.WriteCount(), c.alsoFrom)
 		}
 	})
 }
