@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.29.0
+
+- `tplinkeasysmart_port`: `flow_control = true` with a 10 or 100 Mbps speed is refused while planning, and again by the client before anything is sent. The switch only keeps flow control with `auto` or `1000Mbps-full`; before, it accepted the speed and left flow control off, so the apply changed the speed and then failed on read-back.
+- `tplinkeasysmart_management_ip`: a lost reply to the change no longer reports a failed key exchange for a move that happened. The provider probes the switch (by its MAC address): the apply succeeds when the switch has the new settings, says "not applied" when it is unchanged, and otherwise names what it found (nothing, a different device, or settings that are neither the old nor the new ones). A cancelled run (Ctrl-C) during the change is settled the same way.
+- **Fix:** changing only `allow_disruptive` on `tplinkeasysmart_port`, `_bandwidth_limit`, `_storm_limit`, `_lag`, `_vlan_port_based_group`, `_vlan_8021q_group`, `_vlan_8021q_pvid` or `_port_mirror` no longer writes to the switch (it used to rewrite the port or LAG with identical values), and removing it is no longer refused by the guard.
+- `tplinkeasysmart_lag` and `tplinkeasysmart_port`: when the switch refuses a LAG or a half-duplex port, the error names the cause (error codes 7405 to 7418: members with different priorities, speeds, flow control or admin state, auto-negotiation mixed with a fixed speed, half duplex on a member). The descriptions say what the switch checks when a group is created and that it does not keep the members alike afterwards.
+- A cancelled run stops sending: nothing is written once the context is done, and a write waiting for a reply returns at once.
+- Firmware guard: the build in the version string must stand alone ("Build 2025071012" was read as the verified build 20250710).
+- **Behaviour changes:**
+  - A port that has a link up and is a LAG member (the uplink) is reported as "has a link up" by every port guard (`port`, `bandwidth_limit`, `storm_limit`, the `port_mirror` destination, `vlan_8021q_group`, `vlan_8021q_pvid`). The refusal is the same; the sentence differs.
+  - A write that names a port the switch does not have (a mirror source port, the MTU VLAN uplink) is refused before anything is sent. The client reads the switch's port count once for that, so the first such write costs one extra read; if the switch does not report it, those writes fail.
+  - `tplinkeasysmart_vlan_mode`: the "did not change as requested" error formats its values differently.
+- The ESCP client is now a self-contained library inside the provider (typed values, `ErrInvalid`, a write gate that is told the operation and its impact, a `safety` package with firmware, port and dry-run gates, a fake switch for tests) in preparation for a command line client. It changes nothing for provider users beyond the items above.
+- Building from source needs Go 1.27.3.
+
 ## 0.28.0
 
 - tplinkeasysmart_management_ip: set the static IP address, subnet mask and gateway (allow_disruptive, plan-time validation, the client follows the switch); verified live on firmware 20250710
