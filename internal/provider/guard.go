@@ -30,8 +30,7 @@ func guardPorts(ctx context.Context, c portLister, allowDisruptive bool, ports .
 	if err != nil {
 		return fmt.Errorf("cannot check whether the port is in use: %w", err)
 	}
-	var used *safety.PortUseError
-	if errors.As(safety.CheckPorts(all, safety.PortRule{}, ports...), &used) {
+	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{}, ports...), func(used *safety.PortUseError) error {
 		switch used.Reason {
 		case safety.PortMissing:
 			return errors.New(used.Error())
@@ -40,8 +39,21 @@ func guardPorts(ctx context.Context, c portLister, allowDisruptive bool, ports .
 		default:
 			return fmt.Errorf("port %d is a member of LAG%d; set allow_disruptive = true to change it anyway", used.Port, used.LAG)
 		}
+	})
+}
+
+// wordPortRefusal turns the refusal of safety.CheckPorts into the sentence of a guard. Anything
+// that is not a *safety.PortUseError is returned as it is, so a refusal of a kind this code does
+// not know can never read as "the ports are free" and let a write through.
+func wordPortRefusal(err error, word func(used *safety.PortUseError) error) error {
+	if err == nil {
+		return nil
 	}
-	return nil
+	var used *safety.PortUseError
+	if errors.As(err, &used) {
+		return word(used)
+	}
+	return err
 }
 
 // allowDisruptiveAttribute is the schema of the opt-in that lets a resource

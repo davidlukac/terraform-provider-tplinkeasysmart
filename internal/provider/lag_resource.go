@@ -89,9 +89,9 @@ func (r *lagResource) Configure(_ context.Context, req resource.ConfigureRequest
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-// guardLAG checks every port of the old and new membership. Ports that are
-// already members of this very group count as in a LAG, so they are only
-// accepted when allow_disruptive is set or they are about to be added.
+// guardLAG checks every port of the old and new membership. Members of this very
+// group are tolerated (an edit of the group touches them by definition); a link
+// never is, nor are the members of another group.
 func (r *lagResource) guardLAG(ctx context.Context, group int, allow bool, old, new []int) error {
 	if allow {
 		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped")
@@ -101,18 +101,16 @@ func (r *lagResource) guardLAG(ctx context.Context, group int, allow bool, old, 
 	if err != nil {
 		return fmt.Errorf("cannot check whether the ports are in use: %w", err)
 	}
-	var used *safety.PortUseError
-	if errors.As(safety.CheckPorts(all, safety.PortRule{TolerateLAG: group}, append(append([]int{}, old...), new...)...), &used) {
+	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{TolerateLAG: group}, append(append([]int{}, old...), new...)...), func(used *safety.PortUseError) error {
 		switch used.Reason {
 		case safety.PortMissing:
 			return errors.New(used.Error())
 		case safety.PortLinkUp:
 			return fmt.Errorf("port %d has a link up (%s); changing its LAG membership can cut traffic or management access. Set allow_disruptive = true to proceed anyway", used.Port, used.Speed)
 		default:
-			return fmt.Errorf("port %d already belongs to LAG%d", used.Port, used.LAG)
+			return fmt.Errorf("port %d already belongs to LAG%d. Set allow_disruptive = true to proceed anyway", used.Port, used.LAG)
 		}
-	}
-	return nil
+	})
 }
 
 func (r *lagResource) current(ctx context.Context, group int) ([]int, error) {
@@ -169,7 +167,7 @@ func (r *lagResource) Create(ctx context.Context, req resource.CreateRequest, re
 }
 
 func (r *lagResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
+	applyUpdate(ctx, req, resp, r.apply)
 }
 
 // Read binds the resource to the switch recorded in state, then reads it.

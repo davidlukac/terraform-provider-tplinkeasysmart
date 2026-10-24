@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 // Attribute names and diagnostic summaries shared by several resources.
@@ -50,6 +51,48 @@ func applyPlan[T any](ctx context.Context, plan tfsdk.Plan, state *tfsdk.State, 
 	if apply(ctx, &m, diags.AddError) {
 		diags.Append(state.Set(ctx, &m)...)
 	}
+}
+
+// applyUpdate is the shared body of Update for the resources behind a guard. When the plan differs
+// from the prior state in allow_disruptive alone, nothing is guarded and nothing is written: the
+// flag is an instruction about the next change, not a setting of the switch, so adding it must
+// not rewrite a live port or LAG, and removing it must not be refused by a guard that has nothing
+// to guard. Computed attributes the plan leaves unknown keep their prior values. Any other
+// difference goes through applyPlan, guard included.
+func applyUpdate[T any](ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse,
+	apply func(ctx context.Context, m *T, add func(summary, detail string)) bool) {
+	if merged, ok := planWithOnlyTheFlagChanged(req.Plan.Raw, req.State.Raw); ok {
+		resp.State.Raw = merged
+		return
+	}
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, apply)
+}
+
+// planWithOnlyTheFlagChanged returns the planned state, with the prior value in place of every
+// unknown one, when plan and prior state agree on every attribute except allow_disruptive. Any
+// other difference (including a value the plan cannot decide yet) reports false.
+func planWithOnlyTheFlagChanged(plan, prior tftypes.Value) (tftypes.Value, bool) {
+	var p, s map[string]tftypes.Value
+	if plan.As(&p) != nil || prior.As(&s) != nil || p == nil || s == nil {
+		return tftypes.Value{}, false
+	}
+	merged := make(map[string]tftypes.Value, len(p))
+	for name, pv := range p {
+		sv, ok := s[name]
+		switch {
+		case !ok:
+			return tftypes.Value{}, false
+		case name == attrAllowDisruptive:
+			merged[name] = pv
+		case !pv.IsKnown():
+			merged[name] = sv
+		case pv.Equal(sv):
+			merged[name] = pv
+		default:
+			return tftypes.Value{}, false
+		}
+	}
+	return tftypes.NewValue(plan.Type(), merged), true
 }
 
 // importSingletonID accepts the fixed id of a singleton resource, optionally
