@@ -92,8 +92,7 @@ func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new [
 	if err != nil {
 		return fmt.Errorf("cannot check whether the ports are in use: %w", err)
 	}
-	var used *safety.PortUseError
-	if errors.As(safety.CheckPorts(all, safety.PortRule{}, append(append([]int{}, old...), new...)...), &used) {
+	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{}, append(append([]int{}, old...), new...)...), func(used *safety.PortUseError) error {
 		switch used.Reason {
 		case safety.PortMissing:
 			return errors.New(used.Error())
@@ -102,8 +101,7 @@ func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new [
 		default:
 			return fmt.Errorf("port %d is a member of LAG%d; changing its VLAN can cut the uplink. Set allow_disruptive = true to proceed anyway", used.Port, used.LAG)
 		}
-	}
-	return nil
+	})
 }
 
 func (r *portVLANResource) current(ctx context.Context, group int) ([]int, error) {
@@ -163,7 +161,7 @@ func (r *portVLANResource) Create(ctx context.Context, req resource.CreateReques
 }
 
 func (r *portVLANResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
+	applyUpdate(ctx, req, resp, r.apply)
 }
 
 // Read binds the resource to the switch recorded in state, then reads it.

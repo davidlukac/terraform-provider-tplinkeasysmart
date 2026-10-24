@@ -216,7 +216,7 @@ func (r *vlan8021QGroupResource) Create(ctx context.Context, req resource.Create
 }
 
 func (r *vlan8021QGroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
+	applyUpdate(ctx, req, resp, r.apply)
 }
 
 // Read binds the resource to the switch recorded in state, then reads it.
