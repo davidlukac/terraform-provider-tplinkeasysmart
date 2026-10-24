@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"net"
+	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -220,10 +223,10 @@ var writeOperations = map[string]Operation{
 	"SetQoSMode":        {Name: "SetQoSMode", Impact: ImpactTraffic},
 	"SetPortPriorities": {Name: "SetPortPriorities", Ports: []int{2}, Impact: ImpactTraffic},
 	"SetStormControl":   {Name: "SetStormControl", Ports: []int{2}, Impact: ImpactTraffic},
-	"SetVLAN8021Q":      {Name: "SetVLAN8021Q", Ports: []int{2}, Impact: ImpactTraffic},
-	"DeleteVLAN8021Q":   {Name: "DeleteVLAN8021Q", Impact: ImpactTraffic},
-	"SetPortBasedVLAN":  {Name: "SetPortBasedVLAN", Ports: []int{3, 4}, Impact: ImpactTraffic},
-	"SetLAG":            {Name: "SetLAG", Ports: []int{2, 3}, Impact: ImpactManagement},
+	"SetVLAN8021Q":      {Name: "SetVLAN8021Q", Ports: []int{2}, Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 10},
+	"DeleteVLAN8021Q":   {Name: "DeleteVLAN8021Q", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 10},
+	"SetPortBasedVLAN":  {Name: "SetPortBasedVLAN", Ports: []int{3, 4}, Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 2},
+	"SetLAG":            {Name: "SetLAG", Ports: []int{2, 3}, Impact: ImpactManagement, Replaces: GroupLAG, ID: 1},
 	"SetLoopPrevention": {Name: "SetLoopPrevention", Impact: ImpactManagement},
 	"SetPVIDs":          {Name: "SetPVIDs", Ports: []int{2}, Impact: ImpactManagement},
 	"SetVLANMode":       {Name: "SetVLANMode", Ports: []int{8}, Impact: ImpactManagement},
@@ -343,5 +346,67 @@ func TestImpactNames(t *testing.T) {
 	}
 	if ImpactCosmetic >= ImpactTraffic || ImpactTraffic >= ImpactManagement {
 		t.Fatal("the classes are ordered from harmless to able to cut the management path; gates compare them")
+	}
+}
+
+// Removing a group names no port, but the operation still says which group goes: a gate cannot
+// protect the members without it.
+func TestARemovedGroupIsStillReportedAsReplaced(t *testing.T) {
+	ctx := context.Background()
+	cases := []struct {
+		name string
+		call func(c *Client) error
+		want Operation
+	}{
+		{"LAG", func(c *Client) error { return c.SetLAG(ctx, 2, nil) }, Operation{Name: "SetLAG", Impact: ImpactManagement, Replaces: GroupLAG, ID: 2}},
+		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, 3, nil) }, Operation{Name: "SetPortBasedVLAN", Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 3}},
+		{"802.1Q VLAN", func(c *Client) error { return c.DeleteVLAN8021Q(ctx, 20) }, Operation{Name: "DeleteVLAN8021Q", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 20}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			seen := operationsOf(t, func(_ context.Context, c *Client) error { return tc.call(c) })
+			if len(seen) == 0 {
+				t.Fatal("the gate was not consulted")
+			}
+			got := seen[0]
+			if len(got.Ports) != 0 {
+				t.Errorf("a removal names no port, got %v", got.Ports)
+			}
+			got.Ports = nil
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("got %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+// Every place that sends an OpSet is known. Two are not writes through setTLVs (the session key
+// exchange and the configuration backup, which only reads), and are the only ones allowed; a new
+// one would have to be gated, or be a read on purpose, and this test makes that a decision.
+func TestOnlyKnownPlacesSendASET(t *testing.T) {
+	want := map[string]int{
+		"client.go": 2, // the key exchange in ensureSession, and setTLVsSent
+		"backup.go": 1, // ConfigBackup: a SET on the wire, a read in effect
+	}
+	files, err := filepath.Glob("*.go")
+	if err != nil || len(files) == 0 {
+		t.Fatalf("cannot list the package sources: %v", err)
+	}
+	pattern := regexp.MustCompile(`\bwire\.OpSet\b`)
+	got := map[string]int{}
+	for _, f := range files {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := len(pattern.FindAll(src, -1)); n > 0 {
+			got[f] = n
+		}
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("places that send an OpSet: %v, expected %v. A new SET must pass the write gate (setTLVs) or be a read by design.", got, want)
 	}
 }

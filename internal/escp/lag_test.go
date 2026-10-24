@@ -73,6 +73,8 @@ func TestValidateLAG(t *testing.T) {
 		{"group 0", 0, []int{1, 2}, "invalid LAG group"},
 		{"group 3", 3, []int{1, 2}, "invalid LAG group"},
 		{"remove group 3", 3, nil, "invalid LAG group"},
+		{"the same port twice", 1, []int{2, 2}, "port 2 is listed twice"},
+		{"a repeat among four", 1, []int{1, 2, 3, 3}, "port 3 is listed twice"},
 		{"one port", 1, []int{2}, "2 to 4 ports"},
 		{"five ports", 1, []int{1, 2, 3, 4, 5}, "2 to 4 ports"},
 		{"group 1 reaching into group 2", 1, []int{4, 5}, "port 5 cannot be in LAG 1 (LAG 1 takes ports 1-4)"},

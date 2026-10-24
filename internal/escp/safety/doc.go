@@ -20,13 +20,19 @@
 //
 // A gate is also told the operation: the client method, the ports it names and its Impact
 // (cosmetic, traffic or management: the worst the method can do, not a judgement of one
-// particular write). MaxImpact refuses above a class with an *ImpactError, and DryRun
-// records the operations a front end would perform and refuses them all with ErrDryRun, so
-// a "--dry-run" is a gate and not a second code path. Chain combines gates; put the dry
-// run last so it only sees what the others allowed:
+// particular write: a port setting is Traffic even when it disables the uplink). MaxImpact
+// refuses above a class with an *ImpactError. Which ports a write touches is a separate
+// question, answered by PortGate: it refuses a write that names (or, for a group it replaces
+// or removes, drops) a port that is missing, linked or in a LAG, with the same *PortUseError
+// as CheckPorts. DryRun records the operations a front end would perform and refuses them all
+// with ErrDryRun, so a "--dry-run" is a gate and not a second code path. Chain combines
+// gates; put the dry run last so it only sees what the others allowed:
 //
 //	dry := safety.NewDryRun()
-//	gate := safety.Chain(safety.FirmwareGate(), safety.MaxImpact(escp.ImpactTraffic), dry.Gate())
+//	gate := safety.Chain(safety.FirmwareGate(), safety.MaxImpact(escp.ImpactTraffic), safety.PortGate(), dry.Gate())
+//
+// A ceiling on the impact alone is not a safety rule: without PortGate (or the front end's own
+// check of the ports) a write within the ceiling can still cut the uplink.
 //
 // # Ports
 //

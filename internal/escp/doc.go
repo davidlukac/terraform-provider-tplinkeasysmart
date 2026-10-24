@@ -51,12 +51,14 @@
 // therefore follows the same steps:
 //
 //  1. The arguments are validated (see the Validate functions) and a bad value is refused
-//     before anything is sent.
+//     before any write is sent. A writer that names a port also reads the switch's port count
+//     once (the first time), to refuse ports the switch does not have: that is a read, and it
+//     happens before the gate.
 //  2. The Config.WriteGate, if there is one, is consulted with the write's Operation (the
 //     method, the ports it names and its Impact class). When it refuses, the method returns
-//     the gate's error unchanged and sends nothing at all. The safety package provides gates
+//     the gate's error unchanged and sends no write. The safety package provides gates
 //     for firmware builds this client was not verified against, for a ceiling on the impact,
-//     and for a dry run, and Chain combines them.
+//     for the ports a write touches, and for a dry run, and Chain combines them.
 //  3. The write is sent with the credentials, which ride on every SET. If the switch
 //     answers with a non-zero code the error is a *RejectedError (it matches ErrRejected).
 //
@@ -76,8 +78,8 @@
 // not answer in time), ErrRejected and *RejectedError (the switch refused a write),
 // ErrNoInterface (Discover has nowhere to send), ErrMoveUnconfirmed (SetIPConfig lost
 // track of the switch), ErrInvalidConfig (a configuration backup that is not one) and
-// ErrInvalid (an argument refused before anything was sent; the message names the value and
-// what is allowed).
+// ErrInvalid (an argument refused before any write was sent; the message names the value and
+// what is allowed), ErrReplyTooLarge (a fragmented reply bigger than any switch sends).
 //
 // # Security
 //

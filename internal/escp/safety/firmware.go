@@ -21,7 +21,7 @@ var verifiedFirmwareBuilds = []string{"20230218", "20250710"}
 // unless the user opts in. The result is a copy: changing it changes nothing.
 func VerifiedFirmwareBuilds() []string { return slices.Clone(verifiedFirmwareBuilds) }
 
-var firmwareBuildPattern = regexp.MustCompile(`Build (\d{8})`)
+var firmwareBuildPattern = regexp.MustCompile(`Build (\d{8})\b`)
 
 // FirmwareBuild extracts the build date from a firmware version string as the
 // switch reports it ("1.0.0 Build 20230218 Rel.50633"). ok is false when the

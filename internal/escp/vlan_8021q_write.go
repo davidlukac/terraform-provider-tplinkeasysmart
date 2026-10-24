@@ -110,7 +110,7 @@ func (c *Client) SetVLAN8021Q(ctx context.Context, v VLAN8021Q) error {
 	if err := c.requirePorts(ctx, members...); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, Operation{Name: "SetVLAN8021Q", Ports: members, Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: value})
+	return c.setTLVs(ctx, Operation{Name: "SetVLAN8021Q", Ports: members, Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: v.ID}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: value})
 }
 
 // DeleteVLAN8021Q removes an 802.1Q VLAN: TLV 8705 with both masks empty and an
@@ -120,7 +120,7 @@ func (c *Client) DeleteVLAN8021Q(ctx context.Context, id int) error {
 		return err
 	}
 	empty := make([]byte, maskLen)
-	return c.setTLVs(ctx, Operation{Name: "DeleteVLAN8021Q", Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
+	return c.setTLVs(ctx, Operation{Name: "DeleteVLAN8021Q", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: id}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
 }
 
 // SetPVIDs sets the default VLAN of the given ports (port -> pvid): one TLV

@@ -15,7 +15,9 @@ var ErrInvalidConfig = errors.New("escp: reply is not a switch configuration fil
 // ConfigBackup downloads the switch's binary configuration file (the same
 // bytes as System Tools > Backup Config in the web UI). The vendor utility
 // requests it with an authenticated SET carrying an empty TLV 768; the file
-// arrives in fragments, which are reassembled. Nothing on the switch changes.
+// arrives in fragments, which are reassembled. Nothing on the switch changes. Although it is
+// a SET on the wire, it is a read: it never passes the write gate, so it works on any firmware
+// (as the provider promises for reads) even where writes are refused.
 func (c *Client) ConfigBackup(ctx context.Context) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

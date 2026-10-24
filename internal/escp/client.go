@@ -45,7 +45,7 @@ var (
 	// example, is refused with code 4 although the credentials are fine); the
 	// *RejectedError that wraps it carries the code.
 	ErrRejected = errors.New("escp: switch rejected the request")
-	// ErrInvalid means the caller's argument was refused before anything was sent: a port or
+	// ErrInvalid means the caller's argument was refused before any write was sent: a port or
 	// id out of range, a rate that is not a multiple of the step, a combination the switch
 	// cannot keep. The message names the value and what is allowed; test for the class with
 	// errors.Is(err, ErrInvalid). It is never returned for a reply the client cannot parse,
@@ -312,9 +312,9 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 
 // recv reads packets until one is an acceptable reply to the current request
 // or the deadline passes.
-func (c *Client) recv(deadline time.Time) (reply, bool) {
+func (c *Client) recv(ctx context.Context, deadline time.Time) (reply, bool) {
 	buf := make([]byte, maxDatagram)
-	for time.Now().Before(deadline) {
+	for time.Now().Before(deadline) && ctx.Err() == nil {
 		_ = c.conn.SetReadDeadline(deadline)
 		n, from, err := c.conn.ReadFromUDP(buf)
 		if err != nil {
@@ -325,6 +325,32 @@ func (c *Client) recv(deadline time.Time) (reply, bool) {
 		}
 	}
 	return reply{}, false
+}
+
+// interruptOnDone makes a read that is waiting for a reply return when ctx is done, instead of
+// after the attempt's timeout. The returned function undoes it; call it when the exchange ends.
+// Callers hold c.mu and have opened the socket.
+//
+// The interrupt runs in its own goroutine and may start after the exchange has ended, when the
+// next call is already waiting with a deadline of its own: it must not cut that one short. The
+// returned function therefore waits for a running interrupt and disarms a late one.
+func (c *Client) interruptOnDone(ctx context.Context) func() {
+	conn := c.conn // the function may run after Close has dropped the field
+	var mu sync.Mutex
+	finished := false
+	stop := context.AfterFunc(ctx, func() {
+		mu.Lock()
+		defer mu.Unlock()
+		if !finished {
+			_ = conn.SetReadDeadline(time.Now())
+		}
+	})
+	return func() {
+		stop()
+		mu.Lock()
+		finished = true
+		mu.Unlock()
+	}
 }
 
 // expired reports why the call must stop: the context was cancelled, or its
@@ -369,11 +395,15 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 	if err := c.open(); err != nil {
 		return reply{}, err
 	}
+	defer c.interruptOnDone(ctx)()
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
+		if err := expired(ctx); err != nil { // a cancelled call sends nothing, not even a retry
+			return reply{}, err
+		}
 		if err := c.send(op, tlvs, static, to); err != nil {
 			return reply{}, err
 		}
-		if rep, ok := c.recv(c.attemptDeadline(ctx)); ok {
+		if rep, ok := c.recv(ctx, c.attemptDeadline(ctx)); ok {
 			return rep, nil
 		}
 		if err := expired(ctx); err != nil {
@@ -388,18 +418,22 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 // without the fragment flag arrives. A missing fragment restarts the request.
 func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ int16) ([]byte, error) {
 	// Callers hold c.mu and run inside withSession, so the socket is open.
+	defer c.interruptOnDone(ctx)()
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
+		if err := expired(ctx); err != nil {
+			return nil, err
+		}
 		if err := c.send(op, tlvs, false, []*net.UDPAddr{c.dest}); err != nil {
 			return nil, err
 		}
 		var out []byte
 		for {
-			rep, ok := c.recv(c.attemptDeadline(ctx))
+			rep, ok := c.recv(ctx, c.attemptDeadline(ctx))
 			if !ok {
 				break
 			}
 			if rep.err != 0 {
-				return nil, fmt.Errorf("escp: switch answered error code %d", rep.err)
+				return nil, &RejectedError{Code: rep.err}
 			}
 			for _, x := range rep.tlvs {
 				if x.Type == typ {
@@ -554,20 +588,29 @@ func boolByte(b bool) byte {
 }
 
 // setTLVs sends a SET carrying the credentials plus the given settings. It is
-// the only place where the client writes, so the write gate sits here: no
-// setting can be added without passing it. The gate runs before the lock is
+// the only place where the client changes the switch, so the write gate sits
+// here: no setting can be added without passing it. (The two other SETs are the
+// session key exchange and ConfigBackup, which only reads; a test pins every
+// place that sends an OpSet.) The gate runs before the lock is
 // taken because it reads through the client. op describes the write to the gate
 // (the gate gets a copy of its ports).
 func (c *Client) setTLVs(ctx context.Context, op Operation, tlvs ...wire.TLV) error {
+	_, err := c.setTLVsSent(ctx, op, tlvs...)
+	return err
+}
+
+// setTLVsSent is setTLVs that also reports whether the gate let the write go, so that the
+// request may have reached the switch: false means nothing was sent for certain.
+func (c *Client) setTLVsSent(ctx context.Context, op Operation, tlvs ...wire.TLV) (sent bool, err error) {
 	if gate := c.cfg.WriteGate; gate != nil {
 		op.Ports = slices.Clone(op.Ports)
 		if err := gate(ctx, c, op); err != nil {
-			return err
+			return false, err
 		}
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.withSession(ctx, func() error {
+	return true, c.withSession(ctx, func() error {
 		req := append([]wire.TLV{
 			{Type: wire.TLVUsername, Value: append([]byte(c.cfg.Username), 0)},
 			{Type: wire.TLVPassword, Value: append([]byte(c.cfg.Password), 0)},

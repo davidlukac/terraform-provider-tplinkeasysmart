@@ -74,6 +74,13 @@ func ValidateLAG(group int, ports []int) error {
 	if len(ports) == 0 {
 		return nil
 	}
+	seen := map[int]bool{}
+	for _, p := range ports {
+		if seen[p] {
+			return invalidf("escp: port %d is listed twice in the LAG", p)
+		}
+		seen[p] = true
+	}
 	if len(ports) < LAGMinPorts || len(ports) > LAGPortsPerGroup {
 		return invalidf("escp: a LAG takes %d to %d ports, got %d", LAGMinPorts, LAGPortsPerGroup, len(ports))
 	}
@@ -137,7 +144,7 @@ func (c *Client) SetLAG(ctx context.Context, group int, ports []int) error {
 	if err := c.requirePorts(ctx, ports...); err != nil {
 		return err
 	}
-	return nameRefusal(c.setTLVs(ctx, Operation{Name: "SetLAG", Ports: ports, Impact: ImpactManagement}, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(group)}, mask...)}), lagRefusals)
+	return nameRefusal(c.setTLVs(ctx, Operation{Name: "SetLAG", Ports: ports, Impact: ImpactManagement, Replaces: GroupLAG, ID: group}, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(group)}, mask...)}), lagRefusals)
 }
 
 // nameRefusal adds the reason to a *RejectedError whose code is in reasons; any other

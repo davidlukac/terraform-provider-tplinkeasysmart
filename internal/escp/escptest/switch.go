@@ -99,6 +99,9 @@ type Switch struct {
 	StaleAfterSet int
 	// OnSystemSet is what the switch does after applying a system SET; the default replies.
 	OnSystemSet SystemSetBehaviour
+	// AfterSystemSet, when set, is called (without the lock) once a system SET has been applied
+	// and before the switch replies or leaves, so a test can act at exactly that moment.
+	AfterSystemSet func()
 }
 
 var (
@@ -137,6 +140,11 @@ func (f *Switch) Port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
 // DropPacket makes the switch ignore the nth packet it receives (1-based), to test retries.
 func (f *Switch) DropPacket(n int) { f.mu.Lock(); f.dropNth = n; f.mu.Unlock() }
 
+// Received is the number of datagrams that have reached the switch so far, whatever it did with
+// them. A discovery probe is two datagrams (see DropFirst). Datagrams on one socket arrive in
+// order, so a count read after a reply to a later request includes every earlier one.
+func (f *Switch) Received() int { f.mu.Lock(); defer f.mu.Unlock(); return f.recv }
+
 // DropFirst makes the switch ignore the first n packets it receives. A discovery probe is sent
 // twice per attempt (to the switch and to the broadcast address, which a test points at the same
 // fake), so DropFirst(2) loses exactly one whole attempt of a probe.
@@ -159,7 +167,7 @@ func (f *Switch) SetBackupMode(mode BackupMode) {
 }
 
 // Setting is one entry of a request or a reply: a protocol type number (the numbers of
-// docs/escp-protocol.md) and its value. It is the fake's own type, so a test outside the
+// internal/escp/PROTOCOL.md) and its value. It is the fake's own type, so a test outside the
 // escp module needs nothing from the client's internals to read or script traffic.
 type Setting struct {
 	Type  int16
@@ -244,7 +252,11 @@ func (f *Switch) Port7Setting() []byte {
 }
 
 // DecryptSessionKey recovers the session key from the RSA key-exchange value a client sent.
+// It returns nil for a value too short to be one.
 func DecryptSessionKey(v []byte) []byte {
+	if len(v) < 2+2*4 {
+		return nil
+	}
 	words := new(big.Int)
 	for i := 3; i >= 0; i-- {
 		words.Lsh(words, 16)
@@ -272,6 +284,7 @@ func (f *Switch) serve() {
 		}
 		raw := append([]byte(nil), buf[:n]...)
 		pkt := wire.RC4Static(raw)
+		viaSession := false
 		if !wire.LooksLikeHeader(pkt) {
 			f.mu.Lock()
 			s := f.session
@@ -280,12 +293,13 @@ func (f *Switch) serve() {
 				continue
 			}
 			pkt = wire.RC4Session(raw, s)
+			viaSession = true
 		}
 		h, tlvs, err := wire.Unmarshal(pkt)
 		if err != nil {
 			continue
 		}
-		f.handle(from, h, tlvs)
+		f.handle(from, h, tlvs, viaSession)
 	}
 }
 
@@ -314,7 +328,10 @@ func (f *Switch) send(to *net.UDPAddr, op byte, req wire.Header, errCode int32, 
 	_, _ = f.conn.WriteToUDP(b, to)
 }
 
-func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
+// handle answers one packet. viaSession says it was encrypted with the session key; credentials
+// must never travel under the static key, so a SET that carries them that way is ignored, as the
+// vendor utility never sends one and a client that did would be sending the password in the clear.
+func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSession bool) {
 	f.mu.Lock()
 	gone := f.departed && (h.Op != wire.OpDiscovery || f.OnSystemSet == SystemSetVanishes)
 	f.mu.Unlock()
@@ -357,6 +374,9 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 			{Type: wire.TLVDHCP, Value: []byte{1}}, {Type: wire.TLVFactoryDefault, Value: []byte{1}},
 		}, false)
 	case wire.OpSet:
+		if _, hasUser := find(wire.TLVUsername); hasUser && !viaSession {
+			return
+		}
 		if _, ok := find(wire.TLVConfigFile); ok && len(tlvs) == 3 {
 			u, _ := find(wire.TLVUsername)
 			p, _ := find(wire.TLVPassword)
@@ -406,8 +426,8 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 		if v, ok := find(wire.TLVRSAKey); ok {
 			f.mu.Lock()
 			drop, code := f.RSADrop, f.RSACode
-			if !drop {
-				f.session = DecryptSessionKey(v)
+			if key := DecryptSessionKey(v); !drop && key != nil {
+				f.session = key
 			}
 			f.mu.Unlock()
 			if drop {
@@ -476,7 +496,11 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV) {
 			f.mu.Lock()
 			leaves := f.OnSystemSet != SystemSetReplies
 			f.departed = f.departed || leaves
+			applied := f.AfterSystemSet
 			f.mu.Unlock()
+			if applied != nil {
+				applied()
+			}
 			if leaves {
 				return
 			}

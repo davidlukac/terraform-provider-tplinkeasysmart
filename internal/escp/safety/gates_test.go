@@ -81,6 +81,10 @@ func TestMaxImpact(t *testing.T) {
 		{"an operation that declares no impact is refused", escp.ImpactManagement, 0, true},
 		{"an operation with an impossible impact is refused", escp.ImpactManagement, escp.Impact(9), true},
 		{"a max that is no class refuses everything", 0, escp.ImpactCosmetic, true},
+		{"a max above the classes refuses everything", escp.Impact(4), escp.ImpactCosmetic, true},
+		{"a max far above the classes refuses everything", escp.Impact(99), escp.ImpactManagement, true},
+		{"a negative max refuses everything", escp.Impact(-1), escp.ImpactCosmetic, true},
+		{"an impossible impact is refused even under a max above the classes", escp.Impact(99), escp.Impact(50), true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
