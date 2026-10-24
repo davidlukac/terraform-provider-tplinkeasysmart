@@ -27,12 +27,14 @@ func TestCancelledContextSendsNothing(t *testing.T) {
 		t.Fatalf("the switch was touched: led=%v sets=%d", led, sets)
 	}
 	// Not a datagram reached the switch. A later request, once answered, shows that everything
-	// before it was processed: only its own two datagrams may be counted.
+	// before it was processed, but not that both datagrams of its own probe were counted yet when
+	// the first reply came back: so 1 or 2 are its own. A leaked call would have sent a discovery
+	// probe first (2 datagrams more), which makes 3 or 4.
 	if _, err := dialFake(t, f, "secret").Info(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if n := f.Received(); n != 2 {
-		t.Fatalf("the cancelled call sent datagrams: the switch has received %d, want only the 2 of the later probe", n)
+	if n := f.Received(); n > 2 {
+		t.Fatalf("the cancelled call sent datagrams: the switch has received %d, want only those of the later probe (at most 2)", n)
 	}
 }
 
