@@ -120,7 +120,7 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 		t.Run(fmt.Sprint(tc.code), func(t *testing.T) {
 			f := escptest.Start(t)
 			f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom, f.RejectCode = 1, tc.code })
-			c := dialFast(t, f, "secret")
+			c := dialFake(t, f, "secret")
 			err := c.SetLAG(context.Background(), 1, []int{2, 3})
 			var rejected *RejectedError
 			if !errors.Is(err, ErrRejected) || !errors.As(err, &rejected) || rejected.Code != tc.code {
@@ -134,7 +134,7 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 	t.Run("an unknown code keeps the generic message", func(t *testing.T) {
 		f := escptest.Start(t)
 		f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom = 1 })
-		c := dialFast(t, f, "secret")
+		c := dialFake(t, f, "secret")
 		err := c.SetLAG(context.Background(), 1, []int{2, 3})
 		if !errors.Is(err, ErrRejected) || !strings.Contains(err.Error(), "error code 9") || !strings.Contains(err.Error(), "wrong credentials") {
 			t.Fatalf("got %v", err)

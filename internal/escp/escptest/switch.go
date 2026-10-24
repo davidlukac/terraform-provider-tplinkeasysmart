@@ -74,6 +74,7 @@ type Switch struct {
 	sets             int
 	dropNth          int // drop the nth received packet (1-based) to test retries
 	dropFirst        int // drop the first n received packets
+	droppedSets      int // authenticated SETs ignored under DropSets
 	recv             int
 	mute             bool // swallow everything (switch gone)
 	backupMode       BackupMode
@@ -139,6 +140,11 @@ func (f *Switch) Port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
 
 // DropPacket makes the switch ignore the nth packet it receives (1-based), to test retries.
 func (f *Switch) DropPacket(n int) { f.mu.Lock(); f.dropNth = n; f.mu.Unlock() }
+
+// SetsDropped is the number of authenticated SET datagrams the switch ignored under DropSets. A
+// test of "the write was lost" uses it to show that the write really was sent, so that it does
+// not pass for the wrong reason (WriteCount is zero for a write that never left the client too).
+func (f *Switch) SetsDropped() int { f.mu.Lock(); defer f.mu.Unlock(); return f.droppedSets }
 
 // Received is the number of datagrams that have reached the switch so far, whatever it did with
 // them. A discovery probe is two datagrams (see DropFirst). Datagrams on one socket arrive in
@@ -441,6 +447,9 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		}
 		f.mu.Lock()
 		DropSets, rejectFrom, RejectCode, accepted := f.DropSets, f.RejectSetsFrom, f.RejectCode, len(f.history)
+		if DropSets {
+			f.droppedSets++
+		}
 		f.mu.Unlock()
 		if DropSets {
 			return

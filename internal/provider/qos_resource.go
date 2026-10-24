@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -103,7 +104,7 @@ func (r *qosResource) apply(ctx context.Context, plan *qosResourceModel, add fun
 func (r *qosResource) applyBound(ctx context.Context, plan *qosResourceModel, add func(string, string)) bool {
 	mode, err := escp.ParseQoSMode(plan.Mode.ValueString())
 	if err != nil {
-		add("Invalid QoS mode", fmt.Sprintf("%q is not one of port-based, 802.1p, dscp-802.1p", plan.Mode.ValueString()))
+		add("Invalid QoS mode", fmt.Sprintf("%q is not one of %s", plan.Mode.ValueString(), strings.Join(qosModeNames(), ", ")))
 		return false
 	}
 	want := map[int]escp.Priority{}

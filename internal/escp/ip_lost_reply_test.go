@@ -24,7 +24,7 @@ var (
 func TestSetIPConfigSucceedsWhenTheReplyIsLostButTheSwitchMoved(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Switch) { f.OnSystemSet = escptest.SystemSetLeaves })
-	c := dialFast(t, f, "secret")
+	c := dialFake(t, f, "secret")
 	if err := c.SetIPConfig(context.Background(), lostReplyWanted); err != nil {
 		t.Fatalf("the switch has the new settings, so the call must succeed: %v", err)
 	}
@@ -57,6 +57,9 @@ func TestSetIPConfigReportsAWriteThatWasNotApplied(t *testing.T) {
 	}
 	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("nothing was applied, got %d writes", n)
+	}
+	if f.SetsDropped() == 0 {
+		t.Fatal("the write never reached the switch, so this test did not exercise a lost write")
 	}
 	if !c.dest.IP.Equal(lostReplyBefore.IP) || c.alsoFrom != nil {
 		t.Fatalf("the client must stay where it was: dest=%v alsoFrom=%v", c.dest.IP, c.alsoFrom)
@@ -121,7 +124,7 @@ func TestSettleLostReplyNamesWhatAnswered(t *testing.T) {
 	lost := ErrNoReply
 	t.Run("a different device answers", func(t *testing.T) {
 		f := escptest.Start(t)
-		c := dialFast(t, f, "secret")
+		c := dialFake(t, f, "secret")
 		c.mu.Lock()
 		err := c.settleLostReply(context.Background(), "aa:bb:cc:00:00:01", lostReplyBefore, lostReplyWanted, lost)
 		c.mu.Unlock()
@@ -131,7 +134,7 @@ func TestSettleLostReplyNamesWhatAnswered(t *testing.T) {
 	})
 	t.Run("the switch reports settings that are neither", func(t *testing.T) {
 		f := escptest.Start(t)
-		c := dialFast(t, f, "secret")
+		c := dialFake(t, f, "secret")
 		info, err := c.Info(context.Background())
 		if err != nil {
 			t.Fatal(err)
@@ -157,7 +160,7 @@ func TestSetIPConfigSettlesWhenTheCallIsCancelledAfterTheWrite(t *testing.T) {
 		f.OnSystemSet = escptest.SystemSetLeaves
 		f.AfterSystemSet = cancel // the switch has applied the write; the caller gives up
 	})
-	c := dialFast(t, f, "secret")
+	c := dialFake(t, f, "secret")
 	if err := c.SetIPConfig(ctx, lostReplyWanted); err != nil {
 		t.Fatalf("the switch has the new settings, so the call must succeed: %v", err)
 	}
@@ -198,7 +201,7 @@ func TestSetIPConfigDoesNotProbeAfterARefusal(t *testing.T) {
 	t.Run("the switch refuses", func(t *testing.T) {
 		f := escptest.Start(t)
 		f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom = 1 })
-		c := dialFast(t, f, "secret")
+		c := dialFake(t, f, "secret")
 		err := c.SetIPConfig(context.Background(), lostReplyWanted)
 		var refused *RejectedError
 		if !errors.As(err, &refused) || strings.Contains(err.Error(), "probe") {

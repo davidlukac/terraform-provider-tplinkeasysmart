@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -18,8 +19,6 @@ import (
 
 const vlanModeID = "vlan_mode"
 
-// The three VLAN modes of the switch. They exclude each other: the vendor
-// utility warns that switching discards the settings of the other modes.
 // writableVLANModes lists the modes the library can set, as the attribute spells them.
 func writableVLANModes() []string {
 	modes := escp.VLANModes()
@@ -30,12 +29,16 @@ func writableVLANModes() []string {
 	return names
 }
 
-// The spellings are the library's (they are part of the Terraform state).
-const (
-	vlanModeMTU       = string(escp.VLANModeMTU)
-	vlanModePortBased = string(escp.VLANModePortBased)
-	vlanMode8021Q     = string(escp.VLANModeDot1Q)
-)
+// vlanModeChoices words the list of modes for the attribute description.
+func vlanModeChoices() string {
+	names := writableVLANModes()
+	return "One of `" + strings.Join(names[:len(names)-1], "`, `") + "` or `" + names[len(names)-1] + "`."
+}
+
+// vlanModeMTU is the one mode the resource treats differently (it needs an uplink port). The
+// three modes exclude each other: the vendor utility warns that switching discards the settings
+// of the other modes. The spellings are the library's (they are part of the Terraform state).
+const vlanModeMTU = string(escp.VLANModeMTU)
 
 var (
 	_ resource.Resource                = &vlanModeResource{}
@@ -84,7 +87,7 @@ func (r *vlanModeResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			attrSwitch: resourceSwitchAttribute(),
 			"id": schema.StringAttribute{Computed: true, Description: "Always `vlan_mode`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"mode": schema.StringAttribute{Required: true, Description: "One of `mtu`, `port-based` or `802.1q`.",
+			"mode": schema.StringAttribute{Required: true, Description: vlanModeChoices(),
 				Validators: []validator.String{stringvalidator.OneOf(writableVLANModes()...)}},
 			"mtu_uplink_port": schema.Int64Attribute{Optional: true, Validators: []validator.Int64{validPortNumber()},
 				Description: "The uplink port of the MTU VLAN: every other port can only talk to it. Required with `mode = \"mtu\"`, not allowed with another mode."},

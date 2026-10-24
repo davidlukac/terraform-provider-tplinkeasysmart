@@ -19,10 +19,10 @@ func cfgOf(ip, mask, gw string) IPConfig {
 
 func TestValidateIPConfig(t *testing.T) {
 	good := []IPConfig{
-		cfgOf("192.168.77.13", "255.255.255.0", "192.168.77.1"),
-		cfgOf("192.168.77.14", "255.255.0.0", "192.168.77.2"),
-		cfgOf("10.0.0.2", "255.0.0.0", "0.0.0.0"),                  // no gateway
-		cfgOf("192.168.77.13", "255.255.255.252", "192.168.77.14"), // /30: two hosts
+		cfgOf("192.0.2.13", "255.255.255.0", "192.0.2.1"),
+		cfgOf("192.0.2.14", "255.255.0.0", "192.0.2.2"),
+		cfgOf("10.0.0.2", "255.0.0.0", "0.0.0.0"),            // no gateway
+		cfgOf("192.0.2.13", "255.255.255.252", "192.0.2.14"), // /30: two hosts
 	}
 	for _, cfg := range good {
 		if err := ValidateIPConfig(cfg); err != nil {
@@ -34,21 +34,21 @@ func TestValidateIPConfig(t *testing.T) {
 		cfg  IPConfig
 		want string
 	}{
-		{"missing gateway", IPConfig{IP: net.ParseIP("192.168.77.13"), Netmask: net.ParseIP("255.255.255.0")}, "must all be IPv4"},
-		{"ipv6 address", cfgOf("2001:db8::1", "255.255.255.0", "192.168.77.1"), "must all be IPv4"},
-		{"gap in mask", cfgOf("192.168.77.13", "255.0.255.0", "192.168.77.1"), "contiguous prefix"},
-		{"mask zero", cfgOf("192.168.77.13", "0.0.0.0", "192.168.77.1"), "contiguous prefix"},
+		{"missing gateway", IPConfig{IP: net.ParseIP("192.0.2.13"), Netmask: net.ParseIP("255.255.255.0")}, "must all be IPv4"},
+		{"ipv6 address", cfgOf("2001:db8::1", "255.255.255.0", "192.0.2.1"), "must all be IPv4"},
+		{"gap in mask", cfgOf("192.0.2.13", "255.0.255.0", "192.0.2.1"), "contiguous prefix"},
+		{"mask zero", cfgOf("192.0.2.13", "0.0.0.0", "192.0.2.1"), "contiguous prefix"},
 		{"mask /7", cfgOf("10.0.0.2", "254.0.0.0", "10.0.0.1"), "contiguous prefix"},
-		{"mask /31", cfgOf("192.168.77.13", "255.255.255.254", "192.168.77.12"), "contiguous prefix"},
-		{"unspecified address", cfgOf("0.0.0.0", "255.255.255.0", "192.168.77.1"), "not a usable host"},
+		{"mask /31", cfgOf("192.0.2.13", "255.255.255.254", "192.0.2.12"), "contiguous prefix"},
+		{"unspecified address", cfgOf("0.0.0.0", "255.255.255.0", "192.0.2.1"), "not a usable host"},
 		{"loopback address", cfgOf("127.0.0.1", "255.255.255.0", "127.0.0.2"), "not a usable host"},
 		{"multicast address", cfgOf("224.0.0.5", "255.255.255.0", "224.0.0.1"), "not a usable host"},
-		{"network address", cfgOf("192.168.77.0", "255.255.255.0", "192.168.77.1"), "not a usable host"},
-		{"broadcast address", cfgOf("192.168.77.255", "255.255.255.0", "192.168.77.1"), "not a usable host"},
-		{"gateway outside", cfgOf("192.168.77.13", "255.255.255.0", "192.168.78.1"), "gateway"},
-		{"gateway is the network", cfgOf("192.168.77.13", "255.255.255.0", "192.168.77.0"), "gateway"},
-		{"gateway is the broadcast", cfgOf("192.168.77.13", "255.255.255.0", "192.168.77.255"), "gateway"},
-		{"gateway is the switch", cfgOf("192.168.77.13", "255.255.255.0", "192.168.77.13"), "gateway"},
+		{"network address", cfgOf("192.0.2.0", "255.255.255.0", "192.0.2.1"), "not a usable host"},
+		{"broadcast address", cfgOf("192.0.2.255", "255.255.255.0", "192.0.2.1"), "not a usable host"},
+		{"gateway outside", cfgOf("192.0.2.13", "255.255.255.0", "192.0.3.1"), "gateway"},
+		{"gateway is the network", cfgOf("192.0.2.13", "255.255.255.0", "192.0.2.0"), "gateway"},
+		{"gateway is the broadcast", cfgOf("192.0.2.13", "255.255.255.0", "192.0.2.255"), "gateway"},
+		{"gateway is the switch", cfgOf("192.0.2.13", "255.255.255.0", "192.0.2.13"), "gateway"},
 	}
 	for _, tt := range bad {
 		t.Run(tt.name, func(t *testing.T) {
@@ -61,11 +61,11 @@ func TestValidateIPConfig(t *testing.T) {
 }
 
 func TestIPConfigFromInfoRefusesUnusableReplies(t *testing.T) {
-	if _, err := ipConfigFromInfo(Info{IP: "192.168.77.13", Netmask: "255.255.255.0"}); err == nil {
+	if _, err := ipConfigFromInfo(Info{IP: "192.0.2.13", Netmask: "255.255.255.0"}); err == nil {
 		t.Fatal("a reply without a gateway must be refused")
 	}
-	got, err := ipConfigFromInfo(Info{IP: "192.168.77.13", Netmask: "255.255.255.0", Gateway: "192.168.77.1"})
-	if err != nil || got.String() != "ip 192.168.77.13 mask 255.255.255.0 gateway 192.168.77.1" {
+	got, err := ipConfigFromInfo(Info{IP: "192.0.2.13", Netmask: "255.255.255.0", Gateway: "192.0.2.1"})
+	if err != nil || got.String() != "ip 192.0.2.13 mask 255.255.255.0 gateway 192.0.2.1" {
 		t.Fatalf("got %v, %v", got, err)
 	}
 }

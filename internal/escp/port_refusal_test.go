@@ -14,7 +14,7 @@ import (
 func TestSetPortRefusalNamesTheLAGDuplexRule(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom, f.RejectCode = 1, lagRefusedHalfDuplex })
-	c := dialFast(t, f, "secret")
+	c := dialFake(t, f, "secret")
 	err := c.SetPort(context.Background(), PortConfig{ID: 3, Enabled: true, Speed: Speed100Half})
 	var rejected *RejectedError
 	if !errors.Is(err, ErrRejected) || !errors.As(err, &rejected) || rejected.Code != 7407 {
@@ -30,13 +30,13 @@ func TestSetPortRefusalNamesTheLAGDuplexRule(t *testing.T) {
 func TestSetPortRefusalOfAnotherCodeStaysGeneric(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom, f.RejectCode = 1, 7406 })
-	c := dialFast(t, f, "secret")
+	c := dialFake(t, f, "secret")
 	err := c.SetPort(context.Background(), PortConfig{ID: 3, Enabled: true, Speed: SpeedAuto})
 	if !errors.Is(err, ErrRejected) || !strings.Contains(err.Error(), "error code 7406") || !strings.Contains(err.Error(), "wrong credentials") {
 		t.Fatalf("got %v", err)
 	}
 	g := escptest.Start(t)
-	if err := dialFast(t, g, "secret").SetPort(context.Background(), PortConfig{ID: 3, Enabled: true, Speed: SpeedAuto}); err != nil {
+	if err := dialFake(t, g, "secret").SetPort(context.Background(), PortConfig{ID: 3, Enabled: true, Speed: SpeedAuto}); err != nil {
 		t.Fatalf("an accepted write must stay accepted: %v", err)
 	}
 }
