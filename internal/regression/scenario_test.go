@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -267,5 +270,166 @@ func TestScenarioStormLimit(t *testing.T) {
 			}
 		}
 		return nil
+	})
+}
+
+func intSet(ports ...int) string {
+	var s []string
+	for _, p := range ports {
+		s = append(s, strconv.Itoa(p))
+	}
+	return "[" + strings.Join(s, ", ") + "]"
+}
+
+func TestScenarioLAG(t *testing.T) {
+	s := openForScenario(t)
+	a, b := s.Target.TestPorts[1], s.Target.TestPorts[2] // two ports of LAG 1 (ports 1-4)
+	cfg := fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"this\" {\n  group = 1\n  ports = %s\n}\n", intSet(a, b))
+	s.scenario(t, cfg, "", func(*terraform.State) error {
+		got, err := s.Client.LAGs(context.Background())
+		if err != nil {
+			return err
+		}
+		for _, l := range got {
+			if l.ID == 1 && fmt.Sprint(l.Ports) == fmt.Sprint([]int{a, b}) {
+				return nil
+			}
+		}
+		return fmt.Errorf("LAG 1 not %v on the switch: %v", []int{a, b}, got)
+	})
+}
+
+// The switch refuses a LAG whose members mix auto-negotiation with a fixed speed (error 7410);
+// the provider reports the refusal and writes nothing. The ports are put back to auto by
+// configuration afterwards, because removing a port resource from a configuration only forgets it.
+func TestScenarioLAGRefusedByTheSwitch(t *testing.T) {
+	s := openForScenario(t)
+	a, b := s.Target.TestPorts[1], s.Target.TestPorts[2]
+	ports := func(speedA escp.Speed) string {
+		return fmt.Sprintf("resource \"tplinkeasysmart_port\" \"a\" {\n  port  = %d\n  speed = %q\n}\nresource \"tplinkeasysmart_port\" \"b\" {\n  port  = %d\n  speed = \"auto\"\n}\n", a, string(speedA), b)
+	}
+	lag := fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"this\" {\n  group      = 1\n  ports      = %s\n  depends_on = [tplinkeasysmart_port.a, tplinkeasysmart_port.b]\n}\n", intSet(a, b))
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: s.Factories(),
+		Steps: []resource.TestStep{
+			{Config: s.ProviderHCL() + ports(escp.Speed100Full)},
+			{Config: s.ProviderHCL() + ports(escp.Speed100Full) + lag, ExpectError: regexp.MustCompile(`7410`)},
+			{Config: s.ProviderHCL() + ports(escp.SpeedAuto), Check: s.restoredCheck(t)},
+		},
+	})
+}
+
+func TestScenarioPortMirror(t *testing.T) {
+	s := openForScenario(t)
+	dest, src := s.Target.TestPorts[3], s.Target.TestPorts[2]
+	cfg := func(body string) string {
+		return fmt.Sprintf("resource \"tplinkeasysmart_port_mirror\" \"this\" {\n%s}\n", body)
+	}
+	s.scenario(t, cfg(fmt.Sprintf("  enabled       = true\n  mirror_port   = %d\n  ingress_ports = %s\n", dest, intSet(src))),
+		cfg("  enabled = false\n"), func(*terraform.State) error {
+			got, err := s.Client.PortMirror(context.Background())
+			if err != nil || !got.Enabled || got.MirrorPort != dest || fmt.Sprint(got.IngressPorts) != fmt.Sprint([]int{src}) {
+				return fmt.Errorf("mirror on the switch = %+v, err %w, want %d mirrored to %d", got, err, src, dest)
+			}
+			return nil
+		})
+}
+
+func TestScenarioPortBasedVLANGroup(t *testing.T) {
+	s := openForScenario(t)
+	a, b := s.Target.TestPorts[1], s.Target.TestPorts[2]
+	cfg := fmt.Sprintf("resource \"tplinkeasysmart_vlan_port_based_group\" \"this\" {\n  vlan  = 2\n  ports = %s\n}\n", intSet(a, b))
+	s.scenario(t, cfg, "", func(*terraform.State) error {
+		got, err := s.Client.PortBasedVLAN(context.Background())
+		if err != nil {
+			return err
+		}
+		for _, v := range got.VLANs {
+			if v.ID == 2 && fmt.Sprint(v.Ports) == fmt.Sprint([]int{a, b}) {
+				return nil
+			}
+		}
+		return fmt.Errorf("VLAN 2 not %v on the switch: %v", []int{a, b}, got.VLANs)
+	})
+}
+
+// Guard refusals: writes to the ports that carry the uplink or a device are refused before
+// anything is sent. Each refusal is a step of its own, and at the end the switch must not have
+// received a single write (the fake counts them; on hardware the readout must be identical).
+func TestScenarioGuardRefusals(t *testing.T) {
+	s := openForScenario(t)
+	prot := s.Target.ProtectedPorts
+	if len(prot) < 4 {
+		t.Skip("needs four protected ports (the uplink and three device ports)")
+	}
+	up, d1, d2, d3 := prot[0], prot[1], prot[2], prot[3]
+	refused := regexp.MustCompile(`(?i)refus`)
+	cases := map[string]string{
+		"speed of a device port":          fmt.Sprintf("resource \"tplinkeasysmart_port\" \"x\" {\n  port  = %d\n  speed = \"100Mbps-full\"\n}\n", d1),
+		"disabling the uplink":            fmt.Sprintf("resource \"tplinkeasysmart_port\" \"x\" {\n  port    = %d\n  enabled = false\n  speed   = \"auto\"\n}\n", up),
+		"bandwidth of a device":           fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"x\" {\n  port         = %d\n  ingress_kbps = 10240\n}\n", d3),
+		"storm control":                   fmt.Sprintf("resource \"tplinkeasysmart_storm_limit\" \"x\" {\n  port      = %d\n  broadcast = true\n  rate_kbps = 1024\n}\n", d2),
+		"a LAG with the uplink":           fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"x\" {\n  group = 1\n  ports = %s\n}\n", intSet(up, s.Target.TestPorts[0])),
+		"a VLAN group with a device port": fmt.Sprintf("resource \"tplinkeasysmart_vlan_port_based_group\" \"x\" {\n  vlan  = 2\n  ports = %s\n}\n", intSet(d1)),
+	}
+	var writes int
+	if s.Fake != nil {
+		writes = s.Fake.WriteCount()
+	}
+	var steps []resource.TestStep
+	for _, cfg := range cases {
+		steps = append(steps, resource.TestStep{Config: s.ProviderHCL() + cfg, ExpectError: refused})
+	}
+	steps = append(steps, resource.TestStep{Config: s.ProviderHCL(), Check: func(*terraform.State) error {
+		if s.Fake != nil && s.Fake.WriteCount() != writes {
+			return fmt.Errorf("the switch received %d writes during the refusals", s.Fake.WriteCount()-writes)
+		}
+		return s.restoredCheck(t)(nil)
+	}})
+	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: steps})
+}
+
+// allow_disruptive is the opt-in for a port that carries a device. The step that applies it
+// writes to that port, so on hardware it runs only when TPLINK_REGRESSION_DISRUPT_DEVICE_PORT is
+// set to the port number (a deliberate disruption), never by default. The write repeats the
+// port's own configuration, and the opt-in is then removed again.
+func TestScenarioAllowDisruptive(t *testing.T) {
+	s := openForScenario(t)
+	port := s.Target.ProtectedPorts[1]
+	if s.Target.Real() && os.Getenv("TPLINK_REGRESSION_DISRUPT_DEVICE_PORT") != strconv.Itoa(port) {
+		t.Skipf("writes to device port %d: set TPLINK_REGRESSION_DISRUPT_DEVICE_PORT=%d to run", port, port)
+	}
+	ports, err := s.Client.Ports(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var orig escp.Port
+	for _, p := range ports {
+		if p.ID == port {
+			orig = p
+		}
+	}
+	cfg := func(opt string) string {
+		return fmt.Sprintf("resource \"tplinkeasysmart_port\" \"x\" {\n  port         = %d\n  speed        = %q\n  flow_control = %t\n%s}\n", port, string(orig.ConfiguredSpeed), orig.ConfiguredFlowControl, opt)
+	}
+	var afterOptIn int
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: s.Factories(),
+		Steps: []resource.TestStep{
+			{Config: s.ProviderHCL() + cfg(""), ExpectError: regexp.MustCompile(`(?i)refus`)},
+			{Config: s.ProviderHCL() + cfg("  allow_disruptive = true\n"), Check: func(*terraform.State) error {
+				if s.Fake != nil {
+					afterOptIn = s.Fake.WriteCount()
+				}
+				return nil
+			}},
+			// Taking the opt-in away again is saved without a write to the port.
+			{Config: s.ProviderHCL() + cfg(""), Check: func(*terraform.State) error {
+				if s.Fake != nil && s.Fake.WriteCount() != afterOptIn {
+					return fmt.Errorf("removing allow_disruptive wrote to the switch (%d writes, was %d)", s.Fake.WriteCount(), afterOptIn)
+				}
+				return s.restoredCheck(t)(nil)
+			}},
+		},
 	})
 }

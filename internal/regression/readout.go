@@ -52,6 +52,18 @@ func CoreReaders(c *escp.Client) []Reader {
 			}
 			return b.String(), err
 		}},
+		{"lags", func(ctx context.Context) (string, error) {
+			v, err := c.LAGs(ctx)
+			return fmt.Sprint(v), err
+		}},
+		{"port-mirror", func(ctx context.Context) (string, error) {
+			v, err := c.PortMirror(ctx)
+			return fmt.Sprintf("%+v", v), err
+		}},
+		{"port-based-vlan", func(ctx context.Context) (string, error) {
+			v, err := c.PortBasedVLAN(ctx)
+			return fmt.Sprintf("enabled=%t vlans=%v", v.Enabled, v.VLANs), err
+		}},
 		{"bandwidth", func(ctx context.Context) (string, error) {
 			v, err := c.Bandwidth(ctx)
 			return fmt.Sprint(v), err
