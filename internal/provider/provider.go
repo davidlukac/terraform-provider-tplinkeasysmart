@@ -41,8 +41,16 @@ type tplinkProvider struct {
 
 // New returns the provider factory used by main.
 func New(version string) func() provider.Provider {
+	return NewWithDialer(version, func(c escp.Config) (SwitchClient, error) { return escp.Dial(c) })
+}
+
+// NewWithDialer is New with the transport chosen by the caller: dial receives the configuration
+// the provider built for each switch (including its write gate) and returns the client the
+// resources use. The regression suite uses it to aim the real provider at a fake switch on a
+// loopback port; the provider has no argument for that, on purpose.
+func NewWithDialer(version string, dial func(escp.Config) (SwitchClient, error)) func() provider.Provider {
 	return func() provider.Provider {
-		return &tplinkProvider{version: version, newClient: func(c escp.Config) (SwitchClient, error) { return escp.Dial(c) }}
+		return &tplinkProvider{version: version, newClient: dial}
 	}
 }
 

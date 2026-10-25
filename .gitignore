@@ -8,3 +8,4 @@ bin/
 dist/
 cover.out
 cover.html
+.test.env

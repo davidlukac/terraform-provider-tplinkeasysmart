@@ -11,9 +11,10 @@ lint:
 test:
 	go test -race -count=1 ./...
 
-# Same, with the Terraform acceptance harness enabled explicitly (as in CI).
+# Same, with the Terraform acceptance harness enabled explicitly (as in CI); includes the regression
+# scenarios against the stateful fake, so every Terraform version in the matrix runs them.
 testacc:
-	TF_ACC=1 go test -race -count=1 ./internal/provider/...
+	TF_ACC=1 go test -race -count=1 ./internal/provider/... ./internal/regression/...
 
 # Fails when docs/ is out of date with the schema, templates or examples.
 docs-check: generate
@@ -45,7 +46,18 @@ pre-commit:
 snapshot:
 	GPG_FINGERPRINT=none goreleaser release --snapshot --clean --skip=sign,publish
 
-.PHONY: generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
+# The regression suite (internal/regression) through a real Terraform binary against the stateful
+# fake switch: nothing to configure, runs in CI. `make regression-live` aims the same scenarios at
+# switch 03 and needs the gitignored .test.env (see .test.env.example); it refuses without it.
+regression:
+	TF_ACC=1 go test -count=1 -race ./internal/regression/...
+
+regression-live:
+	@test -f .test.env || { echo ".test.env is missing: copy .test.env.example and fill it in (never commit it)"; exit 1; }
+	@test "$(CONFIRM)" = 1 || { echo "this writes to the real switch named in .test.env: rerun with CONFIRM=1"; exit 1; }
+	TPLINK_REGRESSION_ENV_FILE=$(CURDIR)/.test.env TF_ACC=1 go test -count=1 -timeout 60m -v ./internal/regression/...
+
+.PHONY: regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
 
 # --- coverage -------------------------------------------------------------
 # `make cover` runs the whole suite with the race detector, writes cover.out

@@ -78,7 +78,9 @@ type Switch struct {
 	recv             int
 	mute             bool // swallow everything (switch gone)
 	backupMode       BackupMode
-	departed         bool // a system SET was applied under OnSystemSet and the switch has left
+	departed         bool             // a system SET was applied under OnSystemSet and the switch has left
+	stateful         bool             // EnableState was called: SETs are remembered and answered by later GETs
+	store            map[int16][]byte // the last value of each settings TLV written (or seeded) under EnableState
 
 	// Programmable misbehaviour. Set these inside Configure, which holds the lock.
 
@@ -150,6 +152,21 @@ func (f *Switch) SetsDropped() int { f.mu.Lock(); defer f.mu.Unlock(); return f.
 // them. A discovery probe is two datagrams (see DropFirst). Datagrams on one socket arrive in
 // order, so a count read after a reply to a later request includes every earlier one.
 func (f *Switch) Received() int { f.mu.Lock(); defer f.mu.Unlock(); return f.recv }
+
+// EnableState makes the switch remember settings: every accepted SET stores the value of each
+// TLV it carries, and a GET for a type it holds (seeded here or written since) answers with that
+// value, so a write can be read back the way the real switch does it. Types it holds nothing
+// for fall through to the scripted replies (LED, QoS, port count), and GetFn still wins. The
+// seeds are the settings the switch starts with.
+func (f *Switch) EnableState(seed ...Setting) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.stateful = true
+	f.store = map[int16][]byte{}
+	for _, s := range seed {
+		f.store[s.Type] = append([]byte(nil), s.Value...)
+	}
+}
 
 // DropFirst makes the switch ignore the first n packets it receives. A discovery probe is sent
 // twice per attempt (to the switch and to the broadcast address, which a test points at the same
@@ -475,6 +492,11 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			}
 		}
 		f.history = append(f.history, append([]wire.TLV(nil), f.lastSet...))
+		if f.stateful {
+			for _, t := range f.lastSet {
+				f.store[t.Type] = append([]byte(nil), t.Value...)
+			}
+		}
 		f.mu.Unlock()
 		if v, ok := find(wire.TLVPorts); ok && len(v) == 7 && v[0] == 7 {
 			f.mu.Lock()
@@ -530,6 +552,10 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			}
 			return
 		}
+		if held := f.held(tlvs); len(held) > 0 {
+			f.send(from, wire.OpReply, h, 0, held, true)
+			return
+		}
 		if _, ok := find(wire.TLVQoSMode); ok {
 			f.send(from, wire.OpReply, h, 0, []wire.TLV{{Type: wire.TLVQoSMode, Value: []byte{0}}}, true)
 			return
@@ -561,4 +587,27 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			f.send(from, wire.OpReply, h, 0, []wire.TLV{{Type: wire.TLVLED, Value: []byte{v}}}, true)
 		}
 	}
+}
+
+// held returns the stored settings for the requested types, or nil when the switch is not
+// stateful or holds none of them.
+func (f *Switch) held(req []wire.TLV) []wire.TLV {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.stateful {
+		return nil
+	}
+	var out []wire.TLV
+	for _, r := range req {
+		// The real switch answers a request for the IGMP state with report suppression as well.
+		if r.Type == wire.TLVIGMPEnabled {
+			if v, ok := f.store[wire.TLVIGMPSuppression]; ok {
+				out = append(out, wire.TLV{Type: wire.TLVIGMPSuppression, Value: append([]byte(nil), v...)})
+			}
+		}
+		if v, ok := f.store[r.Type]; ok {
+			out = append(out, wire.TLV{Type: r.Type, Value: append([]byte(nil), v...)})
+		}
+	}
+	return out
 }

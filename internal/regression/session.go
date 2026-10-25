@@ -1,0 +1,150 @@
+package regression
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/provider"
+)
+
+// fakeTimeout is how long the clients of the fake wait per attempt: it answers at once, so a
+// silence is a bug, not a slow management CPU.
+const fakeTimeout = 500 * time.Millisecond
+
+// Session is one run against one target: the readout taken before any scenario, the provider
+// aimed at the target, and a client of the suite's own for checks that must not go through the
+// provider.
+type Session struct {
+	Target Target
+	// Fake is the in-process switch, nil on hardware.
+	Fake   *escptest.Switch
+	Client *escp.Client
+	before Readout
+	rd     []Reader
+	tb     testing.TB
+}
+
+// Getenv is os.Getenv, replaceable in tests.
+type Getenv func(string) string
+
+// Open loads the target from the environment (and from the file named by TPLINK_REGRESSION_ENV_FILE,
+// the gitignored .test.env), prepares it and takes the first readout. Anything wrong with the
+// target fails the test before a single write.
+func Open(t testing.TB, getenv Getenv) *Session { return openWith(t, getenv, nil) }
+
+// openWith is Open with a hook that may change the fake before the first readout (tests only).
+func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Session {
+	t.Helper()
+	env := map[string]string{}
+	if path := getenv(EnvFile); path != "" {
+		f, err := os.Open(path) //nolint:gosec // the path is the operator's own file
+		if err != nil {
+			t.Fatalf("cannot read %s: %v", EnvFile, err)
+		}
+		fileEnv, err := ParseEnvFile(f)
+		_ = f.Close() // read-only, nothing to flush
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		env = fileEnv
+	}
+	if v := getenv(EnvTarget); v != "" {
+		env[EnvTarget] = v
+	}
+	target, err := LoadTarget(env)
+	if err != nil {
+		t.Fatalf("regression target: %v", err)
+	}
+	s := &Session{Target: target, tb: t}
+	cfg := escp.Config{Host: target.Host, Username: target.Username, Password: target.Password}
+	if !target.Real() {
+		s.Fake = startFake(t)
+		if prepare != nil {
+			prepare(s.Fake)
+		}
+		cfg = s.fakeConfig(cfg)
+	}
+	c, err := s.dialClient(cfg)
+	if err != nil {
+		t.Fatalf("cannot dial %s: %v", target.Name, err)
+	}
+	s.Client = c
+	t.Cleanup(func() { _ = s.Client.Close() }) // best effort: the run is over
+	s.rd = CoreReaders(s.Client)
+	if s.before, err = Take(context.Background(), s.rd); err != nil {
+		t.Fatalf("first readout of %s: %v", target.Name, err)
+	}
+	return s
+}
+
+// startFake starts the stateful fake with the settings a freshly reset switch has.
+func startFake(t testing.TB) *escptest.Switch {
+	f := escptest.Start(t)
+	f.EnableState(
+		escptest.Setting{Type: 4352, Value: []byte{1}}, // IGMP snooping on
+		escptest.Setting{Type: 4353},                   // no learned groups
+		escptest.Setting{Type: 4354, Value: []byte{0}}, // report suppression off
+	)
+	return f
+}
+
+// fakeConfig aims a client configuration at the fake: its port, a free local port, loopback broadcast.
+func (s *Session) fakeConfig(cfg escp.Config) escp.Config {
+	cfg.SwitchPort = s.Fake.Port()
+	cfg.BroadcastAddr = "127.0.0.1"
+	cfg.Timeout = fakeTimeout
+	return cfg
+}
+
+// dialClient builds a client; for the fake each client gets its own local port.
+func (s *Session) dialClient(cfg escp.Config) (*escp.Client, error) {
+	if s.Fake != nil {
+		cfg = s.fakeConfig(cfg)
+		cfg.HostPort = escptest.FreeUDPPort(s.tb)
+	}
+	return escp.Dial(cfg)
+}
+
+// dial is dialClient for the provider.
+func (s *Session) dial(cfg escp.Config) (provider.SwitchClient, error) {
+	return s.dialClient(cfg)
+}
+
+// Factories returns the real provider for terraform-plugin-testing, dialling the target.
+func (s *Session) Factories() map[string]func() (tfprotov6.ProviderServer, error) {
+	return map[string]func() (tfprotov6.ProviderServer, error){
+		"tplinkeasysmart": providerserver.NewProtocol6WithError(provider.NewWithDialer("regression", s.dial)()),
+	}
+}
+
+// ProviderHCL is the provider block of every scenario's configuration.
+func (s *Session) ProviderHCL() string {
+	return fmt.Sprintf("provider \"tplinkeasysmart\" {\n  host     = %q\n  username = %q\n  password = %q\n}\n",
+		s.Target.Host, s.Target.Username, s.Target.Password)
+}
+
+// Before is the readout taken when the session opened: what every scenario must leave behind.
+func (s *Session) Before() Readout { return s.before }
+
+// Restored reads the switch again and returns the differences from Before, empty when identical.
+func (s *Session) Restored(ctx context.Context) ([]string, error) {
+	after, err := Take(ctx, s.rd)
+	if err != nil {
+		return nil, err
+	}
+	return Diff(s.before, after), nil
+}
+
+// Describe says which target a run used, for the log and the report; it never includes the password.
+func (s *Session) Describe() string {
+	return fmt.Sprintf("target %s (%s), test ports %s", s.Target.Name, s.Target.Host, strings.Trim(fmt.Sprint(s.Target.TestPorts), "[]"))
+}

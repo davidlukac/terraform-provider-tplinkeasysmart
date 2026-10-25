@@ -301,3 +301,17 @@ func TestClientFromServesNarrowInterfaces(t *testing.T) {
 		t.Fatalf("a client without Ports must not satisfy the port guard interface, got %v", c)
 	}
 }
+
+func TestNewWithDialerUsesTheDialer(t *testing.T) {
+	var got escp.Config
+	p := NewWithDialer("test", func(c escp.Config) (SwitchClient, error) { got = c; return &fakeClient{}, nil })()
+	srv := providerserver.NewProtocol6WithError(p)
+	factories := map[string]func() (tfprotov6.ProviderServer, error){"tplinkeasysmart": srv}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps:                    []resource.TestStep{{Config: providerBlock + `data "tplinkeasysmart_system_info" "x" {}`}},
+	})
+	if got.Host != "192.0.2.120" || got.WriteGate == nil {
+		t.Errorf("dialer received %+v, want the provider's host and its write gate", got)
+	}
+}

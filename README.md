@@ -207,6 +207,7 @@ make hooks              # once per clone: enable the pre-commit hook (gofmt, vet
 make test               # unit + Terraform lifecycle tests against fakes (needs `terraform` on PATH)
 make lint               # golangci-lint
 make cover              # tests with -race and the coverage policy
+make regression         # end-to-end scenarios (real Terraform, real provider, wire protocol) against the stateful fake switch
 make generate           # regenerate docs/ from the schema and examples/
 make validate-examples  # every documentation example against the schemas
 make snapshot           # dry-run of the signed release build
@@ -239,6 +240,8 @@ Failure paths are exercised without hardware:
 
 - `internal/escp`: the fake UDP switch can be scripted per request, stay silent, reject the key exchange, reject the *n*th SET, or replace its discovery reply.
 - `internal/provider`: a fault-injecting client wraps the in-memory fake and fails specific calls of any method, or accepts writes without applying them; every resource is driven through the same failure scenarios (write rejected, read-back fails, write ignored, update fails, refresh fails, bad import id, object vanishes).
+
+- `internal/regression`: the same scenarios run against the stateful fake (`make regression`, in CI with the lifecycle tests) or, from a gitignored `.test.env` (see `.test.env.example`), against one designated test switch (`make regression-live CONFIRM=1`; never in CI; switch 01 is refused by name and address). Every scenario changes a setting, checks it by reading the switch directly, restores the original values by configuration and proves the readout of the whole switch is identical.
 
 CI runs the unit suite on the module's Go version and the latest stable, the lifecycle tests on five Terraform versions and OpenTofu, the linter, a generated-docs check, a vulnerability scan and a release dry run.
 
