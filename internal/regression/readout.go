@@ -64,6 +64,14 @@ func CoreReaders(c *escp.Client) []Reader {
 			v, err := c.PortBasedVLAN(ctx)
 			return fmt.Sprintf("enabled=%t vlans=%v", v.Enabled, v.VLANs), err
 		}},
+		{"vlan-mode", func(ctx context.Context) (string, error) {
+			v, err := c.VLANMode(ctx)
+			return fmt.Sprintf("%+v", v), err
+		}},
+		{"vlan-8021q", func(ctx context.Context) (string, error) {
+			v, err := c.Dot1Q(ctx)
+			return fmt.Sprintf("enabled=%t vlans=%v pvids=%v", v.Enabled, v.VLANs, v.PVIDs), err
+		}},
 		{"bandwidth", func(ctx context.Context) (string, error) {
 			v, err := c.Bandwidth(ctx)
 			return fmt.Sprint(v), err
