@@ -51,7 +51,7 @@ func TestOpenReadsWritesBack(t *testing.T) {
 
 func TestSessionDescribeAndHCL(t *testing.T) {
 	s := Open(t, noEnv)
-	if got := s.Describe(); got != "target fake (127.0.0.1), test ports " {
+	if got := s.Describe(); got != "target fake (127.0.0.1), test ports 2 3 4 5" {
 		t.Errorf("Describe = %q", got)
 	}
 	if hcl := s.ProviderHCL(); !strings.Contains(hcl, `host     = "127.0.0.1"`) || !strings.Contains(hcl, `password = "secret"`) {

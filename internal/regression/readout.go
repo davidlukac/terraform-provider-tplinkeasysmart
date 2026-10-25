@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
@@ -19,7 +20,8 @@ type Reader struct {
 type Readout map[string]string
 
 // CoreReaders are the settings every target has. Later groups of the suite add theirs here, so
-// the same comparison covers more with each addition.
+// the same comparison covers more with each addition. Only what a person configures is read: no
+// counters, no learned tables, no actual link state (a device may come and go).
 func CoreReaders(c *escp.Client) []Reader {
 	return []Reader{
 		{"led", func(ctx context.Context) (string, error) {
@@ -29,6 +31,34 @@ func CoreReaders(c *escp.Client) []Reader {
 		{"igmp", func(ctx context.Context) (string, error) {
 			v, err := c.IGMP(ctx)
 			return fmt.Sprintf("enabled=%t suppression=%t", v.Enabled, v.ReportSuppression), err
+		}},
+		{"loop-prevention", func(ctx context.Context) (string, error) {
+			v, err := c.LoopPrevention(ctx)
+			return fmt.Sprint(v), err
+		}},
+		{"hostname", func(ctx context.Context) (string, error) {
+			v, err := c.Info(ctx)
+			return v.Hostname, err
+		}},
+		{"qos", func(ctx context.Context) (string, error) {
+			v, err := c.QoS(ctx)
+			return fmt.Sprintf("mode=%v priorities=%v", v.Mode, v.Priorities), err
+		}},
+		{"ports", func(ctx context.Context) (string, error) {
+			v, err := c.Ports(ctx)
+			var b strings.Builder
+			for _, p := range v {
+				fmt.Fprintf(&b, "%d:enabled=%t,lag=%d,speed=%s,flow=%t ", p.ID, p.Enabled, p.LAG, p.ConfiguredSpeed, p.ConfiguredFlowControl)
+			}
+			return b.String(), err
+		}},
+		{"bandwidth", func(ctx context.Context) (string, error) {
+			v, err := c.Bandwidth(ctx)
+			return fmt.Sprint(v), err
+		}},
+		{"storm", func(ctx context.Context) (string, error) {
+			v, err := c.StormControl(ctx)
+			return fmt.Sprint(v), err
 		}},
 	}
 }

@@ -73,7 +73,8 @@ func LoadTarget(env map[string]string) (Target, error) {
 	name := env[EnvTarget]
 	switch name {
 	case "", TargetFake:
-		return Target{Name: TargetFake, Host: "127.0.0.1", Username: "admin", Password: "secret"}, nil
+		return Target{Name: TargetFake, Host: "127.0.0.1", Username: "admin", Password: "secret",
+			TestPorts: []int{2, 3, 4, 5}, ProtectedPorts: []int{1, 6, 7, 8}}, nil
 	case TargetSW03:
 	case targetSW01:
 		return Target{}, errors.New("switch 01 is read-only for the regression suite and is never a target")

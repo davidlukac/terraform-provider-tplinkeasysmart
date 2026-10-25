@@ -78,9 +78,10 @@ type Switch struct {
 	recv             int
 	mute             bool // swallow everything (switch gone)
 	backupMode       BackupMode
-	departed         bool             // a system SET was applied under OnSystemSet and the switch has left
-	stateful         bool             // EnableState was called: SETs are remembered and answered by later GETs
-	store            map[int16][]byte // the last value of each settings TLV written (or seeded) under EnableState
+	departed         bool               // a system SET was applied under OnSystemSet and the switch has left
+	stateful         bool               // EnableState was called: SETs are remembered and answered by later GETs
+	store            map[int16][]byte   // the last value of each settings TLV written (or seeded) under EnableState
+	rows             map[int16][][]byte // tables with one TLV per row (ports, priorities, rates), keyed by the first byte of a row
 
 	// Programmable misbehaviour. Set these inside Configure, which holds the lock.
 
@@ -163,6 +164,7 @@ func (f *Switch) EnableState(seed ...Setting) {
 	defer f.mu.Unlock()
 	f.stateful = true
 	f.store = map[int16][]byte{}
+	f.rows = map[int16][][]byte{}
 	for _, s := range seed {
 		f.store[s.Type] = append([]byte(nil), s.Value...)
 	}
@@ -380,6 +382,10 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		}
 		f.mu.Lock()
 		addr, firmware := f.addr, f.firmware
+		name := "TL-SG108E-fake"
+		if f.hostname != "" {
+			name = f.hostname
+		}
 		if f.staleDiscoveries > 0 {
 			f.staleDiscoveries--
 			addr = map[int16][]byte{wire.TLVIP: {127, 0, 0, 9}, wire.TLVNetmask: {255, 255, 255, 0}, wire.TLVGateway: {127, 0, 0, 254}}
@@ -390,7 +396,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			ip, mask, gw = addr[wire.TLVIP], addr[wire.TLVNetmask], addr[wire.TLVGateway]
 		}
 		f.send(from, wire.OpReply, h, 0, []wire.TLV{
-			{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte("TL-SG108E-fake\x00")},
+			{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte(name + "\x00")},
 			{Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}, {Type: wire.TLVIP, Value: ip},
 			{Type: wire.TLVNetmask, Value: mask}, {Type: wire.TLVGateway, Value: gw},
 			{Type: wire.TLVFirmware, Value: []byte(firmware + "\x00")}, {Type: wire.TLVHardware, Value: []byte("TL-SG108E 6.0\x00")},
@@ -494,7 +500,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		f.history = append(f.history, append([]wire.TLV(nil), f.lastSet...))
 		if f.stateful {
 			for _, t := range f.lastSet {
-				f.store[t.Type] = append([]byte(nil), t.Value...)
+				f.storeSet(t)
 			}
 		}
 		f.mu.Unlock()
@@ -589,6 +595,54 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 	}
 }
 
+// EnableRows declares a table the switch keeps one TLV per row of (the ports, the QoS priorities,
+// the bandwidth and storm rates) and seeds it. A row is identified by its first byte, the port
+// number: a SET replaces the row with the same first byte, a GET returns every row in order.
+// A write of the port table (TLV 4096) keeps what only the switch decides, the LAG and the
+// actual speed, and derives the actual flow control from the configured one. Call EnableState
+// first.
+func (f *Switch) EnableRows(typ int16, rows ...[]byte) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.rows[typ] = nil
+	for _, r := range rows {
+		f.rows[typ] = append(f.rows[typ], append([]byte(nil), r...))
+	}
+}
+
+// storeSet remembers one written TLV: into its table when it has one, else as a single value.
+func (f *Switch) storeSet(t wire.TLV) {
+	table, ok := f.rows[t.Type]
+	if !ok {
+		f.store[t.Type] = append([]byte(nil), t.Value...)
+		return
+	}
+	row := append([]byte(nil), t.Value...)
+	for i, old := range table {
+		if old[0] != row[0] {
+			continue
+		}
+		if t.Type == wire.TLVPorts && len(row) == len(old) {
+			row[portRowLAG], row[portRowActualSpeed] = old[portRowLAG], old[portRowActualSpeed]
+			row[portRowActualFlow] = 0
+			if row[portRowConfiguredFlow] == 1 && old[portRowActualSpeed] != 0 {
+				row[portRowActualFlow] = 1
+			}
+		}
+		table[i] = row
+		return
+	}
+	f.rows[t.Type] = append(table, row)
+}
+
+// Offsets in a 7-byte port row (TLV 4096).
+const (
+	portRowLAG            = 2
+	portRowActualSpeed    = 4
+	portRowConfiguredFlow = 5
+	portRowActualFlow     = 6
+)
+
 // held returns the stored settings for the requested types, or nil when the switch is not
 // stateful or holds none of them.
 func (f *Switch) held(req []wire.TLV) []wire.TLV {
@@ -604,6 +658,12 @@ func (f *Switch) held(req []wire.TLV) []wire.TLV {
 			if v, ok := f.store[wire.TLVIGMPSuppression]; ok {
 				out = append(out, wire.TLV{Type: wire.TLVIGMPSuppression, Value: append([]byte(nil), v...)})
 			}
+		}
+		if table, ok := f.rows[r.Type]; ok {
+			for _, row := range table {
+				out = append(out, wire.TLV{Type: r.Type, Value: append([]byte(nil), row...)})
+			}
+			continue
 		}
 		if v, ok := f.store[r.Type]; ok {
 			out = append(out, wire.TLV{Type: r.Type, Value: append([]byte(nil), v...)})
