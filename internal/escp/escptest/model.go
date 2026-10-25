@@ -70,6 +70,9 @@ func (f *Switch) EnableModel(links map[int]LinkSpeed) {
 	f.bundles[wire.TLVVLAN8021QVLAN] = []int16{wire.TLVVLAN8021Q, wire.TLVVLAN8021QMax}
 	f.bundles[wire.TLVVLANPortBased] = []int16{wire.TLVVLANPortBasedMax, wire.TLVVLANPortBasedVID}
 	f.model = true
+	// A static address in the documentation range (RFC 5737): the fake is still reached on
+	// loopback, and nothing that follows this address can leave the machine.
+	f.addr = map[int16][]byte{wire.TLVIP: {192, 0, 2, 13}, wire.TLVNetmask: {255, 255, 255, 0}, wire.TLVGateway: {192, 0, 2, 1}}
 	f.mu.Unlock()
 	var ports, prio, bwIn, bwOut, storm [][]byte
 	for p := 1; p <= modelPortCount; p++ {

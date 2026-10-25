@@ -40,6 +40,10 @@ func CoreReaders(c *escp.Client) []Reader {
 			v, err := c.Info(ctx)
 			return v.Hostname, err
 		}},
+		{"management-address", func(ctx context.Context) (string, error) {
+			v, err := c.Info(ctx)
+			return fmt.Sprintf("ip=%s mask=%s gateway=%s dhcp=%t", v.IP, v.Netmask, v.Gateway, v.DHCP), err
+		}},
 		{"qos", func(ctx context.Context) (string, error) {
 			v, err := c.QoS(ctx)
 			return fmt.Sprintf("mode=%v priorities=%v", v.Mode, v.Priorities), err

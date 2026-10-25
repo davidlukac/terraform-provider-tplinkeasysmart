@@ -155,3 +155,18 @@ func TestFakeModelVLANModesAndDot1Q(t *testing.T) {
 		t.Errorf("mode = %+v, want MTU with uplink 1", m)
 	}
 }
+
+// The modelled switch has a static address in the documentation range, like switch 03 has a static
+// address, so the management-address resource can be exercised without a write that could leave the machine.
+func TestFakeModelHasAStaticDocumentationAddress(t *testing.T) {
+	f := escptest.Start(t)
+	f.EnableModel(nil)
+	c := dialFake(t, f, "secret")
+	info, err := c.Info(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.IP != "192.0.2.13" || info.Netmask != "255.255.255.0" || info.Gateway != "192.0.2.1" || info.DHCP {
+		t.Fatalf("got ip %s mask %s gateway %s dhcp %t", info.IP, info.Netmask, info.Gateway, info.DHCP)
+	}
+}

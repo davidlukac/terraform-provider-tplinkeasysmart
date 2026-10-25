@@ -387,6 +387,10 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		}
 		f.mu.Lock()
 		addr, firmware := f.addr, f.firmware
+		dhcp := byte(1)
+		if f.model {
+			dhcp = 0 // the modelled switch has a static address, like switch 03
+		}
 		name := "TL-SG108E-fake"
 		if f.hostname != "" {
 			name = f.hostname
@@ -405,7 +409,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			{Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}, {Type: wire.TLVIP, Value: ip},
 			{Type: wire.TLVNetmask, Value: mask}, {Type: wire.TLVGateway, Value: gw},
 			{Type: wire.TLVFirmware, Value: []byte(firmware + "\x00")}, {Type: wire.TLVHardware, Value: []byte("TL-SG108E 6.0\x00")},
-			{Type: wire.TLVDHCP, Value: []byte{1}}, {Type: wire.TLVFactoryDefault, Value: []byte{1}},
+			{Type: wire.TLVDHCP, Value: []byte{dhcp}}, {Type: wire.TLVFactoryDefault, Value: []byte{1}},
 		}, false)
 	case wire.OpSet:
 		if _, hasUser := find(wire.TLVUsername); hasUser && !viaSession {
