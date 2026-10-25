@@ -42,6 +42,7 @@ const (
 	rateRowLen     = 6 // port(1) enabled(1) rate(4)
 	stormRowLen    = 9 // port(1) enabled(1) unknown-unicast(1) multicast(1) broadcast(1) rate(4)
 	mirrorLen      = 10
+	maxDot1QVLANs  = 32
 )
 
 // EnableModel turns the switch into a model of a freshly reset TL-SG108E: eight ports on auto
@@ -61,8 +62,12 @@ func (f *Switch) EnableModel(links map[int]LinkSpeed) {
 		Setting{Type: wire.TLVMirror, Value: make([]byte, mirrorLen)},
 		Setting{Type: wire.TLVVLANPortBased, Value: []byte{1}},
 		Setting{Type: wire.TLVVLANPortBasedMax, Value: []byte{modelPortCount}},
+		Setting{Type: wire.TLVVLANMTU, Value: []byte{0, 1}},
+		Setting{Type: wire.TLVVLAN8021Q, Value: []byte{0}},
+		Setting{Type: wire.TLVVLAN8021QMax, Value: []byte{maxDot1QVLANs}},
 	)
 	f.mu.Lock()
+	f.bundles[wire.TLVVLAN8021QVLAN] = []int16{wire.TLVVLAN8021Q, wire.TLVVLAN8021QMax}
 	f.bundles[wire.TLVVLANPortBased] = []int16{wire.TLVVLANPortBasedMax, wire.TLVVLANPortBasedVID}
 	f.model = true
 	f.mu.Unlock()
@@ -83,6 +88,16 @@ func (f *Switch) EnableModel(links map[int]LinkSpeed) {
 	f.mu.Lock()
 	f.rows[wire.TLVLAG][0][0], f.rows[wire.TLVLAG][1][0] = 1, 2
 	f.mu.Unlock()
+	var pvids [][]byte
+	for p := 1; p <= modelPortCount; p++ {
+		pvids = append(pvids, []byte{byte(p), 0, defaultVLAN})
+	}
+	f.EnableRows(wire.TLVVLAN8021QPVID, pvids...)
+	// VLAN 1: every port a member, none tagged, named Default.
+	vlan1 := binary.BigEndian.AppendUint16(nil, defaultVLAN)
+	vlan1 = binary.BigEndian.AppendUint32(vlan1, 1<<modelPortCount-1)
+	vlan1 = binary.BigEndian.AppendUint32(vlan1, 0)
+	f.EnableRows(wire.TLVVLAN8021QVLAN, append(vlan1, "Default\x00"...))
 	f.EnableRows(wire.TLVVLANPortBasedVID, binary.BigEndian.AppendUint32([]byte{defaultVLAN}, 1<<modelPortCount-1))
 }
 
@@ -206,6 +221,25 @@ func (f *Switch) applied(t wire.TLV) {
 		return
 	}
 	switch t.Type {
+	case wire.TLVVLANMTU, wire.TLVVLANPortBased, wire.TLVVLAN8021Q:
+		// The VLAN modes exclude each other: turning one on turns the others off.
+		if t.Value[0] != 1 {
+			return
+		}
+		for _, other := range []int16{wire.TLVVLANMTU, wire.TLVVLANPortBased, wire.TLVVLAN8021Q} {
+			if other != t.Type {
+				f.store[other] = append([]byte{0}, f.store[other][1:]...)
+			}
+		}
+	case wire.TLVVLAN8021QVLAN:
+		// A VLAN written with no member ports is deleted.
+		var kept [][]byte
+		for _, r := range f.rows[wire.TLVVLAN8021QVLAN] {
+			if binary.BigEndian.Uint32(r[2:6]) != 0 {
+				kept = append(kept, r)
+			}
+		}
+		f.rows[wire.TLVVLAN8021QVLAN] = kept
 	case wire.TLVLAG:
 		group, members := t.Value[0], portsOf(t.Value[1:])
 		for _, r := range f.rows[wire.TLVPorts] {

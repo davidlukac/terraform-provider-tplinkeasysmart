@@ -117,3 +117,41 @@ func TestFakeModelEnforcesTheSwitchRules(t *testing.T) {
 		t.Errorf("VLANs = %+v, want only VLAN 1 with all eight ports", vl.VLANs)
 	}
 }
+
+func TestFakeModelVLANModesAndDot1Q(t *testing.T) {
+	f := escptest.Start(t)
+	f.EnableModel(nil)
+	c, ctx := dialFake(t, f, escptest.Password), context.Background()
+
+	if m, _ := c.VLANMode(ctx); m.Mode != VLANModePortBased {
+		t.Fatalf("mode at reset = %v, want port-based", m)
+	}
+	if err := c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeDot1Q}); err != nil {
+		t.Fatal(err)
+	}
+	if m, _ := c.VLANMode(ctx); m.Mode != VLANModeDot1Q {
+		t.Fatalf("mode = %v, want 802.1q and the others off", m)
+	}
+	// Two VLANs whose ids share a leading byte must stay apart.
+	for _, v := range []VLAN8021Q{{ID: 20, Name: "a", Untagged: []int{3}}, {ID: 21, Name: "b", Tagged: []int{4}}} {
+		if err := c.SetVLAN8021Q(ctx, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	q, err := c.Dot1Q(ctx)
+	if err != nil || len(q.VLANs) != 3 || q.MaxVLAN == 0 || len(q.PVIDs) != 8 {
+		t.Fatalf("Dot1Q = %+v, %v; want VLAN 1, 20 and 21, a maximum and eight PVIDs", q, err)
+	}
+	if err := c.DeleteVLAN8021Q(ctx, 20); err != nil {
+		t.Fatal(err)
+	}
+	if q, _ = c.Dot1Q(ctx); len(q.VLANs) != 2 || q.VLANs[1].ID != 21 {
+		t.Errorf("VLANs after the delete = %+v, want VLAN 1 and 21", q.VLANs)
+	}
+	if err := c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if m, _ := c.VLANMode(ctx); m.Mode != VLANModeMTU || m.UplinkPort != 1 {
+		t.Errorf("mode = %+v, want MTU with uplink 1", m)
+	}
+}

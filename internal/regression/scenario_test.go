@@ -433,3 +433,146 @@ func TestScenarioAllowDisruptive(t *testing.T) {
 		},
 	})
 }
+
+// VLAN mode, an 802.1Q VLAN on two test ports and a PVID. Nothing here touches the uplink or the
+// management VLAN: VLAN 1 keeps every port untagged. Restoring takes four steps because removing a
+// PVID resource only forgets it (its value is put back by configuration first), a VLAN cannot be
+// deleted while a port still has it as PVID, and the mode goes back last.
+func TestScenarioVLAN8021Q(t *testing.T) {
+	s := openForScenario(t)
+	ctx := context.Background()
+	orig, err := s.Client.VLANMode(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var originalMode string
+	switch orig.Mode {
+	case escp.VLANModePortBased, escp.VLANModeDot1Q:
+		originalMode = fmt.Sprintf("  mode = %q\n", string(orig.Mode))
+	case escp.VLANModeMTU:
+		originalMode = fmt.Sprintf("  mode            = \"mtu\"\n  mtu_uplink_port = %d\n", orig.UplinkPort)
+	default:
+		t.Skipf("the switch is in VLAN mode %q, which cannot be written back", orig.Mode)
+	}
+	dot1q, err := s.Client.Dot1Q(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b := s.Target.TestPorts[0], s.Target.TestPorts[1]
+	origPVID := 1
+	for _, p := range dot1q.PVIDs {
+		if p.Port == a {
+			origPVID = p.PVID
+		}
+	}
+	mode := func(body string) string {
+		return fmt.Sprintf("resource \"tplinkeasysmart_vlan_mode\" \"this\" {\n%s  allow_disruptive = true\n}\n", body)
+	}
+	group := fmt.Sprintf("resource \"tplinkeasysmart_vlan_8021q_group\" \"lab\" {\n  vlan           = 20\n  name           = \"regtest\"\n  untagged_ports = %s\n  depends_on     = [tplinkeasysmart_vlan_mode.this]\n}\n", intSet(a, b))
+	pvid := func(id int, after string) string {
+		return fmt.Sprintf("resource \"tplinkeasysmart_vlan_8021q_pvid\" \"lab\" {\n  port       = %d\n  pvid       = %d\n  depends_on = [%s]\n}\n", a, id, after)
+	}
+	const modeOnly, modeAndGroup = "tplinkeasysmart_vlan_mode.this", "tplinkeasysmart_vlan_mode.this, tplinkeasysmart_vlan_8021q_group.lab"
+	s.scenarioSteps(t, mode("  mode = \"802.1q\"\n")+group+pvid(20, modeAndGroup), func(*terraform.State) error {
+		got, err := s.Client.Dot1Q(ctx)
+		if err != nil || !got.Enabled {
+			return fmt.Errorf("802.1Q on the switch = %+v, err %w, want it enabled", got.Enabled, err)
+		}
+		found := false
+		for _, v := range got.VLANs {
+			found = found || v.ID == 20 && v.Name == "regtest" && fmt.Sprint(v.Untagged) == fmt.Sprint([]int{a, b})
+		}
+		for _, p := range got.PVIDs {
+			if p.Port == a && p.PVID != 20 {
+				return fmt.Errorf("port %d PVID = %d, want 20", a, p.PVID)
+			}
+		}
+		if !found {
+			return fmt.Errorf("VLAN 20 not as configured: %v", got.VLANs)
+		}
+		return nil
+	},
+		mode("  mode = \"802.1q\"\n")+group+pvid(origPVID, modeAndGroup),
+		mode("  mode = \"802.1q\"\n")+pvid(origPVID, modeOnly),
+		mode(originalMode),
+	)
+}
+
+// Import, drift and destroy semantics, on the LED and on a test port.
+func TestScenarioLifecycle(t *testing.T) {
+	s := openForScenario(t)
+	ctx := context.Background()
+	orig, err := s.Client.LED(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	led := func(on bool) string {
+		return fmt.Sprintf("resource \"tplinkeasysmart_led\" \"this\" {\n  enabled = %t\n}\n", on)
+	}
+	ledIs := func(want bool) resource.TestCheckFunc {
+		return func(*terraform.State) error {
+			got, err := s.Client.LED(ctx)
+			if err != nil || got != want {
+				return fmt.Errorf("LED on the switch = %t, err %w, want %t", got, err, want)
+			}
+			return nil
+		}
+	}
+	port := s.Target.TestPorts[0]
+	ports, err := s.Client.Ports(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var origPort escp.Port
+	for _, p := range ports {
+		if p.ID == port {
+			origPort = p
+		}
+	}
+	// The port is written with the values it has, so creating the resource changes nothing.
+	portCfg := fmt.Sprintf("resource \"tplinkeasysmart_port\" \"this\" {\n  port         = %d\n  enabled      = %t\n  speed        = %q\n  flow_control = %t\n}\n",
+		port, origPort.Enabled, string(origPort.ConfiguredSpeed), origPort.ConfiguredFlowControl)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: s.Factories(),
+		Steps: []resource.TestStep{
+			// Create, then import into a fresh state and compare every attribute.
+			{Config: s.ProviderHCL() + led(orig) + portCfg},
+			{Config: s.ProviderHCL() + led(orig) + portCfg, ResourceName: "tplinkeasysmart_led.this", ImportState: true, ImportStateId: "led", ImportStateVerify: true, ImportStateVerifyIdentifierAttribute: "enabled"},
+			{Config: s.ProviderHCL() + led(orig) + portCfg, ResourceName: "tplinkeasysmart_port.this", ImportState: true, ImportStateId: strconv.Itoa(port), ImportStateVerify: true, ImportStateVerifyIdentifierAttribute: "port", ImportStateVerifyIgnore: []string{"allow_disruptive"}},
+			// Drift: someone changes the switch behind Terraform's back; the plan shows it, an apply fixes it.
+			{PreConfig: func() {
+				if err := s.Client.SetLED(ctx, !orig); err != nil {
+					t.Fatal(err)
+				}
+			}, Config: s.ProviderHCL() + led(orig) + portCfg, PlanOnly: true, ExpectNonEmptyPlan: true},
+			{Config: s.ProviderHCL() + led(orig) + portCfg, Check: ledIs(orig)},
+			// Destroy only forgets: the switch keeps the last value.
+			{Config: s.ProviderHCL() + led(!orig), Check: ledIs(!orig)},
+			{Config: s.ProviderHCL(), Check: ledIs(!orig)},
+			// Restore by configuration.
+			{Config: s.ProviderHCL() + led(orig), Check: func(*terraform.State) error {
+				if err := ledIs(orig)(nil); err != nil {
+					return err
+				}
+				return s.restoredCheck(t)(nil)
+			}},
+		},
+	})
+}
+
+// The configuration file hash is readable and changes when the switch is changed.
+func TestScenarioConfigBackupDataSource(t *testing.T) {
+	s := openForScenario(t)
+	data := `data "tplinkeasysmart_config_backup" "this" {}
+`
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: s.Factories(),
+		Steps: []resource.TestStep{{
+			Config: s.ProviderHCL() + data,
+			Check: resource.ComposeTestCheckFunc(
+				resource.TestMatchResourceAttr("data.tplinkeasysmart_config_backup.this", "sha256", regexp.MustCompile(`^[0-9a-f]{64}$`)),
+				resource.TestCheckResourceAttrSet("data.tplinkeasysmart_config_backup.this", "size"),
+			),
+		}},
+	})
+}

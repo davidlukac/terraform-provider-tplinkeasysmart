@@ -1,6 +1,7 @@
 package escptest
 
 import (
+	"bytes"
 	"math/big"
 	"net"
 	"sync"
@@ -627,8 +628,9 @@ func (f *Switch) storeSet(t wire.TLV) {
 		return
 	}
 	row := append([]byte(nil), t.Value...)
+	k := rowKeyLen(t.Type)
 	for i, old := range table {
-		if old[0] != row[0] {
+		if !bytes.Equal(old[:k], row[:k]) {
 			continue
 		}
 		if t.Type == wire.TLVPorts && len(row) == len(old) {
@@ -689,4 +691,13 @@ func (f *Switch) heldType(typ int16) []wire.TLV {
 		out = append(out, wire.TLV{Type: typ, Value: append([]byte(nil), v...)})
 	}
 	return out
+}
+
+// rowKeyLen is how many leading bytes identify a row of a table: the port number, except for
+// the 802.1Q VLANs, which are identified by their 2-byte id.
+func rowKeyLen(typ int16) int {
+	if typ == wire.TLVVLAN8021QVLAN {
+		return 2
+	}
+	return 1
 }
