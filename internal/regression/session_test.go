@@ -174,3 +174,16 @@ func TestProviderDialAimsAtTheFake(t *testing.T) {
 		t.Errorf("LED through the provider's dialer = %t, %v", on, err)
 	}
 }
+
+func TestOpenStopsWhenATestPortHasALink(t *testing.T) {
+	ft := &fatalRecorder{TB: t}
+	func() {
+		defer func() { _ = recover() }()
+		openWith(ft, noEnv, func(f *escptest.Switch) {
+			f.EnableModel(map[int]escptest.LinkSpeed{3: escptest.Link100Full})
+		})
+	}()
+	if !ft.failed || !strings.Contains(ft.msg, "test port 3 has a link") {
+		t.Errorf("failed=%t msg=%q, want the run stopped before any write", ft.failed, ft.msg)
+	}
+}

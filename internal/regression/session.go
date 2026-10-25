@@ -83,69 +83,17 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 	if s.before, err = Take(context.Background(), s.rd); err != nil {
 		t.Fatalf("first readout of %s: %v", target.Name, err)
 	}
+	if err := CheckTestPorts(context.Background(), s.Client, target); err != nil {
+		t.Fatalf("%s: %v", target.Name, err)
+	}
 	return s
 }
 
-// TLV types of the settings the fake is seeded with (the wire package is internal to escp).
-const (
-	tlvPorts           = 4096
-	tlvIGMPEnabled     = 4352
-	tlvIGMPGroups      = 4353
-	tlvIGMPSuppression = 4354
-	tlvQoSMode         = 12288
-	tlvQoSPriority     = 12289
-	tlvBandwidthIn     = 12544
-	tlvBandwidthOut    = 12545
-	tlvStorm           = 12800
-	tlvLoopPrevention  = 17152
-)
-
-// The fake's port shape mirrors switch 03: the uplink on port 1 and devices on 6, 7 and 8 have a
-// link, the other ports are free. Speed codes are those of the wire (6 = 1000Mbps full, 5 = 100Mbps full).
-const (
-	fakePortCount  = 8
-	speedCodeAuto  = 1
-	speedCode100   = 5
-	speedCode1000  = 6
-	qosModeDSCP    = 2
-	stormRowLen    = 9
-	bandwidthWidth = 6
-)
-
-// fakeLinkSpeed is the actual speed code of a port of the fake, 0 for no link.
-func fakeLinkSpeed(port int) byte {
-	switch port {
-	case 1, 6:
-		return speedCode1000
-	case 7, 8:
-		return speedCode100
-	}
-	return 0
-}
-
-// startFake starts the stateful fake with the settings of a switch that has not been configured.
+// startFake starts the model of a freshly reset switch with the port shape of switch 03: the
+// uplink on port 1 and devices on 6, 7 and 8 have a link, the other ports are free.
 func startFake(t testing.TB) *escptest.Switch {
 	f := escptest.Start(t)
-	f.EnableState(
-		escptest.Setting{Type: tlvIGMPEnabled, Value: []byte{1}},
-		escptest.Setting{Type: tlvIGMPGroups},
-		escptest.Setting{Type: tlvIGMPSuppression, Value: []byte{0}},
-		escptest.Setting{Type: tlvLoopPrevention, Value: []byte{1}},
-		escptest.Setting{Type: tlvQoSMode, Value: []byte{qosModeDSCP}},
-	)
-	var ports, prio, bwIn, bwOut, storm [][]byte
-	for p := byte(1); p <= fakePortCount; p++ {
-		ports = append(ports, []byte{p, 1, 0, speedCodeAuto, fakeLinkSpeed(int(p)), 0, 0})
-		prio = append(prio, []byte{p, 0})
-		bwIn = append(bwIn, append([]byte{p}, make([]byte, bandwidthWidth-1)...))
-		bwOut = append(bwOut, append([]byte{p}, make([]byte, bandwidthWidth-1)...))
-		storm = append(storm, append([]byte{p}, make([]byte, stormRowLen-1)...))
-	}
-	f.EnableRows(tlvPorts, ports...)
-	f.EnableRows(tlvQoSPriority, prio...)
-	f.EnableRows(tlvBandwidthIn, bwIn...)
-	f.EnableRows(tlvBandwidthOut, bwOut...)
-	f.EnableRows(tlvStorm, storm...)
+	f.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full, 6: escptest.Link1000Full, 7: escptest.Link100Full, 8: escptest.Link100Full})
 	return f
 }
 

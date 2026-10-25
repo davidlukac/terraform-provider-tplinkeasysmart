@@ -81,6 +81,8 @@ type Switch struct {
 	departed         bool               // a system SET was applied under OnSystemSet and the switch has left
 	stateful         bool               // EnableState was called: SETs are remembered and answered by later GETs
 	store            map[int16][]byte   // the last value of each settings TLV written (or seeded) under EnableState
+	model            bool               // EnableModel was called: cross-setting rules apply
+	bundles          map[int16][]int16  // requests that the switch answers with more types than asked for
 	rows             map[int16][][]byte // tables with one TLV per row (ports, priorities, rates), keyed by the first byte of a row
 
 	// Programmable misbehaviour. Set these inside Configure, which holds the lock.
@@ -165,6 +167,8 @@ func (f *Switch) EnableState(seed ...Setting) {
 	f.stateful = true
 	f.store = map[int16][]byte{}
 	f.rows = map[int16][][]byte{}
+	// The real switch answers a request for the IGMP state with report suppression as well.
+	f.bundles = map[int16][]int16{wire.TLVIGMPEnabled: {wire.TLVIGMPSuppression}}
 	for _, s := range seed {
 		f.store[s.Type] = append([]byte(nil), s.Value...)
 	}
@@ -490,6 +494,10 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			f.send(from, wire.OpSetReply, h, RejectCode, nil, true)
 			return
 		}
+		if code := f.refuse(tlvs); code != 0 {
+			f.send(from, wire.OpSetReply, h, code, nil, true)
+			return
+		}
 		f.mu.Lock()
 		f.lastSet = nil
 		for _, t := range tlvs {
@@ -612,6 +620,7 @@ func (f *Switch) EnableRows(typ int16, rows ...[]byte) {
 
 // storeSet remembers one written TLV: into its table when it has one, else as a single value.
 func (f *Switch) storeSet(t wire.TLV) {
+	defer f.applied(t)
 	table, ok := f.rows[t.Type]
 	if !ok {
 		f.store[t.Type] = append([]byte(nil), t.Value...)
@@ -653,11 +662,8 @@ func (f *Switch) held(req []wire.TLV) []wire.TLV {
 	}
 	var out []wire.TLV
 	for _, r := range req {
-		// The real switch answers a request for the IGMP state with report suppression as well.
-		if r.Type == wire.TLVIGMPEnabled {
-			if v, ok := f.store[wire.TLVIGMPSuppression]; ok {
-				out = append(out, wire.TLV{Type: wire.TLVIGMPSuppression, Value: append([]byte(nil), v...)})
-			}
+		for _, extra := range f.bundles[r.Type] {
+			out = append(out, f.heldType(extra)...)
 		}
 		if table, ok := f.rows[r.Type]; ok {
 			for _, row := range table {
@@ -668,6 +674,19 @@ func (f *Switch) held(req []wire.TLV) []wire.TLV {
 		if v, ok := f.store[r.Type]; ok {
 			out = append(out, wire.TLV{Type: r.Type, Value: append([]byte(nil), v...)})
 		}
+	}
+	return out
+}
+
+// heldType returns the stored TLVs of one type (a table's rows, or the single value).
+func (f *Switch) heldType(typ int16) []wire.TLV {
+	var out []wire.TLV
+	if table, ok := f.rows[typ]; ok {
+		for _, row := range table {
+			out = append(out, wire.TLV{Type: typ, Value: append([]byte(nil), row...)})
+		}
+	} else if v, ok := f.store[typ]; ok {
+		out = append(out, wire.TLV{Type: typ, Value: append([]byte(nil), v...)})
 	}
 	return out
 }
