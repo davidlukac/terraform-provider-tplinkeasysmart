@@ -56,7 +56,7 @@ Coverage must stay at 100% of reachable statements (`make cover`, exclusions onl
 - [ ] **[R][D]** The README tables are updated: *What you can manage* (resource, web UI page, guard) and, when the verified hardware or firmware changed, *Compatibility*.
 - [ ] **[C]** Client documentation is current: doc comments on the exported API, the package overview (`doc.go`), runnable examples (`example_test.go`) for new public entry points, and the data structures a caller sees.
 - [ ] **[C]** [`internal/escp/PROTOCOL.md`](internal/escp/PROTOCOL.md) describes the layout and its status (verified live on which firmware, vendor code only, or assumed).
-- [ ] **Hardware and firmware compatibility:** record which hardware revision and firmware build the change was verified on, and what is only read. The firmware allow-list (`internal/escp/safety`) grows only after a build has been verified.
+- [ ] **Hardware and firmware compatibility:** the one source is [`internal/escp/safety/compatibility.json`](internal/escp/safety/compatibility.json). Record there which hardware revision and firmware build the change was verified on, and what is only read; then run `make compat-table` to regenerate the README table. The firmware allow-list is read from the same file: a build becomes writable without the opt-in only when a row with `"support": "verified"` names it, and only after it has really been verified on a switch.
 - [ ] `CHANGELOG.md`: user-visible changes only, taken from the diff and not from memory; breaking changes and new refusals called out.
 
 ## 4. Pull request and release

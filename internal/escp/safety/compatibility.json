@@ -1,0 +1,47 @@
+{
+  "rows": [
+    {
+      "model": "TL-SG108E",
+      "hardware": "v6",
+      "firmware": "1.0.0 Build 20230218",
+      "builds": ["20230218"],
+      "support": "verified",
+      "summary": "reads, writes, import and drift checked on a real device. The VLAN mode, 802.1Q group and PVID resources were not tried on this build (they are verified on 20250710; same protocol generation)."
+    },
+    {
+      "model": "TL-SG108E",
+      "hardware": "v6",
+      "firmware": "1.0.0 Build 20250710",
+      "builds": ["20250710"],
+      "support": "verified",
+      "summary": "reads, imports and drift; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID resources). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8; see the `lag` page)."
+    },
+    {
+      "model": "TL-SG108E",
+      "hardware": "v6",
+      "firmware": "builds newer than 20250710",
+      "support": "untried",
+      "summary": "reads work, writes are refused unless `allow_unverified_firmware = true`; start with the read-only data sources"
+    },
+    {
+      "model": "TL-SG108E",
+      "hardware": "other hardware versions",
+      "firmware": "any",
+      "support": "untested"
+    },
+    {
+      "model": "Other Easy Smart models (TL-SG105E, TL-SG1016DE, ...)",
+      "hardware": "any",
+      "firmware": "any",
+      "support": "untested",
+      "summary": "reports wanted"
+    },
+    {
+      "model": "Any",
+      "hardware": "any",
+      "firmware": "firmware **before the 2023 RSA key exchange**",
+      "support": "unsupported",
+      "summary": "the client always performs the key exchange and has never been tried against the older login"
+    }
+  ]
+}
