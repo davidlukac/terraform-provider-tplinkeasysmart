@@ -385,8 +385,9 @@ func TestARemovedGroupIsStillReportedAsReplaced(t *testing.T) {
 // one would have to be gated, or be a read on purpose, and this test makes that a decision.
 func TestOnlyKnownPlacesSendASET(t *testing.T) {
 	want := map[string]int{
-		"client.go": 2, // the key exchange in ensureSession, and setTLVsSent
-		"backup.go": 1, // ConfigBackup: a SET on the wire, a read in effect
+		"session.go": 1, // the key exchange in ensureSession
+		"request.go": 1, // setTLVsSent, behind the write gate
+		"backup.go":  1, // ConfigBackup: a SET on the wire, a read in effect
 	}
 	files, err := filepath.Glob("*.go")
 	if err != nil || len(files) == 0 {
