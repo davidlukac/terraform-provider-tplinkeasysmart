@@ -2,6 +2,8 @@ package regression
 
 import (
 	"context"
+	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -185,5 +187,40 @@ func TestOpenStopsWhenATestPortHasALink(t *testing.T) {
 	}()
 	if !ft.failed || !strings.Contains(ft.msg, "test port 3 has a link") {
 		t.Errorf("failed=%t msg=%q, want the run stopped before any write", ft.failed, ft.msg)
+	}
+}
+
+func TestAClientWithOnlyAMACFindsTheFakeWhenTheMACIsItsOwn(t *testing.T) {
+	s := Open(t, noEnv)
+	if s.MAC != net.HardwareAddr(escptest.DefaultMAC[:]).String() {
+		t.Fatalf("the session reports MAC %q, want the fake's %v", s.MAC, escptest.DefaultMAC)
+	}
+	hw, err := net.ParseMAC(s.MAC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.dialClient(escp.Config{MAC: hw, Username: s.Target.Username, Password: s.Target.Password})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close() }()
+	if on, err := c.LED(context.Background()); err != nil || !on {
+		t.Errorf("LED through a client that only knows the MAC = %t, %v", on, err)
+	}
+	// Nobody else has any other MAC.
+	if _, err := s.dialClient(escp.Config{MAC: net.HardwareAddr{2, 0, 0, 0, 0, 1}}); !errors.Is(err, escp.ErrNotFound) {
+		t.Errorf("a MAC the fake does not have: err = %v, want escp.ErrNotFound", err)
+	}
+}
+
+func TestProviderBlockByMAC(t *testing.T) {
+	s := Open(t, noEnv)
+	only := s.ProviderHCLByMAC("", s.MAC)
+	if !strings.Contains(only, `mac      = "`+s.MAC+`"`) || strings.Contains(only, "host") {
+		t.Errorf("a block by MAC alone must name no host: %q", only)
+	}
+	both := s.ProviderHCLByMAC("192.0.2.9", s.MAC)
+	if !strings.Contains(both, `host     = "192.0.2.9"`) || !strings.Contains(both, `mac      = "`+s.MAC+`"`) {
+		t.Errorf("a block with both: %q", both)
 	}
 }

@@ -1,6 +1,7 @@
 package regression
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -16,6 +17,9 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/provider"
 )
 
+// loopback is where the fakes listen.
+const loopback = "127.0.0.1"
+
 // fakeTimeout is how long the clients of the fake wait per attempt: it answers at once, so a
 // silence is a bug, not a slow management CPU.
 const fakeTimeout = 500 * time.Millisecond
@@ -28,6 +32,8 @@ type Session struct {
 	// Fake is the in-process switch, nil on hardware.
 	Fake   *escptest.Switch
 	Client *escp.Client
+	// MAC is the MAC address the target reports about itself, in the form the client prints it.
+	MAC    string
 	before Readout
 	rd     []Reader
 	tb     testing.TB
@@ -83,6 +89,7 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 	if s.before, err = Take(context.Background(), s.rd); err != nil {
 		t.Fatalf("first readout of %s: %v", target.Name, err)
 	}
+	s.MAC = s.before["mac"]
 	if err := CheckTestPorts(context.Background(), s.Client, target); err != nil {
 		t.Fatalf("%s: %v", target.Name, err)
 	}
@@ -100,7 +107,7 @@ func startFake(t testing.TB) *escptest.Switch {
 // fakeConfig aims a client configuration at the fake: its port, a free local port, loopback broadcast.
 func (s *Session) fakeConfig(cfg escp.Config) escp.Config {
 	cfg.SwitchPort = s.Fake.Port()
-	cfg.BroadcastAddr = "127.0.0.1"
+	cfg.BroadcastAddr = loopback
 	cfg.Timeout = fakeTimeout
 	return cfg
 }
@@ -108,6 +115,15 @@ func (s *Session) fakeConfig(cfg escp.Config) escp.Config {
 // dialClient builds a client; for the fake each client gets its own local port.
 func (s *Session) dialClient(cfg escp.Config) (*escp.Client, error) {
 	if s.Fake != nil {
+		if cfg.Host == "" && cfg.MAC != nil {
+			// A client without an address finds its switch by a discovery on the host's interfaces,
+			// which cannot see a fake on loopback. This stands in for it: the fake is found when the
+			// MAC is its own, and nothing is found otherwise.
+			if !bytes.Equal(cfg.MAC, escptest.DefaultMAC[:]) {
+				return nil, fmt.Errorf("%w: %s", escp.ErrNotFound, cfg.MAC)
+			}
+			cfg.Host = loopback
+		}
 		cfg = s.fakeConfig(cfg)
 		cfg.HostPort = escptest.FreeUDPPort(s.tb)
 	}
@@ -130,6 +146,16 @@ func (s *Session) Factories() map[string]func() (tfprotov6.ProviderServer, error
 func (s *Session) ProviderHCL() string {
 	return fmt.Sprintf("provider \"tplinkeasysmart\" {\n  host     = %q\n  username = %q\n  password = %q\n}\n",
 		s.Target.Host, s.Target.Username, s.Target.Password)
+}
+
+// ProviderHCLByMAC is the provider block naming the switch by its MAC address only: no address
+// anywhere, so the provider has to find it. host, when not empty, is added as an address to try first.
+func (s *Session) ProviderHCLByMAC(host, mac string) string {
+	hostLine := ""
+	if host != "" {
+		hostLine = fmt.Sprintf("  host     = %q\n", host)
+	}
+	return fmt.Sprintf("provider \"tplinkeasysmart\" {\n%s  mac      = %q\n  username = %q\n  password = %q\n}\n", hostLine, mac, s.Target.Username, s.Target.Password)
 }
 
 // Before is the readout taken when the session opened: what every scenario must leave behind.

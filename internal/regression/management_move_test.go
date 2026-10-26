@@ -107,3 +107,57 @@ func TestScenarioManagementMove(t *testing.T) {
 		}},
 	}})
 }
+
+// The same move with the switch named by its MAC address: no host file, no override. The next
+// Terraform command finds the switch at the spare address by itself, which is the end-to-end
+// proof that a changed management address no longer needs a configuration change.
+func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
+	s := openForScenario(t)
+	if s.Fake != nil {
+		t.Skip("the move needs hardware: the fake answers on loopback, where the client refuses to move a switch")
+	}
+	if s.Target.MoveIP == "" {
+		t.Skip("set " + EnvAllowMove + "=1 and TPLINK_REGRESSION_MOVE_IP to move the switch to a spare address and back")
+	}
+	ctx := context.Background()
+	info, err := s.Client.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.DHCP {
+		t.Fatal("the switch uses DHCP; the management address resource only manages a static address")
+	}
+	hw, err := net.ParseMAC(info.MAC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := ipConfigOfInfo(info)
+	t.Cleanup(func() { s.bringBack(t, original) }) // registered before the first write
+
+	hcl := func(ip, mask, gateway string) string {
+		return s.ProviderHCLByMAC("", info.MAC) +
+			fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", ip, mask, gateway)
+	}
+	// reportsIP asks, with a client that has only the MAC, where the switch is now.
+	reportsIP := func(want string) error {
+		c, err := s.dialClient(escp.Config{MAC: hw, Username: s.Target.Username, Password: s.Target.Password})
+		if err != nil {
+			return err
+		}
+		defer func() { _ = c.Close() }() // read-only client at the end of the check
+		got, err := c.Info(ctx)
+		if err != nil || got.IP != want {
+			return fmt.Errorf("the switch found by MAC reports ip %q, err %w, want %q", got.IP, err, want)
+		}
+		return nil
+	}
+	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+		{Config: hcl(s.Target.MoveIP, info.Netmask, info.Gateway), Check: func(*terraform.State) error { return reportsIP(s.Target.MoveIP) }},
+		{Config: hcl(info.IP, info.Netmask, info.Gateway), Check: func(st *terraform.State) error {
+			if err := reportsIP(info.IP); err != nil {
+				return err
+			}
+			return s.restoredCheck(t)(st)
+		}},
+	}})
+}
