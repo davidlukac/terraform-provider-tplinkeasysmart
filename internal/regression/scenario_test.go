@@ -107,6 +107,34 @@ func TestScenarioIGMPSnooping(t *testing.T) {
 	})
 }
 
+// Report suppression is the one value the switch keeps while its feature is off (measured on
+// firmware 20250710, internal/escp/PROTOCOL.md): it can be set while snooping is off and is still
+// there when snooping is switched on. Every other value of an inactive feature is dropped.
+func TestScenarioIGMPSuppressionStagedWhileSnoopingIsOff(t *testing.T) {
+	s := openForScenario(t)
+	orig, err := s.Client.IGMP(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := func(e, r bool) string {
+		return fmt.Sprintf("resource \"tplinkeasysmart_igmp_snooping\" \"this\" {\n  enabled                    = %t\n  report_message_suppression = %t\n}\n", e, r)
+	}
+	is := func(e, r bool) resource.TestCheckFunc {
+		return func(*terraform.State) error {
+			got, err := s.Client.IGMP(context.Background())
+			if err != nil || got.Enabled != e || got.ReportSuppression != r {
+				return fmt.Errorf("IGMP on the switch = %+v, err %w, want enabled=%t suppression=%t", got, err, e, r)
+			}
+			return nil
+		}
+	}
+	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+		{Config: s.ProviderHCL() + cfg(false, true), Check: is(false, true)},
+		{Config: s.ProviderHCL() + cfg(true, true), Check: is(true, true)},
+		{Config: s.ProviderHCL() + cfg(orig.Enabled, orig.ReportSuppression), Check: s.restoredCheck(t)},
+	}})
+}
+
 func TestScenarioLoopPrevention(t *testing.T) {
 	s := openForScenario(t)
 	orig, err := s.Client.LoopPrevention(context.Background())

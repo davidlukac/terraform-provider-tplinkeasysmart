@@ -71,6 +71,17 @@ All GETs below need the session-key exchange first; a GET of several types in on
 - **No integrity or real confidentiality**: static key is public, the 64-bit RSA is trivially breakable, and a SET carries the password. Anyone on the LAN who sees the key exchange can recover the session key and the credentials. Treat ESCP as LAN-management-VLAN-only.
 - Same-L2 only. macOS needs the interface bound for broadcast; unicast to the switch IP works too.
 
+## Settings of a feature that is not active (measured 2026-10-26, firmware 20250710)
+What the switch does when a value is written for a feature whose mode is off, read back immediately, after the mode is switched on, and after a round trip through the other VLAN mode. Test ports only, restored; the probe is `TestLiveInactiveSettings` (`-tags live`).
+- **802.1Q VLAN (8705) and PVID (8706) while 802.1Q is off:** the write is **accepted** (no error code) and **not kept**. The switch reports no VLANs and every PVID 1 while the mode is off, and after the mode is switched on the table is the default only (VLAN 1, every port untagged, every PVID 1).
+- **Port-based group (8449) while port-based mode is off:** accepted and **not kept**; after the mode is switched on only VLAN 1 with every port exists.
+- **Tables do not survive a trip through the other mode.** A port-based group created in port-based mode is gone after 802.1Q has been switched on and off again (VLAN 1 with all ports is back), and an 802.1Q VLAN is gone after port-based mode has been on. Switching the VLAN mode **resets the table of the mode it switches to**.
+- **QoS port priorities while the QoS mode is not port-based:** accepted, **not kept**: the priority reads back as before, also after the mode is switched to port-based.
+- **A disabled port-mirror entry that carries ports** (enabled 0, destination and source set): accepted, **not kept**: the entry reads back as all zeros.
+- **IGMP report suppression while snooping is off:** accepted and **kept**; it reads back and is unchanged after snooping is switched on. This is the one value that can be staged.
+- Not probed: the MTU VLAN uplink port while the mode is off (a misread write could enable the mode without its uplink and cut the management path), and a static address while DHCP is on.
+- A GET that asks for several TLV types at once answers error code 1 on this firmware whatever the mode (as already noted for IGMP); read each setting separately.
+
 ## Compatibility notes
 - Verified on hardware v6, firmware **20230218** (switch 01) and **20250710** (switch 03): the same RSA key exchange and login, the same TLV layouts, and the same replies to every read (a read-only probe of 39 unreviewed TLV ids answered identically, all silent). Other Easy Smart models are not verified; run the read-only data sources against a spare unit first.
 - **A LAG write must respect the port ranges.** Group 1 only takes ports 1-4 and group 2 only ports 5-8, two to four members. Anything else is refused with code 4 (a single port with 7415). An early probe of firmware 20250710 mistook this for a firmware change because it used mixed ranges and group 3 while mirroring was on; the web UI's own script (`PortTrunkRpm.htm`) states the same ranges, and switch 1 on 20230218 shows them too.
