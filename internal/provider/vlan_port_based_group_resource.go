@@ -110,7 +110,7 @@ func (r *portVLANResource) current(ctx context.Context, group int) ([]int, error
 		return nil, err
 	}
 	if !v.Enabled {
-		return nil, fmt.Errorf("port-based VLAN mode is not active on the switch; refusing to manage groups in another VLAN mode")
+		return nil, &inactiveModeError{"port-based VLAN mode is not active on the switch; refusing to manage groups in another VLAN mode"}
 	}
 	for _, g := range v.VLANs {
 		if g.ID == group {
@@ -181,7 +181,9 @@ func (r *portVLANResource) readBound(ctx context.Context, req resource.ReadReque
 	}
 	got, err := r.current(ctx, int(state.VLAN.ValueInt64()))
 	if err != nil {
-		resp.Diagnostics.AddError("Reading VLAN group failed", err.Error())
+		if !warnInactiveMode(&resp.Diagnostics, err, "the port-based VLAN groups", "The state of this resource is kept as it is and cannot be checked until the mode is switched back; changes are refused meanwhile") {
+			resp.Diagnostics.AddError("Reading VLAN group failed", err.Error())
+		}
 		return
 	}
 	if len(got) == 0 {
@@ -202,7 +204,9 @@ func (r *portVLANResource) deleteBound(ctx context.Context, req resource.DeleteR
 	group := int(state.VLAN.ValueInt64())
 	old, err := r.current(ctx, group)
 	if err != nil {
-		resp.Diagnostics.AddError("Reading VLAN group failed", err.Error())
+		if !warnInactiveMode(&resp.Diagnostics, err, "the port-based VLAN groups", "The group cannot be removed meanwhile, so the resource is only forgotten and the switch is left as it is") {
+			resp.Diagnostics.AddError("Reading VLAN group failed", err.Error())
+		}
 		return
 	}
 	if err := r.guardVLAN(ctx, state.AllowDisruptive.ValueBool(), old, nil); err != nil {

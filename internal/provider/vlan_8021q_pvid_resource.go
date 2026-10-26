@@ -83,7 +83,7 @@ func (r *vlan8021QPVIDResource) state(ctx context.Context) (escp.Dot1Q, error) {
 		return q, err
 	}
 	if !q.Enabled {
-		return q, fmt.Errorf("802.1Q VLAN mode is not active on the switch; refusing to manage PVIDs in another VLAN mode (see tplinkeasysmart_vlan_mode)")
+		return q, &inactiveModeError{"802.1Q VLAN mode is not active on the switch; refusing to manage PVIDs in another VLAN mode (see tplinkeasysmart_vlan_mode)"}
 	}
 	return q, nil
 }
@@ -161,7 +161,9 @@ func (r *vlan8021QPVIDResource) readBound(ctx context.Context, req resource.Read
 	}
 	q, err := r.state(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Reading the 802.1Q state failed", err.Error())
+		if !warnInactiveMode(&resp.Diagnostics, err, "the PVIDs", "The state of this resource is kept as it is and cannot be checked until the mode is switched back; changes are refused meanwhile") {
+			resp.Diagnostics.AddError("Reading the 802.1Q state failed", err.Error())
+		}
 		return
 	}
 	pvid, ok := pvidOf(q, int(state.Port.ValueInt64()))
@@ -187,8 +189,12 @@ func (r *vlan8021QPVIDResource) deleteBound(ctx context.Context, req resource.De
 		return
 	}
 	pvid, _ := pvidOf(q, port)
-	if _, hasDefault := findVLAN(q.VLANs, defaultPVID); !q.Enabled || !hasDefault || pvid == defaultPVID {
-		return // nothing to restore: the mode is off, VLAN 1 is gone, or the port already uses it
+	if !q.Enabled {
+		resp.Diagnostics.AddWarning("The VLAN mode of the PVIDs is not active", "802.1Q VLAN mode is not active on the switch, so the PVID cannot be put back; the resource is only forgotten and the switch is left as it is")
+		return
+	}
+	if _, hasDefault := findVLAN(q.VLANs, defaultPVID); !hasDefault || pvid == defaultPVID {
+		return // nothing to restore: VLAN 1 is gone, or the port already uses it
 	}
 	r.set(ctx, port, defaultPVID, state.AllowDisruptive.ValueBool(), resp.Diagnostics.AddError)
 }

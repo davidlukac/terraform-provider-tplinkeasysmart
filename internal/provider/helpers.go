@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -166,4 +167,23 @@ func portsOf(ctx context.Context, s types.Set) (ports []int, ok bool) {
 	}
 	ports, err := setToInts(ctx, s)
 	return ports, err == nil
+}
+
+// inactiveModeError means a VLAN setting cannot be read or written because the VLAN mode it
+// belongs to is not the active one. The message is the refusal a write gets; a read or a destroy
+// turns it into a warning, because failing there would break the refresh of every other
+// resource in the configuration whenever someone changes the mode outside Terraform.
+type inactiveModeError struct{ msg string }
+
+func (e *inactiveModeError) Error() string { return e.msg }
+
+// warnInactiveMode adds a warning and reports true when err is an inactiveModeError; what names
+// the settings that cannot be read and effect says what the provider does instead.
+func warnInactiveMode(diags *diag.Diagnostics, err error, what, effect string) bool {
+	var inactive *inactiveModeError
+	if !errors.As(err, &inactive) {
+		return false
+	}
+	diags.AddWarning("The VLAN mode of "+what+" is not active", inactive.msg+". "+effect)
+	return true
 }

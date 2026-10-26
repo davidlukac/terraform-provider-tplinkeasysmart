@@ -11,6 +11,8 @@ A port-based VLAN group (VLAN > Port Based VLAN). Import with the VLAN id. The V
 
 ~> **Safety** The provider refuses to create, change or destroy a group when any port involved (old or new members) has a link up or belongs to a LAG, because VLAN membership is exclusive and a change moves the port out of its previous group. The VLAN mode itself is not written here; use `tplinkeasysmart_vlan_mode`.
 
+~> **If the VLAN mode changes behind Terraform's back** a refresh no longer fails: it warns that the {x} cannot be read while another VLAN mode is active and keeps the resource's state as it is (changes stay refused until the mode is switched back). Removing the resource from the configuration then only forgets it.
+
 ## Example Usage
 
 ```terraform

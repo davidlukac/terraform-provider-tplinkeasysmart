@@ -13,6 +13,8 @@ The PVID of one port (VLAN > 802.1Q PVID Setting): the VLAN that untagged traffi
 
 ~> **Order** Terraform cannot see that a PVID needs the switch to be in 802.1Q mode and the VLAN to exist, and the provider refuses otherwise. When one configuration sets them all, add `depends_on` the `tplinkeasysmart_vlan_mode` resource and reference the VLAN's `vlan` attribute from `pvid`. To remove them, put the PVID back to 1 by configuration first: removing the resource only forgets the port's value, and a VLAN cannot be deleted while a port still has it as its PVID.
 
+~> **If the VLAN mode changes behind Terraform's back** a refresh no longer fails: it warns that the {x} cannot be read while another VLAN mode is active and keeps the resource's state as it is (changes stay refused until the mode is switched back). Removing the resource from the configuration then only forgets it.
+
 ## Example Usage
 
 ```terraform
