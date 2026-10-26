@@ -37,6 +37,19 @@ for _, p := range ports {
 - Every method takes a `context.Context`. Cancelling it stops the call, and nothing is written once it is done.
 - `Discover(ctx, DiscoverOptions{})` finds the switches on the local network without credentials or addresses.
 
+## Finding a switch by MAC address
+
+A switch's address can change; its MAC address does not. Put it in the configuration and the client pins the identity and finds the switch when it has to:
+
+```go
+mac, _ := net.ParseMAC("c0:3a:55:6c:81:61")
+c, err := escp.Dial(escp.Config{MAC: mac, Username: user, Password: pw}) // no Host: found by discovery on the first request
+```
+
+- With `Config.MAC` set, a device that answers with another MAC is refused (`ErrWrongSwitch`, naming both) and nothing is written to it. The MAC is checked on every reply, the key exchange's included.
+- With no `Host`, or a `Host` that stops answering, the client looks the switch up by its MAC (a discovery probe that stops at the first reply from that switch, normally under a second; `ErrNotFound` when nobody answers). `escp.Locate(ctx, mac, opts)` is the same lookup for a front end.
+- `Dial` still sends nothing; the lookup happens on the first request.
+
 ## Writing safely
 
 Every write follows the same steps: the arguments are validated and a bad value is refused before anything is sent (`errors.Is(err, escp.ErrInvalid)`); the optional **write gate** is asked; the write is sent with the credentials; a refusal by the switch is a `*RejectedError`.
@@ -104,6 +117,8 @@ Test with `errors.Is` and `errors.As`, never by message.
 | `ErrNoInterface` | `Discover` has nowhere to send |
 | `ErrInvalidConfig` | a configuration backup that is not one |
 | `ErrReplyTooLarge` | a fragmented reply bigger than any switch sends |
+| `ErrWrongSwitch`, `*WrongSwitchError` | the device that answered is not the switch `Config.MAC` names; nothing was written to it |
+| `ErrNotFound` | no switch with that MAC answered a discovery probe |
 | `*safety.FirmwareError`, `*safety.PortUseError`, `*safety.ImpactError` | a gate refused; nothing was sent |
 
 ## Testing against a fake switch

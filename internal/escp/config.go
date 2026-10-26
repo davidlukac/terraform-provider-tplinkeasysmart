@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"net"
 	"time"
 )
 
@@ -22,7 +23,15 @@ const defaultRetries = 2
 // Config configures a Client. Zero values select sensible defaults, except Host, which is
 // required. A Config holds the switch's password: keep it out of logs and error messages.
 type Config struct {
-	Host string // switch IPv4 address or hostname (required)
+	// Host is the switch's IPv4 address or hostname. It is required unless MAC is set, in which
+	// case the address is found by discovery on the first request.
+	Host string
+	// MAC, when set, pins the identity of the switch: a device that answers with another MAC
+	// address is never written to (the request fails with ErrWrongSwitch). With no Host, or when
+	// Host does not answer, the switch is looked up by MAC with a discovery probe on the first
+	// request and again when it stops answering (its address may have changed); nothing is sent
+	// by Dial.
+	MAC net.HardwareAddr
 	// Username and Password are sent with every write and every authenticated read.
 	Username string
 	Password string

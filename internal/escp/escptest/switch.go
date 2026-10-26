@@ -66,6 +66,7 @@ type Switch struct {
 	lastSet          []wire.TLV   // settings TLVs (credentials stripped) of the most recent accepted SET
 	port7            []byte
 	setIP            []byte
+	mac              [6]byte          // zero means the default address
 	staleDiscoveries int              // the next n discoveries still report 127.0.0.9, like a network whose caches have not caught up
 	addr             map[int16][]byte // IP, mask and gateway as last set; discovery reports them instead of the defaults
 	led              bool
@@ -346,7 +347,9 @@ func ConfigFile() []byte {
 
 func (f *Switch) send(to *net.UDPAddr, op byte, req wire.Header, errCode int32, tlvs []wire.TLV, useSession bool) {
 	req.Op, req.ErrCode = op, errCode
-	req.SwitchMAC = [6]byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}
+	f.mu.Lock()
+	req.SwitchMAC = f.macAddr()
+	f.mu.Unlock()
 	b := wire.Marshal(req, tlvs)
 	f.mu.Lock()
 	s := f.session
@@ -388,6 +391,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		}
 		f.mu.Lock()
 		addr, firmware := f.addr, f.firmware
+		mac := f.macAddr()
 		dhcp := byte(1)
 		if f.model {
 			dhcp = 0 // the modelled switch has a static address, like switch 03
@@ -407,7 +411,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		}
 		f.send(from, wire.OpReply, h, 0, []wire.TLV{
 			{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte(name + "\x00")},
-			{Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}, {Type: wire.TLVIP, Value: ip},
+			{Type: wire.TLVMAC, Value: mac[:]}, {Type: wire.TLVIP, Value: ip},
 			{Type: wire.TLVNetmask, Value: mask}, {Type: wire.TLVGateway, Value: gw},
 			{Type: wire.TLVFirmware, Value: []byte(firmware + "\x00")}, {Type: wire.TLVHardware, Value: []byte("TL-SG108E 6.0\x00")},
 			{Type: wire.TLVDHCP, Value: []byte{dhcp}}, {Type: wire.TLVFactoryDefault, Value: []byte{1}},
@@ -706,3 +710,18 @@ func rowKeyLen(typ int16) int {
 	}
 	return 1
 }
+
+// DefaultMAC is the address the fake reports unless SetMAC says otherwise (the documentation range, RFC 7042).
+var DefaultMAC = [6]byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}
+
+// macAddr is the MAC the switch reports; callers hold f.mu.
+func (f *Switch) macAddr() [6]byte {
+	if f.mac == ([6]byte{}) {
+		return DefaultMAC
+	}
+	return f.mac
+}
+
+// SetMAC changes the MAC address the switch reports in its headers and in discovery replies,
+// to make several fakes distinguishable or to play a different device at the same address.
+func (f *Switch) SetMAC(mac [6]byte) { f.mu.Lock(); f.mac = mac; f.mu.Unlock() }

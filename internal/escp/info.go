@@ -2,6 +2,8 @@ package escp
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
@@ -19,11 +21,52 @@ func (c *Client) Info(ctx context.Context) (Info, error) {
 }
 
 func (c *Client) discover(ctx context.Context) (Info, error) {
+	if c.dest.IP == nil {
+		if err := c.relocate(ctx); err != nil {
+			return Info{}, err
+		}
+	}
+	info, err := c.discoverOnce(ctx)
+	if errors.Is(err, ErrNoReply) && len(c.cfg.MAC) != 0 {
+		// the configured address does not answer: the switch may have another one now
+		if rerr := c.relocate(ctx); rerr != nil {
+			return Info{}, rerr
+		}
+		info, err = c.discoverOnce(ctx)
+	}
+	return info, err
+}
+
+// discoverOnce is one discovery exchange with the switch's current address. A reply whose MAC is not
+// Config.MAC is refused, whichever way the MAC was carried.
+func (c *Client) discoverOnce(ctx context.Context) (Info, error) {
 	r, err := c.exchange(ctx, wire.OpDiscovery, nil, true, c.discoverTargets())
 	if err != nil {
 		return Info{}, err
 	}
-	return infoFromReply(r), nil
+	info := infoFromReply(r)
+	if len(c.cfg.MAC) != 0 && info.MAC != "" && info.MAC != c.cfg.MAC.String() {
+		got, _ := net.ParseMAC(info.MAC)
+		return Info{}, &WrongSwitchError{Want: c.cfg.MAC, Got: got, IP: c.dest.IP}
+	}
+	return info, nil
+}
+
+// relocate finds the switch by Config.MAC and points the client at the address it answers from.
+// Callers hold c.mu. The destination is changed in place, because requests in flight hold it.
+func (c *Client) relocate(ctx context.Context) error {
+	found, err := c.locator(ctx, c.cfg.MAC)
+	if err != nil {
+		return err
+	}
+	ip := net.ParseIP(found.IP).To4()
+	if ip == nil {
+		return fmt.Errorf("%w: %s answered without a usable address", ErrNotFound, c.cfg.MAC)
+	}
+	c.dest.IP = ip
+	c.hostMAC = localMAC(ip)
+	c.session = nil
+	return nil
 }
 
 // infoFromReply maps the TLVs of a discovery reply to Info; absent or

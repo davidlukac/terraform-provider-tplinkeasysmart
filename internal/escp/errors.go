@@ -3,6 +3,7 @@ package escp
 import (
 	"errors"
 	"fmt"
+	"net"
 )
 
 var (
@@ -21,7 +22,33 @@ var (
 	// errors.Is(err, ErrInvalid). It is never returned for a reply the client cannot parse,
 	// nor for a failure of the switch.
 	ErrInvalid = errors.New("escp: invalid argument")
+	// ErrWrongSwitch means the device that answered is not the one the configuration names:
+	// Config.MAC is set and the reply carries another MAC address. Nothing was written to it.
+	// The *WrongSwitchError that wraps it names both addresses.
+	ErrWrongSwitch = errors.New("escp: the device that answered is not the configured switch")
+	// ErrNotFound means no switch with the wanted MAC address answered a discovery probe on
+	// this network (Locate, or a client configured with a MAC and no working address).
+	ErrNotFound = errors.New("escp: no switch with that MAC address answered")
 )
+
+// WrongSwitchError is the refusal to talk to a device whose MAC address is not Config.MAC. It
+// matches ErrWrongSwitch.
+type WrongSwitchError struct {
+	Want, Got net.HardwareAddr
+	IP        net.IP // where the other device answered from, when known
+}
+
+// Error names both addresses and where the other device was.
+func (e *WrongSwitchError) Error() string {
+	where := ""
+	if e.IP != nil {
+		where = " at " + e.IP.String()
+	}
+	return fmt.Sprintf("%s: the device%s has MAC %s, the configuration names %s", ErrWrongSwitch.Error(), where, e.Got, e.Want)
+}
+
+// Is makes errors.Is(err, ErrWrongSwitch) true.
+func (e *WrongSwitchError) Is(target error) bool { return target == ErrWrongSwitch }
 
 // invalidError is an ErrInvalid with its own message.
 type invalidError struct{ msg string }
