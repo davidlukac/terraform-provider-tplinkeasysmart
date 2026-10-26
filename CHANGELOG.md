@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.29.1
+
+- Documentation: the 802.1Q VLAN group and PVID pages say that a configuration that also sets the VLAN mode needs `depends_on` on `tplinkeasysmart_vlan_mode` (and how to remove a PVID and its VLAN), and the group example shows it. Internal: an end-to-end regression suite (real Terraform and provider against a stateful fake switch, run in CI) and an exported test constructor, `provider.NewWithDialer`. No change in behaviour.
+
 ## 0.29.0
 
 - `tplinkeasysmart_port`: `flow_control = true` with a 10 or 100 Mbps speed is refused while planning, and again by the client before anything is sent. The switch only keeps flow control with `auto` or `1000Mbps-full`; before, it accepted the speed and left flow control off, so the apply changed the speed and then failed on read-back.
