@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/udp"
 )
 
 // Client talks ESCP to one switch. It is safe for concurrent use; requests
@@ -90,7 +92,7 @@ func (c *Client) open() error {
 	if c.conn != nil {
 		return nil
 	}
-	lc := net.ListenConfig{Control: shareSocket}
+	lc := net.ListenConfig{Control: udp.Share}
 	pc, err := lc.ListenPacket(context.Background(), "udp4", net.JoinHostPort("", strconv.Itoa(c.cfg.HostPort)))
 	if err != nil {
 		return fmt.Errorf("escp: binding UDP port %d (is a client that does not share the port running, such as an old Easy Smart utility?): %w", c.cfg.HostPort, err)

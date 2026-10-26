@@ -1,9 +1,10 @@
 //go:build linux
 
-package escp
+package udp
 
 import (
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ import (
 // runs: a datagram sent to the broadcast address reaches every socket that shares the reply port,
 // so several clients and Discover can listen side by side.
 func TestSharingSocketsAllReceiveABroadcast(t *testing.T) {
-	lc := net.ListenConfig{Control: shareSocket}
+	lc := net.ListenConfig{Control: Share}
 	var socks []net.PacketConn
 	first, err := lc.ListenPacket(t.Context(), "udp4", ":0")
 	if err != nil {
@@ -26,7 +27,7 @@ func TestSharingSocketsAllReceiveABroadcast(t *testing.T) {
 	socks = append(socks, first)
 	port := first.LocalAddr().(*net.UDPAddr).Port
 	for range 2 {
-		c, err := lc.ListenPacket(t.Context(), "udp4", net.JoinHostPort("", itoa(port)))
+		c, err := lc.ListenPacket(t.Context(), "udp4", net.JoinHostPort("", strconv.Itoa(port)))
 		if err != nil {
 			t.Fatal(err)
 		}
