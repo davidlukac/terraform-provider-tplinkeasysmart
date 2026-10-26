@@ -95,7 +95,7 @@ func (r *vlan8021QGroupResource) table(ctx context.Context) ([]escp.VLAN8021Q, e
 		return nil, err
 	}
 	if !q.Enabled {
-		return nil, fmt.Errorf("802.1Q VLAN mode is not active on the switch; refusing to manage 802.1Q VLANs in another VLAN mode (see tplinkeasysmart_vlan_mode)")
+		return nil, &inactiveModeError{"802.1Q VLAN mode is not active on the switch; refusing to manage 802.1Q VLANs in another VLAN mode (see tplinkeasysmart_vlan_mode)"}
 	}
 	return q.VLANs, nil
 }
@@ -236,7 +236,9 @@ func (r *vlan8021QGroupResource) readBound(ctx context.Context, req resource.Rea
 	}
 	table, err := r.table(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Reading the 802.1Q VLANs failed", err.Error())
+		if !warnInactiveMode(&resp.Diagnostics, err, "the 802.1Q VLANs", "The state of this resource is kept as it is and cannot be checked until the mode is switched back; changes are refused meanwhile") {
+			resp.Diagnostics.AddError("Reading the 802.1Q VLANs failed", err.Error())
+		}
 		return
 	}
 	got, ok := findVLAN(table, int(state.VLAN.ValueInt64()))
@@ -258,7 +260,9 @@ func (r *vlan8021QGroupResource) deleteBound(ctx context.Context, req resource.D
 	id := int(state.VLAN.ValueInt64())
 	table, err := r.table(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Reading the 802.1Q VLANs failed", err.Error())
+		if !warnInactiveMode(&resp.Diagnostics, err, "the 802.1Q VLANs", "The VLAN cannot be removed meanwhile, so the resource is only forgotten and the switch is left as it is") {
+			resp.Diagnostics.AddError("Reading the 802.1Q VLANs failed", err.Error())
+		}
 		return
 	}
 	old, found := findVLAN(table, id)

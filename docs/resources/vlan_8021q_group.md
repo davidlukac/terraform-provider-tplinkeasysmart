@@ -13,6 +13,8 @@ An 802.1Q VLAN (VLAN > 802.1Q VLAN): its name and its tagged and untagged member
 
 ~> **Order** Terraform cannot see that this resource needs the switch to be in 802.1Q mode first, and the provider refuses to manage 802.1Q VLANs in any other mode. When one configuration sets the mode and the VLANs, add `depends_on = [tplinkeasysmart_vlan_mode.this]` (see the example) so the mode is applied first and, on the way back, removed last.
 
+~> **If the VLAN mode changes behind Terraform's back** a refresh no longer fails: it warns that the {x} cannot be read while another VLAN mode is active and keeps the resource's state as it is (changes stay refused until the mode is switched back). Removing the resource from the configuration then only forgets it.
+
 ## Example Usage
 
 ```terraform
