@@ -27,8 +27,8 @@ func TestLiveDHCPProbe(t *testing.T) {
 	if os.Getenv("TPLINK_EASYSMART_LIVE_DHCP") != "1" {
 		t.Skip("set TPLINK_EASYSMART_LIVE_DHCP=1 to switch the DHCP flag of the switch on and back off")
 	}
-	mac, err := net.ParseMAC(os.Getenv("TPLINK_EASYSMART_MAC"))
-	if err != nil || len(mac) != hwAddrLen {
+	mac, err := ParseMAC(os.Getenv("TPLINK_EASYSMART_MAC"))
+	if err != nil {
 		t.Fatalf("TPLINK_EASYSMART_MAC must name the switch: %v", err)
 	}
 	for _, ro := range strings.Split(os.Getenv("TPLINK_EASYSMART_LIVE_READONLY_MACS"), ",") {

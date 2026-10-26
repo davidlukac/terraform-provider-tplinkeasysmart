@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
@@ -68,6 +69,48 @@ func ExampleDiscover() {
 	for _, s := range switches {
 		fmt.Println(s.IP, s.MAC, s.Model, s.Firmware)
 	}
+}
+
+// Name a switch by its MAC address: the client pins the identity (a device with another MAC is never
+// written to) and finds the switch by itself when its address is not known or has changed.
+func ExampleParseMAC() {
+	mac, err := escp.ParseMAC("C0-3A-55-6C-81-61")
+	fmt.Println(mac, err)
+	_, err = escp.ParseMAC("c03a556c8161")
+	fmt.Println(err)
+	// Output:
+	// c0:3a:55:6c:81:61 <nil>
+	// escp: "c03a556c8161" is not a MAC address; write it as aa:bb:cc:dd:ee:ff (colons or hyphens)
+}
+
+// Find one switch by its MAC address, wherever it is on the segment. Like Discover, run it on its own.
+func ExampleLocate() {
+	mac, _ := escp.ParseMAC("c0:3a:55:6c:81:61")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	info, err := escp.Locate(ctx, mac, escp.DiscoverOptions{})
+	if errors.Is(err, escp.ErrNotFound) {
+		fmt.Println("no switch with that MAC answered")
+		return
+	}
+	fmt.Println(info.IP, info.DHCP)
+}
+
+// Let the switch lease its address. The leased address is not known in advance, so the client must
+// have the switch's MAC: it looks the switch up by it and follows it to the lease.
+func ExampleClient_EnableDHCP() {
+	mac, _ := escp.ParseMAC("c0:3a:55:6c:81:61")
+	c, err := escp.Dial(escp.Config{MAC: mac, Username: "admin", Password: os.Getenv("SWITCH_PASSWORD")})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer c.Close()
+	if err := c.EnableDHCP(context.Background()); err != nil {
+		fmt.Println("DHCP not confirmed:", err) // ErrMoveUnconfirmed: look for the switch by its MAC before anything else
+		return
+	}
+	// The way back is SetIPConfig with the static address: it writes the DHCP flag off.
 }
 
 func ExampleParseSpeed() {

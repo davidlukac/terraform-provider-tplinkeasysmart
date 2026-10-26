@@ -130,15 +130,12 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 	if info.DHCP {
 		t.Fatal("the switch uses DHCP; the management address resource only manages a static address")
 	}
-	hw, err := net.ParseMAC(info.MAC)
-	if err != nil {
-		t.Fatal(err)
-	}
+	hw := info.MAC
 	original := ipConfigOfInfo(info)
 	t.Cleanup(func() { s.bringBack(t, original) }) // registered before the first write
 
 	hcl := func(ip, mask, gateway string) string {
-		return s.ProviderHCLByMAC("", info.MAC) +
+		return s.ProviderHCLByMAC("", info.MAC.String()) +
 			fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", ip, mask, gateway)
 	}
 	// reportsIP asks, with a client that has only the MAC, where the switch is now. The switch
@@ -178,7 +175,7 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 // the switch is already there with DHCP off it does nothing; otherwise it looks the switch up by its
 // MAC address, wherever the lease put it, and writes the static address back. It runs even when the
 // scenario failed halfway.
-func (s *Session) bringBackFromALease(t *testing.T, mac net.HardwareAddr, original escp.IPConfig) {
+func (s *Session) bringBackFromALease(t *testing.T, mac escp.MAC, original escp.IPConfig) {
 	ctx, cancel := context.WithTimeout(context.Background(), settleTime)
 	defer cancel()
 	found, err := escp.Locate(ctx, mac, escp.DiscoverOptions{})
@@ -221,14 +218,11 @@ func TestScenarioManagementDHCP(t *testing.T) {
 	if info.DHCP {
 		t.Fatal("the switch already leases its address; the scenario starts from a static one")
 	}
-	hw, err := net.ParseMAC(info.MAC)
-	if err != nil {
-		t.Fatal(err)
-	}
+	hw := info.MAC
 	original := ipConfigOfInfo(info)
 	t.Cleanup(func() { s.bringBackFromALease(t, hw, original) }) // registered before the first write
 
-	provider := s.ProviderHCLByMAC("", info.MAC)
+	provider := s.ProviderHCLByMAC("", info.MAC.String())
 	dhcp := provider + "resource \"tplinkeasysmart_management_ip\" \"this\" {\n  dhcp             = true\n  allow_disruptive = true\n}\n"
 	static := provider + fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", info.IP, info.Netmask, info.Gateway)
 	leased := func(*terraform.State) error {

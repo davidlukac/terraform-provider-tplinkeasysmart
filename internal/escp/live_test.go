@@ -579,7 +579,7 @@ func TestLiveTwoClientsShareThePort(t *testing.T) {
 		if r.err != nil {
 			t.Fatalf("a client failed while sharing the port: %v", r.err)
 		}
-		macs[r.info.MAC] = true
+		macs[r.info.MAC.String()] = true
 	}
 	if len(macs) != 2 {
 		t.Fatalf("each client must get its own switch's reply, got MACs %v", macs)

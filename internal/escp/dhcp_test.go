@@ -18,11 +18,11 @@ import (
 // of lookups.
 func dialLeasing(t *testing.T, f *escptest.Switch) (*Client, *int) {
 	t.Helper()
-	c := newBoundClient(t, Config{Host: "127.0.0.1", MAC: net.HardwareAddr(escptest.DefaultMAC[:]), Username: "admin", Password: "secret",
+	c := newBoundClient(t, Config{Host: "127.0.0.1", MAC: MAC(escptest.DefaultMAC), Username: "admin", Password: "secret",
 		Timeout: 150 * time.Millisecond, Retries: 1, SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
 	c.allowLoopback = true
 	lookups := new(int)
-	c.locator = func(ctx context.Context, _ net.HardwareAddr) (Info, error) { *lookups++; return c.discoverOnce(ctx) }
+	c.locator = func(ctx context.Context, _ MAC) (Info, error) { *lookups++; return c.discoverOnce(ctx) }
 	t.Cleanup(func() { c.Close() })
 	return c, lookups
 }
@@ -126,8 +126,8 @@ func TestEnableDHCPReportsASwitchThatAnswersButDoesNotLease(t *testing.T) {
 	f := escptest.Start(t)
 	c, _ := dialLeasing(t, f)
 	c.moveWait = 400 * time.Millisecond
-	c.locator = func(ctx context.Context, _ net.HardwareAddr) (Info, error) {
-		return Info{MAC: c.cfg.MAC.String(), IP: "127.0.0.1", Netmask: "255.255.255.0", Gateway: "127.0.0.254"}, nil
+	c.locator = func(ctx context.Context, _ MAC) (Info, error) {
+		return Info{MAC: c.cfg.MAC, IP: "127.0.0.1", Netmask: "255.255.255.0", Gateway: "127.0.0.254"}, nil
 	}
 	err := c.EnableDHCP(context.Background())
 	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "DHCP off") {
@@ -225,11 +225,25 @@ func TestEnableDHCPKeepsWaitingForAUsableLease(t *testing.T) {
 	f := escptest.Start(t)
 	c, _ := dialLeasing(t, f)
 	c.moveWait = 400 * time.Millisecond
-	c.locator = func(context.Context, net.HardwareAddr) (Info, error) {
-		return Info{MAC: c.cfg.MAC.String(), DHCP: true}, nil
+	c.locator = func(context.Context, MAC) (Info, error) {
+		return Info{MAC: c.cfg.MAC, DHCP: true}, nil
 	}
 	err := c.EnableDHCP(context.Background())
 	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "DHCP on") {
 		t.Fatalf("want ErrMoveUnconfirmed saying DHCP is on without an address, got %v", err)
+	}
+}
+
+// A caller that has already given up sends nothing: not the read before the write, and not the write.
+func TestEnableDHCPWithACancelledContextSendsNothing(t *testing.T) {
+	f := escptest.Start(t)
+	c, lookups := dialLeasing(t, f)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := c.EnableDHCP(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("got %v, want context.Canceled", err)
+	}
+	if f.WriteCount() != 0 || *lookups != 0 {
+		t.Fatalf("%d write(s) and %d lookup(s) after the caller gave up", f.WriteCount(), *lookups)
 	}
 }

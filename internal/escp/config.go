@@ -2,7 +2,6 @@ package escp
 
 import (
 	"context"
-	"net"
 	"time"
 )
 
@@ -31,7 +30,7 @@ type Config struct {
 	// Host does not answer, the switch is looked up by MAC with a discovery probe on the first
 	// request and again when it stops answering (its address may have changed); nothing is sent
 	// by Dial.
-	MAC net.HardwareAddr
+	MAC MAC
 	// Username and Password are sent with every write and every authenticated read.
 	Username string
 	Password string
@@ -77,9 +76,11 @@ type WriteGate func(ctx context.Context, sw InfoReader, op Operation) error
 
 // Info is what a discovery reply reports about the switch.
 type Info struct {
-	Model, Hostname, MAC, Firmware, Hardware string
-	IP, Netmask, Gateway                     string
-	DHCP                                     bool
+	Model, Hostname, Firmware, Hardware string
+	// MAC is the switch's hardware address; the zero value when the reply carried none.
+	MAC                  MAC
+	IP, Netmask, Gateway string
+	DHCP                 bool
 	// FactoryDefault is discovery TLV 14: the switch has never been configured
 	// (still on factory credentials).
 	FactoryDefault bool

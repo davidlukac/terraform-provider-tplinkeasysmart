@@ -107,8 +107,8 @@ func (d *systemInfoDataSource) readBound(ctx context.Context, _ datasource.ReadR
 		return
 	}
 	state := systemInfoModel{
-		ID: types.StringValue(info.MAC), Model: types.StringValue(info.Model), Hostname: types.StringValue(info.Hostname),
-		MAC: types.StringValue(info.MAC), Firmware: types.StringValue(info.Firmware), Hardware: types.StringValue(info.Hardware),
+		ID: types.StringValue(info.MAC.String()), Model: types.StringValue(info.Model), Hostname: types.StringValue(info.Hostname),
+		MAC: types.StringValue(info.MAC.String()), Firmware: types.StringValue(info.Firmware), Hardware: types.StringValue(info.Hardware),
 		IP: types.StringValue(info.IP), Netmask: types.StringValue(info.Netmask), Gateway: types.StringValue(info.Gateway),
 		DHCP: types.BoolValue(info.DHCP), Factory: types.BoolValue(info.FactoryDefault),
 		Ports: types.Int64Value(int64(sys.PortCount)), AutoSave: types.BoolValue(sys.AutoSave),

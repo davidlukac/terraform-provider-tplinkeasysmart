@@ -42,7 +42,7 @@ for _, p := range ports {
 A switch's address can change; its MAC address does not. Put it in the configuration and the client pins the identity and finds the switch when it has to:
 
 ```go
-mac, _ := net.ParseMAC("c0:3a:55:6c:81:61")
+mac, _ := escp.ParseMAC("c0:3a:55:6c:81:61") // escp.MAC: a comparable value, the zero value means "no MAC"
 c, err := escp.Dial(escp.Config{MAC: mac, Username: user, Password: pw}) // no Host: found by discovery on the first request
 ```
 

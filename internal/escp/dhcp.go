@@ -29,7 +29,7 @@ const leaseWait = 60 * time.Second
 // switch without an address, and the way back then needs this host to be on the address the switch
 // falls back to.
 func (c *Client) EnableDHCP(ctx context.Context) error {
-	if len(c.cfg.MAC) == 0 {
+	if c.cfg.MAC.IsZero() {
 		return invalidf("escp: EnableDHCP needs Config.MAC: the leased address is not known in advance, and the switch can only be found again by its MAC")
 	}
 	info, err := c.Info(ctx)

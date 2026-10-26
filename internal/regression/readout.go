@@ -38,7 +38,7 @@ func CoreReaders(c *escp.Client) []Reader {
 		}},
 		{"mac", func(ctx context.Context) (string, error) {
 			v, err := c.Info(ctx)
-			return v.MAC, err
+			return v.MAC.String(), err
 		}},
 		{"hostname", func(ctx context.Context) (string, error) {
 			v, err := c.Info(ctx)

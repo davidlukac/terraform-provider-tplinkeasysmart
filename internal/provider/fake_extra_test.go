@@ -37,6 +37,9 @@ type extraState struct {
 	firmware        string    // the firmware version Info reports; empty means defaultFakeFirmware
 }
 
+// fakeMAC is the MAC address every fake client reports.
+var fakeMAC = escp.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x01}
+
 // defaultFakeFirmware is the build the fakes report unless a test sets another: the verified baseline.
 const defaultFakeFirmware = "1.0.0 Build 20230218 Rel.50633"
 
@@ -80,7 +83,7 @@ func (e *extraState) info() (escp.Info, bool, error) {
 	if !e.active {
 		return escp.Info{Firmware: e.firmwareVersion()}, false, nil
 	}
-	return escp.Info{Model: "TL-SG108E", Hostname: e.hostname, MAC: "00:00:5e:00:53:01", Firmware: e.firmwareVersion(),
+	return escp.Info{Model: "TL-SG108E", Hostname: e.hostname, MAC: fakeMAC, Firmware: e.firmwareVersion(),
 		IP: e.ip, Netmask: orDefault(e.netmask, "255.255.255.0"), Gateway: orDefault(e.gateway, "192.0.2.1"), DHCP: !e.static}, true, nil
 }
 

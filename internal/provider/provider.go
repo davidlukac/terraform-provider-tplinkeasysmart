@@ -234,7 +234,7 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		resp.Diagnostics.AddAttributeError(pathRoot("host"), "Missing switch host or MAC address",
 			"Set `host` or `mac` (or TPLINK_EASYSMART_HOST / TPLINK_EASYSMART_MAC), or define switches with `switches`.")
 	}
-	if _, err := parseMAC(mac); mac != "" && err != nil {
+	if _, err := escp.ParseMAC(mac); mac != "" && err != nil {
 		resp.Diagnostics.AddAttributeError(pathRoot("mac"), "Invalid MAC address", err.Error())
 	}
 	if hasDefault && (user == "" || pass == "") {
@@ -252,8 +252,12 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		if label == "" {
 			label = "the provider's own switch"
 		}
-		hw, err := parseMAC(m)
-		if m != "" && err != nil { // the schema validator catches this earlier; the environment is checked here
+		var hw escp.MAC
+		var err error
+		if m != "" {
+			hw, err = escp.ParseMAC(m)
+		}
+		if err != nil { // the schema validator catches this earlier; the environment is checked here
 			resp.Diagnostics.AddError("Invalid MAC address", fmt.Sprintf("%s: %s", label, err))
 			return
 		}

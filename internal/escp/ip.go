@@ -171,7 +171,7 @@ const (
 // classifyLostReply compares what answered a probe after an unanswered write with the
 // switch it was sent to (its MAC address) and with the settings before and wanted. When
 // the wanted settings equal the old ones the switch is where it was asked to be either way.
-func classifyLostReply(mac string, before, want IPConfig, after Info) lostReplyOutcome {
+func classifyLostReply(mac MAC, before, want IPConfig, after Info) lostReplyOutcome {
 	if after.MAC != mac {
 		return lostReplyOtherDevice
 	}
@@ -191,7 +191,7 @@ func classifyLostReply(mac string, before, want IPConfig, after Info) lostReplyO
 // settleLostReply is called when the write got no reply. It returns nil when a probe shows
 // that the switch has the new settings, and otherwise an error that says what is known.
 // Callers hold c.mu.
-func (c *Client) settleLostReply(ctx context.Context, mac string, before, want IPConfig, lost error) error {
+func (c *Client) settleLostReply(ctx context.Context, mac MAC, before, want IPConfig, lost error) error {
 	after, err := c.discover(ctx)
 	if err != nil {
 		return fmt.Errorf("%w: the write got no reply and a probe found nothing at %s or %s", ErrMoveUnconfirmed, before.IP, want.IP)

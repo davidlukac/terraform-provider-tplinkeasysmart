@@ -55,8 +55,8 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 	"SetPortBasedVLAN": func(ctx context.Context, c *Client) error { return c.SetPortBasedVLAN(ctx, 2, []int{3, 4}) },
 	"EnableDHCP": func(ctx context.Context, c *Client) error {
 		// the client needs the switch's MAC, and a lookup that asks the fake itself
-		c.cfg.MAC = net.HardwareAddr(escptest.DefaultMAC[:])
-		c.locator = func(ctx context.Context, _ net.HardwareAddr) (Info, error) { return c.discoverOnce(ctx) }
+		c.cfg.MAC = MAC(escptest.DefaultMAC)
+		c.locator = func(ctx context.Context, _ MAC) (Info, error) { return c.discoverOnce(ctx) }
 		return c.EnableDHCP(ctx)
 	},
 	"SetIPConfig": func(ctx context.Context, c *Client) error {
