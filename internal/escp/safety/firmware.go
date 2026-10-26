@@ -3,7 +3,6 @@ package safety
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"slices"
 	"sync"
 
@@ -21,19 +20,6 @@ var verifiedFirmwareBuilds = verifiedBuilds(compatibility)
 // may have changed layouts or authentication, so writes to it are refused
 // unless the user opts in. The result is a copy: changing it changes nothing.
 func VerifiedFirmwareBuilds() []string { return slices.Clone(verifiedFirmwareBuilds) }
-
-var firmwareBuildPattern = regexp.MustCompile(`Build (\d{8})\b`)
-
-// FirmwareBuild extracts the build date from a firmware version string as the
-// switch reports it ("1.0.0 Build 20230218 Rel.50633"). ok is false when the
-// string has no build date.
-func FirmwareBuild(version string) (build string, ok bool) {
-	m := firmwareBuildPattern.FindStringSubmatch(version)
-	if m == nil {
-		return "", false
-	}
-	return m[1], true
-}
 
 // FirmwareReason says why a firmware check refused a write.
 type FirmwareReason int
@@ -74,15 +60,14 @@ func (e *FirmwareError) Error() string {
 // Unwrap returns the cause of a FirmwareUnreadable refusal.
 func (e *FirmwareError) Unwrap() error { return e.Err }
 
-// CheckFirmware returns a *FirmwareError unless the firmware version string names
+// CheckFirmware returns a *FirmwareError unless the firmware version names
 // a build in VerifiedFirmwareBuilds.
-func CheckFirmware(version string) error {
-	build, ok := FirmwareBuild(version)
-	if !ok {
-		return &FirmwareError{Reason: FirmwareNoBuildDate, Version: version, Verified: VerifiedFirmwareBuilds()}
+func CheckFirmware(fw escp.Firmware) error {
+	if !fw.HasBuild() {
+		return &FirmwareError{Reason: FirmwareNoBuildDate, Version: fw.String(), Verified: VerifiedFirmwareBuilds()}
 	}
-	if !slices.Contains(verifiedFirmwareBuilds, build) {
-		return &FirmwareError{Reason: FirmwareUnverified, Version: version, Build: build, Verified: VerifiedFirmwareBuilds()}
+	if !slices.Contains(verifiedFirmwareBuilds, fw.Build) {
+		return &FirmwareError{Reason: FirmwareUnverified, Version: fw.String(), Build: fw.Build, Verified: VerifiedFirmwareBuilds()}
 	}
 	return nil
 }

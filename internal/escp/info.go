@@ -94,7 +94,7 @@ func infoFromTLVs(tlvs []wire.TLV) Info {
 		}
 		return a
 	}
-	info := Info{Model: str(wire.TLVModel), Hostname: str(wire.TLVHostname), Firmware: str(wire.TLVFirmware),
+	info := Info{Model: str(wire.TLVModel), Hostname: str(wire.TLVHostname), Firmware: ParseFirmware(str(wire.TLVFirmware)),
 		Hardware: str(wire.TLVHardware), IP: ip(wire.TLVIP), Netmask: ip(wire.TLVNetmask), Gateway: ip(wire.TLVGateway)}
 	if v, ok := r.tlv(wire.TLVMAC); ok {
 		info.MAC, _ = MACFromBytes(v) // a reply with a malformed MAC has none

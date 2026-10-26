@@ -13,7 +13,7 @@ import (
 type firmware string
 
 func (f firmware) Info(context.Context) (escp.Info, error) {
-	return escp.Info{Firmware: string(f)}, nil
+	return escp.Info{Firmware: escp.ParseFirmware(string(f))}, nil
 }
 
 // A gate belongs to one switch: it remembers a verified build, so each switch gets its own.
@@ -31,14 +31,14 @@ func ExampleFirmwareGate() {
 	// refused build 20990101 - verified: [20230218 20250710]
 }
 
-func ExampleFirmwareBuild() {
-	build, ok := safety.FirmwareBuild("1.0.0 Build 20250710 Rel.71093")
-	fmt.Println(build, ok)
-	_, ok = safety.FirmwareBuild("custom")
-	fmt.Println(ok)
+func ExampleCheckFirmware() {
+	fmt.Println(safety.CheckFirmware(escp.ParseFirmware("1.0.0 Build 20250710 Rel.71093")))
+	err := safety.CheckFirmware(escp.ParseFirmware("custom"))
+	var fe *safety.FirmwareError
+	fmt.Println(errors.As(err, &fe) && fe.Reason == safety.FirmwareNoBuildDate)
 	// Output:
-	// 20250710 true
-	// false
+	// <nil>
+	// true
 }
 
 // UseOf states facts about a port; the caller decides what they mean for its write.

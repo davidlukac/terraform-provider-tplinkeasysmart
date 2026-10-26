@@ -167,7 +167,7 @@ func TestWriteGateDoesNotAffectReads(t *testing.T) {
 // client's lock; this would deadlock otherwise.
 func TestWriteGateMayReadThroughTheClient(t *testing.T) {
 	f := escptest.Start(t)
-	var firmware string
+	var firmware Firmware
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
 		WriteGate: func(ctx context.Context, sw InfoReader, _ Operation) error {
@@ -179,7 +179,7 @@ func TestWriteGateMayReadThroughTheClient(t *testing.T) {
 	if err := c.SetLED(context.Background(), false); err != nil {
 		t.Fatal(err)
 	}
-	if firmware == "" {
+	if firmware.IsZero() {
 		t.Fatal("the gate did not see the firmware version")
 	}
 }
