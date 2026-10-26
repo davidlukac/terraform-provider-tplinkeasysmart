@@ -59,6 +59,9 @@ func (c *Client) withSession(ctx context.Context, fn func() error) error {
 		err := fn()
 		if errors.Is(err, ErrNoReply) && attempt == 0 {
 			c.session = nil
+			if len(c.cfg.MAC) != 0 {
+				_ = c.relocate(ctx) // best effort: the address may have changed; the retry says if not
+			}
 			continue
 		}
 		return err

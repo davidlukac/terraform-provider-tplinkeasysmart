@@ -152,6 +152,37 @@ type probe struct {
 }
 
 func discoverWith(ctx context.Context, opts DiscoverOptions, env discoverEnv) ([]Info, error) {
+	return discoverUntil(ctx, opts, env, nil)
+}
+
+// Locate finds the switch with the given MAC address: a discovery probe like Discover's that
+// stops at the first reply from that switch, so it normally returns in well under a second (a
+// switch needs 250 to 500 milliseconds to answer). It returns ErrNotFound when nobody with that
+// MAC answers within the window (two seconds unless opts.Window says otherwise). Read-only and
+// not subject to a WriteGate.
+func Locate(ctx context.Context, mac net.HardwareAddr, opts DiscoverOptions) (Info, error) {
+	return locateWith(ctx, mac, opts, discoverEnv{interfaces: hostInterfaces, switchPort: defaultSwitchPort, hostPort: defaultHostPort})
+}
+
+func locateWith(ctx context.Context, mac net.HardwareAddr, opts DiscoverOptions, env discoverEnv) (Info, error) {
+	if len(mac) != hwAddrLen {
+		return Info{}, invalidf("escp: a MAC address has %d bytes, got %d", hwAddrLen, len(mac))
+	}
+	want := mac.String()
+	infos, err := discoverUntil(ctx, opts, env, func(found map[string]Info) bool { _, ok := found[want]; return ok })
+	for _, info := range infos {
+		if info.MAC == want {
+			return info, nil
+		}
+	}
+	if err != nil {
+		return Info{}, err
+	}
+	return Info{}, fmt.Errorf("%w: %s", ErrNotFound, want)
+}
+
+// discoverUntil is discoverWith with an optional condition (done) that ends the search early, checked after each reply.
+func discoverUntil(ctx context.Context, opts DiscoverOptions, env discoverEnv, done func(map[string]Info) bool) ([]Info, error) {
 	if opts.Window < 0 {
 		return nil, invalidf("escp: negative discovery window %v", opts.Window)
 	}
@@ -173,11 +204,11 @@ func discoverWith(ctx context.Context, opts DiscoverOptions, env discoverEnv) ([
 			probes = append(probes, probe{to: &net.UDPAddr{IP: b, Port: env.switchPort}, mac: ifc.MAC})
 		}
 	}
-	return collectReplies(ctx, env, probes, window)
+	return collectReplies(ctx, env, probes, window, done)
 }
 
 // collectReplies sends the probes, listens for the window and returns the distinct replies.
-func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window time.Duration) ([]Info, error) {
+func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window time.Duration, done func(map[string]Info) bool) ([]Info, error) {
 	lc := net.ListenConfig{Control: udp.Share}
 	pc, err := lc.ListenPacket(ctx, "udp4", net.JoinHostPort("", strconv.Itoa(env.hostPort)))
 	if err != nil {
@@ -199,9 +230,12 @@ func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window
 		if err := sendProbes(conn, env, probes, seq); err != nil {
 			return nil, err
 		}
-		listen(ctx, conn, until, seq, found)
+		listen(ctx, conn, until, seq, found, done)
 		if err := ctx.Err(); err != nil {
 			return sortedInfos(found), err
+		}
+		if done != nil && done(found) {
+			break
 		}
 	}
 	return sortedInfos(found), nil
@@ -234,7 +268,7 @@ func sendProbes(conn *net.UDPConn, env discoverEnv, probes []probe, seq uint16) 
 
 // listen reads datagrams until the deadline and records the discovery replies to seq. Anything
 // else (undecodable data, other sequence numbers, echoes of our own probe) is ignored.
-func listen(ctx context.Context, conn *net.UDPConn, until time.Time, seq uint16, found map[string]Info) {
+func listen(ctx context.Context, conn *net.UDPConn, until time.Time, seq uint16, found map[string]Info, done func(map[string]Info) bool) {
 	buf := make([]byte, maxDatagram)
 	_ = conn.SetReadDeadline(until)
 	// The wake-up that a cancelled context sends to the socket may have fired before the line
@@ -258,6 +292,9 @@ func listen(ctx context.Context, conn *net.UDPConn, until time.Time, seq uint16,
 		}
 		if _, dup := found[key]; !dup {
 			found[key] = info
+			if done != nil && done(found) {
+				return
+			}
 		}
 	}
 }

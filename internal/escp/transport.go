@@ -1,9 +1,11 @@
 package escp
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
+	"slices"
 	"sync"
 	"time"
 
@@ -63,6 +65,11 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 	if err != nil || h.Seq != c.seq || h.Op == wire.OpDiscovery {
 		return reply{}, false
 	}
+	if len(c.cfg.MAC) == hwAddrLen && h.SwitchMAC != ([hwAddrLen]byte{}) && !bytes.Equal(h.SwitchMAC[:], c.cfg.MAC) {
+		// the address answers, but it is another device: remember it and let exchange say so
+		c.wrong = &WrongSwitchError{Want: c.cfg.MAC, Got: net.HardwareAddr(slices.Clone(h.SwitchMAC[:])), IP: from.IP}
+		return reply{}, false
+	}
 	if !c.haveSwMAC {
 		c.swMAC, c.haveSwMAC = h.SwitchMAC, true
 	}
@@ -81,6 +88,9 @@ func (c *Client) recv(ctx context.Context, deadline time.Time) (reply, bool) {
 		}
 		if rep, ok := c.accept(from, buf[:n]); ok {
 			return rep, true
+		}
+		if c.wrong != nil {
+			return reply{}, false // another device answers: waiting longer or resending will not change that
 		}
 	}
 	return reply{}, false
@@ -155,6 +165,7 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 		return reply{}, err
 	}
 	defer c.interruptOnDone(ctx)()
+	c.wrong = nil
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
 		if err := expired(ctx); err != nil { // a cancelled call sends nothing, not even a retry
 			return reply{}, err
@@ -164,6 +175,9 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 		}
 		if rep, ok := c.recv(ctx, c.attemptDeadline(ctx)); ok {
 			return rep, nil
+		}
+		if c.wrong != nil {
+			return reply{}, c.wrong
 		}
 		if err := expired(ctx); err != nil {
 			return reply{}, err

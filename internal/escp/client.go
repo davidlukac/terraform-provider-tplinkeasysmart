@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -36,10 +37,15 @@ type Client struct {
 	// switchPorts is the switch's number of ports, read on the first write that names a port
 	// (zero until then) and kept: it is hardware. Guarded by mu.
 	switchPorts int
+	// wrong is the device that answered the request in flight with a MAC other than Config.MAC.
+	wrong *WrongSwitchError
+	// locator finds a switch by MAC address; tests replace it.
+	locator func(ctx context.Context, mac net.HardwareAddr) (Info, error)
 }
 
 // Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
-// name that resolves to one (a name is looked up now). It sends nothing to the switch and
+// name that resolves to one (a name is looked up now), or, when cfg.MAC is set, may be left
+// empty to find the switch by its MAC address on the first request. It sends nothing to the switch and
 // binds no socket: the local UDP port is bound on first use, so merely configuring a
 // provider (e.g. `terraform validate`) has no side effects on the switch. Close the client
 // when done.
@@ -62,12 +68,22 @@ func Dial(cfg Config) (*Client, error) {
 	if cfg.BroadcastAddr == "" {
 		cfg.BroadcastAddr = "255.255.255.255"
 	}
-	ip, err := net.ResolveIPAddr("ip4", cfg.Host)
-	if err != nil {
-		return nil, fmt.Errorf("escp: resolving %q: %w", cfg.Host, err)
+	if len(cfg.MAC) != 0 && len(cfg.MAC) != hwAddrLen {
+		return nil, invalidf("escp: a MAC address has %d bytes, got %d", hwAddrLen, len(cfg.MAC))
 	}
-	c := &Client{cfg: cfg, dest: &net.UDPAddr{IP: ip.IP, Port: cfg.SwitchPort}}
-	c.hostMAC = localMAC(ip.IP)
+	cfg.MAC = slices.Clone(cfg.MAC)
+	c := &Client{cfg: cfg, locator: hostLocator}
+	if cfg.Host == "" && len(cfg.MAC) != 0 {
+		// no address yet: the first request finds the switch by its MAC address
+		c.dest = &net.UDPAddr{Port: cfg.SwitchPort}
+	} else {
+		ip, err := net.ResolveIPAddr("ip4", cfg.Host)
+		if err != nil {
+			return nil, fmt.Errorf("escp: resolving %q: %w", cfg.Host, err)
+		}
+		c.dest = &net.UDPAddr{IP: ip.IP, Port: cfg.SwitchPort}
+		c.hostMAC = localMAC(ip.IP)
+	}
 	var n [2]byte
 	_, _ = rand.Read(n[:])
 	c.seq = uint16(n[0])<<8 | uint16(n[1])
@@ -120,4 +136,11 @@ func localMAC(dst net.IP) (mac [6]byte) {
 		}
 	}
 	return
+}
+
+// hostLocator is the lookup a client uses: Locate on the interfaces of this host.
+//
+// coverage: ignore - thin wrapper that would probe the real network; Locate is tested through locateWith
+func hostLocator(ctx context.Context, mac net.HardwareAddr) (Info, error) {
+	return Locate(ctx, mac, DiscoverOptions{})
 }

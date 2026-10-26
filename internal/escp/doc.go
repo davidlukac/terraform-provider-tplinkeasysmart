@@ -43,9 +43,21 @@
 // reply port between sockets), safety (the policy gates and the compatibility table) and
 // escptest (a fake switch for tests). Tests are named for the source they exercise; the ones
 // that cut across sources have a name of their own: cancel_test (cancellation), parsers_test,
-// readers_test, write_gate_test, dryrun_test, fake_switch_test (the fake itself) and
+// readers_test, mac_test (identity and lookup by MAC address), write_gate_test, dryrun_test, fake_switch_test (the fake itself) and
 // helpers_test. CONTRIBUTING.md in the repository root is the checklist for adding or
 // changing a setting.
+//
+// # Identity: finding a switch by MAC address
+//
+// A switch's address can change (a lease, a move), its MAC address does not. Config.MAC names the
+// switch: it pins the identity, so a request to an address that now belongs to another device
+// fails with ErrWrongSwitch before a session is handed to it or a write is sent (the MAC is
+// checked on every reply, the key exchange's included), and it lets the client find the
+// switch when Config.Host is empty or stops answering (Locate does the lookup: a discovery probe
+// that stops at the first reply from that switch, normally under a second). Nothing is sent by
+// Dial. A device that takes over the address meanwhile ignores requests encrypted with a session
+// key it never accepted; the client then starts a new session, and the reply to the key exchange
+// names the stranger, so nothing is written to it.
 //
 // # Using a client
 //
