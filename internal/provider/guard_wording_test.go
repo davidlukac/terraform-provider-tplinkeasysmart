@@ -1,9 +1,11 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/safety"
 )
 
@@ -23,5 +25,19 @@ func TestWordPortRefusal(t *testing.T) {
 	wrapped := errors.Join(errors.New("context"), &safety.PortUseError{Port: 2, Reason: safety.PortInLAG, LAG: 1})
 	if err := wordPortRefusal(wrapped, word); err == nil || err.Error() != "worded" {
 		t.Fatalf("a wrapped port refusal is still a port refusal, got %v", err)
+	}
+}
+
+// A port number no switch has is not "free": the guard refuses it before it reads anything,
+// even though a port set cannot hold it.
+func TestGuardPortsRefusesAPortNumberNoSwitchHas(t *testing.T) {
+	f := &fakeClient{ports: testPorts()}
+	for _, bad := range []escp.PortID{0, 33, -4} {
+		if err := guardPorts(context.Background(), f, false, 3, bad); err == nil {
+			t.Errorf("port %d must be refused", bad)
+		}
+	}
+	if err := guardPorts(context.Background(), f, true, 0); err != nil {
+		t.Errorf("allow_disruptive skips the guard, as before: %v", err)
 	}
 }

@@ -31,7 +31,7 @@ func (u PortUse) InLAG() bool { return u.LAG != 0 }
 // UseOf looks the port up in a Ports reading. A port the switch does not list is
 // reported as not existing. A port listed more than once (a real switch never does)
 // counts as used if any of its entries says so, so the answer fails closed.
-func UseOf(ports []escp.Port, id int) PortUse {
+func UseOf(ports []escp.Port, id escp.PortID) PortUse {
 	var use PortUse
 	for _, p := range ports {
 		if p.ID != id {
@@ -68,7 +68,7 @@ const (
 // without an explicit decision, and why. Callers branch on Reason and word the message in their
 // own vocabulary, as with FirmwareError; Error is a neutral description.
 type PortUseError struct {
-	Port   int
+	Port   escp.PortID
 	Reason PortReason
 	Speed  escp.Speed // the negotiated speed (PortLinkUp)
 	LAG    int        // the group (PortInLAG)
@@ -94,12 +94,12 @@ type PortRule struct {
 	TolerateLAG int
 }
 
-// CheckPorts returns a *PortUseError for the first of ports (in the order given) that does not exist, has a link up, or belongs to a LAG the rule does not tolerate, in
+// CheckPorts returns a *PortUseError for the lowest-numbered of ports that does not exist, has a link up, or belongs to a LAG the rule does not tolerate, in
 // that order for each port. It returns nil when every port is free. all is a reading of the
 // ports (Client.Ports); a write to a port that fails the check can cut the management path or
 // the uplink, and the switch has no console to recover from that.
-func CheckPorts(all []escp.Port, rule PortRule, ports ...int) error {
-	for _, p := range ports {
+func CheckPorts(all []escp.Port, rule PortRule, ports escp.PortSet) error {
+	for _, p := range ports.Ports() {
 		use := UseOf(all, p)
 		switch {
 		case !use.Exists:

@@ -27,7 +27,7 @@ func VLANModes() []VLANMode { return []VLANMode{VLANModeMTU, VLANModePortBased, 
 // every other mode).
 type VLANModeSetting struct {
 	Mode       VLANMode
-	UplinkPort int
+	UplinkPort PortID
 }
 
 // VLANModeFrom names the active mode from the three mode flags the switch reports. No flag, or
@@ -72,7 +72,7 @@ func (c *Client) VLANMode(ctx context.Context) (VLANModeSetting, error) {
 func ValidateVLANMode(s VLANModeSetting) error {
 	switch s.Mode {
 	case VLANModeMTU:
-		return ValidatePort(s.UplinkPort)
+		return s.UplinkPort.Validate()
 	case VLANModePortBased, VLANModeDot1Q:
 		if s.UplinkPort != 0 {
 			return invalidf("escp: VLAN mode %s has no uplink port (got %d)", s.Mode, s.UplinkPort)
@@ -94,7 +94,7 @@ func (c *Client) SetVLANMode(ctx context.Context, s VLANModeSetting) error {
 	var tlv wire.TLV
 	switch s.Mode {
 	case VLANModeMTU:
-		if err := c.requirePorts(ctx, s.UplinkPort); err != nil {
+		if err := c.requirePorts(ctx, s.UplinkPort.set()); err != nil {
 			return err
 		}
 		tlv = wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{boolByte(true), byte(s.UplinkPort)}}
@@ -105,7 +105,7 @@ func (c *Client) SetVLANMode(ctx context.Context, s VLANModeSetting) error {
 	}
 	op := Operation{Name: "SetVLANMode", Impact: ImpactManagement}
 	if s.Mode == VLANModeMTU {
-		op.Ports = []int{s.UplinkPort}
+		op.Ports = s.UplinkPort.set()
 	}
 	return c.setTLVs(ctx, op, tlv)
 }

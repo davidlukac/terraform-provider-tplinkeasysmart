@@ -18,7 +18,7 @@ func TestParseLAGs(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 0x80000005 -> bits 0,2,31 -> ports 1,3,32
-	want := []LAG{{ID: 1, Ports: []int{1, 2}}, {ID: 2, Ports: []int{}}, {ID: 3, Ports: []int{1, 3, 32}}}
+	want := []LAG{{ID: 1, Ports: MustPortSet(1, 2)}, {ID: 2, Ports: 0}, {ID: 3, Ports: MustPortSet(1, 3, 32)}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v want %+v", got, want)
 	}
@@ -31,13 +31,13 @@ func TestSetLAGWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	if err := c.SetLAG(ctx, 2, []int{6, 7}); err != nil {
+	if err := c.SetLAG(ctx, 2, MustPortSet(6, 7)); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.LastSet(); got[0].Type != wire.TLVLAG || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
 		t.Fatalf("wire %+v", got)
 	}
-	if err := c.SetLAG(ctx, 2, nil); err != nil {
+	if err := c.SetLAG(ctx, 2, 0); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0}) {
@@ -46,8 +46,8 @@ func TestSetLAGWire(t *testing.T) {
 	n := f.WriteCount()
 	for _, bad := range []struct {
 		group int
-		ports []int
-	}{{0, []int{1, 2}}, {2, []int{40}}, {3, []int{5, 6}}, {1, []int{4, 5}}, {2, []int{2, 3}}, {2, []int{6}}, {1, []int{1, 2, 3, 4, 5}}} {
+		ports PortSet
+	}{{0, MustPortSet(1, 2)}, {3, MustPortSet(5, 6)}, {1, MustPortSet(4, 5)}, {2, MustPortSet(2, 3)}, {2, MustPortSet(6)}, {1, MustPortSet(1, 2, 3, 4, 5)}} {
 		if c.SetLAG(ctx, bad.group, bad.ports) == nil {
 			t.Errorf("LAG %d with ports %v must be rejected", bad.group, bad.ports)
 		}
@@ -61,24 +61,22 @@ func TestValidateLAG(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		group int
-		ports []int
+		ports PortSet
 		want  string // empty: valid
 	}{
-		{"group 1 low ports", 1, []int{1, 2}, ""},
-		{"group 1 all four", 1, []int{1, 2, 3, 4}, ""},
-		{"group 2 high ports", 2, []int{5, 8}, ""},
-		{"group 2 all four", 2, []int{5, 6, 7, 8}, ""},
-		{"remove group 1", 1, nil, ""},
-		{"remove group 2", 2, []int{}, ""},
-		{"group 0", 0, []int{1, 2}, "invalid LAG group"},
-		{"group 3", 3, []int{1, 2}, "invalid LAG group"},
-		{"remove group 3", 3, nil, "invalid LAG group"},
-		{"the same port twice", 1, []int{2, 2}, "port 2 is listed twice"},
-		{"a repeat among four", 1, []int{1, 2, 3, 3}, "port 3 is listed twice"},
-		{"one port", 1, []int{2}, "2 to 4 ports"},
-		{"five ports", 1, []int{1, 2, 3, 4, 5}, "2 to 4 ports"},
-		{"group 1 reaching into group 2", 1, []int{4, 5}, "port 5 cannot be in LAG 1 (LAG 1 takes ports 1-4)"},
-		{"group 2 with low ports", 2, []int{2, 3}, "port 2 cannot be in LAG 2 (LAG 2 takes ports 5-8)"},
+		{"group 1 low ports", 1, MustPortSet(1, 2), ""},
+		{"group 1 all four", 1, MustPortSet(1, 2, 3, 4), ""},
+		{"group 2 high ports", 2, MustPortSet(5, 8), ""},
+		{"group 2 all four", 2, MustPortSet(5, 6, 7, 8), ""},
+		{"remove group 1", 1, 0, ""},
+		{"remove group 2", 2, 0, ""},
+		{"group 0", 0, MustPortSet(1, 2), "invalid LAG group"},
+		{"group 3", 3, MustPortSet(1, 2), "invalid LAG group"},
+		{"remove group 3", 3, 0, "invalid LAG group"},
+		{"one port", 1, MustPortSet(2), "2 to 4 ports"},
+		{"five ports", 1, MustPortSet(1, 2, 3, 4, 5), "2 to 4 ports"},
+		{"group 1 reaching into group 2", 1, MustPortSet(4, 5), "port 5 cannot be in LAG 1 (LAG 1 takes ports 1-4)"},
+		{"group 2 with low ports", 2, MustPortSet(2, 3), "port 2 cannot be in LAG 2 (LAG 2 takes ports 5-8)"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := ValidateLAG(tc.group, tc.ports)
@@ -121,7 +119,7 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 			f := escptest.Start(t)
 			f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom, f.RejectCode = 1, tc.code })
 			c := dialFake(t, f, "secret")
-			err := c.SetLAG(context.Background(), 1, []int{2, 3})
+			err := c.SetLAG(context.Background(), 1, MustPortSet(2, 3))
 			var rejected *RejectedError
 			if !errors.Is(err, ErrRejected) || !errors.As(err, &rejected) || rejected.Code != tc.code {
 				t.Fatalf("got %v, want a RejectedError with code %d that matches ErrRejected", err, tc.code)
@@ -135,7 +133,7 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 		f := escptest.Start(t)
 		f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom = 1 })
 		c := dialFake(t, f, "secret")
-		err := c.SetLAG(context.Background(), 1, []int{2, 3})
+		err := c.SetLAG(context.Background(), 1, MustPortSet(2, 3))
 		if !errors.Is(err, ErrRejected) || !strings.Contains(err.Error(), "error code 9") || !strings.Contains(err.Error(), "wrong credentials") {
 			t.Fatalf("got %v", err)
 		}

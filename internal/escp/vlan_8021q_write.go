@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"regexp"
-	"sort"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
@@ -56,16 +55,10 @@ func (v VLAN8021Q) validate() error {
 	if err := ValidateVLANName(v.Name); err != nil {
 		return err
 	}
-	seen := map[int]bool{}
-	for _, p := range v.Untagged {
-		seen[p] = true
+	if both := v.Tagged.Intersect(v.Untagged); !both.IsEmpty() {
+		return invalidf("escp: port %d is both tagged and untagged in VLAN %d", both.Ports()[0], v.ID)
 	}
-	for _, p := range v.Tagged {
-		if seen[p] {
-			return invalidf("escp: port %d is both tagged and untagged in VLAN %d", p, v.ID)
-		}
-	}
-	if len(v.Tagged)+len(v.Untagged) == 0 {
+	if v.Tagged.Union(v.Untagged).IsEmpty() {
 		return invalidf("escp: VLAN %d has no member ports; delete it instead", v.ID)
 	}
 	return nil
@@ -73,17 +66,8 @@ func (v VLAN8021Q) validate() error {
 
 // encode builds the TLV 8705 value for the VLAN, as the vendor utility does:
 // the member mask holds every port, the tagged mask only the tagged ones.
-func (v VLAN8021Q) encode() ([]byte, error) {
-	untagged, err := maskFromPorts(v.Untagged)
-	if err != nil {
-		return nil, err
-	}
-	tagged, err := maskFromPorts(v.Tagged)
-	if err != nil {
-		return nil, err
-	}
-	member := binary.BigEndian.AppendUint32(nil, binary.BigEndian.Uint32(untagged)|binary.BigEndian.Uint32(tagged))
-	return vlanEntryBytes(v.ID, member, tagged, v.Name), nil
+func (v VLAN8021Q) encode() []byte {
+	return vlanEntryBytes(v.ID, v.Tagged.Union(v.Untagged).Mask(), v.Tagged.Mask(), v.Name)
 }
 
 // vlanEntryBytes lays out a TLV 8705 value: id, member mask, tagged mask, name, NUL.
@@ -102,15 +86,11 @@ func (c *Client) SetVLAN8021Q(ctx context.Context, v VLAN8021Q) error {
 	if err := v.validate(); err != nil {
 		return err
 	}
-	value, err := v.encode()
-	if err != nil {
+	members := v.Tagged.Union(v.Untagged)
+	if err := c.requirePorts(ctx, members); err != nil {
 		return err
 	}
-	members := append(append([]int{}, v.Tagged...), v.Untagged...)
-	if err := c.requirePorts(ctx, members...); err != nil {
-		return err
-	}
-	return c.setTLVs(ctx, Operation{Name: "SetVLAN8021Q", Ports: members, Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: v.ID}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: value})
+	return c.setTLVs(ctx, Operation{Name: "SetVLAN8021Q", Ports: members, Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: v.ID}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: v.encode()})
 }
 
 // DeleteVLAN8021Q removes an 802.1Q VLAN: TLV 8705 with both masks empty and an
@@ -126,28 +106,28 @@ func (c *Client) DeleteVLAN8021Q(ctx context.Context, id int) error {
 // SetPVIDs sets the default VLAN of the given ports (port -> pvid): one TLV
 // 8706 per port with the port (1 byte) and the pvid (2 bytes). The VLAN must
 // exist and the 802.1Q mode must be on; callers must guard linked ports.
-func (c *Client) SetPVIDs(ctx context.Context, pvids map[int]int) error {
+func (c *Client) SetPVIDs(ctx context.Context, pvids map[PortID]int) error {
 	if len(pvids) == 0 {
 		return invalidf("escp: no PVIDs to set")
 	}
-	ports := make([]int, 0, len(pvids))
+	var named PortSet
 	for p, id := range pvids {
-		if err := ValidatePort(p); err != nil {
+		if err := p.Validate(); err != nil {
 			return err
 		}
 		if err := ValidateVLANID(id); err != nil {
 			return err
 		}
-		ports = append(ports, p)
+		named = named.Union(p.set())
 	}
-	sort.Ints(ports)
-	if err := c.requirePorts(ctx, ports...); err != nil {
+	if err := c.requirePorts(ctx, named); err != nil {
 		return err
 	}
+	ports := named.Ports()
 	tlvs := make([]wire.TLV, 0, len(ports))
 	for _, p := range ports {
 		value := binary.BigEndian.AppendUint16([]byte{byte(p)}, uint16(pvids[p])) //nolint:gosec // bounded by the validation above
 		tlvs = append(tlvs, wire.TLV{Type: wire.TLVVLAN8021QPVID, Value: value})
 	}
-	return c.setTLVs(ctx, Operation{Name: "SetPVIDs", Ports: ports, Impact: ImpactManagement}, tlvs...)
+	return c.setTLVs(ctx, Operation{Name: "SetPVIDs", Ports: named, Impact: ImpactManagement}, tlvs...)
 }

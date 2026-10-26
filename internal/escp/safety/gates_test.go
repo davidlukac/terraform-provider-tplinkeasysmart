@@ -56,7 +56,7 @@ func TestChain(t *testing.T) {
 	t.Run("the operation reaches every gate unchanged", func(t *testing.T) {
 		var seen []escp.Operation
 		spy := func(_ context.Context, _ escp.InfoReader, o escp.Operation) error { seen = append(seen, o); return nil }
-		want := escp.Operation{Name: "SetLAG", Ports: []int{5, 6}, Impact: escp.ImpactManagement}
+		want := escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(5, 6), Impact: escp.ImpactManagement}
 		if err := Chain(spy, spy)(ctx, nil, want); err != nil || len(seen) != 2 || !reflect.DeepEqual(seen[0], want) || !reflect.DeepEqual(seen[1], want) {
 			t.Fatalf("err=%v seen=%+v", err, seen)
 		}
@@ -116,7 +116,7 @@ func TestDryRun(t *testing.T) {
 		t.Fatal("a new dry run has recorded nothing")
 	}
 	gate := d.Gate()
-	a := escp.Operation{Name: "SetPort", Ports: []int{3}, Impact: escp.ImpactTraffic}
+	a := escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(3), Impact: escp.ImpactTraffic}
 	b := escp.Operation{Name: "SetLED", Impact: escp.ImpactCosmetic}
 	for _, op := range []escp.Operation{a, b} {
 		if err := gate(ctx, nil, op); !errors.Is(err, ErrDryRun) {
@@ -127,11 +127,10 @@ func TestDryRun(t *testing.T) {
 	if !reflect.DeepEqual(got, []escp.Operation{a, b}) {
 		t.Fatalf("recorded %+v, want %+v in order", got, []escp.Operation{a, b})
 	}
-	// what was handed in and what is handed out are copies
-	a.Ports[0] = 99
-	got[0].Ports[0] = 98
-	if again := d.Operations(); again[0].Ports[0] != 3 {
-		t.Fatalf("the record changed through a slice it does not own: %+v", again[0])
+	// what is handed out is a copy
+	got[0].Ports = escp.MustPortSet(8)
+	if again := d.Operations(); again[0].Ports != escp.MustPortSet(3) {
+		t.Fatalf("the record changed through a value it does not own: %+v", again[0])
 	}
 }
 

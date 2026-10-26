@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"slices"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
@@ -32,7 +31,6 @@ func (c *Client) setTLVs(ctx context.Context, op Operation, tlvs ...wire.TLV) er
 // request may have reached the switch: false means nothing was sent for certain.
 func (c *Client) setTLVsSent(ctx context.Context, op Operation, tlvs ...wire.TLV) (sent bool, err error) {
 	if gate := c.cfg.WriteGate; gate != nil {
-		op.Ports = slices.Clone(op.Ports)
 		if err := gate(ctx, c, op); err != nil {
 			return false, err
 		}
@@ -79,21 +77,21 @@ func (c *Client) getTLVs(ctx context.Context, types ...int16) ([]wire.TLV, error
 	return out, err
 }
 
-// requirePorts refuses ports the switch does not have. ValidatePort has already shown that
-// each port fits the 32-bit port mask; the switch may have far fewer (8 on a TL-SG108E), and
+// requirePorts refuses ports the switch does not have. A PortSet only holds ports that fit
+// the 32-bit port mask; the switch may have far fewer (8 on a TL-SG108E), and
 // what it does with a write for a port beyond them is unknown. The port count is read from
 // the switch once and kept, so the first write that names a port costs one extra read; if
 // that read fails, so does the write, with that error. It reads only, and so is not gated.
-func (c *Client) requirePorts(ctx context.Context, ports ...int) error {
-	if len(ports) == 0 {
+func (c *Client) requirePorts(ctx context.Context, ports PortSet) error {
+	if ports.IsEmpty() {
 		return nil
 	}
 	have, err := c.portCount(ctx)
 	if err != nil {
 		return err
 	}
-	for _, p := range ports {
-		if p > have {
+	for _, p := range ports.Ports() {
+		if int(p) > have {
 			return invalidf("escp: port %d does not exist: this switch has %d ports", p, have)
 		}
 	}

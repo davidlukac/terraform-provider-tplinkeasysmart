@@ -19,11 +19,11 @@ import (
 type fakeClient struct {
 	mu      sync.Mutex
 	igmp    escp.IGMP
-	pvlans  map[int][]int
-	lags    map[int][]int
+	pvlans  map[int]escp.PortSet
+	lags    map[int]escp.PortSet
 	mirror  *escp.Mirror
-	storm   map[int]escp.PortStorm
-	bw      map[int][2]int
+	storm   map[escp.PortID]escp.PortStorm
+	bw      map[escp.PortID][2]int
 	qos     *escp.QoS
 	ports   []escp.Port
 	loop    bool
@@ -87,10 +87,10 @@ func (f *fakeClient) PortStatistics(context.Context) ([]escp.PortStats, error) {
 	return []escp.PortStats{{ID: 1, Enabled: true, Link: "1000Mbps-full", TxGood: 4000000000, RxGood: 7, RxBad: 1}}, nil
 }
 
-func (f *fakeClient) SetLAG(_ context.Context, group int, ports []int) error {
+func (f *fakeClient) SetLAG(_ context.Context, group int, ports escp.PortSet) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.lags[group] = append([]int{}, ports...)
+	f.lags[group] = ports
 	f.sets++
 	return nil
 }
@@ -99,16 +99,16 @@ func (f *fakeClient) LAGs(context.Context) ([]escp.LAG, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.lags != nil {
-		return []escp.LAG{{ID: 1, Ports: f.lags[1]}, {ID: 2, Ports: append([]int{}, f.lags[2]...)}}, nil
+		return []escp.LAG{{ID: 1, Ports: f.lags[1]}, {ID: 2, Ports: f.lags[2]}}, nil
 	}
-	return []escp.LAG{{ID: 1, Ports: []int{1, 2}}, {ID: 2, Ports: []int{}}}, nil
+	return []escp.LAG{{ID: 1, Ports: escp.MustPortSet(1, 2)}, {ID: 2, Ports: 0}}, nil
 }
 
 func (f *fakeClient) IGMP(context.Context) (escp.IGMP, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	g := f.igmp
-	g.Groups = []escp.IGMPGroup{{IP: "239.255.255.250", VLAN: 1, Ports: []int{1, 4}}}
+	g.Groups = []escp.IGMPGroup{{IP: "239.255.255.250", VLAN: 1, Ports: escp.MustPortSet(1, 4)}}
 	return g, nil
 }
 
@@ -135,7 +135,7 @@ func (f *fakeClient) SetLoopPrevention(_ context.Context, on bool) error {
 }
 
 func (f *fakeClient) SetPortMirror(_ context.Context, m escp.Mirror) error {
-	if m.Enabled && len(m.IngressPorts)+len(m.EgressPorts) == 0 {
+	if m.Enabled && m.IngressPorts.Union(m.EgressPorts).IsEmpty() {
 		return fmt.Errorf("mirroring needs a source port")
 	}
 	f.mu.Lock()
@@ -150,15 +150,9 @@ func (f *fakeClient) PortMirror(context.Context) (escp.Mirror, error) {
 	defer f.mu.Unlock()
 	if f.mirror != nil {
 		m := *f.mirror
-		if m.IngressPorts == nil {
-			m.IngressPorts = []int{}
-		}
-		if m.EgressPorts == nil {
-			m.EgressPorts = []int{}
-		}
 		return m, nil
 	}
-	return escp.Mirror{Enabled: true, MirrorPort: 8, IngressPorts: []int{1, 2}, EgressPorts: []int{}}, nil
+	return escp.Mirror{Enabled: true, MirrorPort: 8, IngressPorts: escp.MustPortSet(1, 2), EgressPorts: 0}, nil
 }
 
 func (f *fakeClient) MTUVLAN(context.Context) (escp.MTUVLAN, error) {
@@ -170,29 +164,17 @@ func (f *fakeClient) MTUVLAN(context.Context) (escp.MTUVLAN, error) {
 	return escp.MTUVLAN{Enabled: true, UplinkPort: 8}, nil
 }
 
-func (f *fakeClient) SetPortBasedVLAN(_ context.Context, id int, ports []int) error {
+func (f *fakeClient) SetPortBasedVLAN(_ context.Context, id int, ports escp.PortSet) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	// membership is exclusive: take the ports out of every other group, return them to VLAN 1 on delete
 	for g, ps := range f.pvlans {
-		var keep []int
-		for _, p := range ps {
-			moved := false
-			for _, q := range ports {
-				if p == q {
-					moved = true
-				}
-			}
-			if !moved {
-				keep = append(keep, p)
-			}
-		}
-		f.pvlans[g] = keep
+		f.pvlans[g] = ps.Minus(ports)
 	}
-	if len(ports) == 0 {
+	if ports.IsEmpty() {
 		delete(f.pvlans, id)
 	} else {
-		f.pvlans[id] = append([]int{}, ports...)
+		f.pvlans[id] = ports
 	}
 	f.sets++
 	return nil
@@ -213,7 +195,7 @@ func (f *fakeClient) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) 
 		}
 		return v, nil
 	}
-	return escp.PortBasedVLAN{Enabled: true, MaxVLAN: 8, VLANs: []escp.PortVLAN{{ID: 1, Ports: []int{1, 2, 3}}}}, nil
+	return escp.PortBasedVLAN{Enabled: true, MaxVLAN: 8, VLANs: []escp.PortVLAN{{ID: 1, Ports: escp.MustPortSet(1, 2, 3)}}}, nil
 }
 
 func (f *fakeClient) Dot1Q(context.Context) (escp.Dot1Q, error) {
@@ -223,7 +205,7 @@ func (f *fakeClient) Dot1Q(context.Context) (escp.Dot1Q, error) {
 		return f.vlans.dot1q(), nil
 	}
 	return escp.Dot1Q{Enabled: true, MaxVLAN: 32,
-		VLANs: []escp.VLAN8021Q{{ID: 10, Name: "iot", Tagged: []int{8}, Untagged: []int{1, 2}}},
+		VLANs: []escp.VLAN8021Q{{ID: 10, Name: "iot", Tagged: escp.MustPortSet(8), Untagged: escp.MustPortSet(1, 2)}},
 		PVIDs: []escp.PortPVID{{Port: 1, PVID: 10}, {Port: 8, PVID: 1}}}, nil
 }
 
@@ -235,7 +217,7 @@ func (f *fakeClient) SetQoSMode(_ context.Context, mode escp.QoSMode) error {
 	return nil
 }
 
-func (f *fakeClient) SetPortPriorities(_ context.Context, ch map[int]escp.Priority) error {
+func (f *fakeClient) SetPortPriorities(_ context.Context, ch map[escp.PortID]escp.Priority) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.qos.Mode != 0 {
@@ -268,7 +250,7 @@ func (f *fakeClient) SetBandwidth(_ context.Context, limit escp.PortBandwidth) e
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.bw == nil {
-		f.bw = map[int][2]int{}
+		f.bw = map[escp.PortID][2]int{}
 	}
 	f.bw[port] = [2]int{in, eg}
 	f.sets++
@@ -281,7 +263,7 @@ func (f *fakeClient) Bandwidth(context.Context) ([]escp.PortBandwidth, error) {
 	if f.bw != nil {
 		var rows []escp.PortBandwidth
 		for _, p := range f.rows() {
-			rows = append(rows, escp.PortBandwidth{Port: p, IngressKbps: f.bw[p][0], EgressKbps: f.bw[p][1]})
+			rows = append(rows, escp.PortBandwidth{Port: escp.PortID(p), IngressKbps: f.bw[escp.PortID(p)][0], EgressKbps: f.bw[escp.PortID(p)][1]})
 		}
 		return rows, nil
 	}
@@ -296,7 +278,7 @@ func (f *fakeClient) SetStormControl(_ context.Context, cfg escp.StormConfig) er
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.storm == nil {
-		f.storm = map[int]escp.PortStorm{}
+		f.storm = map[escp.PortID]escp.PortStorm{}
 	}
 	f.storm[port] = escp.PortStorm{Port: port, UnknownUnicast: uu, Multicast: mc, Broadcast: bc, RateKbps: rate, Enabled: rate != 0}
 	f.sets++
@@ -309,8 +291,8 @@ func (f *fakeClient) StormControl(context.Context) ([]escp.PortStorm, error) {
 	if f.storm != nil {
 		var rows []escp.PortStorm
 		for _, p := range f.rows() {
-			r := f.storm[p]
-			r.Port = p
+			r := f.storm[escp.PortID(p)]
+			r.Port = escp.PortID(p)
 			rows = append(rows, r)
 		}
 		return rows, nil
@@ -718,7 +700,7 @@ func TestAccPortGuardOverride(t *testing.T) {
 func newFakeQoS() *fakeClient {
 	q := escp.QoS{Mode: escp.QoSDSCP8021p}
 	for p := 1; p <= 8; p++ {
-		q.Priorities = append(q.Priorities, escp.PortPriority{Port: p, Priority: 1})
+		q.Priorities = append(q.Priorities, escp.PortPriority{Port: escp.PortID(p), Priority: 1})
 	}
 	return &fakeClient{qos: &q}
 }
@@ -766,7 +748,7 @@ func bwConfig(port int, body string) string {
 }
 
 func TestAccBandwidthLimitLifecycle(t *testing.T) {
-	f := &fakeClient{ports: testPorts(), bw: map[int][2]int{}}
+	f := &fakeClient{ports: testPorts(), bw: map[escp.PortID][2]int{}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
@@ -789,7 +771,7 @@ func TestAccBandwidthLimitLifecycle(t *testing.T) {
 }
 
 func TestAccBandwidthLimitGuardAndValidation(t *testing.T) {
-	f := &fakeClient{ports: testPorts(), bw: map[int][2]int{}}
+	f := &fakeClient{ports: testPorts(), bw: map[escp.PortID][2]int{}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
@@ -808,7 +790,7 @@ func stormConfig(port int, body string) string {
 }
 
 func TestAccStormLimitLifecycle(t *testing.T) {
-	f := &fakeClient{ports: testPorts(), storm: map[int]escp.PortStorm{}}
+	f := &fakeClient{ports: testPorts(), storm: map[escp.PortID]escp.PortStorm{}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
@@ -825,7 +807,7 @@ func TestAccStormLimitLifecycle(t *testing.T) {
 }
 
 func TestAccStormLimitGuardAndValidation(t *testing.T) {
-	f := &fakeClient{ports: testPorts(), storm: map[int]escp.PortStorm{}}
+	f := &fakeClient{ports: testPorts(), storm: map[escp.PortID]escp.PortStorm{}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
@@ -899,7 +881,7 @@ func lagConfig(group int, body string) string {
 }
 
 func TestAccLAGLifecycleOnUnusedPorts(t *testing.T) {
-	f := &fakeClient{ports: lagPorts(), lags: map[int][]int{1: {1, 2}}}
+	f := &fakeClient{ports: lagPorts(), lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2)}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
@@ -908,7 +890,7 @@ func TestAccLAGLifecycleOnUnusedPorts(t *testing.T) {
 				ImportStateVerifyIdentifierAttribute: "group"},
 		},
 	})
-	if len(f.lags[2]) != 0 || fmt.Sprint(f.lags[1]) != "[1 2]" {
+	if !f.lags[2].IsEmpty() || f.lags[1] != escp.MustPortSet(1, 2) {
 		t.Fatalf("after destroy LAG2 must be empty and LAG1 untouched: %v", f.lags)
 	}
 }
@@ -916,7 +898,7 @@ func TestAccLAGLifecycleOnUnusedPorts(t *testing.T) {
 func TestAccLAGGuard(t *testing.T) {
 	ports := lagPorts()
 	ports[6].ActualSpeed = "1000Mbps-full" // port 7 carries a link
-	f := &fakeClient{ports: ports, lags: map[int][]int{1: {1, 2}}}
+	f := &fakeClient{ports: ports, lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2)}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
@@ -935,7 +917,7 @@ func TestAccLAGGuard(t *testing.T) {
 func TestAccLAGGuardToleratesItsOwnIdleMembers(t *testing.T) {
 	ports := lagPorts()
 	ports[5].LAG, ports[6].LAG = 2, 2 // ports 6 and 7 are already LAG2 members, without a link
-	f := &fakeClient{ports: ports, lags: map[int][]int{1: {1, 2}, 2: {6, 7}}}
+	f := &fakeClient{ports: ports, lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2), 2: escp.MustPortSet(6, 7)}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
@@ -949,7 +931,7 @@ func vlanGroupConfig(id int, body string) string {
 }
 
 func TestAccVLANGroupLifecycleOnUnusedPorts(t *testing.T) {
-	f := &fakeClient{ports: lagPorts(), pvlans: map[int][]int{1: {1, 2, 4, 6, 7}}}
+	f := &fakeClient{ports: lagPorts(), pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
@@ -964,7 +946,7 @@ func TestAccVLANGroupLifecycleOnUnusedPorts(t *testing.T) {
 }
 
 func TestAccVLANGroupGuard(t *testing.T) {
-	f := &fakeClient{ports: lagPorts(), pvlans: map[int][]int{1: {1, 2, 4, 6, 7}}}
+	f := &fakeClient{ports: lagPorts(), pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{

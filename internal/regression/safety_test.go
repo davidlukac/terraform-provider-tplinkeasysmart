@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 )
 
@@ -28,7 +29,7 @@ func TestCheckTestPorts(t *testing.T) {
 		})
 	}
 	// A free port that has become a LAG member is refused too.
-	if err := s.Client.SetLAG(ctx, 1, []int{3, 4}); err != nil {
+	if err := s.Client.SetLAG(ctx, 1, escp.MustPortSet(3, 4)); err != nil {
 		t.Fatal(err)
 	}
 	if err := CheckTestPorts(ctx, s.Client, Target{TestPorts: []int{3}}); err == nil || !strings.Contains(err.Error(), "member of LAG 1") {

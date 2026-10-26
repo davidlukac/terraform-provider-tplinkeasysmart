@@ -66,26 +66,19 @@ var lagRefusals = map[int32]string{
 }
 
 // ValidateLAG checks a group number and member ports against the limits
-// above. An empty port list (removing the group) only needs a valid group.
-func ValidateLAG(group int, ports []int) error {
+// above. An empty port set (removing the group) only needs a valid group.
+func ValidateLAG(group int, ports PortSet) error {
 	if group < 1 || group > LAGGroupCount {
 		return invalidf("escp: invalid LAG group %d (valid: 1-%d)", group, LAGGroupCount)
 	}
-	if len(ports) == 0 {
+	if ports.IsEmpty() {
 		return nil
 	}
-	seen := map[int]bool{}
-	for _, p := range ports {
-		if seen[p] {
-			return invalidf("escp: port %d is listed twice in the LAG", p)
-		}
-		seen[p] = true
+	if ports.Len() < LAGMinPorts || ports.Len() > LAGPortsPerGroup {
+		return invalidf("escp: a LAG takes %d to %d ports, got %d", LAGMinPorts, LAGPortsPerGroup, ports.Len())
 	}
-	if len(ports) < LAGMinPorts || len(ports) > LAGPortsPerGroup {
-		return invalidf("escp: a LAG takes %d to %d ports, got %d", LAGMinPorts, LAGPortsPerGroup, len(ports))
-	}
-	first, last := (group-1)*LAGPortsPerGroup+1, group*LAGPortsPerGroup
-	for _, p := range ports {
+	first, last := PortID((group-1)*LAGPortsPerGroup+1), PortID(group*LAGPortsPerGroup)
+	for _, p := range ports.Ports() {
 		if p < first || p > last {
 			return invalidf("escp: port %d cannot be in LAG %d (LAG %d takes ports %d-%d)", p, group, group, first, last)
 		}
@@ -96,7 +89,7 @@ func ValidateLAG(group int, ports []int) error {
 // LAG is one link aggregation group (Switching > Port Trunk).
 type LAG struct {
 	ID    int
-	Ports []int // empty when the group is unused
+	Ports PortSet // empty when the group is unused
 }
 
 // parseLAGs decodes TLV 4608: group id (1 byte), member port bitmap (4 bytes).
@@ -109,7 +102,7 @@ func parseLAGs(tlvs []wire.TLV) ([]LAG, error) {
 		if len(t.Value) < lagEntryLen {
 			return nil, fmt.Errorf("escp: LAG TLV too short (%d bytes)", len(t.Value))
 		}
-		out = append(out, LAG{ID: int(t.Value[0]), Ports: portsFromMask(t.Value[lagOffMask:])})
+		out = append(out, LAG{ID: int(t.Value[0]), Ports: PortSetFromMask(t.Value[lagOffMask:])})
 	}
 	return out, nil
 }
@@ -124,7 +117,7 @@ func (c *Client) LAGs(ctx context.Context) ([]LAG, error) {
 }
 
 // SetLAG creates or replaces a link aggregation group: TLV 4608 with the group
-// id and the member port mask. An empty port list removes the group. Group
+// id and the member port mask. An empty port set removes the group. Group
 // and ports are checked against ValidateLAG first. The switch itself refuses
 // ports that conflict with mirroring, a port-based VLAN, a bandwidth limit or
 // storm control, and member ports that differ in speed, negotiation, flow control,
@@ -133,18 +126,14 @@ func (c *Client) LAGs(ctx context.Context) ([]LAG, error) {
 // checks these only when the group is written: it does not keep members alike
 // afterwards (see SetPort). Changing a group whose ports carry traffic can cut the
 // uplink; callers must guard against that.
-func (c *Client) SetLAG(ctx context.Context, group int, ports []int) error {
-	mask, err := maskFromPorts(ports)
-	if err != nil {
-		return err
-	}
+func (c *Client) SetLAG(ctx context.Context, group int, ports PortSet) error {
 	if err := ValidateLAG(group, ports); err != nil {
 		return err
 	}
-	if err := c.requirePorts(ctx, ports...); err != nil {
+	if err := c.requirePorts(ctx, ports); err != nil {
 		return err
 	}
-	return nameRefusal(c.setTLVs(ctx, Operation{Name: "SetLAG", Ports: ports, Impact: ImpactManagement, Replaces: GroupLAG, ID: group}, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(group)}, mask...)}), lagRefusals)
+	return nameRefusal(c.setTLVs(ctx, Operation{Name: "SetLAG", Ports: ports, Impact: ImpactManagement, Replaces: GroupLAG, ID: group}, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(group)}, ports.Mask()...)}), lagRefusals)
 }
 
 // nameRefusal adds the reason to a *RejectedError whose code is in reasons; any other

@@ -173,10 +173,10 @@ func TestWrongPasswordIsRejectedForEverySetter(t *testing.T) {
 			return c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64})
 		},
 		"SetPortMirror": func(c *Client, ctx context.Context) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 7, IngressPorts: []int{4}})
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 7, IngressPorts: MustPortSet(4)})
 		},
-		"SetLAG":           func(c *Client, ctx context.Context) error { return c.SetLAG(ctx, 2, []int{6, 7}) },
-		"SetPortBasedVLAN": func(c *Client, ctx context.Context) error { return c.SetPortBasedVLAN(ctx, 2, []int{6, 7}) },
+		"SetLAG":           func(c *Client, ctx context.Context) error { return c.SetLAG(ctx, 2, MustPortSet(6, 7)) },
+		"SetPortBasedVLAN": func(c *Client, ctx context.Context) error { return c.SetPortBasedVLAN(ctx, 2, MustPortSet(6, 7)) },
 	}
 	for name, call := range setters {
 		t.Run(name, func(t *testing.T) {

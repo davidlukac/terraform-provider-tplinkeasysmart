@@ -19,11 +19,11 @@ import (
 func pvFakes() *fakeClient {
 	f := newFakeQoS()
 	f.ports = lagPorts()
-	f.lags = map[int][]int{1: {1, 2}}
-	f.pvlans = map[int][]int{1: {1, 2, 4, 6, 7}}
+	f.lags = map[int]escp.PortSet{1: escp.MustPortSet(1, 2)}
+	f.pvlans = map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}
 	f.mirror = &escp.Mirror{}
-	f.storm = map[int]escp.PortStorm{}
-	f.bw = map[int][2]int{}
+	f.storm = map[escp.PortID]escp.PortStorm{}
+	f.bw = map[escp.PortID][2]int{}
 	return f
 }
 
@@ -165,20 +165,20 @@ func TestMirrorProblem(t *testing.T) {
 		name            string
 		enabled         types.Bool
 		dest            types.Int64
-		ingress, egress []int
+		ingress, egress escp.PortSet
 		wantProblemPart string
 	}{
-		{"disabled and empty", no, types.Int64Value(0), nil, nil, ""},
-		{"enabled and complete", yes, types.Int64Value(7), []int{4}, nil, ""},
-		{"enabled with egress only", yes, types.Int64Value(7), nil, []int{1, 2}, ""},
-		{"disabled with a destination", no, types.Int64Value(7), nil, nil, "must be empty"},
-		{"disabled with sources", no, types.Int64Value(0), []int{4}, nil, "must be empty"},
-		{"enabled without destination", yes, types.Int64Value(0), []int{4}, nil, "mirror_port must be set"},
-		{"enabled without sources", yes, types.Int64Value(7), nil, nil, "at least one"},
-		{"destination mirrors itself via ingress", yes, types.Int64Value(7), []int{7}, nil, "cannot mirror itself"},
-		{"destination mirrors itself via egress", yes, types.Int64Value(7), []int{4}, []int{7}, "cannot mirror itself"},
-		{"unknown enabled is skipped", types.BoolUnknown(), types.Int64Value(0), nil, nil, ""},
-		{"unknown destination is skipped", yes, types.Int64Unknown(), nil, nil, ""},
+		{"disabled and empty", no, types.Int64Value(0), 0, 0, ""},
+		{"enabled and complete", yes, types.Int64Value(7), escp.MustPortSet(4), 0, ""},
+		{"enabled with egress only", yes, types.Int64Value(7), 0, escp.MustPortSet(1, 2), ""},
+		{"disabled with a destination", no, types.Int64Value(7), 0, 0, "must be empty"},
+		{"disabled with sources", no, types.Int64Value(0), escp.MustPortSet(4), 0, "must be empty"},
+		{"enabled without destination", yes, types.Int64Value(0), escp.MustPortSet(4), 0, "mirror_port must be set"},
+		{"enabled without sources", yes, types.Int64Value(7), 0, 0, "at least one"},
+		{"destination mirrors itself via ingress", yes, types.Int64Value(7), escp.MustPortSet(7), 0, "cannot mirror itself"},
+		{"destination mirrors itself via egress", yes, types.Int64Value(7), escp.MustPortSet(4), escp.MustPortSet(7), "cannot mirror itself"},
+		{"unknown enabled is skipped", types.BoolUnknown(), types.Int64Value(0), 0, 0, ""},
+		{"unknown destination is skipped", yes, types.Int64Unknown(), 0, 0, ""},
 	}
 	for _, tc := range cases {
 		got := mirrorProblem(tc.enabled, tc.dest, tc.ingress, tc.egress)
@@ -271,15 +271,15 @@ func TestDefaultsForOmittedAttributes(t *testing.T) {
 
 func TestPortsOfDistinguishesOmittedFromUnknown(t *testing.T) {
 	ctx := context.Background()
-	if p, ok := portsOf(ctx, types.SetUnknown(types.Int64Type)); ok || p != nil {
+	if p, ok := portsOf(ctx, types.SetUnknown(types.Int64Type)); ok || p != 0 {
 		t.Fatal("an unknown set is not usable yet")
 	}
-	if p, ok := portsOf(ctx, types.SetNull(types.Int64Type)); !ok || len(p) != 0 {
+	if p, ok := portsOf(ctx, types.SetNull(types.Int64Type)); !ok || !p.IsEmpty() {
 		t.Fatal("an omitted set means no ports")
 	}
 	set := types.SetValueMust(types.Int64Type, []attr.Value{types.Int64Value(6), types.Int64Value(4)})
-	if p, ok := portsOf(ctx, set); !ok || len(p) != 2 || p[0] != 4 || p[1] != 6 {
-		t.Fatalf("a known set yields its ports sorted, got %v %v", p, ok)
+	if p, ok := portsOf(ctx, set); !ok || p != escp.MustPortSet(4, 6) {
+		t.Fatalf("a known set yields its ports, got %v %v", p, ok)
 	}
 }
 

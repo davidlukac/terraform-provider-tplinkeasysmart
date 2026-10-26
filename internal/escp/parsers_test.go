@@ -22,7 +22,7 @@ func TestParsersIgnoreForeignTLVs(t *testing.T) {
 			[]Port{{ID: 3, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"}}},
 		{"port statistics", func() (any, error) { return parsePortStats([]wire.TLV{foreign}) }, []PortStats(nil)},
 		{"LAGs", func() (any, error) { return parseLAGs([]wire.TLV{foreign, th(wire.TLVLAG, "0100000003")}) },
-			[]LAG{{ID: 1, Ports: []int{1, 2}}}},
+			[]LAG{{ID: 1, Ports: MustPortSet(1, 2)}}},
 		{"storm control", func() (any, error) { return parseStorm([]wire.TLV{foreign}) }, []PortStorm(nil)},
 		{"bandwidth", func() (any, error) {
 			return parseBandwidth([]wire.TLV{foreign, th(wire.TLVBandwidthEgress, "010000000040")})
@@ -31,7 +31,7 @@ func TestParsersIgnoreForeignTLVs(t *testing.T) {
 		{"mirror", func() (any, error) {
 			return parseMirror([]wire.TLV{foreign, th(wire.TLVMirror, "00000000000000000000")})
 		},
-			Mirror{IngressPorts: []int{}, EgressPorts: []int{}}},
+			Mirror{IngressPorts: 0, EgressPorts: 0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
@@ -46,7 +45,7 @@ type lagResource struct {
 type lagClient interface {
 	LAGs(ctx context.Context) ([]escp.LAG, error)
 	Ports(ctx context.Context) ([]escp.Port, error)
-	SetLAG(ctx context.Context, group int, ports []int) error
+	SetLAG(ctx context.Context, group int, ports escp.PortSet) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -92,7 +91,7 @@ func (r *lagResource) Configure(_ context.Context, req resource.ConfigureRequest
 // guardLAG checks every port of the old and new membership. Members of this very
 // group are tolerated (an edit of the group touches them by definition); a link
 // never is, nor are the members of another group.
-func (r *lagResource) guardLAG(ctx context.Context, group int, allow bool, old, new []int) error {
+func (r *lagResource) guardLAG(ctx context.Context, group int, allow bool, old, new escp.PortSet) error {
 	if allow {
 		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped")
 		return nil
@@ -101,7 +100,7 @@ func (r *lagResource) guardLAG(ctx context.Context, group int, allow bool, old, 
 	if err != nil {
 		return fmt.Errorf("cannot check whether the ports are in use: %w", err)
 	}
-	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{TolerateLAG: group}, append(append([]int{}, old...), new...)...), func(used *safety.PortUseError) error {
+	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{TolerateLAG: group}, old.Union(new)), func(used *safety.PortUseError) error {
 		switch used.Reason {
 		case safety.PortMissing:
 			return errors.New(used.Error())
@@ -113,19 +112,17 @@ func (r *lagResource) guardLAG(ctx context.Context, group int, allow bool, old, 
 	})
 }
 
-func (r *lagResource) current(ctx context.Context, group int) ([]int, error) {
+func (r *lagResource) current(ctx context.Context, group int) (escp.PortSet, error) {
 	lags, err := r.client.LAGs(ctx)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	for _, l := range lags {
 		if l.ID == group {
-			p := append([]int(nil), l.Ports...)
-			sort.Ints(p)
-			return p, nil
+			return l.Ports, nil
 		}
 	}
-	return nil, fmt.Errorf("LAG%d does not exist on this switch", group)
+	return 0, fmt.Errorf("LAG%d does not exist on this switch", group)
 }
 
 // apply binds the resource to the switch the plan selects, then applies it.
@@ -136,8 +133,8 @@ func (r *lagResource) apply(ctx context.Context, m *lagResourceModel, add func(s
 
 func (r *lagResource) applyBound(ctx context.Context, m *lagResourceModel, add func(string, string)) bool {
 	group := int(m.Group.ValueInt64())
-	ports, err := setToInts(ctx, m.Ports)
-	if err != nil || len(ports) == 0 {
+	ports, err := setToPorts(ctx, m.Ports)
+	if err != nil || ports.IsEmpty() {
 		add("Invalid ports", "a LAG needs at least one member port")
 		return false
 	}
@@ -155,8 +152,8 @@ func (r *lagResource) applyBound(ctx context.Context, m *lagResourceModel, add f
 		return false
 	}
 	got, err := r.current(ctx, group)
-	if err != nil || fmt.Sprint(got) != fmt.Sprint(ports) {
-		add("LAG did not change as requested", fmt.Sprintf("requested %v, switch reports %v (err=%v)", ports, got, err))
+	if err != nil || got != ports {
+		add("LAG did not change as requested", fmt.Sprintf("requested %s, switch reports %s (err=%v)", ports, got, err))
 		return false
 	}
 	return true
@@ -190,11 +187,11 @@ func (r *lagResource) readBound(ctx context.Context, req resource.ReadRequest, r
 		resp.Diagnostics.AddError("Reading LAG failed", err.Error())
 		return
 	}
-	if len(got) == 0 {
+	if got.IsEmpty() {
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	state.Ports = intsToSet(got)
+	state.Ports = portsToSet(got)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -211,11 +208,11 @@ func (r *lagResource) deleteBound(ctx context.Context, req resource.DeleteReques
 		resp.Diagnostics.AddError("Reading LAG failed", err.Error())
 		return
 	}
-	if err := r.guardLAG(ctx, group, state.AllowDisruptive.ValueBool(), old, nil); err != nil {
+	if err := r.guardLAG(ctx, group, state.AllowDisruptive.ValueBool(), old, 0); err != nil {
 		resp.Diagnostics.AddError("Refusing to remove LAG", err.Error())
 		return
 	}
-	if err := r.client.SetLAG(ctx, group, nil); err != nil {
+	if err := r.client.SetLAG(ctx, group, 0); err != nil {
 		resp.Diagnostics.AddError("Removing LAG failed", err.Error())
 	}
 }
@@ -244,7 +241,7 @@ func (r *lagResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 		return
 	}
 	group := int(m.Group.ValueInt64())
-	if group < 1 || group > escp.LAGGroupCount || len(ports) < escp.LAGMinPorts || len(ports) > escp.LAGPortsPerGroup {
+	if group < 1 || group > escp.LAGGroupCount || ports.Len() < escp.LAGMinPorts || ports.Len() > escp.LAGPortsPerGroup {
 		return
 	}
 	if err := escp.ValidateLAG(group, ports); err != nil {

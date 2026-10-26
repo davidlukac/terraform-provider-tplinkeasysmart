@@ -32,7 +32,7 @@ func TestUseOf(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := UseOf(tc.ports, tc.id)
+			got := UseOf(tc.ports, escp.PortID(tc.id))
 			if got != tc.want {
 				t.Fatalf("UseOf = %+v, want %+v", got, tc.want)
 			}
@@ -85,26 +85,25 @@ func TestCheckPorts(t *testing.T) {
 	cases := []struct {
 		name  string
 		rule  PortRule
-		ports []int
+		ports escp.PortSet
 		want  *PortUseError // nil: every port is free
 	}{
-		{"free ports", PortRule{}, []int{4, 5}, nil},
-		{"no ports", PortRule{}, nil, nil},
-		{"a port that does not exist", PortRule{}, []int{9}, &PortUseError{Port: 9, Reason: PortMissing}},
-		{"a port with a link", PortRule{}, []int{3}, &PortUseError{Port: 3, Reason: PortLinkUp, Speed: "100Mbps-full"}},
-		{"a LAG member without a link", PortRule{}, []int{2}, &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
-		{"the link is named before the LAG", PortRule{}, []int{1}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}},
-		{"missing is named before anything else about the same port", PortRule{}, []int{9, 3}, &PortUseError{Port: 9, Reason: PortMissing}},
-		{"the first offender in the order given", PortRule{}, []int{4, 3, 2}, &PortUseError{Port: 3, Reason: PortLinkUp, Speed: "100Mbps-full"}},
-		{"the same port twice", PortRule{}, []int{4, 4, 2, 2}, &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
-		{"members of the tolerated LAG", PortRule{TolerateLAG: 1}, []int{2}, nil},
-		{"another LAG is not tolerated", PortRule{TolerateLAG: 1}, []int{6}, &PortUseError{Port: 6, Reason: PortInLAG, LAG: 2}},
-		{"a link is never tolerated, not even in the tolerated LAG", PortRule{TolerateLAG: 1}, []int{1}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}},
-		{"no group tolerated", PortRule{TolerateLAG: 0}, []int{2}, &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
+		{"free ports", PortRule{}, escp.MustPortSet(4, 5), nil},
+		{"no ports", PortRule{}, 0, nil},
+		{"a port that does not exist", PortRule{}, escp.MustPortSet(9), &PortUseError{Port: 9, Reason: PortMissing}},
+		{"a port with a link", PortRule{}, escp.MustPortSet(3), &PortUseError{Port: 3, Reason: PortLinkUp, Speed: "100Mbps-full"}},
+		{"a LAG member without a link", PortRule{}, escp.MustPortSet(2), &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
+		{"the link is named before the LAG", PortRule{}, escp.MustPortSet(1), &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}},
+		{"a port the switch does not list is missing, whatever else is named", PortRule{}, escp.MustPortSet(9, 12), &PortUseError{Port: 9, Reason: PortMissing}},
+		{"the lowest-numbered offender is named", PortRule{}, escp.MustPortSet(4, 3, 2), &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
+		{"members of the tolerated LAG", PortRule{TolerateLAG: 1}, escp.MustPortSet(2), nil},
+		{"another LAG is not tolerated", PortRule{TolerateLAG: 1}, escp.MustPortSet(6), &PortUseError{Port: 6, Reason: PortInLAG, LAG: 2}},
+		{"a link is never tolerated, not even in the tolerated LAG", PortRule{TolerateLAG: 1}, escp.MustPortSet(1), &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}},
+		{"no group tolerated", PortRule{TolerateLAG: 0}, escp.MustPortSet(2), &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := CheckPorts(checkedPorts(), tc.rule, tc.ports...)
+			err := CheckPorts(checkedPorts(), tc.rule, tc.ports)
 			if tc.want == nil {
 				if err != nil {
 					t.Fatalf("want no refusal, got %v", err)
@@ -144,7 +143,7 @@ func TestPortUseErrorMessages(t *testing.T) {
 func TestCheckPortsLeavesTheReadingAlone(t *testing.T) {
 	all := checkedPorts()
 	before := append([]escp.Port(nil), all...)
-	_ = CheckPorts(all, PortRule{}, 1, 2, 3)
+	_ = CheckPorts(all, PortRule{}, escp.MustPortSet(1, 2, 3))
 	if !reflect.DeepEqual(all, before) {
 		t.Fatal("the reading was modified")
 	}

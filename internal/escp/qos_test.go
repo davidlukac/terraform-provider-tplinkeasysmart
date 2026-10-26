@@ -16,7 +16,7 @@ func TestSetPortPrioritiesStopsWhenTheCurrentStateCannotBeRead(t *testing.T) {
 	f.Configure(func(f *escptest.Switch) {
 		f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) { return nil, 0, true }
 	})
-	if err := c.SetPortPriorities(context.Background(), map[int]Priority{3: 2}); !errors.Is(err, ErrNoReply) {
+	if err := c.SetPortPriorities(context.Background(), map[PortID]Priority{3: 2}); !errors.Is(err, ErrNoReply) {
 		t.Fatalf("got %v", err)
 	}
 	if n := f.WriteCount(); n != 0 {
@@ -60,7 +60,7 @@ func TestSetQoSWire(t *testing.T) {
 	if err := c.SetQoSMode(ctx, 7); err == nil {
 		t.Fatal("invalid mode must be rejected")
 	}
-	if err := c.SetPortPriorities(ctx, map[int]Priority{3: 4}); err != nil {
+	if err := c.SetPortPriorities(ctx, map[PortID]Priority{3: 4}); err != nil {
 		t.Fatal(err)
 	}
 	got := f.LastSet()
@@ -76,10 +76,10 @@ func TestSetQoSWire(t *testing.T) {
 			t.Fatalf("entry %d: %+v", i, tl)
 		}
 	}
-	if err := c.SetPortPriorities(ctx, map[int]Priority{3: 9}); err == nil {
+	if err := c.SetPortPriorities(ctx, map[PortID]Priority{3: 9}); err == nil {
 		t.Fatal("priority 9 must be rejected")
 	}
-	if err := c.SetPortPriorities(ctx, map[int]Priority{99: 2}); err == nil {
+	if err := c.SetPortPriorities(ctx, map[PortID]Priority{99: 2}); err == nil {
 		t.Fatal("unknown port must be rejected")
 	}
 }

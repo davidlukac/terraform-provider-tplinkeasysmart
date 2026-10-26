@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"regexp"
 	"testing"
 
@@ -18,7 +17,7 @@ import (
 func vlanPorts() []escp.Port {
 	down, up := escp.SpeedLinkDown, escp.Speed1000Full
 	port := func(id int, lag int, speed escp.Speed) escp.Port {
-		return escp.Port{ID: id, Enabled: true, LAG: lag, ConfiguredSpeed: "auto", ActualSpeed: speed}
+		return escp.Port{ID: escp.PortID(id), Enabled: true, LAG: lag, ConfiguredSpeed: "auto", ActualSpeed: speed}
 	}
 	return []escp.Port{port(1, 1, up), port(2, 1, up), port(3, 0, down), port(4, 0, up), port(5, 0, down), port(6, 0, down), port(7, 0, down), port(8, 0, up)}
 }
@@ -209,7 +208,7 @@ func TestAccVLAN8021QGroupLifecycleOnFreePorts(t *testing.T) {
 					resource.TestCheckResourceAttr("tplinkeasysmart_vlan_8021q_group.v", "tagged_ports.#", "0"),
 					func(*terraformState) error {
 						got := f.vlanState().vlans[20]
-						if len(got.Tagged) != 0 || !reflect.DeepEqual(got.Untagged, []int{6}) {
+						if !got.Tagged.IsEmpty() || got.Untagged != escp.MustPortSet(6) {
 							return fmt.Errorf("switch has %+v", got)
 						}
 						return nil
@@ -268,18 +267,18 @@ func TestAccVLAN8021QGroupGuardOverride(t *testing.T) {
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{{
 			Config: groupConfig8021Q(20, "  tagged_ports = [4]\n  allow_disruptive = true\n"),
-			Check:  func(*terraformState) error { return expectVLANPorts(f, 20, []int{4}, nil) },
+			Check:  func(*terraformState) error { return expectVLANPorts(f, 20, escp.MustPortSet(4), 0) },
 		}},
 	})
 }
 
-func expectVLANPorts(f *fakeClient, id int, tagged, untagged []int) error {
+func expectVLANPorts(f *fakeClient, id int, tagged, untagged escp.PortSet) error {
 	got, ok := f.vlanState().vlans[id]
 	if !ok {
 		return fmt.Errorf("VLAN %d is not on the switch", id)
 	}
-	if !reflect.DeepEqual(append([]int(nil), got.Tagged...), append([]int(nil), tagged...)) || !reflect.DeepEqual(append([]int(nil), got.Untagged...), append([]int(nil), untagged...)) {
-		return fmt.Errorf("VLAN %d: tagged %v untagged %v, want %v and %v", id, got.Tagged, got.Untagged, tagged, untagged)
+	if got.Tagged != tagged || got.Untagged != untagged {
+		return fmt.Errorf("VLAN %d: tagged %s untagged %s, want %s and %s", id, got.Tagged, got.Untagged, tagged, untagged)
 	}
 	return nil
 }
@@ -288,7 +287,7 @@ func TestAccVLAN8021QGroupNeverLeavesAPortInNoVLAN(t *testing.T) {
 	// ports 5, 6 and 7 are members of VLAN 20 only; the default VLAN has the others
 	f := newVLANFake("802.1q")
 	f.mutate(func(f *fakeClient) {
-		f.vlans.vlans[1] = escp.VLAN8021Q{ID: 1, Name: "Default", Untagged: []int{1, 2, 3, 4, 8}, Tagged: []int{}}
+		f.vlans.vlans[1] = escp.VLAN8021Q{ID: 1, Name: "Default", Untagged: escp.MustPortSet(1, 2, 3, 4, 8), Tagged: 0}
 	})
 	cfg := groupConfig8021Q(20, "  untagged_ports = [5, 6]\n")
 	resource.UnitTest(t, resource.TestCase{
@@ -297,7 +296,7 @@ func TestAccVLAN8021QGroupNeverLeavesAPortInNoVLAN(t *testing.T) {
 			// creating VLAN 20 on ports that are in no VLAN yet is fine: it gives them one
 			{Config: cfg},
 			// shrinking it would strand port 6
-			{Config: groupConfig8021Q(20, "  untagged_ports = [5]\n"), ExpectError: regexp.MustCompile(`leave port\(s\) \[6\] in no VLAN`)},
+			{Config: groupConfig8021Q(20, "  untagged_ports = [5]\n"), ExpectError: regexp.MustCompile(`(?s)leave\s+port\(s\)\s+6\s+in\s+no\s+VLAN`)},
 			{Config: groupConfig8021Q(20, "  untagged_ports = [5]\n  allow_disruptive = true\n")},
 			// destroying it would strand port 5; the override is part of the state
 			{Config: providerBlock, Destroy: false},
@@ -311,7 +310,7 @@ func TestAccVLAN8021QGroupNeverLeavesAPortInNoVLAN(t *testing.T) {
 func TestAccVLAN8021QGroupDestroyIsGuarded(t *testing.T) {
 	f := newVLANFake("802.1q")
 	f.mutate(func(f *fakeClient) {
-		f.vlans.vlans[1] = escp.VLAN8021Q{ID: 1, Name: "Default", Untagged: []int{1, 2, 3, 4, 8}, Tagged: []int{}}
+		f.vlans.vlans[1] = escp.VLAN8021Q{ID: 1, Name: "Default", Untagged: escp.MustPortSet(1, 2, 3, 4, 8), Tagged: 0}
 	})
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
@@ -361,12 +360,14 @@ func TestAccVLAN8021QGroupDriftIsDetected(t *testing.T) {
 		Steps: []resource.TestStep{
 			{Config: cfg},
 			{
-				PreConfig:          func() { f.withVLAN(escp.VLAN8021Q{ID: 20, Name: "media", Untagged: []int{5}, Tagged: []int{6}}) },
+				PreConfig: func() {
+					f.withVLAN(escp.VLAN8021Q{ID: 20, Name: "media", Untagged: escp.MustPortSet(5), Tagged: escp.MustPortSet(6)})
+				},
 				Config:             cfg,
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: true,
 			},
-			{Config: cfg, Check: func(*terraformState) error { return expectVLANPorts(f, 20, nil, []int{5, 6}) }},
+			{Config: cfg, Check: func(*terraformState) error { return expectVLANPorts(f, 20, 0, escp.MustPortSet(5, 6)) }},
 			// the VLAN vanishes behind our back: it is planned for creation again
 			{
 				PreConfig:          func() { f.mutate(func(f *fakeClient) { delete(f.vlans.vlans, 20) }) },
@@ -486,44 +487,45 @@ func TestAccVLAN8021QGroupImportRejectsBadIDs(t *testing.T) {
 
 func TestOrphanedPorts(t *testing.T) {
 	table := []escp.VLAN8021Q{
-		{ID: 1, Untagged: []int{1, 2, 3}},
-		{ID: 20, Untagged: []int{5}, Tagged: []int{6}},
-		{ID: 30, Untagged: []int{6, 7}},
+		{ID: 1, Untagged: escp.MustPortSet(1, 2, 3)},
+		{ID: 20, Untagged: escp.MustPortSet(5), Tagged: escp.MustPortSet(6)},
+		{ID: 30, Untagged: escp.MustPortSet(6, 7)},
 	}
 	tests := []struct {
 		name       string
 		id         int
-		newMembers []int
-		affected   []int
-		want       []int
+		newMembers escp.PortSet
+		affected   escp.PortSet
+		want       escp.PortSet
 	}{
-		{"deleting a VLAN whose ports have another", 30, nil, []int{6, 7}, []int{7}},
-		{"moving a port out of a VLAN that was its only one", 20, []int{6}, []int{5, 6}, []int{5}},
-		{"every affected port stays covered", 20, []int{5, 6}, []int{5, 6}, []int{}},
-		{"a new VLAN covers its own ports", 40, []int{4}, []int{4}, []int{}},
-		{"orphans come back sorted", 20, nil, []int{6, 5, 4}, []int{4, 5}},
+		{"deleting a VLAN whose ports have another", 30, 0, escp.MustPortSet(6, 7), escp.MustPortSet(7)},
+		{"moving a port out of a VLAN that was its only one", 20, escp.MustPortSet(6), escp.MustPortSet(5, 6), escp.MustPortSet(5)},
+		{"every affected port stays covered", 20, escp.MustPortSet(5, 6), escp.MustPortSet(5, 6), 0},
+		{"a new VLAN covers its own ports", 40, escp.MustPortSet(4), escp.MustPortSet(4), 0},
+		{"orphans are all named", 20, 0, escp.MustPortSet(6, 5, 4), escp.MustPortSet(4, 5)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := orphanedPorts(table, tt.id, tt.newMembers, tt.affected); !reflect.DeepEqual(got, tt.want) {
-				t.Fatalf("got %v, want %v", got, tt.want)
+			if got := orphanedPorts(table, tt.id, tt.newMembers, tt.affected); got != tt.want {
+				t.Fatalf("got %s, want %s", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestSameVLANIgnoresPortOrderOnly(t *testing.T) {
-	a := escp.VLAN8021Q{ID: 2, Name: "x", Tagged: []int{6, 5}, Untagged: []int{1}}
-	if !sameVLAN(a, escp.VLAN8021Q{ID: 2, Name: "x", Tagged: []int{5, 6}, Untagged: []int{1}}) {
+// A VLAN is a value: port order cannot matter because a set has none, and every field counts.
+func TestVLANsCompareByIdNameAndPortSets(t *testing.T) {
+	a := escp.VLAN8021Q{ID: 2, Name: "x", Tagged: escp.MustPortSet(6, 5), Untagged: escp.MustPortSet(1)}
+	if a != (escp.VLAN8021Q{ID: 2, Name: "x", Tagged: escp.MustPortSet(5, 6), Untagged: escp.MustPortSet(1)}) {
 		t.Fatal("port order must not matter")
 	}
 	for name, b := range map[string]escp.VLAN8021Q{
-		"id":       {ID: 3, Name: "x", Tagged: []int{5, 6}, Untagged: []int{1}},
-		"name":     {ID: 2, Name: "y", Tagged: []int{5, 6}, Untagged: []int{1}},
-		"tagged":   {ID: 2, Name: "x", Tagged: []int{5}, Untagged: []int{1}},
-		"untagged": {ID: 2, Name: "x", Tagged: []int{5, 6}, Untagged: []int{2}},
+		"id":       {ID: 3, Name: "x", Tagged: escp.MustPortSet(5, 6), Untagged: escp.MustPortSet(1)},
+		"name":     {ID: 2, Name: "y", Tagged: escp.MustPortSet(5, 6), Untagged: escp.MustPortSet(1)},
+		"tagged":   {ID: 2, Name: "x", Tagged: escp.MustPortSet(5), Untagged: escp.MustPortSet(1)},
+		"untagged": {ID: 2, Name: "x", Tagged: escp.MustPortSet(5, 6), Untagged: escp.MustPortSet(2)},
 	} {
-		if sameVLAN(a, b) {
+		if a == b {
 			t.Fatalf("a different %s must not compare equal", name)
 		}
 	}
@@ -533,11 +535,11 @@ func TestSameVLANIgnoresPortOrderOnly(t *testing.T) {
 
 func newPVIDFake() *fakeClient {
 	f := newVLANFake("802.1q")
-	f.withVLAN(escp.VLAN8021Q{ID: 20, Name: "media", Untagged: []int{5, 6}, Tagged: []int{}})
+	f.withVLAN(escp.VLAN8021Q{ID: 20, Name: "media", Untagged: escp.MustPortSet(5, 6), Tagged: 0})
 	return f
 }
 
-func expectPVID(f *fakeClient, port, want int) error {
+func expectPVID(f *fakeClient, port escp.PortID, want int) error {
 	if got := f.vlanState().pvids[port]; got != want {
 		return fmt.Errorf("port %d has PVID %d, want %d", port, got, want)
 	}
@@ -830,12 +832,12 @@ resource "tplinkeasysmart_vlan_8021q_group" "v" {
   untagged_ports = [tonumber(terraform_data.port.output)]
   depends_on     = [tplinkeasysmart_vlan_mode.m]
 }
-`, Check: func(*terraformState) error { return expectVLANPorts(f, 20, nil, []int{5}) }}},
+`, Check: func(*terraformState) error { return expectVLANPorts(f, 20, 0, escp.MustPortSet(5)) }}},
 	})
 }
 
 func TestVLANGroupApplyRefusesPortSetsThatAreNotKnown(t *testing.T) {
-	known := intsToSet([]int{5})
+	known := portsToSet(escp.MustPortSet(5))
 	unknown := types.SetUnknown(types.Int64Type)
 	for name, m := range map[string]vlan8021QGroupModel{
 		"tagged ports":   {VLAN: types.Int64Value(20), TaggedPorts: unknown, UntaggedPorts: known},

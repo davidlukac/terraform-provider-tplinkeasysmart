@@ -35,8 +35,8 @@ type portReader interface {
 // Failures to look are refused with ErrCannotCheckPorts.
 func PortGate() escp.WriteGate {
 	return func(ctx context.Context, sw escp.InfoReader, op escp.Operation) error {
-		touched := append([]int(nil), op.Ports...)
-		if op.Replaces == 0 && len(touched) == 0 {
+		touched := op.Ports
+		if op.Replaces == 0 && touched.IsEmpty() {
 			return nil
 		}
 		r, ok := sw.(portReader)
@@ -48,9 +48,9 @@ func PortGate() escp.WriteGate {
 			if err != nil {
 				return fmt.Errorf("%w: %w", ErrCannotCheckPorts, err)
 			}
-			touched = append(touched, members...)
+			touched = touched.Union(members)
 		}
-		if len(touched) == 0 {
+		if touched.IsEmpty() {
 			return nil
 		}
 		all, err := r.Ports(ctx)
@@ -61,17 +61,17 @@ func PortGate() escp.WriteGate {
 		if op.Replaces == escp.GroupLAG {
 			rule.TolerateLAG = op.ID
 		}
-		return CheckPorts(all, rule, touched...)
+		return CheckPorts(all, rule, touched)
 	}
 }
 
 // membersOf lists the ports that belong to a group now (none for a group that does not exist yet).
-func membersOf(ctx context.Context, r portReader, kind escp.GroupKind, id int) ([]int, error) {
+func membersOf(ctx context.Context, r portReader, kind escp.GroupKind, id int) (escp.PortSet, error) {
 	switch kind {
 	case escp.GroupLAG:
 		lags, err := r.LAGs(ctx)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, l := range lags {
 			if l.ID == id {
@@ -81,7 +81,7 @@ func membersOf(ctx context.Context, r portReader, kind escp.GroupKind, id int) (
 	case escp.GroupPortVLAN:
 		v, err := r.PortBasedVLAN(ctx)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, g := range v.VLANs {
 			if g.ID == id {
@@ -91,15 +91,15 @@ func membersOf(ctx context.Context, r portReader, kind escp.GroupKind, id int) (
 	case escp.GroupDot1QVLAN:
 		q, err := r.Dot1Q(ctx)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		for _, v := range q.VLANs {
 			if v.ID == id {
-				return append(append([]int(nil), v.Tagged...), v.Untagged...), nil
+				return v.Tagged.Union(v.Untagged), nil
 			}
 		}
 	default:
-		return nil, fmt.Errorf("unknown group kind %d", int(kind))
+		return 0, fmt.Errorf("unknown group kind %d", int(kind))
 	}
-	return nil, nil
+	return 0, nil
 }

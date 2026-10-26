@@ -17,7 +17,7 @@ type refusingClient struct {
 	lag, port error
 }
 
-func (r *refusingClient) SetLAG(context.Context, int, []int) error { return r.lag }
+func (r *refusingClient) SetLAG(context.Context, int, escp.PortSet) error { return r.lag }
 func (r *refusingClient) SetPort(context.Context, escp.PortConfig) error {
 	return r.port
 }

@@ -47,7 +47,7 @@ func ExampleUseOf() {
 		{ID: 1, ActualSpeed: escp.Speed1000Full, LAG: 1},
 		{ID: 7, ActualSpeed: escp.SpeedLinkDown},
 	}
-	for _, id := range []int{1, 7, 9} {
+	for _, id := range []escp.PortID{1, 7, 9} {
 		u := safety.UseOf(ports, id)
 		fmt.Printf("port %d: exists=%v link=%v lag=%v\n", id, u.Exists, u.LinkUp(), u.InLAG())
 	}
@@ -57,22 +57,22 @@ func ExampleUseOf() {
 	// port 9: exists=false link=false lag=false
 }
 
-// CheckPorts names the first port a write should not touch; the caller words the refusal.
+// CheckPorts names the lowest-numbered port a write should not touch; the caller words the refusal.
 func ExampleCheckPorts() {
 	ports := []escp.Port{
 		{ID: 1, ActualSpeed: escp.Speed1000Full, LAG: 1},
 		{ID: 2, ActualSpeed: escp.SpeedLinkDown, LAG: 1},
 		{ID: 7, ActualSpeed: escp.SpeedLinkDown},
 	}
-	fmt.Println(safety.CheckPorts(ports, safety.PortRule{}, 7))
-	err := safety.CheckPorts(ports, safety.PortRule{}, 7, 2)
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{}, escp.MustPortSet(7)))
+	err := safety.CheckPorts(ports, safety.PortRule{}, escp.MustPortSet(7, 2))
 	var used *safety.PortUseError
 	if errors.As(err, &used) && used.Reason == safety.PortInLAG {
 		fmt.Printf("port %d is in LAG %d\n", used.Port, used.LAG)
 	}
 	// Editing LAG 1 itself tolerates its idle members, but never a link.
-	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, 2))
-	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, 1))
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, escp.MustPortSet(2)))
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, escp.MustPortSet(1)))
 	// Output:
 	// <nil>
 	// port 2 is in LAG 1
@@ -89,8 +89,8 @@ func ExampleDryRun() {
 
 	for _, op := range []escp.Operation{
 		{Name: "SetLED", Impact: escp.ImpactCosmetic},
-		{Name: "SetPort", Ports: []int{7}, Impact: escp.ImpactTraffic},
-		{Name: "SetLAG", Ports: []int{5, 6}, Impact: escp.ImpactManagement},
+		{Name: "SetPort", Ports: escp.MustPortSet(7), Impact: escp.ImpactTraffic},
+		{Name: "SetLAG", Ports: escp.MustPortSet(5, 6), Impact: escp.ImpactManagement},
 	} {
 		err := gate(ctx, firmware(""), op)
 		var tooMuch *safety.ImpactError

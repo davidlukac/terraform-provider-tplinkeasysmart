@@ -35,7 +35,7 @@ type vlan8021QPVIDResource struct {
 // vlan8021QPVIDClient is the part of the switch API this resource needs.
 type vlan8021QPVIDClient interface {
 	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
-	SetPVIDs(ctx context.Context, pvids map[int]int) error
+	SetPVIDs(ctx context.Context, pvids map[escp.PortID]int) error
 	Ports(ctx context.Context) ([]escp.Port, error)
 }
 
@@ -89,7 +89,7 @@ func (r *vlan8021QPVIDResource) state(ctx context.Context) (escp.Dot1Q, error) {
 }
 
 // pvidOf returns the PVID of a port, if the switch reports one.
-func pvidOf(q escp.Dot1Q, port int) (int, bool) {
+func pvidOf(q escp.Dot1Q, port escp.PortID) (int, bool) {
 	for _, p := range q.PVIDs {
 		if p.Port == port {
 			return p.PVID, true
@@ -105,12 +105,12 @@ func (r *vlan8021QPVIDResource) apply(ctx context.Context, m *vlan8021QPVIDModel
 }
 
 func (r *vlan8021QPVIDResource) applyBound(ctx context.Context, m *vlan8021QPVIDModel, add func(string, string)) bool {
-	port, pvid := int(m.Port.ValueInt64()), int(m.PVID.ValueInt64())
+	port, pvid := escp.PortID(m.Port.ValueInt64()), int(m.PVID.ValueInt64())
 	return r.set(ctx, port, pvid, m.AllowDisruptive.ValueBool(), add)
 }
 
 // set writes the PVID of a port under the guard and checks it by reading it back.
-func (r *vlan8021QPVIDResource) set(ctx context.Context, port, pvid int, allow bool, add func(string, string)) bool {
+func (r *vlan8021QPVIDResource) set(ctx context.Context, port escp.PortID, pvid int, allow bool, add func(string, string)) bool {
 	q, err := r.state(ctx)
 	if err != nil {
 		add("Reading the 802.1Q state failed", err.Error())
@@ -124,7 +124,7 @@ func (r *vlan8021QPVIDResource) set(ctx context.Context, port, pvid int, allow b
 		add("Refusing to change the PVID", err.Error())
 		return false
 	}
-	if err := r.client.SetPVIDs(ctx, map[int]int{port: pvid}); err != nil {
+	if err := r.client.SetPVIDs(ctx, map[escp.PortID]int{port: pvid}); err != nil {
 		add("Setting the PVID failed", err.Error())
 		return false
 	}
@@ -166,7 +166,7 @@ func (r *vlan8021QPVIDResource) readBound(ctx context.Context, req resource.Read
 		}
 		return
 	}
-	pvid, ok := pvidOf(q, int(state.Port.ValueInt64()))
+	pvid, ok := pvidOf(q, escp.PortID(state.Port.ValueInt64()))
 	if !ok {
 		resp.State.RemoveResource(ctx)
 		return
@@ -182,7 +182,7 @@ func (r *vlan8021QPVIDResource) deleteBound(ctx context.Context, req resource.De
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	port := int(state.Port.ValueInt64())
+	port := escp.PortID(state.Port.ValueInt64())
 	q, err := r.client.Dot1Q(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading the 802.1Q state failed", err.Error())

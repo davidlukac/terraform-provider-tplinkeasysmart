@@ -107,7 +107,7 @@ func (r *vlanModeResource) apply(ctx context.Context, m *vlanModeModel, add func
 }
 
 func (r *vlanModeResource) applyBound(ctx context.Context, m *vlanModeModel, add func(string, string)) bool {
-	want := escp.VLANModeSetting{Mode: escp.VLANMode(m.Mode.ValueString()), UplinkPort: int(m.MTUUplinkPort.ValueInt64())}
+	want := escp.VLANModeSetting{Mode: escp.VLANMode(m.Mode.ValueString()), UplinkPort: escp.PortID(m.MTUUplinkPort.ValueInt64())}
 	have, err := r.client.VLANMode(ctx)
 	if err != nil {
 		add("Reading the VLAN mode failed", err.Error())

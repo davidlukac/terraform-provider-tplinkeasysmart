@@ -29,29 +29,29 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 	"SetIGMP": func(ctx context.Context, c *Client) error {
 		return c.SetIGMP(ctx, IGMPConfig{Enabled: true, ReportSuppression: false})
 	},
-	"SetLAG":            func(ctx context.Context, c *Client) error { return c.SetLAG(ctx, 1, []int{2, 3}) },
+	"SetLAG":            func(ctx context.Context, c *Client) error { return c.SetLAG(ctx, 1, MustPortSet(2, 3)) },
 	"SetLoopPrevention": func(ctx context.Context, c *Client) error { return c.SetLoopPrevention(ctx, true) },
 	"SetPort": func(ctx context.Context, c *Client) error {
 		return c.SetPort(ctx, PortConfig{ID: 2, Enabled: true, Speed: "auto", FlowControl: false})
 	},
 	"SetPortMirror": func(ctx context.Context, c *Client) error {
-		return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 2, IngressPorts: []int{3}})
+		return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 2, IngressPorts: MustPortSet(3)})
 	},
 	"SetQoSMode":        func(ctx context.Context, c *Client) error { return c.SetQoSMode(ctx, 1) },
-	"SetPortPriorities": func(ctx context.Context, c *Client) error { return c.SetPortPriorities(ctx, map[int]Priority{2: 1}) },
+	"SetPortPriorities": func(ctx context.Context, c *Client) error { return c.SetPortPriorities(ctx, map[PortID]Priority{2: 1}) },
 	"SetStormControl": func(ctx context.Context, c *Client) error {
 		return c.SetStormControl(ctx, StormConfig{Port: 2, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64})
 	},
 	"SetHostname": func(ctx context.Context, c *Client) error { return c.SetHostname(ctx, "sw-test") },
 	"SetVLAN8021Q": func(ctx context.Context, c *Client) error {
-		return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 10, Name: "test", Untagged: []int{2}})
+		return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 10, Name: "test", Untagged: MustPortSet(2)})
 	},
 	"DeleteVLAN8021Q": func(ctx context.Context, c *Client) error { return c.DeleteVLAN8021Q(ctx, 10) },
-	"SetPVIDs":        func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, map[int]int{2: 1}) },
+	"SetPVIDs":        func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, map[PortID]int{2: 1}) },
 	"SetVLANMode": func(ctx context.Context, c *Client) error {
 		return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 8})
 	},
-	"SetPortBasedVLAN": func(ctx context.Context, c *Client) error { return c.SetPortBasedVLAN(ctx, 2, []int{3, 4}) },
+	"SetPortBasedVLAN": func(ctx context.Context, c *Client) error { return c.SetPortBasedVLAN(ctx, 2, MustPortSet(3, 4)) },
 	"EnableDHCP": func(ctx context.Context, c *Client) error {
 		// the client needs the switch's MAC, and a lookup that asks the fake itself
 		c.cfg.MAC = MAC(escptest.DefaultMAC)
@@ -221,20 +221,20 @@ func TestEscptestWriteRecordsAreCopies(t *testing.T) {
 var writeOperations = map[string]Operation{
 	"SetLED":            {Name: "SetLED", Impact: ImpactCosmetic},
 	"SetHostname":       {Name: "SetHostname", Impact: ImpactCosmetic},
-	"SetBandwidth":      {Name: "SetBandwidth", Ports: []int{2}, Impact: ImpactTraffic},
+	"SetBandwidth":      {Name: "SetBandwidth", Ports: MustPortSet(2), Impact: ImpactTraffic},
 	"SetIGMP":           {Name: "SetIGMP", Impact: ImpactTraffic},
-	"SetPort":           {Name: "SetPort", Ports: []int{2}, Impact: ImpactTraffic},
-	"SetPortMirror":     {Name: "SetPortMirror", Ports: []int{2, 3}, Impact: ImpactTraffic},
+	"SetPort":           {Name: "SetPort", Ports: MustPortSet(2), Impact: ImpactTraffic},
+	"SetPortMirror":     {Name: "SetPortMirror", Ports: MustPortSet(2, 3), Impact: ImpactTraffic},
 	"SetQoSMode":        {Name: "SetQoSMode", Impact: ImpactTraffic},
-	"SetPortPriorities": {Name: "SetPortPriorities", Ports: []int{2}, Impact: ImpactTraffic},
-	"SetStormControl":   {Name: "SetStormControl", Ports: []int{2}, Impact: ImpactTraffic},
-	"SetVLAN8021Q":      {Name: "SetVLAN8021Q", Ports: []int{2}, Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 10},
+	"SetPortPriorities": {Name: "SetPortPriorities", Ports: MustPortSet(2), Impact: ImpactTraffic},
+	"SetStormControl":   {Name: "SetStormControl", Ports: MustPortSet(2), Impact: ImpactTraffic},
+	"SetVLAN8021Q":      {Name: "SetVLAN8021Q", Ports: MustPortSet(2), Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 10},
 	"DeleteVLAN8021Q":   {Name: "DeleteVLAN8021Q", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 10},
-	"SetPortBasedVLAN":  {Name: "SetPortBasedVLAN", Ports: []int{3, 4}, Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 2},
-	"SetLAG":            {Name: "SetLAG", Ports: []int{2, 3}, Impact: ImpactManagement, Replaces: GroupLAG, ID: 1},
+	"SetPortBasedVLAN":  {Name: "SetPortBasedVLAN", Ports: MustPortSet(3, 4), Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 2},
+	"SetLAG":            {Name: "SetLAG", Ports: MustPortSet(2, 3), Impact: ImpactManagement, Replaces: GroupLAG, ID: 1},
 	"SetLoopPrevention": {Name: "SetLoopPrevention", Impact: ImpactManagement},
-	"SetPVIDs":          {Name: "SetPVIDs", Ports: []int{2}, Impact: ImpactManagement},
-	"SetVLANMode":       {Name: "SetVLANMode", Ports: []int{8}, Impact: ImpactManagement},
+	"SetPVIDs":          {Name: "SetPVIDs", Ports: MustPortSet(2), Impact: ImpactManagement},
+	"SetVLANMode":       {Name: "SetVLANMode", Ports: MustPortSet(8), Impact: ImpactManagement},
 	"SetIPConfig":       {Name: "SetIPConfig", Impact: ImpactManagement},
 	"EnableDHCP":        {Name: "EnableDHCP", Impact: ImpactManagement},
 }
@@ -286,26 +286,26 @@ func TestOperationPortsFollowTheArguments(t *testing.T) {
 	cases := []struct {
 		name  string
 		call  func(c *Client) error
-		ports []int
+		ports PortSet
 	}{
 		{"a mirror names its destination and both kinds of source", func(c *Client) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, IngressPorts: []int{1, 2}, EgressPorts: []int{3}})
-		}, []int{5, 1, 2, 3}},
-		{"a disabled mirror names none", func(c *Client) error { return c.SetPortMirror(ctx, Mirror{}) }, nil},
-		{"an 802.1Q VLAN names its tagged ports and then its untagged ones", func(c *Client) error {
-			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Tagged: []int{8}, Untagged: []int{3, 4}})
-		}, []int{8, 3, 4}},
-		{"several PVIDs are named in port order", func(c *Client) error { return c.SetPVIDs(ctx, map[int]int{6: 1, 2: 1, 4: 1}) }, []int{2, 4, 6}},
-		{"several priorities are named in port order", func(c *Client) error {
-			return c.SetPortPriorities(ctx, map[int]Priority{7: 1, 3: 2})
-		}, []int{3, 7}},
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, IngressPorts: MustPortSet(1, 2), EgressPorts: MustPortSet(3)})
+		}, MustPortSet(5, 1, 2, 3)},
+		{"a disabled mirror names none", func(c *Client) error { return c.SetPortMirror(ctx, Mirror{}) }, 0},
+		{"an 802.1Q VLAN names its tagged and its untagged ports", func(c *Client) error {
+			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Tagged: MustPortSet(8), Untagged: MustPortSet(3, 4)})
+		}, MustPortSet(8, 3, 4)},
+		{"several PVIDs are all named", func(c *Client) error { return c.SetPVIDs(ctx, map[PortID]int{6: 1, 2: 1, 4: 1}) }, MustPortSet(2, 4, 6)},
+		{"several priorities are all named", func(c *Client) error {
+			return c.SetPortPriorities(ctx, map[PortID]Priority{7: 1, 3: 2})
+		}, MustPortSet(3, 7)},
 		{"the MTU VLAN names its uplink", func(c *Client) error {
 			return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 5})
-		}, []int{5}},
+		}, MustPortSet(5)},
 		{"the other VLAN modes name no port", func(c *Client) error {
 			return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeDot1Q})
-		}, nil},
-		{"a LAG that is removed names none", func(c *Client) error { return c.SetLAG(ctx, 2, nil) }, nil},
+		}, 0},
+		{"a LAG that is removed names none", func(c *Client) error { return c.SetLAG(ctx, 2, 0) }, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -313,31 +313,25 @@ func TestOperationPortsFollowTheArguments(t *testing.T) {
 			if len(seen) == 0 {
 				t.Fatal("the gate was not consulted")
 			}
-			if !reflect.DeepEqual(seen[0].Ports, tc.ports) && (len(seen[0].Ports) != 0 || len(tc.ports) != 0) {
-				t.Fatalf("ports %v, want %v", seen[0].Ports, tc.ports)
+			if seen[0].Ports != tc.ports {
+				t.Fatalf("ports %s, want %s", seen[0].Ports, tc.ports)
 			}
 		})
 	}
 }
 
-// A gate that changes the ports it was given changes nothing that is sent.
-func TestGateGetsItsOwnCopyOfThePorts(t *testing.T) {
+// A gate that changes the ports it was given changes nothing that is sent: the operation is a value.
+func TestGateChangingItsOperationChangesNothingThatIsSent(t *testing.T) {
 	f := escptest.Start(t)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
 		WriteGate: func(_ context.Context, _ InfoReader, op Operation) error {
-			for i := range op.Ports {
-				op.Ports[i] = 8
-			}
+			op.Ports = MustPortSet(8)
 			return nil
 		}})
 	t.Cleanup(func() { c.Close() })
-	ports := []int{3, 4}
-	if err := c.SetPortBasedVLAN(context.Background(), 2, ports); err != nil {
+	if err := c.SetPortBasedVLAN(context.Background(), 2, MustPortSet(3, 4)); err != nil {
 		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(ports, []int{3, 4}) {
-		t.Fatalf("the caller's slice was changed through the gate: %v", ports)
 	}
 	if got := f.LastSet(); len(got) != 1 || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x0c}) {
 		t.Fatalf("the write must carry ports 3 and 4, got %+v", got)
@@ -364,8 +358,8 @@ func TestARemovedGroupIsStillReportedAsReplaced(t *testing.T) {
 		call func(c *Client) error
 		want Operation
 	}{
-		{"LAG", func(c *Client) error { return c.SetLAG(ctx, 2, nil) }, Operation{Name: "SetLAG", Impact: ImpactManagement, Replaces: GroupLAG, ID: 2}},
-		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, 3, nil) }, Operation{Name: "SetPortBasedVLAN", Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 3}},
+		{"LAG", func(c *Client) error { return c.SetLAG(ctx, 2, 0) }, Operation{Name: "SetLAG", Impact: ImpactManagement, Replaces: GroupLAG, ID: 2}},
+		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, 3, 0) }, Operation{Name: "SetPortBasedVLAN", Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 3}},
 		{"802.1Q VLAN", func(c *Client) error { return c.DeleteVLAN8021Q(ctx, 20) }, Operation{Name: "DeleteVLAN8021Q", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 20}},
 	}
 	for _, tc := range cases {
@@ -375,10 +369,10 @@ func TestARemovedGroupIsStillReportedAsReplaced(t *testing.T) {
 				t.Fatal("the gate was not consulted")
 			}
 			got := seen[0]
-			if len(got.Ports) != 0 {
-				t.Errorf("a removal names no port, got %v", got.Ports)
+			if !got.Ports.IsEmpty() {
+				t.Errorf("a removal names no port, got %s", got.Ports)
 			}
-			got.Ports = nil
+			got.Ports = 0
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Fatalf("got %+v, want %+v", got, tc.want)
 			}

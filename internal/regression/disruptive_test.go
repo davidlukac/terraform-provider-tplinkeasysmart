@@ -3,7 +3,6 @@ package regression
 import (
 	"context"
 	"fmt"
-	"slices"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -35,7 +34,7 @@ func (s *Session) portOf(t *testing.T, id int) escp.Port {
 		t.Fatal(err)
 	}
 	for _, p := range ports {
-		if p.ID == id {
+		if int(p.ID) == id {
 			return p
 		}
 	}
@@ -114,7 +113,7 @@ func TestScenarioDisruptiveLAG(t *testing.T) {
 			return err
 		}
 		for _, l := range got {
-			if l.ID == group && slices.Equal(l.Ports, []int{a, b}) {
+			if l.ID == group && l.Ports == escp.MustPortSet(escp.PortID(a), escp.PortID(b)) {
 				return nil
 			}
 		}
@@ -133,7 +132,7 @@ func TestScenarioDisruptiveMirrorDestination(t *testing.T) {
 	s.scenario(t, cfg(fmt.Sprintf("  enabled       = true\n  mirror_port   = %d\n  ingress_ports = %s\n", dest, intSet(src))), cfg("  enabled = false\n"),
 		func(*terraform.State) error {
 			got, err := s.Client.PortMirror(context.Background())
-			if err != nil || !got.Enabled || got.MirrorPort != dest || !slices.Equal(got.IngressPorts, []int{src}) {
+			if err != nil || !got.Enabled || int(got.MirrorPort) != dest || got.IngressPorts != escp.MustPortSet(escp.PortID(src)) {
 				return fmt.Errorf("mirror on the switch = %+v, err %w, want %d mirrored to %d", got, err, src, dest)
 			}
 			return nil
@@ -159,7 +158,7 @@ func TestScenarioDisruptiveVLANGroup(t *testing.T) {
 			return err
 		}
 		for _, v := range got.VLANs {
-			if v.ID == 2 && slices.Equal(v.Ports, []int{free, device}) {
+			if v.ID == 2 && v.Ports == escp.MustPortSet(escp.PortID(free), escp.PortID(device)) {
 				return nil
 			}
 		}

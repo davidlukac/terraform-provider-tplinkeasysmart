@@ -20,9 +20,9 @@ const (
 // source ports is copied to MirrorPort. When Enabled is false the switch reports no ports.
 type Mirror struct {
 	Enabled      bool
-	MirrorPort   int   // monitoring (destination) port, 0 when disabled
-	IngressPorts []int // source ports whose incoming traffic is copied
-	EgressPorts  []int // source ports whose outgoing traffic is copied
+	MirrorPort   PortID  // monitoring (destination) port, 0 when disabled
+	IngressPorts PortSet // source ports whose incoming traffic is copied
+	EgressPorts  PortSet // source ports whose outgoing traffic is copied
 }
 
 // parseMirror decodes TLV 16640: enabled, destination port, ingress mask(4), egress mask(4).
@@ -35,11 +35,11 @@ func parseMirror(tlvs []wire.TLV) (Mirror, error) {
 		if len(t.Value) != mirrorEntryLen {
 			return Mirror{}, fmt.Errorf("escp: port mirror TLV has %d bytes, want %d", len(t.Value), mirrorEntryLen)
 		}
-		m := Mirror{IngressPorts: []int{}, EgressPorts: []int{}}
+		m := Mirror{}
 		if t.Value[mirrorOffEnabled] == 1 {
-			m.Enabled, m.MirrorPort = true, int(t.Value[mirrorOffPort])
-			m.IngressPorts = portsFromMask(t.Value[mirrorOffIngress:])
-			m.EgressPorts = portsFromMask(t.Value[mirrorOffEgress:])
+			m.Enabled, m.MirrorPort = true, PortID(t.Value[mirrorOffPort])
+			m.IngressPorts = PortSetFromMask(t.Value[mirrorOffIngress:])
+			m.EgressPorts = PortSetFromMask(t.Value[mirrorOffEgress:])
 		}
 		return m, nil
 	}
@@ -62,37 +62,28 @@ func (c *Client) PortMirror(ctx context.Context) (Mirror, error) {
 func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
 	v := make([]byte, mirrorEntryLen)
 	if m.Enabled {
-		if err := ValidatePort(m.MirrorPort); err != nil {
+		if err := m.MirrorPort.Validate(); err != nil {
 			return err
 		}
-		if len(m.IngressPorts)+len(m.EgressPorts) == 0 {
+		sources := m.IngressPorts.Union(m.EgressPorts)
+		if sources.IsEmpty() {
 			return invalidf("escp: port mirroring needs at least one ingress or egress source port")
 		}
-		for _, p := range append(append([]int{}, m.IngressPorts...), m.EgressPorts...) {
-			if p == m.MirrorPort {
-				return invalidf("escp: port %d cannot mirror itself", p)
-			}
+		if sources.Has(m.MirrorPort) {
+			return invalidf("escp: port %d cannot mirror itself", m.MirrorPort)
 		}
-		in, err := maskFromPorts(m.IngressPorts)
-		if err != nil {
-			return err
-		}
-		eg, err := maskFromPorts(m.EgressPorts)
-		if err != nil {
-			return err
-		}
-		if err := c.requirePorts(ctx, append(append([]int{m.MirrorPort}, m.IngressPorts...), m.EgressPorts...)...); err != nil {
+		if err := c.requirePorts(ctx, sources.Union(m.MirrorPort.set())); err != nil {
 			return err
 		}
 		v[mirrorOffEnabled], v[mirrorOffPort] = 1, byte(m.MirrorPort)
-		copy(v[mirrorOffIngress:], in)
-		copy(v[mirrorOffEgress:], eg)
-	} else if m.MirrorPort != 0 || len(m.IngressPorts) != 0 || len(m.EgressPorts) != 0 {
+		copy(v[mirrorOffIngress:], m.IngressPorts.Mask())
+		copy(v[mirrorOffEgress:], m.EgressPorts.Mask())
+	} else if m.MirrorPort != 0 || !m.IngressPorts.IsEmpty() || !m.EgressPorts.IsEmpty() {
 		return invalidf("escp: a disabled mirror must have no destination or source ports")
 	}
 	op := Operation{Name: "SetPortMirror", Impact: ImpactTraffic}
 	if m.Enabled {
-		op.Ports = append(append([]int{m.MirrorPort}, m.IngressPorts...), m.EgressPorts...)
+		op.Ports = m.IngressPorts.Union(m.EgressPorts).Union(m.MirrorPort.set())
 	}
 	return c.setTLVs(ctx, op, wire.TLV{Type: wire.TLVMirror, Value: v})
 }

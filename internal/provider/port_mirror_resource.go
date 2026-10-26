@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -89,27 +88,6 @@ func (r *portMirrorResource) Configure(_ context.Context, req resource.Configure
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func setToInts(ctx context.Context, s types.Set) ([]int, error) {
-	var vals []int64
-	if d := s.ElementsAs(ctx, &vals, false); d.HasError() {
-		return nil, fmt.Errorf("%v", d)
-	}
-	out := make([]int, 0, len(vals))
-	for _, v := range vals {
-		out = append(out, int(v))
-	}
-	sort.Ints(out)
-	return out, nil
-}
-
-func intsToSet(in []int) types.Set {
-	vals := make([]attr.Value, 0, len(in))
-	for _, v := range in {
-		vals = append(vals, types.Int64Value(int64(v)))
-	}
-	return types.SetValueMust(types.Int64Type, vals)
-}
-
 // apply binds the resource to the switch the plan selects, then applies it.
 func (r *portMirrorResource) apply(ctx context.Context, m *portMirrorResourceModel, add func(string, string)) bool {
 	b := r.bound(add, m.Switch)
@@ -117,13 +95,13 @@ func (r *portMirrorResource) apply(ctx context.Context, m *portMirrorResourceMod
 }
 
 func (r *portMirrorResource) applyBound(ctx context.Context, m *portMirrorResourceModel, add func(string, string)) bool {
-	in, err1 := setToInts(ctx, m.IngressPorts)
-	eg, err2 := setToInts(ctx, m.EgressPorts)
+	in, err1 := setToPorts(ctx, m.IngressPorts)
+	eg, err2 := setToPorts(ctx, m.EgressPorts)
 	if err1 != nil || err2 != nil {
 		add("Invalid port set", fmt.Sprintf("%v %v", err1, err2))
 		return false
 	}
-	want := escp.Mirror{Enabled: m.Enabled.ValueBool(), MirrorPort: int(m.MirrorPort.ValueInt64()), IngressPorts: in, EgressPorts: eg}
+	want := escp.Mirror{Enabled: m.Enabled.ValueBool(), MirrorPort: escp.PortID(m.MirrorPort.ValueInt64()), IngressPorts: in, EgressPorts: eg}
 	if want.Enabled {
 		if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), want.MirrorPort); err != nil {
 			add("Refusing to use this destination port", err.Error())
@@ -139,10 +117,7 @@ func (r *portMirrorResource) applyBound(ctx context.Context, m *portMirrorResour
 		add("Reading port mirror back failed", err.Error())
 		return false
 	}
-	gin, geg := append([]int(nil), got.IngressPorts...), append([]int(nil), got.EgressPorts...)
-	sort.Ints(gin)
-	sort.Ints(geg)
-	if got.Enabled != want.Enabled || got.MirrorPort != want.MirrorPort || fmt.Sprint(gin) != fmt.Sprint(in) || fmt.Sprint(geg) != fmt.Sprint(eg) {
+	if got != want {
 		add("Port mirror did not change as requested", fmt.Sprintf("requested %+v, switch reports %+v", want, got))
 		return false
 	}
@@ -180,7 +155,7 @@ func (r *portMirrorResource) readBound(ctx context.Context, req resource.ReadReq
 	}
 	state.ID = qualifiedID(r.sw, portMirrorID)
 	state.Enabled, state.MirrorPort = types.BoolValue(got.Enabled), types.Int64Value(int64(got.MirrorPort))
-	state.IngressPorts, state.EgressPorts = intsToSet(got.IngressPorts), intsToSet(got.EgressPorts)
+	state.IngressPorts, state.EgressPorts = portsToSet(got.IngressPorts), portsToSet(got.EgressPorts)
 	if state.AllowDisruptive.IsNull() {
 		state.AllowDisruptive = types.BoolValue(false)
 	}

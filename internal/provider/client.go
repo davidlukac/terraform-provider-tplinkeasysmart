@@ -17,7 +17,7 @@ type SwitchClient interface {
 	SetPort(ctx context.Context, cfg escp.PortConfig) error
 	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
 	LAGs(ctx context.Context) ([]escp.LAG, error)
-	SetLAG(ctx context.Context, group int, ports []int) error
+	SetLAG(ctx context.Context, group int, ports escp.PortSet) error
 	IGMP(ctx context.Context) (escp.IGMP, error)
 	SetIGMP(ctx context.Context, cfg escp.IGMPConfig) error
 	LoopPrevention(ctx context.Context) (bool, error)
@@ -26,16 +26,16 @@ type SwitchClient interface {
 	SetPortMirror(ctx context.Context, m escp.Mirror) error
 	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
-	SetPortBasedVLAN(ctx context.Context, id int, ports []int) error
+	SetPortBasedVLAN(ctx context.Context, id int, ports escp.PortSet) error
 	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
 	VLANMode(ctx context.Context) (escp.VLANModeSetting, error)
 	SetVLANMode(ctx context.Context, s escp.VLANModeSetting) error
 	SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error
 	DeleteVLAN8021Q(ctx context.Context, id int) error
-	SetPVIDs(ctx context.Context, pvids map[int]int) error
+	SetPVIDs(ctx context.Context, pvids map[escp.PortID]int) error
 	QoS(ctx context.Context) (escp.QoS, error)
 	SetQoSMode(ctx context.Context, mode escp.QoSMode) error
-	SetPortPriorities(ctx context.Context, changes map[int]escp.Priority) error
+	SetPortPriorities(ctx context.Context, changes map[escp.PortID]escp.Priority) error
 	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
 	SetBandwidth(ctx context.Context, limit escp.PortBandwidth) error
 	StormControl(ctx context.Context) ([]escp.PortStorm, error)

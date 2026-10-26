@@ -13,7 +13,7 @@ func TestStormControlRejectsInvalidPortBeforeSending(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")
 	for _, port := range []int{0, 33} {
-		if err := c.SetStormControl(context.Background(), StormConfig{Port: port, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64}); err == nil {
+		if err := c.SetStormControl(context.Background(), StormConfig{Port: PortID(port), UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64}); err == nil {
 			t.Errorf("port %d must be rejected", port)
 		}
 	}

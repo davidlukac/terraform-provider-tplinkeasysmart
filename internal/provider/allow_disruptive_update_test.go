@@ -29,11 +29,11 @@ func TestAllowDisruptiveAloneNeverTouchesTheSwitch(t *testing.T) {
 			portConfig(4, "  flow_control = true\n  allow_disruptive = true\n"), portConfig(4, "  flow_control = true\n"),
 			portConfig(4, "  flow_control = true\n  enabled = false\n"), `port 4 has a link up`},
 		{"bandwidth_limit", "tplinkeasysmart_bandwidth_limit.b",
-			func() *fakeClient { return &fakeClient{ports: testPorts(), bw: map[int][2]int{}} },
+			func() *fakeClient { return &fakeClient{ports: testPorts(), bw: map[escp.PortID][2]int{}} },
 			bwConfig(4, "  ingress_kbps = 64\n  allow_disruptive = true\n"), bwConfig(4, "  ingress_kbps = 64\n"),
 			bwConfig(4, "  ingress_kbps = 128\n"), `port 4 has a link up`},
 		{"storm_limit", "tplinkeasysmart_storm_limit.s",
-			func() *fakeClient { return &fakeClient{ports: testPorts(), storm: map[int]escp.PortStorm{}} },
+			func() *fakeClient { return &fakeClient{ports: testPorts(), storm: map[escp.PortID]escp.PortStorm{}} },
 			stormConfig(4, "  broadcast = true\n  rate_kbps = 64\n  allow_disruptive = true\n"), stormConfig(4, "  broadcast = true\n  rate_kbps = 64\n"),
 			stormConfig(4, "  broadcast = true\n  rate_kbps = 128\n"), `port 4 has a link up`},
 		{"port_mirror", "tplinkeasysmart_port_mirror.m",
@@ -42,11 +42,15 @@ func TestAllowDisruptiveAloneNeverTouchesTheSwitch(t *testing.T) {
 			mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [7]\n"),
 			mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [6, 7]\n"), `port 4 has a link up`},
 		{"lag", "tplinkeasysmart_lag.l",
-			func() *fakeClient { return &fakeClient{ports: lagPorts(), lags: map[int][]int{1: {1, 2}}} },
+			func() *fakeClient {
+				return &fakeClient{ports: lagPorts(), lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2)}}
+			},
 			lagConfig(1, "  ports = [3, 4]\n  allow_disruptive = true\n"), lagConfig(1, "  ports = [3, 4]\n"),
 			lagConfig(1, "  ports = [2, 3, 4]\n"), `link up`},
 		{"vlan_port_based_group", "tplinkeasysmart_vlan_port_based_group.v",
-			func() *fakeClient { return &fakeClient{ports: lagPorts(), pvlans: map[int][]int{1: {1, 2, 4, 6, 7}}} },
+			func() *fakeClient {
+				return &fakeClient{ports: lagPorts(), pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
+			},
 			vlanGroupConfig(2, "  ports = [4]\n  allow_disruptive = true\n"), vlanGroupConfig(2, "  ports = [4]\n"),
 			vlanGroupConfig(2, "  ports = [4, 6]\n"), `port 4 has a link up`},
 		{"vlan_8021q_group", "tplinkeasysmart_vlan_8021q_group.v",

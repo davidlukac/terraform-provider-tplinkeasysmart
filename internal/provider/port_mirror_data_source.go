@@ -68,14 +68,6 @@ func (d *portMirrorDataSource) Configure(_ context.Context, req datasource.Confi
 	d.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func toInt64s(in []int) []int64 {
-	out := make([]int64, 0, len(in))
-	for _, v := range in {
-		out = append(out, int64(v))
-	}
-	return out
-}
-
 // Read binds the data source to the switch selected in the configuration, then reads it.
 func (d *portMirrorDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	sw := switchOf(ctx, req.Config, &resp.Diagnostics)
@@ -92,6 +84,6 @@ func (d *portMirrorDataSource) readBound(ctx context.Context, _ datasource.ReadR
 		return
 	}
 	state := portMirrorModel{ID: qualifiedID(d.sw, "port_mirror"), Enabled: types.BoolValue(m.Enabled),
-		MirrorPort: types.Int64Value(int64(m.MirrorPort)), IngressPorts: toInt64s(m.IngressPorts), EgressPorts: toInt64s(m.EgressPorts)}
+		MirrorPort: types.Int64Value(int64(m.MirrorPort)), IngressPorts: portInt64s(m.IngressPorts), EgressPorts: portInt64s(m.EgressPorts)}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

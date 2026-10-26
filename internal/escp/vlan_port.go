@@ -17,7 +17,7 @@ const (
 // Membership is exclusive: a port is in one group at a time.
 type PortVLAN struct {
 	ID    int
-	Ports []int
+	Ports PortSet
 }
 
 // PortBasedVLAN is the port-based VLAN state (VLAN > Port Based VLAN): whether this is the active
@@ -46,7 +46,7 @@ func parsePortBasedVLAN(tlvs []wire.TLV) (PortBasedVLAN, error) {
 			if len(t.Value) != pvlanEntryLen {
 				return out, fmt.Errorf("escp: port-based VLAN entry has %d bytes, want %d", len(t.Value), pvlanEntryLen)
 			}
-			out.VLANs = append(out.VLANs, PortVLAN{ID: int(t.Value[0]), Ports: portsFromMask(t.Value[pvlanOffMask:])})
+			out.VLANs = append(out.VLANs, PortVLAN{ID: int(t.Value[0]), Ports: PortSetFromMask(t.Value[pvlanOffMask:])})
 		}
 	}
 	if !seen {
@@ -65,19 +65,15 @@ func (c *Client) PortBasedVLAN(ctx context.Context) (PortBasedVLAN, error) {
 }
 
 // SetPortBasedVLAN creates or replaces a port-based VLAN group: TLV 8449 with
-// the VLAN id (1 byte) and the member port mask. An empty port list removes
+// the VLAN id (1 byte) and the member port mask. An empty port set removes
 // the group. The mode itself (enabled/disabled) is not touched. Changing a
 // group whose ports carry traffic can cut connectivity; callers must guard.
-func (c *Client) SetPortBasedVLAN(ctx context.Context, id int, ports []int) error {
+func (c *Client) SetPortBasedVLAN(ctx context.Context, id int, ports PortSet) error {
 	if err := validateByteID("port-based VLAN id", id); err != nil {
 		return err
 	}
-	mask, err := maskFromPorts(ports)
-	if err != nil {
+	if err := c.requirePorts(ctx, ports); err != nil {
 		return err
 	}
-	if err := c.requirePorts(ctx, ports...); err != nil {
-		return err
-	}
-	return c.setTLVs(ctx, Operation{Name: "SetPortBasedVLAN", Ports: ports, Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: id}, wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(id)}, mask...)})
+	return c.setTLVs(ctx, Operation{Name: "SetPortBasedVLAN", Ports: ports, Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: id}, wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(id)}, ports.Mask()...)})
 }
