@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/udp"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
@@ -177,7 +178,7 @@ func discoverWith(ctx context.Context, opts DiscoverOptions, env discoverEnv) ([
 
 // collectReplies sends the probes, listens for the window and returns the distinct replies.
 func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window time.Duration) ([]Info, error) {
-	lc := net.ListenConfig{Control: shareSocket}
+	lc := net.ListenConfig{Control: udp.Share}
 	pc, err := lc.ListenPacket(ctx, "udp4", net.JoinHostPort("", strconv.Itoa(env.hostPort)))
 	if err != nil {
 		return nil, fmt.Errorf("escp: binding UDP port %d (is a client that does not share the port running, such as an old Easy Smart utility?): %w", env.hostPort, err)

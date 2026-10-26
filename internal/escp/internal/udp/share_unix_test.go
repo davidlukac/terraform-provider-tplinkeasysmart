@@ -1,10 +1,11 @@
 //go:build linux || darwin || freebsd
 
-package escp
+package udp
 
 import (
 	"errors"
 	"net"
+	"strconv"
 	"syscall"
 	"testing"
 )
@@ -28,21 +29,21 @@ func (fakeRawConn) Write(func(uintptr) bool) error { return nil }
 var _ syscall.RawConn = fakeRawConn{}
 
 func TestShareSocketSetsTheOptionsOnARealSocket(t *testing.T) {
-	// A listener opened with shareSocket must allow a second listener on the same port.
-	lc := net.ListenConfig{Control: shareSocket}
+	// A listener opened with Share must allow a second listener on the same port.
+	lc := net.ListenConfig{Control: Share}
 	first, err := lc.ListenPacket(t.Context(), "udp4", ":0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer first.Close()
 	port := first.LocalAddr().(*net.UDPAddr).Port
-	second, err := lc.ListenPacket(t.Context(), "udp4", net.JoinHostPort("", itoa(port)))
+	second, err := lc.ListenPacket(t.Context(), "udp4", net.JoinHostPort("", strconv.Itoa(port)))
 	if err != nil {
 		t.Fatalf("a second sharing listener on port %d must be allowed: %v", port, err)
 	}
 	second.Close()
 	// ...but not a listener that does not share.
-	if plain, err := net.ListenPacket("udp4", net.JoinHostPort("", itoa(port))); err == nil {
+	if plain, err := net.ListenPacket("udp4", net.JoinHostPort("", strconv.Itoa(port))); err == nil {
 		plain.Close()
 		t.Fatalf("a non-sharing listener must not get port %d while sharing listeners hold it", port)
 	}
@@ -50,10 +51,10 @@ func TestShareSocketSetsTheOptionsOnARealSocket(t *testing.T) {
 
 func TestShareSocketReportsControlAndOptionErrors(t *testing.T) {
 	boom := errors.New("control failed")
-	if err := shareSocket("udp4", ":0", fakeRawConn{controlErr: boom}); !errors.Is(err, boom) {
+	if err := Share("udp4", ":0", fakeRawConn{controlErr: boom}); !errors.Is(err, boom) {
 		t.Fatalf("a failing Control must be reported, got %v", err)
 	}
-	if err := shareSocket("udp4", ":0", fakeRawConn{fd: ^uintptr(0)}); err == nil {
+	if err := Share("udp4", ":0", fakeRawConn{fd: ^uintptr(0)}); err == nil {
 		t.Fatal("setting options on an invalid descriptor must be reported")
 	}
 }

@@ -1,13 +1,10 @@
 package escp
 
 import (
-	"strconv"
 	"testing"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 )
-
-func itoa(n int) string { return strconv.Itoa(n) }
 
 // Several clients (several provider instances, one per switch) must be able to
 // hold the reply port at the same time.
