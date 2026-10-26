@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
@@ -26,8 +27,16 @@ func (c *Client) discover(ctx context.Context) (Info, error) {
 			return Info{}, err
 		}
 	}
-	info, err := c.discoverOnce(ctx)
-	if errors.Is(err, ErrNoReply) && len(c.cfg.MAC) != 0 {
+	if len(c.cfg.MAC) == 0 || c.haveSwMAC {
+		return c.discoverOnce(ctx)
+	}
+	// First contact with a switch that is pinned by MAC: the address gets a short budget (a switch
+	// answers a discovery within half a second), because a stale address would otherwise cost
+	// every attempt of the normal timeout before the lookup by MAC starts.
+	quick, cancel := context.WithTimeout(ctx, firstContactBudget)
+	info, err := c.discoverOnce(quick)
+	cancel()
+	if err != nil && ctx.Err() == nil && (errors.Is(err, ErrNoReply) || errors.Is(err, context.DeadlineExceeded)) {
 		// the configured address does not answer: the switch may have another one now
 		if rerr := c.relocate(ctx); rerr != nil {
 			return Info{}, rerr
@@ -36,6 +45,10 @@ func (c *Client) discover(ctx context.Context) (Info, error) {
 	}
 	return info, err
 }
+
+// firstContactBudget is how long the configured address gets to answer the first discovery of a
+// client that pins the switch by MAC before the switch is looked up by it.
+const firstContactBudget = 1500 * time.Millisecond
 
 // discoverOnce is one discovery exchange with the switch's current address. A reply whose MAC is not
 // Config.MAC is refused, whichever way the MAC was carried.

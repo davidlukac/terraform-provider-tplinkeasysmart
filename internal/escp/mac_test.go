@@ -192,3 +192,29 @@ func TestLocateOnAnInterfaceThisHostDoesNotHaveSendsNothing(t *testing.T) {
 		t.Fatalf("got %v, want ErrNoInterface", err)
 	}
 }
+
+// A dead address must not cost the normal timeout of every attempt before the lookup by MAC
+// starts: the first contact gets a short budget (a real switch answers a discovery in under half
+// a second; measured: a dead host with the normal timeouts took 9.6 s to fall back).
+func TestADeadAddressGetsAShortBudgetBeforeTheLookup(t *testing.T) {
+	f := escptest.Start(t)
+	f.DropFirst(2)
+	c, calls := dialMAC(t, f, "127.0.0.1", wantMAC, nil)
+	c.cfg.Timeout = time.Minute // the budget, not the per-attempt timeout, ends the wait
+	start := time.Now()
+	if _, err := c.Info(context.Background()); err != nil || *calls != 1 {
+		t.Fatalf("Info = %v after %d lookups", err, *calls)
+	}
+	if took := time.Since(start); took > 20*time.Second {
+		t.Fatalf("the dead address was waited on for %v", took)
+	}
+	// a caller that cancels is not retried through the lookup
+	f2 := escptest.Start(t)
+	f2.DropFirst(2)
+	c, calls = dialMAC(t, f2, "127.0.0.1", wantMAC, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := c.Info(ctx); !errors.Is(err, context.Canceled) || *calls != 0 {
+		t.Fatalf("a cancelled call must not look the switch up: %v after %d lookups", err, *calls)
+	}
+}
