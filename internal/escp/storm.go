@@ -19,13 +19,13 @@ const (
 	stormEntryLen          = stormOffRate + 4
 )
 
-// PortStorm is a port's storm control setting.
+// PortStorm is a port's storm control setting: which kinds of traffic are limited and at what rate.
 type PortStorm struct {
 	Port           int
-	UnknownUnicast bool
-	Multicast      bool
-	Broadcast      bool
-	RateKbps       int
+	UnknownUnicast bool // limit unknown-unicast traffic
+	Multicast      bool // limit multicast traffic
+	Broadcast      bool // limit broadcast traffic
+	RateKbps       int  // the limit in kbps, a multiple of RateStepKbps; 0 when none is set
 	// Enabled mirrors the web UI: a rate is set and at least one traffic type is selected.
 	Enabled bool
 }
@@ -48,7 +48,7 @@ func parseStorm(tlvs []wire.TLV) ([]PortStorm, error) {
 	return out, nil
 }
 
-// StormControl reads the per-port storm control settings.
+// StormControl reads the storm control setting of every port.
 func (c *Client) StormControl(ctx context.Context) ([]PortStorm, error) {
 	tlvs, err := c.getTLVs(ctx, wire.TLVStormControl)
 	if err != nil {

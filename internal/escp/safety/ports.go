@@ -74,7 +74,8 @@ type PortUseError struct {
 	LAG    int        // the group (PortInLAG)
 }
 
-// Error implements error.
+// Error names the port and why it may not be written: it does not exist, it has a link, or it is in a
+// LAG.
 func (e *PortUseError) Error() string {
 	switch e.Reason {
 	case PortMissing:

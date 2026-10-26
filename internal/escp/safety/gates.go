@@ -40,7 +40,7 @@ type ImpactError struct {
 	Max escp.Impact
 }
 
-// Error implements error.
+// Error names the operation, its impact and the ceiling it exceeded.
 func (e *ImpactError) Error() string {
 	return fmt.Sprintf("%s has impact %s, above the allowed %s", e.Op.Name, e.Op.Impact, e.Max)
 }
@@ -73,7 +73,7 @@ type DryRun struct {
 	ops []escp.Operation
 }
 
-// NewDryRun returns an empty DryRun.
+// NewDryRun returns a DryRun that has recorded nothing yet.
 func NewDryRun() *DryRun { return &DryRun{} }
 
 // Gate returns the gate to put in escp.Config: it records the operation and refuses it with

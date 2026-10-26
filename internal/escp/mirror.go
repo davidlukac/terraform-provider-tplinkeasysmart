@@ -16,12 +16,13 @@ const (
 	mirrorEntryLen   = mirrorOffEgress + maskLen
 )
 
-// Mirror is Monitoring > Port Mirror.
+// Mirror is the port mirroring configuration (Monitoring > Port Mirror): the traffic of the
+// source ports is copied to MirrorPort. When Enabled is false the switch reports no ports.
 type Mirror struct {
 	Enabled      bool
-	MirrorPort   int // monitoring (destination) port, 0 when disabled
-	IngressPorts []int
-	EgressPorts  []int
+	MirrorPort   int   // monitoring (destination) port, 0 when disabled
+	IngressPorts []int // source ports whose incoming traffic is copied
+	EgressPorts  []int // source ports whose outgoing traffic is copied
 }
 
 // parseMirror decodes TLV 16640: enabled, destination port, ingress mask(4), egress mask(4).
@@ -45,7 +46,8 @@ func parseMirror(tlvs []wire.TLV) (Mirror, error) {
 	return Mirror{}, fmt.Errorf("escp: no port mirror TLV in reply")
 }
 
-// PortMirror reads the port mirroring configuration.
+// PortMirror reads the port mirroring configuration: whether it is on, the monitoring port and the
+// source ports per direction.
 func (c *Client) PortMirror(ctx context.Context) (Mirror, error) {
 	tlvs, err := c.getTLVs(ctx, wire.TLVMirror)
 	if err != nil {
