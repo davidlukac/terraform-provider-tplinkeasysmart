@@ -56,6 +56,10 @@ func TestLoadTargetRefusals(t *testing.T) {
 		{"port zero", with(envTestPorts, "0"), "not a port number"},
 		{"bad protected port", with(envProtectedPorts, "-1"), "not a port number"},
 		{"test port is protected", with(envTestPorts, "2,6"), "both a test port and a protected port"},
+		{"disrupt the uplink", with(envDisruptPort, "1"), "not a device port"},
+		{"disrupt a test port", with(envDisruptPort, "3"), "not a device port"},
+		{"disrupt two ports", with(envDisruptPort, "6,7"), "not one port number"},
+		{"disrupt a non-number", with(envDisruptPort, "x"), "not one port number"},
 		{"move without an address", with(EnvAllowMove, "1"), "not an IPv4 address"},
 		{"move to a name", func() map[string]string { e := with(EnvAllowMove, "1"); e[envMoveIP] = "spare"; return e }(), "not an IPv4 address"},
 		{"move to its own address", func() map[string]string { e := with(EnvAllowMove, "1"); e[envMoveIP] = "192.0.2.13"; return e }(), "own address"},
@@ -99,6 +103,19 @@ func TestLoadTargetMove(t *testing.T) {
 	e[EnvAllowMove] = "1"
 	got, err = LoadTarget(e)
 	if err != nil || got.MoveIP != "192.0.2.14" {
+		t.Fatalf("with the opt-in: %+v, %v", got, err)
+	}
+}
+
+func TestLoadTargetDisruptPort(t *testing.T) {
+	got, err := LoadTarget(sw03Env())
+	if err != nil || got.DisruptPort != 0 {
+		t.Fatalf("without the opt-in: %+v, %v", got, err)
+	}
+	e := sw03Env()
+	e[envDisruptPort] = "8"
+	got, err = LoadTarget(e)
+	if err != nil || got.DisruptPort != 8 {
 		t.Fatalf("with the opt-in: %+v, %v", got, err)
 	}
 }
