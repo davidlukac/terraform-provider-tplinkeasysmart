@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"regexp"
 	"sync"
 	"testing"
@@ -54,7 +55,7 @@ func (f *fakeClient) Info(context.Context) (escp.Info, error) {
 	}
 	return escp.Info{Model: "TL-SG108E", Hostname: "TL-SG108E-01", MAC: fakeMAC,
 		Firmware: info.Firmware, Hardware: "TL-SG108E 6.0",
-		IP: "192.0.2.120", Netmask: "255.255.255.0", Gateway: "192.0.2.1", DHCP: true}, nil
+		IP: netip.MustParseAddr("192.0.2.120"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("192.0.2.1"), DHCP: true}, nil
 }
 
 func (f *fakeClient) SetPort(_ context.Context, cfg escp.PortConfig) error {

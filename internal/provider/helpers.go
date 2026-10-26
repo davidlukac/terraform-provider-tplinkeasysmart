@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -186,4 +187,12 @@ func warnInactiveMode(diags *diag.Diagnostics, err error, what, effect string) b
 	}
 	diags.AddWarning("The VLAN mode of "+what+" is not active", inactive.msg+". "+effect)
 	return true
+}
+
+// addrString is the text of an address the switch reported: empty when the reply carried none.
+func addrString(a netip.Addr) string {
+	if !a.IsValid() {
+		return ""
+	}
+	return a.String()
 }

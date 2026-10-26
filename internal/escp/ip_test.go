@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -33,11 +34,11 @@ func TestSetIPConfigSucceedsWhenTheReplyIsLostButTheSwitchMoved(t *testing.T) {
 	if n := f.WriteCount(); n != 1 {
 		t.Fatalf("the write must be sent once and not repeated, got %d writes", n)
 	}
-	if !c.dest.IP.Equal(lostReplyWanted.IP) || c.alsoFrom != nil || c.session != nil {
+	if !c.dest.IP.Equal(net.IP(lostReplyWanted.IP.AsSlice())) || c.alsoFrom != nil || c.session != nil {
 		t.Fatalf("the client must follow the switch with a fresh session: dest=%v alsoFrom=%v session=%v", c.dest.IP, c.alsoFrom, c.session != nil)
 	}
 	info, err := c.Info(context.Background())
-	if err != nil || info.Netmask != "255.255.0.0" || info.Gateway != "127.0.0.2" {
+	if err != nil || info.Netmask.String() != "255.255.0.0" || info.Gateway.String() != "127.0.0.2" {
 		t.Fatalf("after the move: %+v err=%v", info, err)
 	}
 }
@@ -63,7 +64,7 @@ func TestSetIPConfigReportsAWriteThatWasNotApplied(t *testing.T) {
 	if f.SetsDropped() == 0 {
 		t.Fatal("the write never reached the switch, so this test did not exercise a lost write")
 	}
-	if !c.dest.IP.Equal(lostReplyBefore.IP) || c.alsoFrom != nil {
+	if !c.dest.IP.Equal(net.IP(lostReplyBefore.IP.AsSlice())) || c.alsoFrom != nil {
 		t.Fatalf("the client must stay where it was: dest=%v alsoFrom=%v", c.dest.IP, c.alsoFrom)
 	}
 }
@@ -95,7 +96,7 @@ var otherDevice = MAC{0xaa, 0xbb, 0xcc, 0, 0, 1}
 func TestClassifyLostReply(t *testing.T) {
 	mac := MAC(escptest.DefaultMAC)
 	info := func(mac MAC, cfg IPConfig) Info {
-		return Info{MAC: mac, IP: cfg.IP.String(), Netmask: cfg.Netmask.String(), Gateway: cfg.Gateway.String()}
+		return Info{MAC: mac, IP: cfg.IP, Netmask: cfg.Netmask, Gateway: cfg.Gateway}
 	}
 	third := cfgOf("127.0.0.1", "255.255.255.128", "127.0.0.3")
 	leasing := func(cfg IPConfig) Info { i := info(mac, cfg); i.DHCP = true; return i }
@@ -148,7 +149,7 @@ func TestSettleLostReplyNamesWhatAnswered(t *testing.T) {
 			t.Fatal(err)
 		}
 		// the fake reports 127.0.0.1/255.255.255.0/127.0.0.254; claim that it used to have something else
-		oldOther := IPConfig{IP: net.ParseIP("127.0.0.1"), Netmask: net.ParseIP("255.255.0.0"), Gateway: net.ParseIP("127.0.0.9")}
+		oldOther := cfgOf("127.0.0.1", "255.255.0.0", "127.0.0.9")
 		c.mu.Lock()
 		err = c.settleLostReply(context.Background(), info.MAC, oldOther, lostReplyWanted, lost)
 		c.mu.Unlock()
@@ -176,7 +177,7 @@ func TestSetIPConfigSettlesWhenTheCallIsCancelledAfterTheWrite(t *testing.T) {
 		t.Fatalf("the write must be sent once, got %d", n)
 	}
 	info, err := c.Info(context.Background())
-	if err != nil || info.Netmask != "255.255.0.0" || info.Gateway != "127.0.0.2" {
+	if err != nil || info.Netmask.String() != "255.255.0.0" || info.Gateway.String() != "127.0.0.2" {
 		t.Fatalf("after the move: %+v err=%v", info, err)
 	}
 }
@@ -215,7 +216,7 @@ func TestSetIPConfigDoesNotProbeAfterARefusal(t *testing.T) {
 		if !errors.As(err, &refused) || strings.Contains(err.Error(), "probe") {
 			t.Fatalf("want the refusal as it is, got %v", err)
 		}
-		if !c.dest.IP.Equal(lostReplyBefore.IP) || c.alsoFrom != nil {
+		if !c.dest.IP.Equal(net.IP(lostReplyBefore.IP.AsSlice())) || c.alsoFrom != nil {
 			t.Fatalf("the client must stay where it was: dest=%v alsoFrom=%v", c.dest.IP, c.alsoFrom)
 		}
 	})
@@ -236,7 +237,7 @@ func TestSetIPConfigDoesNotProbeAfterARefusal(t *testing.T) {
 }
 
 func cfgOf(ip, mask, gw string) IPConfig {
-	return IPConfig{IP: net.ParseIP(ip), Netmask: net.ParseIP(mask), Gateway: net.ParseIP(gw)}
+	return IPConfig{IP: netip.MustParseAddr(ip), Netmask: netip.MustParseAddr(mask), Gateway: netip.MustParseAddr(gw)}
 }
 
 func TestValidateIPConfig(t *testing.T) {
@@ -256,7 +257,7 @@ func TestValidateIPConfig(t *testing.T) {
 		cfg  IPConfig
 		want string
 	}{
-		{"missing gateway", IPConfig{IP: net.ParseIP("192.0.2.13"), Netmask: net.ParseIP("255.255.255.0")}, "must all be IPv4"},
+		{"missing gateway", IPConfig{IP: netip.MustParseAddr("192.0.2.13"), Netmask: netip.MustParseAddr("255.255.255.0")}, "must all be IPv4"},
 		{"ipv6 address", cfgOf("2001:db8::1", "255.255.255.0", "192.0.2.1"), "must all be IPv4"},
 		{"gap in mask", cfgOf("192.0.2.13", "255.0.255.0", "192.0.2.1"), "contiguous prefix"},
 		{"mask zero", cfgOf("192.0.2.13", "0.0.0.0", "192.0.2.1"), "contiguous prefix"},
@@ -283,10 +284,10 @@ func TestValidateIPConfig(t *testing.T) {
 }
 
 func TestIPConfigFromInfoRefusesUnusableReplies(t *testing.T) {
-	if _, err := ipConfigFromInfo(Info{IP: "192.0.2.13", Netmask: "255.255.255.0"}); err == nil {
+	if _, err := ipConfigFromInfo(Info{IP: netip.MustParseAddr("192.0.2.13"), Netmask: netip.MustParseAddr("255.255.255.0")}); err == nil {
 		t.Fatal("a reply without a gateway must be refused")
 	}
-	got, err := ipConfigFromInfo(Info{IP: "192.0.2.13", Netmask: "255.255.255.0", Gateway: "192.0.2.1"})
+	got, err := ipConfigFromInfo(Info{IP: netip.MustParseAddr("192.0.2.13"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("192.0.2.1")})
 	if err != nil || got.String() != "ip 192.0.2.13 mask 255.255.255.0 gateway 192.0.2.1" {
 		t.Fatalf("got %v, %v", got, err)
 	}
@@ -318,7 +319,7 @@ func TestSetIPConfigWireLayoutAndReadBack(t *testing.T) {
 		}
 	}
 	info, err := c.Info(context.Background())
-	if err != nil || info.Netmask != "255.255.0.0" || info.Gateway != "127.0.0.2" {
+	if err != nil || info.Netmask.String() != "255.255.0.0" || info.Gateway.String() != "127.0.0.2" {
 		t.Fatalf("after the move: %+v err=%v", info, err)
 	}
 }
@@ -411,7 +412,35 @@ func TestSetIPConfigWaitsUntilTheSwitchAnswersAtTheNewAddress(t *testing.T) {
 	if time.Since(start) < ipMovePoll {
 		t.Fatalf("SetIPConfig returned after %s: it must keep probing until the switch reports the new address", time.Since(start))
 	}
-	if info, err := c.Info(context.Background()); err != nil || info.Netmask != "255.255.0.0" {
+	if info, err := c.Info(context.Background()); err != nil || info.Netmask.String() != "255.255.0.0" {
 		t.Fatalf("after the move: %+v err=%v", info, err)
+	}
+}
+
+func TestParseIPv4(t *testing.T) {
+	for _, s := range []string{"192.0.2.13", "0.0.0.0", "255.255.255.0"} {
+		if a, err := ParseIPv4(s); err != nil || a.String() != s || !a.Is4() {
+			t.Errorf("ParseIPv4(%q) = %v, %v", s, a, err)
+		}
+	}
+	// Refused: names, IPv6 (also the IPv4-mapped form), zones, ports, short forms, spaces.
+	for _, s := range []string{"", "switch", "2001:db8::1", "::ffff:192.0.2.1", "fe80::1%en0", "192.0.2.13:80", "192.0.2", "192.0.2.256", " 192.0.2.13", "192.0.2.13/24"} {
+		if a, err := ParseIPv4(s); !errors.Is(err, ErrInvalid) || a.IsValid() {
+			t.Errorf("ParseIPv4(%q) = %v, %v; want the invalid address and ErrInvalid", s, a, err)
+		}
+	}
+}
+
+// A reply that carries no gateway has none, which is not the same as the gateway 0.0.0.0 ("no gateway"):
+// writing it back would change the switch, so it is refused, while a gateway of 0.0.0.0 is usable.
+func TestAnAddressTheReplyDidNotCarryIsNotZero(t *testing.T) {
+	missing := Info{IP: netip.MustParseAddr("192.0.2.13"), Netmask: netip.MustParseAddr("255.255.255.0")}
+	if _, err := ipConfigFromInfo(missing); err == nil {
+		t.Fatal("a reply without a gateway must not be usable")
+	}
+	none := missing
+	none.Gateway = netip.MustParseAddr("0.0.0.0")
+	if cfg, err := ipConfigFromInfo(none); err != nil || cfg.Gateway != netip.MustParseAddr("0.0.0.0") {
+		t.Fatalf("a gateway of 0.0.0.0 means none and is usable: %v, %v", cfg, err)
 	}
 }

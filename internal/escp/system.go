@@ -85,5 +85,5 @@ func (c *Client) writeSystem(ctx context.Context, op Operation, name string, dhc
 	return c.setTLVsSent(ctx, op,
 		wire.TLV{Type: wire.TLVHostname, Value: append([]byte(name), 0)},
 		wire.TLV{Type: wire.TLVDHCP, Value: []byte{boolByte(dhcp)}},
-		wire.TLV{Type: wire.TLVIP, Value: cfg.IP.To4()}, wire.TLV{Type: wire.TLVNetmask, Value: cfg.Netmask.To4()}, wire.TLV{Type: wire.TLVGateway, Value: cfg.Gateway.To4()})
+		wire.TLV{Type: wire.TLVIP, Value: cfg.IP.AsSlice()}, wire.TLV{Type: wire.TLVNetmask, Value: cfg.Netmask.AsSlice()}, wire.TLV{Type: wire.TLVGateway, Value: cfg.Gateway.AsSlice()})
 }

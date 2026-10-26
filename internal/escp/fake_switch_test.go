@@ -166,7 +166,7 @@ func TestFakeModelHasAStaticDocumentationAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.IP != "192.0.2.13" || info.Netmask != "255.255.255.0" || info.Gateway != "192.0.2.1" || info.DHCP {
+	if info.IP.String() != "192.0.2.13" || info.Netmask.String() != "255.255.255.0" || info.Gateway.String() != "192.0.2.1" || info.DHCP {
 		t.Fatalf("got ip %s mask %s gateway %s dhcp %t", info.IP, info.Netmask, info.Gateway, info.DHCP)
 	}
 }

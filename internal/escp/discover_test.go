@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net"
+	"net/netip"
 	"reflect"
 	"strings"
 	"testing"
@@ -116,7 +117,7 @@ func TestDiscoverReturnsEveryDistinctSwitchSortedByAddress(t *testing.T) {
 	}
 	names := make([]string, len(got))
 	for i, info := range got {
-		names[i] = info.IP + " " + info.Hostname
+		names[i] = info.IP.String() + " " + info.Hostname
 	}
 	// Numeric order (.9 before .30), one entry per MAC, nothing from the other request,
 	// the echo or the garbage; the reply without a MAC appears once.
@@ -124,7 +125,7 @@ func TestDiscoverReturnsEveryDistinctSwitchSortedByAddress(t *testing.T) {
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("got %v, want %v", names, want)
 	}
-	if got[0].MAC.String() != "c0:3a:55:00:00:09" || got[0].Model != "TL-SG108E" || got[0].Gateway != "192.0.2.1" {
+	if got[0].MAC.String() != "c0:3a:55:00:00:09" || got[0].Model != "TL-SG108E" || got[0].Gateway.String() != "192.0.2.1" {
 		t.Errorf("fields not decoded: %+v", got[0])
 	}
 }
@@ -382,7 +383,7 @@ func TestSubnetBroadcast(t *testing.T) {
 
 func TestSortedInfosOrdersByAddressThenMAC(t *testing.T) {
 	got := sortedInfos(map[string]Info{
-		"a": {IP: "192.0.2.10", MAC: MAC{0xbb}}, "b": {IP: "192.0.2.10", MAC: MAC{0xaa}}, "c": {IP: "192.0.2.9", MAC: MAC{0xcc}}, "d": {IP: "", MAC: MAC{0xdd}},
+		"a": {IP: netip.MustParseAddr("192.0.2.10"), MAC: MAC{0xbb}}, "b": {IP: netip.MustParseAddr("192.0.2.10"), MAC: MAC{0xaa}}, "c": {IP: netip.MustParseAddr("192.0.2.9"), MAC: MAC{0xcc}}, "d": {IP: netip.Addr{}, MAC: MAC{0xdd}},
 	})
 	var order []string
 	for _, i := range got {

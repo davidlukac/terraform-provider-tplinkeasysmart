@@ -3,7 +3,6 @@ package escp
 import (
 	"context"
 	"errors"
-	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -61,7 +60,7 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 	},
 	"SetIPConfig": func(ctx context.Context, c *Client) error {
 		// the address the fake switch already has, so an allowed write is confirmed at once
-		return c.SetIPConfig(ctx, IPConfig{IP: net.IPv4(127, 0, 0, 1), Netmask: net.IPv4(255, 0, 0, 0), Gateway: net.IPv4(127, 0, 0, 2)})
+		return c.SetIPConfig(ctx, cfgOf("127.0.0.1", "255.0.0.0", "127.0.0.2"))
 	},
 }
 
