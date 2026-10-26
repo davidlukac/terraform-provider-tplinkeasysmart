@@ -94,7 +94,7 @@ func membersOf(ctx context.Context, r portReader, kind escp.GroupKind, id int) (
 			return 0, err
 		}
 		for _, v := range q.VLANs {
-			if v.ID == id {
+			if int(v.ID) == id {
 				return v.Tagged.Union(v.Untagged), nil
 			}
 		}

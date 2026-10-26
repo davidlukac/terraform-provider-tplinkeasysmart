@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -108,7 +109,7 @@ func TestSetPVIDsWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	if err := c.SetPVIDs(ctx, map[PortID]int{5: 300, 4: 2}); err != nil {
+	if err := c.SetPVIDs(ctx, map[PortID]VLANID{5: 300, 4: 2}); err != nil {
 		t.Fatal(err)
 	}
 	got := f.LastSet()
@@ -118,12 +119,28 @@ func TestSetPVIDsWire(t *testing.T) {
 		t.Fatalf("wire %+v, want %+v", got, want)
 	}
 	n := f.WriteCount()
-	for name, bad := range map[string]map[PortID]int{"empty": {}, "port 0": {0: 2}, "port 33": {33: 2}, "pvid 0": {4: 0}, "pvid 4095": {4: 4095}} {
+	for name, bad := range map[string]map[PortID]VLANID{"empty": {}, "port 0": {0: 2}, "port 33": {33: 2}, "pvid 0": {4: 0}, "pvid 4095": {4: 4095}} {
 		if c.SetPVIDs(ctx, bad) == nil {
 			t.Fatalf("%s must be rejected", name)
 		}
 	}
 	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")
+	}
+}
+
+func TestVLANIDValidate(t *testing.T) {
+	for _, id := range []VLANID{MinVLANID, 100, MaxVLANID} {
+		if err := id.Validate(); err != nil {
+			t.Errorf("VLAN %d: %v", id, err)
+		}
+	}
+	for _, id := range []VLANID{-1, 0, MaxVLANID + 1, 65535} {
+		if err := id.Validate(); !errors.Is(err, ErrInvalid) {
+			t.Errorf("VLAN %d: got %v, want ErrInvalid", id, err)
+		}
+	}
+	if VLANID(4094).String() != "4094" {
+		t.Error("a VLAN id prints as its number")
 	}
 }

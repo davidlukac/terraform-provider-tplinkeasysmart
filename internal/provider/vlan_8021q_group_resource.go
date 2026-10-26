@@ -36,7 +36,7 @@ type vlan8021QGroupResource struct {
 type vlan8021QGroupClient interface {
 	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
 	SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error
-	DeleteVLAN8021Q(ctx context.Context, id int) error
+	DeleteVLAN8021Q(ctx context.Context, id escp.VLANID) error
 	Ports(ctx context.Context) ([]escp.Port, error)
 }
 
@@ -100,7 +100,7 @@ func (r *vlan8021QGroupResource) table(ctx context.Context) ([]escp.VLAN8021Q, e
 }
 
 // findVLAN returns the VLAN with the id, if the table has it.
-func findVLAN(table []escp.VLAN8021Q, id int) (escp.VLAN8021Q, bool) {
+func findVLAN(table []escp.VLAN8021Q, id escp.VLANID) (escp.VLAN8021Q, bool) {
 	for _, v := range table {
 		if v.ID == id {
 			return v, true
@@ -114,7 +114,7 @@ func members(v escp.VLAN8021Q) escp.PortSet { return v.Tagged.Union(v.Untagged) 
 
 // orphanedPorts returns the ports of affected that would belong to no VLAN
 // once VLAN id has the given member ports (none: it is deleted); the other VLANs of the table stay as they are.
-func orphanedPorts(table []escp.VLAN8021Q, id int, newMembers, affected escp.PortSet) escp.PortSet {
+func orphanedPorts(table []escp.VLAN8021Q, id escp.VLANID, newMembers, affected escp.PortSet) escp.PortSet {
 	covered := newMembers
 	for _, v := range table {
 		if v.ID != id {
@@ -126,7 +126,7 @@ func orphanedPorts(table []escp.VLAN8021Q, id int, newMembers, affected escp.Por
 
 // guard refuses a change of VLAN id from the old to the new members when a port
 // involved carries traffic, or would be left in no VLAN.
-func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []escp.VLAN8021Q, id int, old, new escp.PortSet) error {
+func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []escp.VLAN8021Q, id escp.VLANID, old, new escp.PortSet) error {
 	affected := old.Union(new)
 	if err := guardPorts(ctx, r.client, allow, affected.Ports()...); err != nil {
 		return err
@@ -149,7 +149,7 @@ func (m *vlan8021QGroupModel) vlan(ctx context.Context) (escp.VLAN8021Q, error) 
 	if err != nil {
 		return escp.VLAN8021Q{}, err
 	}
-	return escp.VLAN8021Q{ID: int(m.VLAN.ValueInt64()), Name: m.Name.ValueString(), Tagged: tagged, Untagged: untagged}, nil
+	return escp.VLAN8021Q{ID: escp.VLANID(m.VLAN.ValueInt64()), Name: m.Name.ValueString(), Tagged: tagged, Untagged: untagged}, nil
 }
 
 // apply binds the resource to the switch the plan selects, then applies it.
@@ -217,7 +217,7 @@ func (r *vlan8021QGroupResource) readBound(ctx context.Context, req resource.Rea
 		}
 		return
 	}
-	got, ok := findVLAN(table, int(state.VLAN.ValueInt64()))
+	got, ok := findVLAN(table, escp.VLANID(state.VLAN.ValueInt64()))
 	if !ok {
 		resp.State.RemoveResource(ctx)
 		return
@@ -233,7 +233,7 @@ func (r *vlan8021QGroupResource) deleteBound(ctx context.Context, req resource.D
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	id := int(state.VLAN.ValueInt64())
+	id := escp.VLANID(state.VLAN.ValueInt64())
 	table, err := r.table(ctx)
 	if err != nil {
 		if !warnInactiveMode(&resp.Diagnostics, err, "the 802.1Q VLANs", "The VLAN cannot be removed meanwhile, so the resource is only forgotten and the switch is left as it is") {

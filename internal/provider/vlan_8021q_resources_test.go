@@ -272,7 +272,7 @@ func TestAccVLAN8021QGroupGuardOverride(t *testing.T) {
 	})
 }
 
-func expectVLANPorts(f *fakeClient, id int, tagged, untagged escp.PortSet) error {
+func expectVLANPorts(f *fakeClient, id escp.VLANID, tagged, untagged escp.PortSet) error {
 	got, ok := f.vlanState().vlans[id]
 	if !ok {
 		return fmt.Errorf("VLAN %d is not on the switch", id)
@@ -493,7 +493,7 @@ func TestOrphanedPorts(t *testing.T) {
 	}
 	tests := []struct {
 		name       string
-		id         int
+		id         escp.VLANID
 		newMembers escp.PortSet
 		affected   escp.PortSet
 		want       escp.PortSet
@@ -539,7 +539,7 @@ func newPVIDFake() *fakeClient {
 	return f
 }
 
-func expectPVID(f *fakeClient, port escp.PortID, want int) error {
+func expectPVID(f *fakeClient, port escp.PortID, want escp.VLANID) error {
 	if got := f.vlanState().pvids[port]; got != want {
 		return fmt.Errorf("port %d has PVID %d, want %d", port, got, want)
 	}

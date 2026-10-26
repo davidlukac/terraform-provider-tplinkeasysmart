@@ -60,7 +60,7 @@ func TestWritersRefusePortsTheSwitchDoesNotHave(t *testing.T) {
 		{"SetVLAN8021Q untagged", func(c *Client) error {
 			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Untagged: MustPortSet(9)})
 		}},
-		{"SetPVIDs", func(c *Client) error { return c.SetPVIDs(ctx, map[PortID]int{2: 1, 9: 1}) }},
+		{"SetPVIDs", func(c *Client) error { return c.SetPVIDs(ctx, map[PortID]VLANID{2: 1, 9: 1}) }},
 		{"SetVLANMode", func(c *Client) error {
 			return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 9})
 		}},

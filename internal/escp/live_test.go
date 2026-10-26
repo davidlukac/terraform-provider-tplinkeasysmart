@@ -639,7 +639,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 		}
 		if err != nil || q.Enabled {
 			if _, ok := vlanByID(q, testVLAN); ok || err != nil {
-				if err := c.SetPVIDs(ctx, map[PortID]int{a: 1, b: 1}); err != nil {
+				if err := c.SetPVIDs(ctx, map[PortID]VLANID{a: 1, b: 1}); err != nil {
 					t.Errorf("RESTORE: PVIDs: %v", err)
 				}
 				if err := c.DeleteVLAN8021Q(ctx, testVLAN); err != nil {
@@ -682,7 +682,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 		t.Fatalf("VLAN not applied as requested: %+v", got)
 	}
 
-	if err := c.SetPVIDs(ctx, map[PortID]int{a: testVLAN}); err != nil {
+	if err := c.SetPVIDs(ctx, map[PortID]VLANID{a: testVLAN}); err != nil {
 		t.Fatal(err)
 	}
 	_, _, q = vlanModes(t, c)
@@ -690,7 +690,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 	if pvid, _ := pvidByPort(q, a); pvid != testVLAN {
 		t.Fatalf("PVID of port %d is %d, want %d", a, pvid, testVLAN)
 	}
-	if err := c.SetPVIDs(ctx, map[PortID]int{a: 1}); err != nil {
+	if err := c.SetPVIDs(ctx, map[PortID]VLANID{a: 1}); err != nil {
 		t.Fatal(err)
 	}
 	_, _, q = vlanModes(t, c)
@@ -707,7 +707,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 	}
 }
 
-func vlanByID(q Dot1Q, id int) (VLAN8021Q, bool) {
+func vlanByID(q Dot1Q, id VLANID) (VLAN8021Q, bool) {
 	for _, v := range q.VLANs {
 		if v.ID == id {
 			return v, true
@@ -716,7 +716,7 @@ func vlanByID(q Dot1Q, id int) (VLAN8021Q, bool) {
 	return VLAN8021Q{}, false
 }
 
-func pvidByPort(q Dot1Q, port PortID) (int, bool) {
+func pvidByPort(q Dot1Q, port PortID) (VLANID, bool) {
 	for _, p := range q.PVIDs {
 		if p.Port == port {
 			return p.PVID, true

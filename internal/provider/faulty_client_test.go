@@ -265,10 +265,10 @@ func (w *faultyClient) SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error
 	return w.write("SetVLAN8021Q", func() error { return w.SwitchClient.SetVLAN8021Q(ctx, v) })
 }
 
-func (w *faultyClient) DeleteVLAN8021Q(ctx context.Context, id int) error {
+func (w *faultyClient) DeleteVLAN8021Q(ctx context.Context, id escp.VLANID) error {
 	return w.write("DeleteVLAN8021Q", func() error { return w.SwitchClient.DeleteVLAN8021Q(ctx, id) })
 }
 
-func (w *faultyClient) SetPVIDs(ctx context.Context, pvids map[escp.PortID]int) error {
+func (w *faultyClient) SetPVIDs(ctx context.Context, pvids map[escp.PortID]escp.VLANID) error {
 	return w.write("SetPVIDs", func() error { return w.SwitchClient.SetPVIDs(ctx, pvids) })
 }

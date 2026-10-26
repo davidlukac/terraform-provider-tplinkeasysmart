@@ -89,7 +89,7 @@ func stormRateRangeText() string {
 	return fmt.Sprintf("%d..%d kbps, multiple of %d", escp.RateStepKbps, escp.MaxBandwidthKbps, escp.RateStepKbps)
 }
 
-func vlanIDRangeText() string { return fmt.Sprintf("%d-%d", escp.MinVLANID, escp.MaxVLANID) }
+func vlanIDRangeText() string { return fmt.Sprintf("%d-%d", int(escp.MinVLANID), int(escp.MaxVLANID)) }
 
 // rateKbps accepts 0 (unlimited) or a multiple of 64 up to the maximum.
 type rateKbps struct{}
@@ -196,7 +196,9 @@ func qosProblem(mode types.String, priorities types.Map) string {
 }
 
 // validVLANID accepts an 802.1Q VLAN id or PVID.
-func validVLANID() validator.Int64 { return int64validator.Between(escp.MinVLANID, escp.MaxVLANID) }
+func validVLANID() validator.Int64 {
+	return int64validator.Between(int64(escp.MinVLANID), int64(escp.MaxVLANID))
+}
 
 // validVLANName accepts what the switch accepts as an 802.1Q VLAN name.
 func validVLANName() []validator.String {
