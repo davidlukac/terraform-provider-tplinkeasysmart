@@ -110,7 +110,7 @@ func (r *portVLANResource) current(ctx context.Context, group int) ([]int, error
 		return nil, err
 	}
 	if !v.Enabled {
-		return nil, &inactiveModeError{"port-based VLAN mode is not active on the switch; refusing to manage groups in another VLAN mode"}
+		return nil, &inactiveModeError{"port-based VLAN mode is not active on the switch; refusing to manage groups in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the groups when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the groups depend on it"}
 	}
 	for _, g := range v.VLANs {
 		if g.ID == group {

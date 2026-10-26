@@ -83,7 +83,7 @@ func (r *vlan8021QPVIDResource) state(ctx context.Context) (escp.Dot1Q, error) {
 		return q, err
 	}
 	if !q.Enabled {
-		return q, &inactiveModeError{"802.1Q VLAN mode is not active on the switch; refusing to manage PVIDs in another VLAN mode (see tplinkeasysmart_vlan_mode)"}
+		return q, &inactiveModeError{"802.1Q VLAN mode is not active on the switch; refusing to manage PVIDs in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the PVIDs when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the PVIDs depend on it"}
 	}
 	return q, nil
 }
