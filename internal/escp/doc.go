@@ -54,7 +54,8 @@
 // fails with ErrWrongSwitch before a session is handed to it or a write is sent (the MAC is
 // checked on every reply, the key exchange's included), and it lets the client find the
 // switch when Config.Host is empty or stops answering (Locate does the lookup: a discovery probe
-// that stops at the first reply from that switch, normally under a second). Nothing is sent by
+// that stops at the first reply from that switch, normally under a second; a lookup that finds
+// nobody is tried once more before ErrNotFound is returned). Nothing is sent by
 // Dial. A device that takes over the address meanwhile ignores requests encrypted with a session
 // key it never accepted; the client then starts a new session, and the reply to the key exchange
 // names the stranger, so nothing is written to it.

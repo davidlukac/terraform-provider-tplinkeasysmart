@@ -69,6 +69,12 @@ func (c *Client) discoverOnce(ctx context.Context) (Info, error) {
 // Callers hold c.mu. The destination is changed in place, because requests in flight hold it.
 func (c *Client) relocate(ctx context.Context) error {
 	found, err := c.locator(ctx, c.cfg.MAC)
+	if errors.Is(err, ErrNotFound) && ctx.Err() == nil {
+		// Once in a while a lookup finds nobody although the switch is there: seen right after a
+		// management move, when the first lookup missed and the next one, half a second later, found it.
+		// Failing a whole run for that costs more than the second window of a lookup that was going to fail.
+		found, err = c.locator(ctx, c.cfg.MAC)
+	}
 	if err != nil {
 		return err
 	}

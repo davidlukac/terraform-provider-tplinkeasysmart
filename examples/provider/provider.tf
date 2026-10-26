@@ -36,6 +36,18 @@ provider "tplinkeasysmart" {
 # Alternatively leave the provider block empty and export
 # TPLINK_EASYSMART_HOST, TPLINK_EASYSMART_USERNAME and TPLINK_EASYSMART_PASSWORD.
 
+# Name the switch by its MAC address when its IP address may change (DHCP, a move).
+# `mac` pins the identity, so a different device at `host` is never written to; without
+# `host`, or when `host` does not answer, the switch is found by a layer-2 discovery on
+# the first request (about half a second). The data source tplinkeasysmart_system_info
+# reports the value as `mac_address`.
+#
+# provider "tplinkeasysmart" {
+#   mac      = "c0:3a:55:6c:81:61"   # or TPLINK_EASYSMART_MAC
+#   username = var.switch_username
+#   password = var.switch_password
+# }
+
 # Several switches: use the `switches` map and select one per resource with
 # `switch = "<name>"` (see examples/multi-switch), or declare one provider
 # alias per switch.

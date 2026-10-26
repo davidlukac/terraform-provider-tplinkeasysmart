@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net"
 	"regexp"
 	"strconv"
 
@@ -204,5 +205,51 @@ func validVLANName() []validator.String {
 	return []validator.String{
 		stringvalidator.LengthAtMost(escp.MaxVLANNameLen),
 		stringvalidator.RegexMatches(regexp.MustCompile(escp.VLANNamePattern), "must contain only letters, digits, hyphens and underscores"),
+	}
+}
+
+// macLen is the length of an Ethernet MAC address in bytes.
+const (
+	macLen     = 6
+	macTextLen = 3*macLen - 1 // "aa:bb:cc:dd:ee:ff"
+)
+
+// parseMAC reads a switch MAC address (colon or hyphen separated). An empty string is "no MAC"
+// and yields nil without an error.
+func parseMAC(s string) (net.HardwareAddr, error) {
+	if s == "" {
+		return nil, nil
+	}
+	hw, err := net.ParseMAC(s)
+	// ParseMAC also reads dotted and unseparated forms; only the colon and hyphen forms are documented.
+	if err != nil || len(hw) != macLen || len(s) != macTextLen {
+		return nil, notAMAC(s)
+	}
+	return hw, nil
+}
+
+func notAMAC(s string) error {
+	return fmt.Errorf("%q is not a MAC address; write it as aa:bb:cc:dd:ee:ff (colons or hyphens)", s)
+}
+
+// validMAC accepts a six-byte MAC address with one kind of separator.
+func validMAC() validator.String { return macValidator{} }
+
+type macValidator struct{}
+
+func (macValidator) Description(context.Context) string {
+	return "must be a MAC address such as aa:bb:cc:dd:ee:ff"
+}
+
+func (v macValidator) MarkdownDescription(ctx context.Context) string { return v.Description(ctx) }
+
+func (macValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	// parseMAC reads "" as "no MAC"; an explicitly empty argument is a mistake, not an omission.
+	v := req.ConfigValue.ValueString()
+	if _, err := parseMAC(v); err != nil || v == "" {
+		resp.Diagnostics.AddAttributeError(req.Path, "Invalid MAC address", notAMAC(v).Error())
 	}
 }

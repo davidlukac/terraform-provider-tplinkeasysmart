@@ -72,6 +72,32 @@ func TestAClientWithoutAnAddressReportsAFailedLookup(t *testing.T) {
 	}
 }
 
+// A lookup that misses once is tried once more; one that misses twice is a switch that is not there,
+// and a caller that has given up is not kept waiting for a second window.
+func TestALookupThatFindsNobodyIsTriedOnceMore(t *testing.T) {
+	f := escptest.Start(t)
+	var calls *int
+	var c *Client
+	c, calls = dialMAC(t, f, "", wantMAC, func(m net.HardwareAddr) (Info, error) {
+		if *calls == 1 { // the first lookup misses
+			return Info{}, ErrNotFound
+		}
+		return Info{IP: "127.0.0.1", MAC: m.String()}, nil
+	})
+	if info, err := c.Info(context.Background()); err != nil || info.MAC != wantMAC.String() || *calls != 2 {
+		t.Fatalf("a miss followed by a hit: info %+v, err %v, %d lookups; want success after 2", info, err, *calls)
+	}
+	c, calls = dialMAC(t, f, "", wantMAC, func(net.HardwareAddr) (Info, error) { return Info{}, ErrNotFound })
+	if _, err := c.Info(context.Background()); !errors.Is(err, ErrNotFound) || *calls != 2 {
+		t.Fatalf("two misses: err %v after %d lookups; want ErrNotFound after 2", err, *calls)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	c, calls = dialMAC(t, f, "", wantMAC, func(net.HardwareAddr) (Info, error) { cancel(); return Info{}, ErrNotFound })
+	if _, err := c.Info(ctx); err == nil || *calls != 1 {
+		t.Fatalf("a cancelled caller: err %v after %d lookups; want one lookup", err, *calls)
+	}
+}
+
 func TestADeviceWithAnotherMACIsNeverWrittenTo(t *testing.T) {
 	f := escptest.Start(t)
 	f.SetMAC(otherMAC)

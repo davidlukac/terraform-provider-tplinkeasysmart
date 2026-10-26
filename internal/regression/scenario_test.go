@@ -34,9 +34,16 @@ func (s *Session) scenario(t *testing.T, change, restore string, verifyChange re
 // allows them is still set). The readout is compared after the last one.
 func (s *Session) scenarioSteps(t *testing.T, change string, verifyChange resource.TestCheckFunc, restore ...string) {
 	t.Helper()
-	steps := []resource.TestStep{{Config: s.ProviderHCL() + change, Check: verifyChange}}
+	s.scenarioWithProvider(t, s.ProviderHCL(), change, verifyChange, restore...)
+}
+
+// scenarioWithProvider is scenarioSteps with the provider block chosen by the caller (the switch
+// named by its MAC address, for instance).
+func (s *Session) scenarioWithProvider(t *testing.T, providerHCL, change string, verifyChange resource.TestCheckFunc, restore ...string) {
+	t.Helper()
+	steps := []resource.TestStep{{Config: providerHCL + change, Check: verifyChange}}
 	for i, cfg := range restore {
-		step := resource.TestStep{Config: s.ProviderHCL() + cfg}
+		step := resource.TestStep{Config: providerHCL + cfg}
 		if i == len(restore)-1 {
 			step.Check = s.restoredCheck(t)
 		}

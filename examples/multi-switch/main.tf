@@ -5,9 +5,10 @@
 # To adopt an existing object: terraform import 'tplinkeasysmart_led.this["sw02"]' sw02:led
 
 variable "switches" {
-  description = "Switches by name."
+  description = "Switches by name. Each needs `host`, `mac` or both: the MAC pins the identity and finds the switch when its address changes."
   type = map(object({
-    host     = string
+    host     = optional(string)
+    mac      = optional(string)
     username = string
     password = string
   }))

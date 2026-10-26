@@ -27,11 +27,15 @@ import (
 // Environment variables that back the provider arguments.
 const (
 	envHost     = "TPLINK_EASYSMART_HOST"
+	envMAC      = "TPLINK_EASYSMART_MAC"
 	envUsername = "TPLINK_EASYSMART_USERNAME"
 	envPassword = "TPLINK_EASYSMART_PASSWORD" //nolint:gosec // the name of an environment variable, not a credential
 )
 
-var _ provider.Provider = &tplinkProvider{}
+var (
+	_ provider.Provider                   = &tplinkProvider{}
+	_ provider.ProviderWithValidateConfig = &tplinkProvider{}
+)
 
 type tplinkProvider struct {
 	version string
@@ -56,6 +60,7 @@ func NewWithDialer(version string, dial func(escp.Config) (SwitchClient, error))
 
 type providerModel struct {
 	Host           types.String `tfsdk:"host"`
+	MAC            types.String `tfsdk:"mac"`
 	Username       types.String `tfsdk:"username"`
 	Password       types.String `tfsdk:"password"`
 	TimeoutSeconds types.Int64  `tfsdk:"timeout_seconds"`
@@ -67,6 +72,7 @@ type providerModel struct {
 // switchModel is one entry of the `switches` map.
 type switchModel struct {
 	Host                    types.String `tfsdk:"host"`
+	MAC                     types.String `tfsdk:"mac"`
 	Username                types.String `tfsdk:"username"`
 	Password                types.String `tfsdk:"password"`
 	TimeoutSeconds          types.Int64  `tfsdk:"timeout_seconds"`
@@ -87,7 +93,12 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
 				Optional:    true,
-				Description: "IPv4 address or hostname of the switch. Falls back to TPLINK_EASYSMART_HOST.",
+				Description: "IPv4 address or hostname of the switch. Falls back to TPLINK_EASYSMART_HOST. Optional when `mac` is set.",
+			},
+			"mac": schema.StringAttribute{
+				Optional:    true,
+				Validators:  []validator.String{validMAC()},
+				Description: macArgDescription + " Falls back to TPLINK_EASYSMART_MAC.",
 			},
 			"username": schema.StringAttribute{
 				Optional:    true,
@@ -115,7 +126,8 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 					"May be combined with `host`, which then names the default switch used when `switch` is omitted.",
 				Validators: []validator.Map{mapvalidator.KeysAre(validSwitchName()...)},
 				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
-					"host":     schema.StringAttribute{Required: true, Description: "IPv4 address or hostname of the switch."},
+					"host":     schema.StringAttribute{Optional: true, Description: "IPv4 address or hostname of the switch. Optional when `mac` is set; at least one of the two is required."},
+					"mac":      schema.StringAttribute{Optional: true, Validators: []validator.String{validMAC()}, Description: macArgDescription},
 					"username": schema.StringAttribute{Required: true, Description: "Admin user name."},
 					"password": schema.StringAttribute{Required: true, Sensitive: true, Description: "Admin password."},
 					"timeout_seconds": schema.Int64Attribute{Optional: true, Validators: []validator.Int64{int64validator.AtLeast(1)},
@@ -125,6 +137,31 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				}},
 			},
 		},
+	}
+}
+
+// macArgDescription is shared by the provider block and the `switches` entries.
+const macArgDescription = "MAC address of the switch (`aa:bb:cc:dd:ee:ff`, colons or hyphens, any case; `system_info` reports it as `mac_address`). " +
+	"It pins the identity: a device with another MAC at `host` is never written to. Without `host`, or when `host` does not answer, " +
+	"the switch is found by a layer-2 discovery on the first request, so its address may change (for example under DHCP). " +
+	"Discovery needs the same layer-2 segment; use `host` as well when Terraform runs elsewhere."
+
+// ValidateConfig requires every `switches` entry to name its switch by `host`, `mac` or both.
+// The provider's own switch is checked in Configure, because its values may come from the environment.
+func (p *tplinkProvider) ValidateConfig(ctx context.Context, req provider.ValidateConfigRequest, resp *provider.ValidateConfigResponse) {
+	var cfg providerModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
+	if resp.Diagnostics.HasError() || cfg.Switches.IsNull() || cfg.Switches.IsUnknown() {
+		return
+	}
+	var entries map[string]switchModel
+	resp.Diagnostics.Append(cfg.Switches.ElementsAs(ctx, &entries, false)...)
+	for _, name := range sortedKeys(entries) {
+		e := entries[name]
+		if e.Host.IsNull() && e.MAC.IsNull() {
+			resp.Diagnostics.AddAttributeError(pathRoot("switches").AtMapKey(name), "Missing switch host or MAC address",
+				"Switch "+name+" needs `host`, `mac` or both: the MAC finds the switch and pins its identity, the host says where to look first.")
+		}
 	}
 }
 
@@ -165,7 +202,7 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	for _, attr := range []struct {
 		name  string
 		value attr.Value
-	}{{"host", cfg.Host}, {"username", cfg.Username}, {"password", cfg.Password}, {"switches", cfg.Switches}} {
+	}{{"host", cfg.Host}, {"mac", cfg.MAC}, {"username", cfg.Username}, {"password", cfg.Password}, {"switches", cfg.Switches}} {
 		if attr.value.IsUnknown() {
 			resp.Diagnostics.AddAttributeError(pathRoot(attr.name), "Unknown switch "+attr.name,
 				"The provider cannot create the switch client because `"+attr.name+"` is not known yet. Apply the resource that provides it first "+
@@ -181,7 +218,7 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		for _, f := range []struct {
 			attr  string
 			value attr.Value
-		}{{"host", e.Host}, {"username", e.Username}, {"password", e.Password}} {
+		}{{"host", e.Host}, {"mac", e.MAC}, {"username", e.Username}, {"password", e.Password}} {
 			if f.value.IsUnknown() {
 				resp.Diagnostics.AddAttributeError(pathRoot("switches").AtMapKey(name).AtName(f.attr), "Unknown switch "+f.attr,
 					"The provider cannot create the client for switch "+name+" because `"+f.attr+"` is not known yet; set it statically or apply the resource that provides it first.")
@@ -189,11 +226,16 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		}
 	}
 	host := envOr(cfg.Host, envHost)
+	mac := envOr(cfg.MAC, envMAC)
 	user := envOr(cfg.Username, envUsername)
 	pass := envOr(cfg.Password, envPassword)
-	hasDefault := host != "" || len(entries) == 0
-	if hasDefault && host == "" {
-		resp.Diagnostics.AddAttributeError(pathRoot("host"), "Missing switch host", "Set `host` or TPLINK_EASYSMART_HOST, or define switches with `switches`.")
+	hasDefault := host != "" || mac != "" || len(entries) == 0
+	if hasDefault && host == "" && mac == "" {
+		resp.Diagnostics.AddAttributeError(pathRoot("host"), "Missing switch host or MAC address",
+			"Set `host` or `mac` (or TPLINK_EASYSMART_HOST / TPLINK_EASYSMART_MAC), or define switches with `switches`.")
+	}
+	if _, err := parseMAC(mac); mac != "" && err != nil {
+		resp.Diagnostics.AddAttributeError(pathRoot("mac"), "Invalid MAC address", err.Error())
 	}
 	if hasDefault && (user == "" || pass == "") {
 		resp.Diagnostics.AddError("Missing credentials", "Set `username`/`password` or TPLINK_EASYSMART_USERNAME/TPLINK_EASYSMART_PASSWORD.")
@@ -203,19 +245,30 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 	providerTimeout := timeoutOr(cfg.TimeoutSeconds, defaultTimeout)
 	reg := &switchRegistry{named: map[string]SwitchClient{}}
-	hosts := map[string]string{} // host -> switch, so one device is never configured twice
+	seen := map[string]string{} // "host x" or "mac x" -> switch, so one device is never configured twice
 	providerAllow := cfg.AllowUnverifiedFirmware.ValueBool()
-	build := func(name, h, u, pw string, timeout time.Duration, allowUnverified bool) {
+	build := func(name, h, m, u, pw string, timeout time.Duration, allowUnverified bool) {
 		label := name
 		if label == "" {
 			label = "the provider's own switch"
 		}
-		if other, dup := hosts[h]; dup {
-			resp.Diagnostics.AddError("Same switch configured twice", fmt.Sprintf("%s and %s have the same host %q; two clients on one switch would compete for it.", other, label, h))
+		hw, err := parseMAC(m)
+		if m != "" && err != nil { // the schema validator catches this earlier; the environment is checked here
+			resp.Diagnostics.AddError("Invalid MAC address", fmt.Sprintf("%s: %s", label, err))
 			return
 		}
-		hosts[h] = label
-		c, err := p.newClient(escp.Config{Host: h, Username: u, Password: pw, Timeout: timeout, WriteGate: firmwareWriteGate(allowUnverified)})
+		for _, id := range []struct{ kind, value string }{{"host", h}, {"mac", hw.String()}} {
+			if id.value == "" {
+				continue
+			}
+			key := id.kind + " " + id.value
+			if other, dup := seen[key]; dup {
+				resp.Diagnostics.AddError("Same switch configured twice", fmt.Sprintf("%s and %s have the same %s %q; two clients on one switch would compete for it.", other, label, id.kind, id.value))
+				return
+			}
+			seen[key] = label
+		}
+		c, err := p.newClient(escp.Config{Host: h, MAC: hw, Username: u, Password: pw, Timeout: timeout, WriteGate: firmwareWriteGate(allowUnverified)})
 		if err != nil {
 			resp.Diagnostics.AddError("Cannot configure switch client", fmt.Sprintf("%s: %s", label, err))
 			return
@@ -227,7 +280,7 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		reg.named[name] = c
 	}
 	if hasDefault {
-		build("", host, user, pass, providerTimeout, providerAllow)
+		build("", host, mac, user, pass, providerTimeout, providerAllow)
 	}
 	for _, name := range sortedKeys(entries) {
 		e := entries[name]
@@ -235,7 +288,7 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		if !e.AllowUnverifiedFirmware.IsNull() {
 			allow = e.AllowUnverifiedFirmware.ValueBool()
 		}
-		build(name, e.Host.ValueString(), e.Username.ValueString(), e.Password.ValueString(), timeoutOr(e.TimeoutSeconds, providerTimeout), allow)
+		build(name, e.Host.ValueString(), e.MAC.ValueString(), e.Username.ValueString(), e.Password.ValueString(), timeoutOr(e.TimeoutSeconds, providerTimeout), allow)
 	}
 	if resp.Diagnostics.HasError() {
 		return
