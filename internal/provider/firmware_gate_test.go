@@ -162,6 +162,13 @@ func (g *gatedClient) SetHostname(ctx context.Context, name string) error {
 	return g.SwitchClient.SetHostname(ctx, name)
 }
 
+func (g *gatedClient) EnableDHCP(ctx context.Context) error {
+	if err := g.allow(ctx); err != nil {
+		return err
+	}
+	return g.SwitchClient.EnableDHCP(ctx)
+}
+
 func (g *gatedClient) SetIPConfig(ctx context.Context, cfg escp.IPConfig) error {
 	if err := g.allow(ctx); err != nil {
 		return err
@@ -178,7 +185,7 @@ func TestGatedTestClientCoversEveryWriteMethod(t *testing.T) {
 	checked := 0
 	for i := 0; i < ifaceType.NumMethod(); i++ {
 		m := ifaceType.Method(i)
-		if !strings.HasPrefix(m.Name, "Set") && !strings.HasPrefix(m.Name, "Delete") {
+		if !strings.HasPrefix(m.Name, "Set") && !strings.HasPrefix(m.Name, "Delete") && !strings.HasPrefix(m.Name, "Enable") {
 			continue
 		}
 		checked++

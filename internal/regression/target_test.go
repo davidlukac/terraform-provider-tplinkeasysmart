@@ -111,6 +111,17 @@ func TestLoadTargetMove(t *testing.T) {
 	}
 }
 
+func TestLoadTargetDHCP(t *testing.T) {
+	e := sw03Env()
+	if got, err := LoadTarget(e); err != nil || got.DHCP {
+		t.Fatalf("without the opt-in: %+v, %v", got, err)
+	}
+	e[EnvAllowDHCP] = "1"
+	if got, err := LoadTarget(e); err != nil || !got.DHCP {
+		t.Fatalf("with the opt-in: %+v, %v", got, err)
+	}
+}
+
 func TestLoadTargetDisruptPort(t *testing.T) {
 	got, err := LoadTarget(sw03Env())
 	if err != nil || got.DisruptPort != 0 {

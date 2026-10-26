@@ -103,7 +103,7 @@ Write support exists only where it cannot cut management access. Per-port and pe
 |---|---|---|
 | `tplinkeasysmart_led` | System > LED On/Off | none needed |
 | `tplinkeasysmart_system` | System > System Info (device description) | IP config re-sent unchanged and verified; skipped if unchanged |
-| `tplinkeasysmart_management_ip` | System > IP Setting (static address, mask, gateway) | `allow_disruptive` for every change; DHCP switches refused |
+| `tplinkeasysmart_management_ip` | System > IP Setting (static address, mask, gateway) | `allow_disruptive` for every change, between a static address and a DHCP lease included (`dhcp = true` needs the switch's `mac`) |
 | `tplinkeasysmart_igmp_snooping` | Switching > IGMP Snooping | none |
 | `tplinkeasysmart_loop_prevention` | Monitoring > Loop Prevention | none |
 | `tplinkeasysmart_qos` | QoS > QoS Basic | priorities only in port-based mode |
@@ -119,14 +119,14 @@ Write support exists only where it cannot cut management access. Per-port and pe
 
 **Data sources** (read-only): `system_info`, `ports`, `port_statistics`, `lags`, `port_mirror`, `qos`, `bandwidth_control`, `storm_control`, `vlan_mtu`, `vlan_port_based`, `vlan_8021q`, and `config_backup` (the configuration file, optional and sensitive).
 
-Deliberately **not** writable: DHCP on/off, user account, config restore, reboot, factory reset and firmware upgrade. These are the changes that can lock you out of a device that has no console. The full reference for every resource and data source is in [`docs/`](docs/index.md) and on the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart/latest/docs).
+Deliberately **not** writable: user account, config restore, reboot, factory reset and firmware upgrade. These are the changes that can lock you out of a device that has no console. The full reference for every resource and data source is in [`docs/`](docs/index.md) and on the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart/latest/docs).
 
 ## Safety by design
 
 A managed switch is the one device you cannot reach when you misconfigure it. The provider is built around that.
 
 - **Guards.** `port`, `bandwidth_limit`, `storm_limit`, `port_mirror`, `lag`, `vlan_port_based_group`, `vlan_8021q_group` and `vlan_8021q_pvid` refuse to touch a port that has a link up or belongs to a LAG, because that is how you cut your own uplink. Set `allow_disruptive = true` on the object to take the risk deliberately.
-- **Management address.** `management_ip` moves the switch only with `allow_disruptive = true`, validates the address, mask and gateway while planning, and the client follows the switch to its new address and checks it answers there.
+- **Management address.** `management_ip` moves the switch only with `allow_disruptive = true`, validates the address, mask and gateway while planning, and the client follows the switch to its new address and checks it answers there. With `dhcp = true` the switch takes the address its DHCP server gives it; that needs the switch's `mac` in the provider configuration, because only a lookup by MAC finds it again.
 - **VLAN mode.** Switching between MTU, port-based and 802.1Q VLAN discards the other modes' settings and can cut every connection, so `vlan_mode` refuses unless `allow_disruptive = true`; applying the mode the switch already has writes nothing.
 - **Firmware guard.** Writes are refused while the switch runs a firmware build this provider was not verified against (reads and imports always work). `allow_unverified_firmware = true` opts in.
 - **Import the uplink, protect it.** Bring the LAG that carries your router uplink under management and add `lifecycle { prevent_destroy = true }`.

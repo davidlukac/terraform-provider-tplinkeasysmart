@@ -2,14 +2,16 @@
 page_title: "tplinkeasysmart_management_ip Resource - tplinkeasysmart"
 subcategory: "System"
 description: |-
-  The static management address of the switch (System > IP Setting): IP address, subnet mask and default gateway. Singleton; import with id management_ip. Safety: changing it moves the switch, which can cut the management path, so the provider refuses unless allow_disruptive = true. The DHCP flag and the device description are sent back as the switch reports them (the switch must already use a static address). After the apply, point the provider's host at the new address. Applying the address the switch already has writes nothing. Destroying only removes it from state.
+  The management address of the switch (System > IP Setting): a static IP address, subnet mask and default gateway, or a lease from a DHCP server (dhcp = true). Singleton; import with id management_ip. Safety: changing it moves the switch, which can cut the management path, so the provider refuses unless allow_disruptive = true. Changing a static address needs the new address in the provider's host, or the switch's MAC in the provider's mac, which finds it wherever it is. Turning DHCP on needs mac as well, because the leased address is not known in advance. The device description is sent back as the switch reports it. Applying what the switch already has writes nothing. Destroying only removes it from state.
 ---
 
 # tplinkeasysmart_management_ip (Resource)
 
-The static management address of the switch (System > IP Setting): IP address, subnet mask and default gateway. Singleton; import with id `management_ip`. **Safety:** changing it moves the switch, which can cut the management path, so the provider refuses unless `allow_disruptive = true`. The DHCP flag and the device description are sent back as the switch reports them (the switch must already use a static address). After the apply, point the provider's `host` at the new address. Applying the address the switch already has writes nothing. Destroying only removes it from state.
+The management address of the switch (System > IP Setting): a static IP address, subnet mask and default gateway, or a lease from a DHCP server (`dhcp = true`). Singleton; import with id `management_ip`. **Safety:** changing it moves the switch, which can cut the management path, so the provider refuses unless `allow_disruptive = true`. Changing a static address needs the new address in the provider's `host`, or the switch's MAC in the provider's `mac`, which finds it wherever it is. Turning DHCP on needs `mac` as well, because the leased address is not known in advance. The device description is sent back as the switch reports it. Applying what the switch already has writes nothing. Destroying only removes it from state.
 
-~> **Safety** Moving the switch to another address, mask or gateway can cut the management path for good: there is no console, and recovery is a physical factory reset. The provider refuses to change it unless `allow_disruptive = true`, validates the values while planning (IPv4, a contiguous mask between /8 and /30, a usable host address, a gateway inside the subnet) and only manages a static address: a switch that leases its address by DHCP is refused. After the change the provider's `host` must point at the new address, so update it right after the apply; the same run keeps working because the client follows the switch. If the switch does not answer at the new address in time, the apply fails and says to look at both addresses. Pick an address outside your router's DHCP pool. On the verified firmware (20250710) a move took about two seconds, and the address, mask and gateway were each changed and restored live with no change to the rest of the configuration.
+~> **Safety** Moving the switch to another address, mask or gateway, or between a static address and a DHCP lease, can cut the management path for good: there is no console, and recovery is a physical factory reset. The provider refuses to change it unless `allow_disruptive = true` and validates the values while planning (IPv4, a contiguous mask between /8 and /30, a usable host address, a gateway inside the subnet). After a change of the static address the provider's `host` must point at the new address, so update it right after the apply; the same run keeps working because the client follows the switch. If the switch does not answer at the new address in time, the apply fails and says to look at both addresses. Pick a static address outside your router's DHCP pool. On the verified firmware (20250710) a move took about two seconds, and the address, mask and gateway were each changed and restored live with no change to the rest of the configuration.
+
+~> **DHCP** With `dhcp = true` the switch leases its address, normally from the router's pool, and `ip_address`, `netmask` and `gateway` report the lease. The switch is silent for a few seconds while it asks for it (about four seconds in total on the verified firmware). The provider needs the switch's `mac` in its configuration (the provider block or the `switches` entry) to turn DHCP on: the leased address is not known in advance, and only a lookup by MAC finds the switch again in the next run. A switch that leases an address ignores a static one, so turning DHCP off needs `ip_address`, `netmask` and `gateway`. Make sure the router's DHCP server is up before you turn it on; a switch that gets no lease has no address to be managed at.
 
 ## Example Usage
 
@@ -25,20 +27,27 @@ resource "tplinkeasysmart_management_ip" "this" {
   # Needed for the change itself; remove it again once the switch is at its new address.
   allow_disruptive = true
 }
+
+# Or lease the address from the DHCP server instead. The provider needs the switch's `mac`
+# (provider block or `switches` entry) to find it at the address it is given; the three
+# address attributes then report the lease and must not be set.
+#
+# resource "tplinkeasysmart_management_ip" "this" {
+#   dhcp             = true
+#   allow_disruptive = true
+# }
 ```
 
 <!-- schema generated by tfplugindocs -->
 ## Schema
 
-### Required
-
-- `gateway` (String) Default gateway: another host address of the subnet, or `0.0.0.0` for none. A wrong gateway only cuts the switch's route out of its subnet.
-- `ip_address` (String) IPv4 address of the switch. Must be a host address of the subnet; keep it out of the DHCP pool of the router.
-- `netmask` (String) Subnet mask, a contiguous prefix between /8 (`255.0.0.0`) and /30 (`255.255.255.252`).
-
 ### Optional
 
-- `allow_disruptive` (Boolean) Allow moving the switch to another address, mask or gateway. Defaults to false.
+- `allow_disruptive` (Boolean) Allow moving the switch to another address, mask or gateway, or between a static address and a lease. Defaults to false.
+- `dhcp` (Boolean) Lease the address from a DHCP server instead of using a static one. Defaults to false. Turning it on needs the switch's `mac` in the provider configuration, because the switch takes the address the server gives it, which only a lookup by MAC can find again. A switch that leases an address ignores a static one, so turning it off needs `ip_address`, `netmask` and `gateway`.
+- `gateway` (String) Default gateway: another host address of the subnet, or `0.0.0.0` for none. A wrong gateway only cuts the switch's route out of its subnet. Required with `dhcp = false`; reports the leased gateway with `dhcp = true`.
+- `ip_address` (String) IPv4 address of the switch. Required with `dhcp = false`; must be a host address of the subnet and outside the DHCP pool of the router. Must not be set with `dhcp = true`, where it reports the leased address.
+- `netmask` (String) Subnet mask, a contiguous prefix between /8 (`255.0.0.0`) and /30 (`255.255.255.252`). Required with `dhcp = false`; reports the leased mask with `dhcp = true`.
 - `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
 
 ### Read-Only

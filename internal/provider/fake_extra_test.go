@@ -29,8 +29,12 @@ type extraState struct {
 	static          bool   // the switch uses a static address (DHCP off); the default fake leases one
 	ipSetCalls      int
 	ipSetErr        error
-	ipIgnoreSet     bool   // accept SetIPConfig but keep the old address
-	firmware        string // the firmware version Info reports; empty means defaultFakeFirmware
+	ipIgnoreSet     bool      // accept SetIPConfig but keep the old address
+	dhcpCalls       int       // EnableDHCP calls
+	dhcpErr         error     // EnableDHCP fails
+	dhcpIgnore      bool      // EnableDHCP is accepted but the switch stays static
+	lease           [3]string // ip, mask and gateway the fake leases; empty means 192.0.2.85 / 255.255.255.0 / 192.0.2.1
+	firmware        string    // the firmware version Info reports; empty means defaultFakeFirmware
 }
 
 // defaultFakeFirmware is the build the fakes report unless a test sets another: the verified baseline.
@@ -101,6 +105,23 @@ func (f *fakeClient) SetIPConfig(_ context.Context, cfg escp.IPConfig) error {
 	}
 	if !e.ipIgnoreSet {
 		e.ip, e.netmask, e.gateway = cfg.IP.String(), cfg.Netmask.String(), cfg.Gateway.String()
+		e.static = true // writing a static address turns DHCP off
+	}
+	return nil
+}
+
+// EnableDHCP makes the fake switch lease an address, like the real one: Info reports the lease afterwards.
+func (f *fakeClient) EnableDHCP(context.Context) error {
+	e := f.extra()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.dhcpCalls++
+	if e.dhcpErr != nil {
+		return e.dhcpErr
+	}
+	if !e.dhcpIgnore {
+		e.static = false
+		e.ip, e.netmask, e.gateway = orDefault(e.lease[0], "192.0.2.85"), orDefault(e.lease[1], "255.255.255.0"), orDefault(e.lease[2], "192.0.2.1")
 	}
 	return nil
 }

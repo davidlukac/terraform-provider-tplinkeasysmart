@@ -3,7 +3,6 @@ package escp
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"time"
 
@@ -78,14 +77,7 @@ func (c *Client) relocate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	ip := net.ParseIP(found.IP).To4()
-	if ip == nil {
-		return fmt.Errorf("%w: %s answered without a usable address", ErrNotFound, c.cfg.MAC)
-	}
-	c.dest.IP = ip
-	c.hostMAC = localMAC(ip)
-	c.session = nil
-	return nil
+	return c.follow(found)
 }
 
 // infoFromReply maps the TLVs of a discovery reply to Info; absent or

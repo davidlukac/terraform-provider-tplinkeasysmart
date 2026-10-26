@@ -173,3 +173,82 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 		}},
 	}})
 }
+
+// bringBackFromALease puts the switch back on its static address whatever happened to the run: when
+// the switch is already there with DHCP off it does nothing; otherwise it looks the switch up by its
+// MAC address, wherever the lease put it, and writes the static address back. It runs even when the
+// scenario failed halfway.
+func (s *Session) bringBackFromALease(t *testing.T, mac net.HardwareAddr, original escp.IPConfig) {
+	ctx, cancel := context.WithTimeout(context.Background(), settleTime)
+	defer cancel()
+	found, err := escp.Locate(ctx, mac, escp.DiscoverOptions{})
+	if err != nil {
+		t.Errorf("CANNOT FIND THE SWITCH: %v. Look for MAC %s with a discovery before doing anything else", err, mac)
+		return
+	}
+	if found.IP == original.IP.String() && !found.DHCP {
+		return
+	}
+	t.Logf("the switch is at %s with DHCP %t; writing %s back", found.IP, found.DHCP, original)
+	c, err := s.dialClient(escp.Config{Host: found.IP, MAC: mac, Username: s.Target.Username, Password: s.Target.Password})
+	if err != nil {
+		t.Errorf("CANNOT REACH THE SWITCH at %s: %v", found.IP, err)
+		return
+	}
+	defer func() { _ = c.Close() }() // best effort at the end of the run
+	if err := c.SetIPConfig(ctx, original); err != nil {
+		t.Errorf("CANNOT PUT THE STATIC ADDRESS BACK: %v. The switch may be at %s or at %s; look for MAC %s before doing anything else", err, found.IP, original.IP, mac)
+	}
+}
+
+// Turning DHCP on and off through the provider, with the switch named by its MAC address only: the
+// router's DHCP server gives it an address, the next Terraform commands find it there by themselves,
+// and the static address goes back with the DHCP flag off. Only when the run opted in
+// (TPLINK_REGRESSION_ALLOW_DHCP=1) and on hardware: the fake has no network to lease from.
+func TestScenarioManagementDHCP(t *testing.T) {
+	s := openForScenario(t)
+	if s.Fake != nil {
+		t.Skip("the lease needs hardware and a DHCP server; the provider and library tests cover it on the fake")
+	}
+	if !s.Target.DHCP {
+		t.Skip("set " + EnvAllowDHCP + "=1 to turn DHCP on and back off (the router's DHCP server must be up)")
+	}
+	ctx := context.Background()
+	info, err := s.Client.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.DHCP {
+		t.Fatal("the switch already leases its address; the scenario starts from a static one")
+	}
+	hw, err := net.ParseMAC(info.MAC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := ipConfigOfInfo(info)
+	t.Cleanup(func() { s.bringBackFromALease(t, hw, original) }) // registered before the first write
+
+	provider := s.ProviderHCLByMAC("", info.MAC)
+	dhcp := provider + "resource \"tplinkeasysmart_management_ip\" \"this\" {\n  dhcp             = true\n  allow_disruptive = true\n}\n"
+	static := provider + fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", info.IP, info.Netmask, info.Gateway)
+	leased := func(*terraform.State) error {
+		found, err := escp.Locate(ctx, hw, escp.DiscoverOptions{})
+		if err != nil || !found.DHCP {
+			return fmt.Errorf("the switch found by MAC reports %+v, err %w, want DHCP on", found, err)
+		}
+		t.Logf("leased address %s mask %s gateway %s", found.IP, found.Netmask, found.Gateway)
+		return nil
+	}
+	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+		{Config: dhcp, Check: resource.ComposeAggregateTestCheckFunc(leased, resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.this", "dhcp", "true"),
+			resource.TestCheckResourceAttrSet("tplinkeasysmart_management_ip.this", "ip_address"))},
+		{Config: dhcp}, // the second look: nothing to change, the plan after the apply is empty
+		{Config: static, Check: func(st *terraform.State) error {
+			found, err := escp.Locate(ctx, hw, escp.DiscoverOptions{})
+			if err != nil || found.DHCP || found.IP != info.IP {
+				return fmt.Errorf("the switch found by MAC reports %+v, err %w, want %s with DHCP off", found, err, info.IP)
+			}
+			return s.restoredCheck(t)(st)
+		}},
+	}})
+}

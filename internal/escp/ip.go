@@ -87,8 +87,10 @@ func broadcastOf(n net.IPNet) net.IP {
 	return out
 }
 
-// SetIPConfig changes the static management address, keeping the device
-// description and the DHCP flag as the switch reports them.
+// SetIPConfig gives the switch a static management address, keeping the device description as
+// the switch reports it. It turns DHCP off: a switch that leases its address ignores a static
+// one written next to the flag (measured on switch 03, firmware 20250710), so the flag is
+// written off with the address, and the switch is at that address a fraction of a second later.
 //
 // DANGER: this moves the switch. The request is answered from the old or the
 // new address, so the client accepts replies from both and, once the switch
@@ -109,10 +111,8 @@ func broadcastOf(n net.IPNet) net.IP {
 // reported as ErrMoveUnconfirmed, not as "not applied". A write the switch refuses, or the gate refuses, is not probed:
 // nothing was applied.
 //
-// A switch that has DHCP on keeps its leased address whatever it is written, so this
-// is not meant for it (the Terraform provider refuses it); writing a static address
-// to such a switch was never tried on hardware. Callers must guard: a wrong address,
-// mask or gateway can cut the management path for good.
+// Callers must guard: a wrong address, mask or gateway can cut the management path for good.
+// EnableDHCP is the way back to a lease.
 func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	if err := validateIPConfig(cfg, c.allowLoopback); err != nil {
 		return err
@@ -128,7 +128,7 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	c.mu.Lock()
 	c.alsoFrom = cfg.IP.To4()
 	c.mu.Unlock()
-	sent, err := c.writeSystem(ctx, Operation{Name: "SetIPConfig", Impact: ImpactManagement}, info.Hostname, info.DHCP, cfg)
+	sent, err := c.writeSystem(ctx, Operation{Name: "SetIPConfig", Impact: ImpactManagement}, info.Hostname, false, cfg)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var refused *RejectedError
@@ -179,7 +179,7 @@ func classifyLostReply(mac string, before, want IPConfig, after Info) lostReplyO
 	switch {
 	case err != nil:
 		return lostReplyUnexpected
-	case got.equal(want):
+	case got.equal(want) && !after.DHCP:
 		return lostReplyApplied
 	case got.equal(before):
 		return lostReplyUnchanged
@@ -225,7 +225,7 @@ func (c *Client) awaitAddress(ctx context.Context, want IPConfig) error {
 	ctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
 	for {
-		if info, err := c.discover(ctx); err == nil && info.IP == want.IP.String() {
+		if info, err := c.discover(ctx); err == nil && info.IP == want.IP.String() && !info.DHCP {
 			return nil
 		}
 		select {
