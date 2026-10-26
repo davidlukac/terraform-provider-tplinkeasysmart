@@ -576,3 +576,73 @@ func TestScenarioConfigBackupDataSource(t *testing.T) {
 		}},
 	})
 }
+
+// managementIP is a tplinkeasysmart_management_ip resource for the given address triple.
+func managementIP(ip, mask, gateway string) string {
+	return fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address = %q\n  netmask    = %q\n  gateway    = %q\n}\n", ip, mask, gateway)
+}
+
+// writesUnchanged returns a check that the fake received no write since n; on hardware the
+// readout comparison that closes every scenario is the only evidence, as there is no counter.
+func (s *Session) writesUnchanged(n int) resource.TestCheckFunc {
+	return func(*terraform.State) error {
+		if s.Fake != nil {
+			if got := s.Fake.WriteCount(); got != n {
+				return fmt.Errorf("the switch received %d write(s), want none", got-n)
+			}
+		}
+		return nil
+	}
+}
+
+// The management address is managed with the address the switch already has: nothing is written,
+// the resource imports, and the plan is clean. Moving the switch is not part of this scenario
+// (see the live move in the sw03 target): the fake answers on loopback, where the client refuses
+// to move it, and a move to a documentation address would aim packets at nothing.
+func TestScenarioManagementAddressUnchanged(t *testing.T) {
+	s := openForScenario(t)
+	info, err := s.Client.Info(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := s.ProviderHCL() + managementIP(info.IP, info.Netmask, info.Gateway)
+	writes := 0
+	if s.Fake != nil {
+		writes = s.Fake.WriteCount()
+	}
+	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+		{Config: cfg, Check: resource.ComposeTestCheckFunc(
+			resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.this", "ip_address", info.IP),
+			resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.this", "id", "management_ip"),
+			s.writesUnchanged(writes),
+			s.restoredCheck(t))},
+		{Config: cfg, ResourceName: "tplinkeasysmart_management_ip.this", ImportState: true, ImportStateVerify: true,
+			ImportStateVerifyIgnore: []string{"allow_disruptive"}},
+	}})
+}
+
+// A different mask is refused while allow_disruptive is false, before anything is written, and a
+// mask that is not a prefix is refused at plan time.
+func TestScenarioManagementAddressRefusals(t *testing.T) {
+	s := openForScenario(t)
+	info, err := s.Client.Info(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := "255.255.0.0"
+	if info.Netmask == other {
+		other = "255.255.255.0"
+	}
+	writes := 0
+	if s.Fake != nil {
+		writes = s.Fake.WriteCount()
+	}
+	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+		{Config: s.ProviderHCL() + managementIP(info.IP, other, info.Gateway),
+			ExpectError: regexp.MustCompile(`Refusing to change the management address`)},
+		{Config: s.ProviderHCL() + managementIP(info.IP, "255.0.255.0", info.Gateway),
+			ExpectError: regexp.MustCompile(`contiguous prefix`)},
+		{Config: s.ProviderHCL() + managementIP(info.IP, info.Netmask, info.Gateway), Check: resource.ComposeTestCheckFunc(
+			s.writesUnchanged(writes), s.restoredCheck(t))},
+	}})
+}
