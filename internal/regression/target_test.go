@@ -1,6 +1,7 @@
 package regression
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -60,6 +61,9 @@ func TestLoadTargetRefusals(t *testing.T) {
 		{"disrupt a test port", with(envDisruptPort, "3"), "not a device port"},
 		{"disrupt two ports", with(envDisruptPort, "6,7"), "not one port number"},
 		{"disrupt a non-number", with(envDisruptPort, "x"), "not one port number"},
+		{"disruptive uplink", with(envDisruptivePorts, "1,7"), "not a device port"},
+		{"disruptive test port", with(envDisruptivePorts, "7,3"), "not a device port"},
+		{"disruptive not numbers", with(envDisruptivePorts, "x"), "not a list of port numbers"},
 		{"move without an address", with(EnvAllowMove, "1"), "not an IPv4 address"},
 		{"move to a name", func() map[string]string { e := with(EnvAllowMove, "1"); e[envMoveIP] = "spare"; return e }(), "not an IPv4 address"},
 		{"move to its own address", func() map[string]string { e := with(EnvAllowMove, "1"); e[envMoveIP] = "192.0.2.13"; return e }(), "own address"},
@@ -117,5 +121,21 @@ func TestLoadTargetDisruptPort(t *testing.T) {
 	got, err = LoadTarget(e)
 	if err != nil || got.DisruptPort != 8 {
 		t.Fatalf("with the opt-in: %+v, %v", got, err)
+	}
+}
+
+func TestLoadTargetDisruptivePorts(t *testing.T) {
+	got, err := LoadTarget(sw03Env())
+	if err != nil || len(got.DisruptivePorts) != 0 {
+		t.Fatalf("without the opt-in: %+v, %v", got, err)
+	}
+	e := sw03Env()
+	e[envDisruptivePorts] = "7, 8"
+	got, err = LoadTarget(e)
+	if err != nil || fmt.Sprint(got.DisruptivePorts) != "[7 8]" {
+		t.Fatalf("with the opt-in: %+v, %v", got, err)
+	}
+	if fake, _ := LoadTarget(map[string]string{}); fmt.Sprint(fake.DisruptivePorts) != "[7 8]" {
+		t.Fatalf("the fake always runs the disruptive scenarios, on its device ports 7 and 8: %v", fake.DisruptivePorts)
 	}
 }

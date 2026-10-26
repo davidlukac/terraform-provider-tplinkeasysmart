@@ -38,6 +38,9 @@ const (
 	// envDisruptPort opts in to the allow_disruptive scenario writing to this device port (a brief
 	// link drop). It must be a protected port other than the first, which is the uplink.
 	envDisruptPort = "TPLINK_REGRESSION_DISRUPT_DEVICE_PORT"
+	// envDisruptivePorts opts in to the disruptive scenarios (real changes behind allow_disruptive on
+	// ports that carry a device). The ports must be protected ports other than the uplink.
+	envDisruptivePorts = "TPLINK_REGRESSION_DISRUPTIVE_PORTS"
 )
 
 // Target says what a run talks to and what it may touch.
@@ -54,6 +57,9 @@ type Target struct {
 	MoveIP string
 	// DisruptPort is the device port the allow_disruptive scenario may write to; zero unless the run opted in.
 	DisruptPort int
+	// DisruptivePorts are the device ports the disruptive scenarios may change for real (a link
+	// drop, a LAG, a VLAN, a mirror destination); empty unless the run opted in. Never the uplink.
+	DisruptivePorts []int
 }
 
 // Real reports whether the target is hardware.
@@ -87,7 +93,7 @@ func LoadTarget(env map[string]string) (Target, error) {
 	switch name {
 	case "", TargetFake:
 		return Target{Name: TargetFake, Host: "127.0.0.1", Username: "admin", Password: "secret",
-			TestPorts: []int{2, 3, 4, 5}, ProtectedPorts: []int{1, 6, 7, 8}}, nil
+			TestPorts: []int{2, 3, 4, 5}, ProtectedPorts: []int{1, 6, 7, 8}, DisruptivePorts: []int{7, 8}}, nil
 	case TargetSW03:
 	case targetSW01:
 		return Target{}, errors.New("switch 01 is read-only for the regression suite and is never a target")
@@ -136,6 +142,19 @@ func LoadTarget(env map[string]string) (Target, error) {
 			return Target{}, fmt.Errorf("%s: port %d is not a device port (the protected ports other than the uplink, which is listed first, are %v)", envDisruptPort, ports[0], t.ProtectedPorts[min(1, len(t.ProtectedPorts)):])
 		}
 		t.DisruptPort = ports[0]
+	}
+	if v := env[envDisruptivePorts]; v != "" {
+		ports, err := parsePorts(v)
+		if err != nil || len(ports) == 0 {
+			return Target{}, fmt.Errorf("%s: %q is not a list of port numbers", envDisruptivePorts, v)
+		}
+		devices := t.ProtectedPorts[min(1, len(t.ProtectedPorts)):]
+		for _, p := range ports {
+			if !slices.Contains(devices, p) {
+				return Target{}, fmt.Errorf("%s: port %d is not a device port (the protected ports other than the uplink, which is listed first, are %v)", envDisruptivePorts, p, devices)
+			}
+		}
+		t.DisruptivePorts = ports
 	}
 	return t, nil
 }
