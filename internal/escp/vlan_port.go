@@ -13,17 +13,19 @@ const (
 	pvlanEntryLen = pvlanOffMask + maskLen
 )
 
-// PortVLAN is one port-based VLAN group.
+// PortVLAN is one port-based VLAN group: the VLAN id (1 to MaxByteID) and its member ports.
+// Membership is exclusive: a port is in one group at a time.
 type PortVLAN struct {
 	ID    int
 	Ports []int
 }
 
-// PortBasedVLAN is VLAN > Port Based VLAN.
+// PortBasedVLAN is the port-based VLAN state (VLAN > Port Based VLAN): whether this is the active
+// VLAN mode, how many groups the switch supports, and the groups that exist.
 type PortBasedVLAN struct {
-	Enabled bool
-	MaxVLAN int
-	VLANs   []PortVLAN
+	Enabled bool       // the port-based mode is the active VLAN mode
+	MaxVLAN int        // the most groups the switch supports (0 when it did not say)
+	VLANs   []PortVLAN // never nil
 }
 
 func parsePortBasedVLAN(tlvs []wire.TLV) (PortBasedVLAN, error) {

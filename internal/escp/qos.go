@@ -58,16 +58,17 @@ const (
 // Valid reports whether the priority is within PriorityLowest..PriorityHighest.
 func (p Priority) Valid() bool { return p >= PriorityLowest && p <= PriorityHighest }
 
-// PortPriority is a port's priority queue.
+// PortPriority is a port's priority queue (PriorityLowest to PriorityHighest).
 type PortPriority struct {
 	Port     int
 	Priority Priority
 }
 
-// QoS is QoS > QoS Basic.
+// QoS is the QoS Basic page: the mode and, for every port, a priority. The priorities are only
+// effective in QoSPortBased mode, but the switch reports them in every mode.
 type QoS struct {
 	Mode       QoSMode
-	Priorities []PortPriority
+	Priorities []PortPriority // one entry per port
 }
 
 func parseQoS(tlvs []wire.TLV) (QoS, error) {

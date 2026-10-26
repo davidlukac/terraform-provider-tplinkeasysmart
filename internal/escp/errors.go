@@ -45,6 +45,8 @@ type RejectedError struct {
 	Reason string
 }
 
+// Error names the code and, when the client knows it, the reason; for an unknown code it says only that
+// the credentials, the setting or the value may be at fault, because the switch does not say which.
 func (e *RejectedError) Error() string {
 	if e.Reason != "" {
 		return fmt.Sprintf("%s (error code %d): %s", ErrRejected.Error(), e.Code, e.Reason)

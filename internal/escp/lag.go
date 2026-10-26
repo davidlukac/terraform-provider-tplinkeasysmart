@@ -114,7 +114,7 @@ func parseLAGs(tlvs []wire.TLV) ([]LAG, error) {
 	return out, nil
 }
 
-// LAGs reads the link aggregation groups.
+// LAGs reads the link aggregation groups (Switching > Port Trunk), unused ones included with no ports.
 func (c *Client) LAGs(ctx context.Context) ([]LAG, error) {
 	tlvs, err := c.getTLVs(ctx, wire.TLVLAG)
 	if err != nil {

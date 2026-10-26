@@ -58,7 +58,8 @@ type FirmwareError struct {
 	Err      error    // the cause (FirmwareUnreadable)
 }
 
-// Error implements error.
+// Error describes the refusal in neutral words (which build, what would have been accepted); front
+// ends word their own message from Reason.
 func (e *FirmwareError) Error() string {
 	switch e.Reason {
 	case FirmwareUnreadable:

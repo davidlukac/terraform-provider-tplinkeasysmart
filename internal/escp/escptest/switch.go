@@ -189,7 +189,8 @@ func (f *Switch) ClearSession() { f.mu.Lock(); f.session = nil; f.mu.Unlock() }
 // Configure changes the fake's behaviour under its lock.
 func (f *Switch) Configure(fn func(f *Switch)) { f.mu.Lock(); fn(f); f.mu.Unlock() }
 
-// SetBackupMode chooses how the configuration backup misbehaves.
+// SetBackupMode chooses how the configuration backup misbehaves (BackupOK, the default, is a
+// well-behaved switch); it applies to the next backup read.
 func (f *Switch) SetBackupMode(mode BackupMode) {
 	f.mu.Lock()
 	f.backupMode = mode

@@ -7,7 +7,7 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
-// LoopPrevention reports Monitoring > Loop Prevention.
+// LoopPrevention reports whether loop prevention (Monitoring > Loop Prevention) is on.
 func (c *Client) LoopPrevention(ctx context.Context) (bool, error) {
 	tlvs, err := c.getTLVs(ctx, wire.TLVLoopPrevention)
 	if err != nil {

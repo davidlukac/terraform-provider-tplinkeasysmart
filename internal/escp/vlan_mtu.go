@@ -29,7 +29,7 @@ func parseMTUVLAN(tlvs []wire.TLV) (MTUVLAN, error) {
 	return MTUVLAN{}, fmt.Errorf("escp: no valid MTU VLAN TLV in reply")
 }
 
-// MTUVLAN reads the MTU VLAN mode.
+// MTUVLAN reads whether the MTU VLAN mode is on and which port is its uplink.
 func (c *Client) MTUVLAN(ctx context.Context) (MTUVLAN, error) {
 	tlvs, err := c.getTLVs(ctx, wire.TLVVLANMTU)
 	if err != nil {

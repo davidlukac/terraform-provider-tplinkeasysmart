@@ -18,11 +18,11 @@ const (
 	igmpGroupLen = igmpOffPorts + maskLen
 )
 
-// IGMPGroup is one learned multicast group.
+// IGMPGroup is one multicast group the switch has learned through IGMP snooping.
 type IGMPGroup struct {
-	IP    string
-	VLAN  int
-	Ports []int
+	IP    string // the group address, dotted quad
+	VLAN  int    // the VLAN the group was learned in
+	Ports []int  // the ports that asked to receive it
 }
 
 // IGMP is the Switching > IGMP Snooping page.
