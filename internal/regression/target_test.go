@@ -56,6 +56,10 @@ func TestLoadTargetRefusals(t *testing.T) {
 		{"port zero", with(envTestPorts, "0"), "not a port number"},
 		{"bad protected port", with(envProtectedPorts, "-1"), "not a port number"},
 		{"test port is protected", with(envTestPorts, "2,6"), "both a test port and a protected port"},
+		{"move without an address", with(EnvAllowMove, "1"), "not an IPv4 address"},
+		{"move to a name", func() map[string]string { e := with(EnvAllowMove, "1"); e[envMoveIP] = "spare"; return e }(), "not an IPv4 address"},
+		{"move to its own address", func() map[string]string { e := with(EnvAllowMove, "1"); e[envMoveIP] = "192.0.2.13"; return e }(), "own address"},
+		{"move to switch 01", func() map[string]string { e := with(EnvAllowMove, "1"); e[envMoveIP] = "192.0.2.99"; return e }(), "read-only switch"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := LoadTarget(tc.env)
@@ -82,5 +86,19 @@ func TestParseEnvFile(t *testing.T) {
 	}
 	if _, err := ParseEnvFile(strings.NewReader("=v\n")); err == nil {
 		t.Error("an empty key was accepted")
+	}
+}
+
+func TestLoadTargetMove(t *testing.T) {
+	e := sw03Env()
+	e[envMoveIP] = "192.0.2.14"
+	got, err := LoadTarget(e)
+	if err != nil || got.MoveIP != "" {
+		t.Fatalf("without the opt-in the spare address is ignored: %+v, %v", got, err)
+	}
+	e[EnvAllowMove] = "1"
+	got, err = LoadTarget(e)
+	if err != nil || got.MoveIP != "192.0.2.14" {
+		t.Fatalf("with the opt-in: %+v, %v", got, err)
 	}
 }

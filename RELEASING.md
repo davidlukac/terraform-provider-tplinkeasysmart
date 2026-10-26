@@ -11,7 +11,7 @@ How a version of the provider is cut and published. Maintainers only.
 
 ## Cutting a version
 
-1. On a feature branch: bump `var version` in `main.go`, add the `CHANGELOG.md` entry, run `make test lint docs-check validate-examples`.
+1. On a feature branch: bump `var version` in `main.go`, add the `CHANGELOG.md` entry, run `make test lint docs-check validate-examples`. For a release that touches how a setting is written to the switch, also run the regression suite against the test switch (`make regression-live CONFIRM=1`, see the README; it needs hardware and is never part of CI) and attach its report to the PR.
 2. Open the PR, wait for CI, squash merge.
 3. On `main`, once the release PR is merged and pulled: check that `main.go` and the `CHANGELOG.md` entry both say `X.Y.Z`, then `git tag -a vX.Y.Z -m vX.Y.Z` and push **that one tag**.
 
