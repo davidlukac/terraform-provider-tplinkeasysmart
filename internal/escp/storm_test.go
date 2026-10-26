@@ -9,6 +9,19 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
+func TestStormControlRejectsInvalidPortBeforeSending(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFast(t, f, "secret")
+	for _, port := range []int{0, 33} {
+		if err := c.SetStormControl(context.Background(), StormConfig{Port: port, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64}); err == nil {
+			t.Errorf("port %d must be rejected", port)
+		}
+	}
+	if n := f.WriteCount(); n != 0 {
+		t.Fatalf("%d SET(s) reached the switch", n)
+	}
+}
+
 func TestParseStorm(t *testing.T) {
 	got, err := parseStorm([]wire.TLV{
 		tlvHex(t, wire.TLVStormControl, "010000000000000000"), // captured: everything off

@@ -111,3 +111,14 @@ func TestConfigBackupRefusesAnEndlessFragmentedReply(t *testing.T) {
 		t.Fatalf("want ErrReplyTooLarge, got %v", err)
 	}
 }
+
+// A wrong password is a refusal by the switch, for the backup as for every write.
+func TestConfigBackupRefusalIsARejection(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFake(t, f, "wrong")
+	_, err := c.ConfigBackup(context.Background())
+	var refused *RejectedError
+	if !errors.Is(err, ErrRejected) || !errors.As(err, &refused) || refused.Code != 5 {
+		t.Fatalf("want a *RejectedError with code 5, got %v", err)
+	}
+}

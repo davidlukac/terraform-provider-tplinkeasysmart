@@ -3,7 +3,8 @@ package escp
 import (
 	"context"
 	"errors"
-	"fmt"
+	"net"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -11,191 +12,179 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 )
 
-func dialFake(t *testing.T, f *escptest.Switch, pass string) *Client {
-	t.Helper()
-	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 300 * time.Millisecond,
-		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
-	c.allowLoopback = true
-	t.Cleanup(func() { c.Close() })
-	return c
-}
-
-// dialFast is dialFake with short timeouts and a single retry, for tests that
-// deliberately make the switch stay silent.
-func dialFast(t *testing.T, f *escptest.Switch, pass string) *Client {
-	t.Helper()
-	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 80 * time.Millisecond, Retries: 1,
-		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
-	c.allowLoopback = true
-	t.Cleanup(func() { c.Close() })
-	return c
-}
-
-func TestInfo(t *testing.T) {
-	c := dialFake(t, escptest.Start(t), "secret")
-	info, err := c.Info(context.Background())
+func TestDialAppliesDefaults(t *testing.T) {
+	c, err := Dial(Config{Host: "127.0.0.1"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Model != "TL-SG108E" || info.Hostname != "TL-SG108E-fake" || info.MAC != "00:00:5e:00:53:02" ||
-		info.Hardware != "TL-SG108E 6.0" || info.IP != "127.0.0.1" || !info.DHCP || !info.FactoryDefault {
-		t.Fatalf("unexpected info: %+v", info)
+	if c.cfg.Timeout != 3*time.Second || c.cfg.Retries != 2 || c.cfg.SwitchPort != defaultSwitchPort ||
+		c.cfg.HostPort != defaultHostPort || c.cfg.BroadcastAddr != "255.255.255.255" {
+		t.Fatalf("defaults not applied: %+v", c.cfg)
+	}
+	if c.conn != nil {
+		t.Fatal("Dial must not bind the UDP port; that happens on first use")
+	}
+	if err := c.Close(); err != nil {
+		t.Fatalf("closing a client that never opened a socket must succeed: %v", err)
 	}
 }
 
-func TestLEDRoundTrip(t *testing.T) {
-	f := escptest.Start(t)
-	c := dialFake(t, f, "secret")
-	ctx := context.Background()
-	on, err := c.LED(ctx)
-	if err != nil || !on {
-		t.Fatalf("LED = %v, %v; want true", on, err)
-	}
-	if err := c.SetLED(ctx, false); err != nil {
+func TestDialKeepsExplicitValues(t *testing.T) {
+	want := Config{Host: "127.0.0.1", Timeout: time.Second, Retries: 5, SwitchPort: 1111, HostPort: 2222, BroadcastAddr: "10.0.0.255"}
+	c, err := Dial(want)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if on, _ := c.LED(ctx); on {
-		t.Fatal("LED should be off")
-	}
-	if err := c.SetLED(ctx, true); err != nil {
-		t.Fatal(err)
-	}
-	if led, _, sets := f.State(); !led || sets != 2 {
-		t.Fatalf("fake state led=%v sets=%d", led, sets)
+	// Config holds a func (the write gate), so it is not comparable with ==; the gate is nil here.
+	if !reflect.DeepEqual(c.cfg, want) {
+		t.Fatalf("explicit configuration was overwritten: %+v", c.cfg)
 	}
 }
 
-func TestBadPassword(t *testing.T) {
-	f := escptest.Start(t)
-	c := dialFake(t, f, "wrong")
-	if err := c.SetLED(context.Background(), false); !errors.Is(err, ErrRejected) {
-		t.Fatalf("want ErrRejected, got %v", err)
-	}
-	if led, _, sets := f.State(); !led || sets != 0 {
-		t.Fatal("switch must be untouched after a rejected SET")
-	}
-}
-
-func TestRetryOnLostPacket(t *testing.T) {
-	f := escptest.Start(t)
-	f.DropFirst(2) // lose both datagrams of the first attempt (the probe goes to the switch and to the broadcast address)
-	c := dialFake(t, f, "secret")
-	if _, err := c.Info(context.Background()); err != nil {
-		t.Fatalf("expected retry to recover: %v", err)
-	}
-}
-
-func TestNoReply(t *testing.T) {
-	f := escptest.Start(t)
-	f.Mute()
-	c := dialFake(t, f, "secret")
-	c.cfg.Retries = 1
-	if _, err := c.Info(context.Background()); !errors.Is(err, ErrNoReply) {
-		t.Fatalf("want ErrNoReply, got %v", err)
-	}
-}
-
-func TestSessionRecoversAfterSwitchRestart(t *testing.T) {
-	f := escptest.Start(t)
-	c := dialFake(t, f, "secret")
-	ctx := context.Background()
-	if _, err := c.LED(ctx); err != nil {
-		t.Fatal(err)
-	}
-	f.ClearSession() // the switch forgets the session key
-	if _, err := c.LED(ctx); err != nil {
-		t.Fatalf("client should re-establish the session: %v", err)
-	}
-}
-
-func TestSetHostnameKeepsIPConfiguration(t *testing.T) {
-	f := escptest.Start(t)
-	c := dialFake(t, f, "secret")
-	if err := c.SetHostname(context.Background(), "new-name"); err != nil {
-		t.Fatal(err)
-	}
-	ip := f.IPSent()
-	if f.Hostname() != "new-name" || len(ip) != 4 || ip[0] != 127 || ip[3] != 1 {
-		t.Fatalf("hostname=%q ip=%v: the current IP must be re-sent unchanged", f.Hostname(), ip)
-	}
-	if err := c.SetHostname(context.Background(), "bad name"); err == nil {
-		t.Fatal("invalid name must be rejected before any packet is sent")
-	}
-}
-
-func TestSetPortWire(t *testing.T) {
-	f := escptest.Start(t)
-	c := dialFake(t, f, "secret")
-	// 1000Mbps-full: flow control with a fixed 10 or 100 Mbps speed is refused (TestSetPortRefusesFlowControlAtAFixedSpeed).
-	if err := c.SetPort(context.Background(), PortConfig{ID: 7, Enabled: true, Speed: Speed1000Full, FlowControl: true}); err != nil {
-		t.Fatal(err)
-	}
-	got := f.Port7Setting()
-	want := []byte{7, 1, 0, 6, 0, 1, 0}
-	if string(got) != string(want) {
-		t.Fatalf("wire bytes %v, want %v", got, want)
-	}
-	if err := c.SetPort(context.Background(), PortConfig{ID: 7, Enabled: true, Speed: "warp", FlowControl: false}); err == nil {
-		t.Fatal("unknown speed must be rejected before sending")
-	}
-	if err := c.SetPort(context.Background(), PortConfig{ID: 0, Enabled: true, Speed: "auto", FlowControl: false}); err == nil {
-		t.Fatal("port 0 must be rejected")
-	}
-}
-
-func TestRejectedErrorNamesTheCodeAndMatchesErrAuth(t *testing.T) {
-	err := error(&RejectedError{Code: 4})
-	if !errors.Is(err, ErrRejected) {
-		t.Fatal("a rejected write must match ErrRejected")
-	}
-	if errors.Is(err, ErrNoReply) {
-		t.Fatal("a rejected write is not a missing reply")
-	}
-	msg := err.Error()
-	for _, want := range []string{"rejected the request", "error code 4", "refuses this setting"} {
-		if !strings.Contains(msg, want) {
-			t.Errorf("message %q must contain %q", msg, want)
+// Zero selects the default, a negative value selects "no retry"; a positive one is kept.
+func TestDialRetriesSemantics(t *testing.T) {
+	for _, tc := range []struct{ in, want int }{{0, 2}, {NoRetries, 0}, {-7, 0}, {1, 1}, {5, 5}} {
+		c, err := Dial(Config{Host: "127.0.0.1", Retries: tc.in})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.cfg.Retries != tc.want {
+			t.Errorf("Retries %d became %d, want %d", tc.in, c.cfg.Retries, tc.want)
 		}
 	}
-	var rejected *RejectedError
-	if !errors.As(fmt.Errorf("setting a LAG: %w", err), &rejected) || rejected.Code != 4 {
-		t.Fatalf("the code must be recoverable with errors.As, got %+v", rejected)
-	}
 }
 
-func TestRejectedErrorWithAReasonReplacesTheGenericHint(t *testing.T) {
-	err := &RejectedError{Code: 7404, Reason: "a member port has storm control enabled"}
-	if !errors.Is(err, ErrRejected) {
-		t.Fatal("must still match ErrRejected")
-	}
-	want := "escp: switch rejected the request (error code 7404): a member port has storm control enabled"
-	if err.Error() != want {
-		t.Fatalf("got %q, want %q", err.Error(), want)
-	}
-}
-
-// Admin state and flow control are separate bytes: one set and the other clear tells a swapped
-// field apart, which TestSetPortWire (both set) cannot.
-func TestSetPortWireStateAndFlowControlAreNotSwapped(t *testing.T) {
-	cases := []struct {
-		name string
-		cfg  PortConfig
-		want []byte
-	}{
-		{"enabled, no flow control", PortConfig{ID: 7, Enabled: true, Speed: SpeedAuto}, []byte{7, 1, 0, 1, 0, 0, 0}},
-		{"disabled, flow control", PortConfig{ID: 7, Speed: SpeedAuto, FlowControl: true}, []byte{7, 0, 0, 1, 0, 1, 0}},
-	}
-	for _, tc := range cases {
+// With NoRetries the first lost packet is the answer; with one retry the same loss is absorbed.
+func TestNoRetriesSendsEachRequestOnce(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		retries int
+		wantErr error
+	}{{"no retries", NoRetries, ErrNoReply}, {"one retry", 1, nil}} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := escptest.Start(t)
-			c := dialFake(t, f, "secret")
-			if err := c.SetPort(context.Background(), tc.cfg); err != nil {
-				t.Fatal(err)
-			}
-			got := f.Port7Setting()
-			if string(got) != string(tc.want) {
-				t.Fatalf("wire bytes %v, want %v", got, tc.want)
+			f.DropFirst(2) // both datagrams of the first attempt are lost
+			c := newBoundClient(t, Config{Host: "127.0.0.1", Timeout: 80 * time.Millisecond, Retries: tc.retries,
+				SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
+			c.allowLoopback = true
+			t.Cleanup(func() { c.Close() })
+			_, err := c.Info(context.Background())
+			if !errors.Is(err, tc.wantErr) { // errors.Is(nil, nil) is true
+				t.Fatalf("got %v, want %v", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestDialRejectsHostThatIsNotIPv4(t *testing.T) {
+	_, err := Dial(Config{Host: "::1"})
+	if err == nil || !strings.Contains(err.Error(), `resolving "::1"`) {
+		t.Fatalf("want a resolution error naming the host, got %v", err)
+	}
+}
+
+func TestCloseReleasesTheSocket(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFake(t, f, "secret")
+	if _, err := c.Info(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if c.conn == nil {
+		t.Fatal("the first request must open the socket")
+	}
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if c.conn != nil {
+		t.Fatal("Close must forget the socket")
+	}
+	// the client is reusable: the next request binds again
+	if _, err := c.Info(context.Background()); err != nil {
+		t.Fatalf("reuse after Close: %v", err)
+	}
+}
+
+func TestBusyHostPortIsReportedOnFirstUse(t *testing.T) {
+	f := escptest.Start(t)
+	busy, err := net.ListenUDP("udp4", &net.UDPAddr{Port: escptest.FreeUDPPort(t)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer busy.Close()
+	port := busy.LocalAddr().(*net.UDPAddr).Port
+	c, err := Dial(Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 80 * time.Millisecond,
+		SwitchPort: f.Port(), HostPort: port, BroadcastAddr: "127.0.0.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, call := range map[string]func() error{
+		"Info":   func() error { _, err := c.Info(context.Background()); return err },
+		"LED":    func() error { _, err := c.LED(context.Background()); return err },
+		"SetLED": func() error { return c.SetLED(context.Background(), true) },
+	} {
+		err := call()
+		if err == nil || !strings.Contains(err.Error(), "binding UDP port") {
+			t.Errorf("%s: want a bind error mentioning the port, got %v", name, err)
+		}
+	}
+}
+
+func TestLocalMAC(t *testing.T) {
+	t.Run("loopback has no hardware address", func(t *testing.T) {
+		if got := localMAC(net.IPv4(127, 0, 0, 1)); got != [6]byte{} {
+			t.Fatalf("got %x, want zero", got)
+		}
+	})
+	t.Run("destination that cannot be dialled", func(t *testing.T) {
+		if got := localMAC(net.ParseIP("::1")); got != [6]byte{} {
+			t.Fatalf("got %x, want zero", got)
+		}
+	})
+	t.Run("interface with a hardware address", func(t *testing.T) {
+		ifs, _ := net.Interfaces()
+		for _, ifc := range ifs {
+			if len(ifc.HardwareAddr) != 6 {
+				continue
+			}
+			addrs, _ := ifc.Addrs()
+			for _, a := range addrs {
+				ipn, ok := a.(*net.IPNet)
+				if !ok || ipn.IP.To4() == nil || ipn.IP.IsLoopback() {
+					continue
+				}
+				var want [6]byte
+				copy(want[:], ifc.HardwareAddr)
+				if got := localMAC(ipn.IP); got != want {
+					t.Fatalf("localMAC(%s) = %x, want %x of %s", ipn.IP, got, want, ifc.Name)
+				}
+				return
+			}
+		}
+		t.Skip("no non-loopback IPv4 interface with a hardware address on this host")
+	})
+}
+
+// Several clients (several provider instances, one per switch) must be able to
+// hold the reply port at the same time.
+func TestSeveralClientsShareTheReplyPort(t *testing.T) {
+	port := escptest.FreeUDPPort(t)
+	var clients []*Client
+	for i := 0; i < 3; i++ {
+		c, err := Dial(Config{Host: "127.0.0.1", HostPort: port})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.mu.Lock()
+		err = c.open()
+		c.mu.Unlock()
+		if err != nil {
+			t.Fatalf("client %d could not share port %d: %v", i+1, port, err)
+		}
+		clients = append(clients, c)
+	}
+	for _, c := range clients {
+		if err := c.Close(); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
