@@ -77,7 +77,7 @@ func (r *bandwidthLimitResource) Configure(_ context.Context, req resource.Confi
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func (r *bandwidthLimitResource) find(ctx context.Context, port escp.PortID) (ingress, egress int, ok bool, err error) {
+func (r *bandwidthLimitResource) find(ctx context.Context, port escp.PortID) (ingress, egress escp.Kbps, ok bool, err error) {
 	rows, err := r.client.Bandwidth(ctx)
 	if err != nil {
 		return 0, 0, false, err
@@ -98,7 +98,7 @@ func (r *bandwidthLimitResource) apply(ctx context.Context, m *bandwidthLimitMod
 
 func (r *bandwidthLimitResource) applyBound(ctx context.Context, m *bandwidthLimitModel, add func(string, string)) bool {
 	port := escp.PortID(m.Port.ValueInt64())
-	in, eg := int(m.IngressKbps.ValueInt64()), int(m.EgressKbps.ValueInt64())
+	in, eg := escp.Kbps(m.IngressKbps.ValueInt64()), escp.Kbps(m.EgressKbps.ValueInt64())
 	if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), port); err != nil {
 		add("Refusing to change port", err.Error())
 		return false

@@ -1,5 +1,7 @@
 package escp
 
+import "strconv"
+
 const (
 	// MaxPort is the highest port number a 32-bit port mask can express.
 	MaxPort = 32
@@ -13,19 +15,22 @@ const (
 	maskLen = 4
 )
 
-// validateRateKbps reports whether kbps is a valid rate limit: 0 is
-// unlimited, otherwise a multiple of RateStepKbps up to MaxBandwidthKbps.
-func validateRateKbps(kbps int) bool {
-	return kbps >= 0 && kbps <= MaxBandwidthKbps && kbps%RateStepKbps == 0
-}
+// Kbps is a rate limit in kilobits per second, as the bandwidth and storm control pages take it:
+// 0 is unlimited (or, for storm control, no limit set), otherwise a multiple of RateStepKbps up to
+// MaxBandwidthKbps. It is the unit of the switch's own rate fields.
+type Kbps int
 
-// ValidateRateKbps checks a rate limit (see validateRateKbps) and explains what is allowed.
-func ValidateRateKbps(kbps int) error {
-	if !validateRateKbps(kbps) {
-		return invalidf("%d kbps is not a valid rate: use 0 (unlimited) or a multiple of %d up to %d", kbps, RateStepKbps, MaxBandwidthKbps)
+// Validate reports whether k is a rate the switch can hold; the error matches ErrInvalid and says
+// what is allowed.
+func (k Kbps) Validate() error {
+	if k < 0 || k > MaxBandwidthKbps || k%RateStepKbps != 0 {
+		return invalidf("%d kbps is not a valid rate: use 0 (unlimited) or a multiple of %d up to %d", int(k), RateStepKbps, MaxBandwidthKbps)
 	}
 	return nil
 }
+
+// String is the rate with its unit, "128 kbps".
+func (k Kbps) String() string { return strconv.Itoa(int(k)) + " kbps" }
 
 // validateByteID checks an id (LAG group, port-based VLAN) that is one byte on the wire.
 func validateByteID(kind string, id int) error {

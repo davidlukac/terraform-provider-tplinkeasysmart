@@ -104,7 +104,7 @@ func (rateKbps) ValidateInt64(_ context.Context, req validator.Int64Request, res
 	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
 		return
 	}
-	if err := escp.ValidateRateKbps(int(req.ConfigValue.ValueInt64())); err != nil {
+	if err := escp.Kbps(req.ConfigValue.ValueInt64()).Validate(); err != nil {
 		resp.Diagnostics.AddAttributeError(req.Path, "Invalid rate", err.Error())
 	}
 }

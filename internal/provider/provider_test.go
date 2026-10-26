@@ -252,7 +252,7 @@ func (f *fakeClient) SetBandwidth(_ context.Context, limit escp.PortBandwidth) e
 	if f.bw == nil {
 		f.bw = map[escp.PortID][2]int{}
 	}
-	f.bw[port] = [2]int{in, eg}
+	f.bw[port] = [2]int{int(in), int(eg)}
 	f.sets++
 	return nil
 }
@@ -263,7 +263,7 @@ func (f *fakeClient) Bandwidth(context.Context) ([]escp.PortBandwidth, error) {
 	if f.bw != nil {
 		var rows []escp.PortBandwidth
 		for _, p := range f.rows() {
-			rows = append(rows, escp.PortBandwidth{Port: escp.PortID(p), IngressKbps: f.bw[escp.PortID(p)][0], EgressKbps: f.bw[escp.PortID(p)][1]})
+			rows = append(rows, escp.PortBandwidth{Port: escp.PortID(p), IngressKbps: escp.Kbps(f.bw[escp.PortID(p)][0]), EgressKbps: escp.Kbps(f.bw[escp.PortID(p)][1])})
 		}
 		return rows, nil
 	}
