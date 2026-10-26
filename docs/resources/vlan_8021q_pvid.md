@@ -11,6 +11,8 @@ The PVID of one port (VLAN > 802.1Q PVID Setting): the VLAN that untagged traffi
 
 ~> **Safety** The provider refuses to change the PVID of a port that has a link up or belongs to a LAG, because untagged traffic that enters the port is assigned to the new VLAN and may no longer reach its destination. Destroying the resource sets the PVID back to 1, under the same guard.
 
+~> **Order** Terraform cannot see that a PVID needs the switch to be in 802.1Q mode and the VLAN to exist, and the provider refuses otherwise. When one configuration sets them all, add `depends_on` the `tplinkeasysmart_vlan_mode` resource and reference the VLAN's `vlan` attribute from `pvid`. To remove them, put the PVID back to 1 by configuration first: removing the resource only forgets the port's value, and a VLAN cannot be deleted while a port still has it as its PVID.
+
 ## Example Usage
 
 ```terraform

@@ -11,16 +11,26 @@ An 802.1Q VLAN (VLAN > 802.1Q VLAN): its name and its tagged and untagged member
 
 ~> **Safety** The provider refuses to create, change or destroy a VLAN when any port involved (old or new members) has a link up or belongs to a LAG, and when the change would leave a port in no VLAN, because that can cut connectivity or management access. The VLAN mode is not written here; use `tplinkeasysmart_vlan_mode`.
 
+~> **Order** Terraform cannot see that this resource needs the switch to be in 802.1Q mode first, and the provider refuses to manage 802.1Q VLANs in any other mode. When one configuration sets the mode and the VLANs, add `depends_on = [tplinkeasysmart_vlan_mode.this]` (see the example) so the mode is applied first and, on the way back, removed last.
+
 ## Example Usage
 
 ```terraform
-# Only valid while the switch is in 802.1Q mode (see tplinkeasysmart_vlan_mode).
+# Only valid while the switch is in 802.1Q mode (see tplinkeasysmart_vlan_mode), so the
+# VLAN waits for the mode resource: Terraform cannot see that dependency by itself.
+resource "tplinkeasysmart_vlan_mode" "this" {
+  mode             = "802.1q"
+  allow_disruptive = true # needed for the change itself; remove it once the switch is in the mode
+}
+
 # A port can be a member of several 802.1Q VLANs, tagged in some and untagged in others.
 resource "tplinkeasysmart_vlan_8021q_group" "media" {
   vlan           = 20
   name           = "media"
   tagged_ports   = [5]
   untagged_ports = [6, 7]
+
+  depends_on = [tplinkeasysmart_vlan_mode.this]
 }
 ```
 
