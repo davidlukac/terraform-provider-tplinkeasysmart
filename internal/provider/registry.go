@@ -4,18 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	dschema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -30,22 +27,13 @@ const (
 	attrSwitch = "switch"
 
 	summaryUnknownSwitch = "Cannot select the switch"
-
-	// idSeparator joins a switch name and an id, in `id` attributes and import ids.
-	idSeparator = ":"
-
-	maxSwitchNameLen = 63
 )
-
-// switchNamePattern limits switch names to what is safe in addresses and ids:
-// no separator, no spaces.
-const switchNamePattern = `^[A-Za-z0-9][A-Za-z0-9_-]*$`
 
 // switchSource hands out the client of a switch by name.
 type switchSource interface {
 	// Client returns the client for the named switch. An empty name selects the
 	// default switch.
-	Client(name string) (SwitchClient, error)
+	Client(name switchName) (SwitchClient, error)
 }
 
 // switchRegistry is the switchSource built from the provider configuration.
@@ -66,9 +54,9 @@ func (r *switchRegistry) names() string {
 // Client implements switchSource. Without a name the default switch is used;
 // if there is none, the only configured switch; otherwise the choice is
 // ambiguous and refused.
-func (r *switchRegistry) Client(name string) (SwitchClient, error) {
+func (r *switchRegistry) Client(name switchName) (SwitchClient, error) {
 	if name != "" {
-		c, ok := r.named[name]
+		c, ok := r.named[string(name)]
 		if !ok {
 			return nil, fmt.Errorf("unknown switch %q (configured: %s)", name, r.names())
 		}
@@ -106,7 +94,7 @@ func clientFor[C any](src switchSource, name types.String) (C, error) {
 	if src == nil {
 		return zero, errors.New("the provider is not configured")
 	}
-	c, err := src.Client(name.ValueString())
+	c, err := src.Client(switchNameOf(name))
 	if err != nil {
 		return zero, err
 	}
@@ -143,31 +131,9 @@ func switchOf(ctx context.Context, g attrGetter, diags *diag.Diagnostics) types.
 	return sw
 }
 
-// qualifiedID prefixes an id with the switch name when one was given, so ids
-// stay unique across switches and equal the import id. Without a switch the id
-// is unchanged.
+// qualifiedID is the id of an object on the switch the `switch` argument names (see switchName.qualify).
 func qualifiedID(sw types.String, id string) types.String {
-	if sw.IsNull() || sw.IsUnknown() || sw.ValueString() == "" {
-		return types.StringValue(id)
-	}
-	return types.StringValue(sw.ValueString() + idSeparator + id)
-}
-
-// splitImportID separates an optional `switch:` prefix from an import id.
-func splitImportID(id string) (sw, rest string) {
-	if i := strings.Index(id, idSeparator); i >= 0 {
-		return id[:i], id[i+len(idSeparator):]
-	}
-	return "", id
-}
-
-// validSwitchName accepts the names usable as a switch key.
-func validSwitchName() []validator.String {
-	return []validator.String{
-		stringvalidator.LengthBetween(1, maxSwitchNameLen),
-		stringvalidator.RegexMatches(regexp.MustCompile(switchNamePattern),
-			"must start with a letter or digit and contain only letters, digits, hyphens and underscores"),
-	}
+	return types.StringValue(switchNameOf(sw).qualify(id))
 }
 
 const switchArgDescription = "Name of the switch (a key of the provider's `switches` map) this object lives on. " +
@@ -199,7 +165,7 @@ func checkSwitch(ctx context.Context, src switchSource, plan tfsdk.Plan, diags *
 	if sw.IsUnknown() {
 		return
 	}
-	if _, err := src.Client(sw.ValueString()); err != nil {
+	if _, err := src.Client(switchNameOf(sw)); err != nil {
 		diags.AddAttributeError(path.Root(attrSwitch), summaryUnknownSwitch, err.Error())
 	}
 }

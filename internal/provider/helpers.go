@@ -104,7 +104,7 @@ func planWithOnlyTheFlagChanged(plan, prior tftypes.Value) (tftypes.Value, bool)
 // prefixed with a switch name ("sw02:led"), and records id and switch in state.
 // It reports whether the id was valid.
 func importSingletonID(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse, id string) bool {
-	sw, rest := splitImportID(req.ID)
+	sw, rest := splitQualified(req.ID)
 	if rest != id {
 		resp.Diagnostics.AddError(summaryInvalidImportID, fmt.Sprintf("the only valid id is %q (optionally prefixed with a switch name and %q), got %q", id, idSeparator, req.ID))
 		return false
@@ -119,7 +119,7 @@ func importSingletonID(ctx context.Context, req resource.ImportStateRequest, res
 // under keyAttr and the switch under `switch`, and reports whether it was
 // valid. what describes the expected id in the error ("a port number").
 func importPositiveInt(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse, what, keyAttr string) bool {
-	sw, rest := splitImportID(req.ID)
+	sw, rest := splitQualified(req.ID)
 	n, err := strconv.Atoi(rest)
 	if err != nil || n < 1 {
 		resp.Diagnostics.AddError(summaryInvalidImportID, fmt.Sprintf("expected %s (optionally prefixed with a switch name and %q), got %q", what, idSeparator, req.ID))
@@ -131,9 +131,9 @@ func importPositiveInt(ctx context.Context, req resource.ImportStateRequest, res
 }
 
 // importSwitch records the switch named in an import id, if any.
-func importSwitch(ctx context.Context, resp *resource.ImportStateResponse, sw string) {
+func importSwitch(ctx context.Context, resp *resource.ImportStateResponse, sw switchName) {
 	if sw != "" {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(attrSwitch), sw)...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(attrSwitch), string(sw))...)
 	}
 }
 
