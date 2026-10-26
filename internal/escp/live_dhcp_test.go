@@ -5,7 +5,7 @@ package escp
 import (
 	"context"
 	"fmt"
-	"net"
+	"net/netip"
 	"os"
 	"strings"
 	"testing"
@@ -105,20 +105,20 @@ func TestLiveDHCPProbe(t *testing.T) {
 			t.Errorf("RESTORE FAILED: nobody with MAC %s answers a discovery: %v", mac, err)
 			return
 		}
-		if now.IP == static.IP.String() && !now.DHCP {
+		if now.IP == static.IP && !now.DHCP {
 			obs("restore: the switch is already at %s with DHCP off", now.IP)
 			return
 		}
-		setSystem(dial(now.IP), false, static)
-		end := watch(60*time.Second, func(i Info) bool { return i.IP == static.IP.String() && !i.DHCP })
-		if end.IP != static.IP.String() || end.DHCP {
+		setSystem(dial(now.IP.String()), false, static)
+		end := watch(60*time.Second, func(i Info) bool { return i.IP == static.IP && !i.DHCP })
+		if end.IP != static.IP || end.DHCP {
 			t.Errorf("RESTORE FAILED: the switch reports %+v, want %s with DHCP off", end, static.IP)
 		}
 	}()
 
 	// 1. DHCP on, keeping the static address in the request as the vendor utility does.
 	setSystem(c, true, static)
-	leased := watch(90*time.Second, func(i Info) bool { return i.DHCP && i.IP != static.IP.String() })
+	leased := watch(90*time.Second, func(i Info) bool { return i.DHCP && i.IP != static.IP })
 	obs("%s after DHCP on: ip %s mask %s gateway %s dhcp=%t", since(), leased.IP, leased.Netmask, leased.Gateway, leased.DHCP)
 
 	// 2. Is it still reachable and manageable at the lease? A client that has only the MAC finds it.
@@ -135,7 +135,7 @@ func TestLiveDHCPProbe(t *testing.T) {
 
 	// 3. A static address written while DHCP is on: is it ignored (the vendor notes say so)?
 	if leased.DHCP {
-		other := IPConfig{IP: net.ParseIP("192.168.77.14").To4(), Netmask: static.Netmask, Gateway: static.Gateway}
+		other := IPConfig{IP: netip.MustParseAddr("192.168.77.14"), Netmask: static.Netmask, Gateway: static.Gateway}
 		setSystem(byMAC, true, other)
 		after := watch(15*time.Second, nil)
 		obs("%s after a static address was written with DHCP on: ip %s dhcp=%t (was %s)", since(), after.IP, after.DHCP, leased.IP)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -51,7 +52,7 @@ func TestEnableDHCPAsksForALeaseAndFollowsIt(t *testing.T) {
 		}
 	}
 	info, err := c.Info(context.Background())
-	if err != nil || !info.DHCP || info.Netmask != "255.255.0.0" || info.Gateway != "127.0.0.2" {
+	if err != nil || !info.DHCP || info.Netmask.String() != "255.255.0.0" || info.Gateway.String() != "127.0.0.2" {
 		t.Fatalf("after the lease: %+v err=%v", info, err)
 	}
 	if !c.dest.IP.Equal(net.IPv4(127, 0, 0, 1)) {
@@ -127,7 +128,7 @@ func TestEnableDHCPReportsASwitchThatAnswersButDoesNotLease(t *testing.T) {
 	c, _ := dialLeasing(t, f)
 	c.moveWait = 400 * time.Millisecond
 	c.locator = func(ctx context.Context, _ MAC) (Info, error) {
-		return Info{MAC: c.cfg.MAC, IP: "127.0.0.1", Netmask: "255.255.255.0", Gateway: "127.0.0.254"}, nil
+		return Info{MAC: c.cfg.MAC, IP: netip.MustParseAddr("127.0.0.1"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("127.0.0.254")}, nil
 	}
 	err := c.EnableDHCP(context.Background())
 	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "DHCP off") {
@@ -185,7 +186,7 @@ func TestSetIPConfigTurnsDHCPOff(t *testing.T) {
 		t.Fatal(err)
 	}
 	info, err := c.Info(context.Background())
-	if err != nil || info.DHCP || info.Netmask != "255.255.255.0" || info.Gateway != "127.0.0.254" {
+	if err != nil || info.DHCP || info.Netmask.String() != "255.255.255.0" || info.Gateway.String() != "127.0.0.254" {
 		t.Fatalf("after DHCP off: %+v err=%v", info, err)
 	}
 	last := f.LastSet()

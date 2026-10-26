@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -29,7 +30,7 @@ func dialMAC(t *testing.T, f *escptest.Switch, host string, mac MAC, locator fun
 	c.locator = func(_ context.Context, m MAC) (Info, error) {
 		*calls++
 		if locator == nil {
-			return Info{IP: "127.0.0.1", MAC: m}, nil
+			return Info{IP: netip.MustParseAddr("127.0.0.1"), MAC: m}, nil
 		}
 		return locator(m)
 	}
@@ -58,7 +59,7 @@ func TestAClientWithoutAnAddressReportsAFailedLookup(t *testing.T) {
 	if _, err := c.Info(context.Background()); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("got %v, want ErrNotFound", err)
 	}
-	noAddress := func(m MAC) (Info, error) { return Info{IP: "not an address"}, nil }
+	noAddress := func(m MAC) (Info, error) { return Info{IP: netip.Addr{}}, nil }
 	c, _ = dialMAC(t, f, "", wantMAC, noAddress)
 	if _, err := c.Info(context.Background()); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("an answer without a usable address must be ErrNotFound, got %v", err)
@@ -75,7 +76,7 @@ func TestALookupThatFindsNobodyIsTriedOnceMore(t *testing.T) {
 		if *calls == 1 { // the first lookup misses
 			return Info{}, ErrNotFound
 		}
-		return Info{IP: "127.0.0.1", MAC: m}, nil
+		return Info{IP: netip.MustParseAddr("127.0.0.1"), MAC: m}, nil
 	})
 	if info, err := c.Info(context.Background()); err != nil || info.MAC != wantMAC || *calls != 2 {
 		t.Fatalf("a miss followed by a hit: info %+v, err %v, %d lookups; want success after 2", info, err, *calls)
@@ -179,7 +180,7 @@ func TestLocateStopsAtTheFirstReplyFromTheWantedSwitch(t *testing.T) {
 	env := loopbackEnv(t, r, hostPort, netInterface{Name: "en0", MAC: macOne, Broadcasts: lo})
 	start := time.Now()
 	info, err := locateWith(context.Background(), MAC(macB), DiscoverOptions{Window: time.Minute}, env)
-	if err != nil || info.IP != "192.0.2.9" || info.Hostname != "sw-b" {
+	if err != nil || info.IP.String() != "192.0.2.9" || info.Hostname != "sw-b" {
 		t.Fatalf("got %+v, %v", info, err)
 	}
 	if time.Since(start) > 10*time.Second {

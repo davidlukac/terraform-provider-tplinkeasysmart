@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"reflect"
 	"testing"
@@ -729,8 +730,10 @@ func pvidByPort(q Dot1Q, port int) (int, bool) {
 // that it answers there and not at the old address, then moves it back. Only
 // the address changes; the mask and gateway stay. Needs ping monitoring.
 func TestLiveIPChange(t *testing.T) {
-	newIP, newMask, newGW := net.ParseIP(os.Getenv("TPLINK_EASYSMART_LIVE_NEWIP")), net.ParseIP(os.Getenv("TPLINK_EASYSMART_LIVE_NEWMASK")), net.ParseIP(os.Getenv("TPLINK_EASYSMART_LIVE_NEWGATEWAY"))
-	if newIP == nil && newMask == nil && newGW == nil {
+	newIP, _ := netip.ParseAddr(os.Getenv("TPLINK_EASYSMART_LIVE_NEWIP"))
+	newMask, _ := netip.ParseAddr(os.Getenv("TPLINK_EASYSMART_LIVE_NEWMASK"))
+	newGW, _ := netip.ParseAddr(os.Getenv("TPLINK_EASYSMART_LIVE_NEWGATEWAY"))
+	if !newIP.IsValid() && !newMask.IsValid() && !newGW.IsValid() {
 		t.Skip("set TPLINK_EASYSMART_LIVE_NEWIP (an unused address in the subnet), _NEWMASK or _NEWGATEWAY")
 	}
 	c, ctx := liveClient(t), context.Background()
@@ -744,11 +747,11 @@ func TestLiveIPChange(t *testing.T) {
 	}
 	moved := orig
 	for _, o := range []struct {
-		dst *net.IP
-		val net.IP
+		dst *netip.Addr
+		val netip.Addr
 	}{{&moved.IP, newIP}, {&moved.Netmask, newMask}, {&moved.Gateway, newGW}} {
-		if o.val != nil {
-			*o.dst = o.val.To4()
+		if o.val.IsValid() {
+			*o.dst = o.val
 		}
 	}
 	// The restore comes first. The switch may be at either address, or have moved while the reply
@@ -774,8 +777,8 @@ func TestLiveIPChange(t *testing.T) {
 			t.Errorf("RESTORE FAILED: the switch (MAC %s) answers nowhere; TestLiveIPSet is the manual way back", before.MAC)
 			return
 		}
-		if cur.IP != orig.IP.String() || cur.Netmask != orig.Netmask.String() || cur.Gateway != orig.Gateway.String() {
-			r, err := Dial(Config{Host: cur.IP, Username: os.Getenv("TPLINK_EASYSMART_USERNAME"),
+		if cur.IP != orig.IP || cur.Netmask != orig.Netmask || cur.Gateway != orig.Gateway {
+			r, err := Dial(Config{Host: cur.IP.String(), Username: os.Getenv("TPLINK_EASYSMART_USERNAME"),
 				Password: os.Getenv("TPLINK_EASYSMART_PASSWORD"), Timeout: 3 * time.Second})
 			if err != nil {
 				t.Errorf("RESTORE dial %s: %v", cur.IP, err)
@@ -800,7 +803,7 @@ func TestLiveIPChange(t *testing.T) {
 		t.Fatalf("no discovery reply at the new address: %v", err)
 	}
 	want := before
-	want.IP, want.Netmask, want.Gateway = moved.IP.String(), moved.Netmask.String(), moved.Gateway.String()
+	want.IP, want.Netmask, want.Gateway = moved.IP, moved.Netmask, moved.Gateway
 	if after != want {
 		t.Fatalf("after move: %+v, want %+v", after, want)
 	}
@@ -827,11 +830,11 @@ func TestLiveIPSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.IP = target.To4()
+	cfg.IP, _ = netip.AddrFromSlice(target.To4())
 	if err := c.SetIPConfig(ctx, cfg); err != nil {
 		t.Fatal(err)
 	}
-	if after, err := c.Info(ctx); err != nil || after.IP != target.String() {
+	if after, err := c.Info(ctx); err != nil || after.IP.String() != target.String() {
 		t.Fatalf("after: %+v err=%v", after, err)
 	}
 }

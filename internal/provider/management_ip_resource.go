@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -94,9 +94,9 @@ func (r *managementIPResource) Configure(_ context.Context, req resource.Configu
 // problem named on the attribute) when one is not an IPv4 address.
 func ipConfigOf(m managementIPModel, add func(path.Path, string, string)) (escp.IPConfig, bool) {
 	ok := true
-	parse := func(attr string, v types.String) net.IP {
-		ip := net.ParseIP(v.ValueString()).To4()
-		if ip == nil {
+	parse := func(attr string, v types.String) netip.Addr {
+		ip, err := escp.ParseIPv4(v.ValueString())
+		if err != nil {
 			add(path.Root(attr), "Not an IPv4 address", fmt.Sprintf("%q is not a dotted IPv4 address", v.ValueString()))
 			ok = false
 		}
@@ -180,7 +180,7 @@ func (r *managementIPResource) applyBound(ctx context.Context, m *managementIPMo
 		tflog.Info(ctx, "management address changed; the provider's host must point at the new address from now on, or its mac must be set", map[string]any{"ip": got.IP, "dhcp": got.DHCP})
 	}
 	if wantDHCP { // the leased values are what the switch reports
-		m.IPAddress, m.Netmask, m.Gateway = types.StringValue(cur.IP), types.StringValue(cur.Netmask), types.StringValue(cur.Gateway)
+		m.IPAddress, m.Netmask, m.Gateway = types.StringValue(addrString(cur.IP)), types.StringValue(addrString(cur.Netmask)), types.StringValue(addrString(cur.Gateway))
 	}
 	m.ID = qualifiedID(r.sw, managementIPID)
 	return true
@@ -223,7 +223,7 @@ func requested(dhcp bool, static escp.IPConfig) string {
 
 // sameIPConfig compares the address triple of a discovery reply with the wanted one.
 func sameIPConfig(info escp.Info, want escp.IPConfig) bool {
-	return info.IP == want.IP.String() && info.Netmask == want.Netmask.String() && info.Gateway == want.Gateway.String()
+	return info.IP == want.IP && info.Netmask == want.Netmask && info.Gateway == want.Gateway
 }
 
 func (r *managementIPResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -250,7 +250,7 @@ func (r *managementIPResource) readBound(ctx context.Context, _ resource.ReadReq
 		return
 	}
 	// resp.State starts as a copy of the prior state, so allow_disruptive and the switch are kept.
-	for attr, v := range map[string]string{"id": qualifiedID(r.sw, managementIPID).ValueString(), "ip_address": info.IP, "netmask": info.Netmask, "gateway": info.Gateway} {
+	for attr, v := range map[string]string{"id": qualifiedID(r.sw, managementIPID).ValueString(), "ip_address": addrString(info.IP), "netmask": addrString(info.Netmask), "gateway": addrString(info.Gateway)} {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(attr), v)...)
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("dhcp"), info.DHCP)...)

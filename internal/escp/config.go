@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"net/netip"
 	"time"
 )
 
@@ -78,8 +79,11 @@ type WriteGate func(ctx context.Context, sw InfoReader, op Operation) error
 type Info struct {
 	Model, Hostname, Firmware, Hardware string
 	// MAC is the switch's hardware address; the zero value when the reply carried none.
-	MAC                  MAC
-	IP, Netmask, Gateway string
+	MAC MAC
+	// IP, Netmask and Gateway are the management address the switch reports. An address the reply
+	// did not carry is the invalid netip.Addr (Addr.IsValid is false), which is not the same as
+	// 0.0.0.0: a gateway of 0.0.0.0 means "no gateway".
+	IP, Netmask, Gateway netip.Addr
 	DHCP                 bool
 	// FactoryDefault is discovery TLV 14: the switch has never been configured
 	// (still on factory credentials).

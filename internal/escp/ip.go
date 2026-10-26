@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"time"
 )
 
@@ -23,9 +24,20 @@ const (
 // found nothing, or something else answered. Its address is then unknown: look at both.
 var ErrMoveUnconfirmed = errors.New("escp: the switch did not answer at its new address")
 
-// IPConfig is the static management address of the switch (System > IP Setting).
+// IPConfig is the static management address of the switch (System > IP Setting): three IPv4
+// addresses. It is a comparable value; two configurations are the same when they are ==.
 type IPConfig struct {
-	IP, Netmask, Gateway net.IP
+	IP, Netmask, Gateway netip.Addr
+}
+
+// ParseIPv4 reads a dotted-quad IPv4 address: no IPv6, no zone, no port. The error matches
+// ErrInvalid. It is the one parser of an address a person types; replies are read from the wire.
+func ParseIPv4(s string) (netip.Addr, error) {
+	a, err := netip.ParseAddr(s)
+	if err != nil || !a.Is4() {
+		return netip.Addr{}, invalidf("escp: %q is not a dotted IPv4 address", s)
+	}
+	return a, nil
 }
 
 // String formats the triple for messages.
@@ -33,17 +45,12 @@ func (cfg IPConfig) String() string {
 	return fmt.Sprintf("ip %s mask %s gateway %s", cfg.IP, cfg.Netmask, cfg.Gateway)
 }
 
-// equal reports whether two configurations have the same three addresses.
-func (cfg IPConfig) equal(other IPConfig) bool {
-	return cfg.IP.Equal(other.IP) && cfg.Netmask.Equal(other.Netmask) && cfg.Gateway.Equal(other.Gateway)
-}
-
 // ipConfigFromInfo parses the address triple of a discovery reply. It refuses
 // a reply that does not carry three IPv4 addresses, because anything written
 // back from it could cut the management path.
 func ipConfigFromInfo(info Info) (IPConfig, error) {
-	cfg := IPConfig{IP: net.ParseIP(info.IP).To4(), Netmask: net.ParseIP(info.Netmask).To4(), Gateway: net.ParseIP(info.Gateway).To4()}
-	if cfg.IP == nil || cfg.Netmask == nil || cfg.Gateway == nil {
+	cfg := IPConfig{IP: info.IP, Netmask: info.Netmask, Gateway: info.Gateway}
+	if !cfg.IP.Is4() || !cfg.Netmask.Is4() || !cfg.Gateway.Is4() {
 		return IPConfig{}, fmt.Errorf("escp: switch reported an unusable IP configuration (%q %q %q); refusing to write", info.IP, info.Netmask, info.Gateway)
 	}
 	return cfg, nil
@@ -57,10 +64,10 @@ func ValidateIPConfig(cfg IPConfig) error { return validateIPConfig(cfg, false) 
 
 // validateIPConfig is ValidateIPConfig; allowLoopback lets tests move a fake switch that lives on 127.0.0.0/8.
 func validateIPConfig(cfg IPConfig, allowLoopback bool) error {
-	ip, mask, gw := cfg.IP.To4(), cfg.Netmask.To4(), cfg.Gateway.To4()
-	if ip == nil || mask == nil || gw == nil {
+	if !cfg.IP.Is4() || !cfg.Netmask.Is4() || !cfg.Gateway.Is4() {
 		return invalidf("escp: IP address, subnet mask and gateway must all be IPv4 addresses (%s)", cfg)
 	}
+	ip, mask, gw := net.IP(cfg.IP.AsSlice()), net.IP(cfg.Netmask.AsSlice()), net.IP(cfg.Gateway.AsSlice())
 	m := net.IPMask(mask)
 	ones, bits := m.Size()
 	if bits == 0 || ones < 8 || ones > 30 {
@@ -126,7 +133,7 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 		return err
 	}
 	c.mu.Lock()
-	c.alsoFrom = cfg.IP.To4()
+	c.alsoFrom = net.IP(cfg.IP.AsSlice())
 	c.mu.Unlock()
 	sent, err := c.writeSystem(ctx, Operation{Name: "SetIPConfig", Impact: ImpactManagement}, info.Hostname, false, cfg)
 	c.mu.Lock()
@@ -149,7 +156,7 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	if err != nil {
 		return err
 	}
-	c.dest = &net.UDPAddr{IP: cfg.IP.To4(), Port: c.dest.Port}
+	c.dest = &net.UDPAddr{IP: net.IP(cfg.IP.AsSlice()), Port: c.dest.Port}
 	c.session = nil
 	return c.awaitAddress(ctx, cfg)
 }
@@ -179,9 +186,9 @@ func classifyLostReply(mac MAC, before, want IPConfig, after Info) lostReplyOutc
 	switch {
 	case err != nil:
 		return lostReplyUnexpected
-	case got.equal(want) && !after.DHCP:
+	case got == want && !after.DHCP:
 		return lostReplyApplied
-	case got.equal(before):
+	case got == before:
 		return lostReplyUnchanged
 	default:
 		return lostReplyUnexpected
@@ -225,7 +232,7 @@ func (c *Client) awaitAddress(ctx context.Context, want IPConfig) error {
 	ctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
 	for {
-		if info, err := c.discover(ctx); err == nil && info.IP == want.IP.String() && !info.DHCP {
+		if info, err := c.discover(ctx); err == nil && info.IP == want.IP && !info.DHCP {
 			return nil
 		}
 		select {

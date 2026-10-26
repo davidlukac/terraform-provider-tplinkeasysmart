@@ -107,8 +107,8 @@ func onOff(on bool) string {
 // follow points the client at the address a lookup found the switch at, with a fresh session.
 // Callers hold c.mu. The destination is changed in place, because requests in flight hold it.
 func (c *Client) follow(found Info) error {
-	ip := net.ParseIP(found.IP).To4()
-	if ip == nil {
+	ip := net.IP(found.IP.AsSlice())
+	if !found.IP.Is4() {
 		return fmt.Errorf("%w: %s answered without a usable address", ErrNotFound, c.cfg.MAC)
 	}
 	c.dest.IP = ip

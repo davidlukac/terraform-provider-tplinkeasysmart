@@ -643,14 +643,14 @@ func TestScenarioManagementAddressUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := s.ProviderHCL() + managementIP(info.IP, info.Netmask, info.Gateway)
+	cfg := s.ProviderHCL() + managementIP(info.IP.String(), info.Netmask.String(), info.Gateway.String())
 	writes := 0
 	if s.Fake != nil {
 		writes = s.Fake.WriteCount()
 	}
 	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
 		{Config: cfg, Check: resource.ComposeTestCheckFunc(
-			resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.this", "ip_address", info.IP),
+			resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.this", "ip_address", info.IP.String()),
 			resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.this", "id", "management_ip"),
 			s.writesUnchanged(writes),
 			s.restoredCheck(t))},
@@ -668,7 +668,7 @@ func TestScenarioManagementAddressRefusals(t *testing.T) {
 		t.Fatal(err)
 	}
 	other := "255.255.0.0"
-	if info.Netmask == other {
+	if info.Netmask.String() == other {
 		other = "255.255.255.0"
 	}
 	writes := 0
@@ -676,11 +676,11 @@ func TestScenarioManagementAddressRefusals(t *testing.T) {
 		writes = s.Fake.WriteCount()
 	}
 	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
-		{Config: s.ProviderHCL() + managementIP(info.IP, other, info.Gateway),
+		{Config: s.ProviderHCL() + managementIP(info.IP.String(), other, info.Gateway.String()),
 			ExpectError: regexp.MustCompile(`Refusing to change the management address`)},
-		{Config: s.ProviderHCL() + managementIP(info.IP, "255.0.255.0", info.Gateway),
+		{Config: s.ProviderHCL() + managementIP(info.IP.String(), "255.0.255.0", info.Gateway.String()),
 			ExpectError: regexp.MustCompile(`contiguous prefix`)},
-		{Config: s.ProviderHCL() + managementIP(info.IP, info.Netmask, info.Gateway), Check: resource.ComposeTestCheckFunc(
+		{Config: s.ProviderHCL() + managementIP(info.IP.String(), info.Netmask.String(), info.Gateway.String()), Check: resource.ComposeTestCheckFunc(
 			s.writesUnchanged(writes), s.restoredCheck(t))},
 	}})
 }

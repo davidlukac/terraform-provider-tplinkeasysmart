@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 	"os"
 	"time"
 
@@ -135,11 +135,11 @@ func ExampleQoSModes() {
 }
 
 func ExampleValidateIPConfig() {
-	ok := escp.IPConfig{IP: net.IPv4(192, 168, 77, 11), Netmask: net.IPv4(255, 255, 255, 0), Gateway: net.IPv4(192, 168, 77, 1)}
+	ok := escp.IPConfig{IP: netip.MustParseAddr("192.168.77.11"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("192.168.77.1")}
 	fmt.Println(escp.ValidateIPConfig(ok))
 
 	bad := ok
-	bad.Gateway = net.IPv4(192, 168, 78, 1) // another subnet: the switch would be unreachable
+	bad.Gateway = netip.MustParseAddr("192.168.78.1") // another subnet: the switch would be unreachable
 	fmt.Println(escp.ValidateIPConfig(bad) != nil)
 	// Output:
 	// <nil>

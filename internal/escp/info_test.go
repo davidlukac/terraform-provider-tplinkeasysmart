@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"net/netip"
 	"testing"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
@@ -20,7 +21,7 @@ func TestInfoFromReplyToleratesMissingAndMalformedFields(t *testing.T) {
 		{Type: wire.TLVFactoryDefault, Value: nil},               // empty: ignored
 		{Type: wire.TLVModel, Value: []byte("TL-SG108E")},        // no NUL terminator
 	}})
-	want := Info{Model: "TL-SG108E", Netmask: "255.255.255.0"}
+	want := Info{Model: "TL-SG108E", Netmask: netip.MustParseAddr("255.255.255.0")}
 	if got != want {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
@@ -33,7 +34,7 @@ func TestInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 	if info.Model != "TL-SG108E" || info.Hostname != "TL-SG108E-fake" || info.MAC.String() != "00:00:5e:00:53:02" ||
-		info.Hardware != "TL-SG108E 6.0" || info.IP != "127.0.0.1" || info.DHCP || !info.FactoryDefault {
+		info.Hardware != "TL-SG108E 6.0" || info.IP.String() != "127.0.0.1" || info.DHCP || !info.FactoryDefault {
 		t.Fatalf("unexpected info: %+v", info)
 	}
 }

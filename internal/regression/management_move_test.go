@@ -3,7 +3,6 @@ package regression
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -23,7 +22,7 @@ const settleTime = 2 * time.Minute
 
 // ipConfigOfInfo is the address triple a discovery reply carries.
 func ipConfigOfInfo(i escp.Info) escp.IPConfig {
-	return escp.IPConfig{IP: net.ParseIP(i.IP), Netmask: net.ParseIP(i.Netmask), Gateway: net.ParseIP(i.Gateway)}
+	return escp.IPConfig{IP: i.IP, Netmask: i.Netmask, Gateway: i.Gateway}
 }
 
 // bringBack puts the switch at its original address whatever happened to the run: when a look at
@@ -32,7 +31,7 @@ func ipConfigOfInfo(i escp.Info) escp.IPConfig {
 func (s *Session) bringBack(t *testing.T, original escp.IPConfig) {
 	ctx, cancel := context.WithTimeout(context.Background(), settleTime)
 	defer cancel()
-	if info, err := s.Client.Info(ctx); err == nil && info.IP == original.IP.String() {
+	if info, err := s.Client.Info(ctx); err == nil && info.IP.String() == original.IP.String() {
 		return
 	}
 	t.Logf("the switch is not at %s; moving it back from %s", original.IP, s.Target.MoveIP)
@@ -91,19 +90,19 @@ func TestScenarioManagementMove(t *testing.T) {
 		}
 		defer func() { _ = c.Close() }() // read-only client at the end of the check
 		got, err := c.Info(ctx)
-		if err != nil || got.IP != want {
-			return fmt.Errorf("the switch at %s reports ip %q, err %w, want %q", host, got.IP, err, want)
+		if err != nil || got.IP.String() != want {
+			return fmt.Errorf("the switch at %s reports ip %q, err %w, want %q", host, got.IP.String(), err, want)
 		}
 		return nil
 	}
 	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
-		{Config: hcl(s.Target.MoveIP, info.Netmask, info.Gateway), Check: func(*terraform.State) error {
+		{Config: hcl(s.Target.MoveIP, info.Netmask.String(), info.Gateway.String()), Check: func(*terraform.State) error {
 			setHost(s.Target.MoveIP) // the next Terraform commands must dial the new address
 			return reportsIP(s.Target.MoveIP, s.Target.MoveIP)
 		}},
-		{Config: hcl(info.IP, info.Netmask, info.Gateway), Check: func(st *terraform.State) error {
+		{Config: hcl(info.IP.String(), info.Netmask.String(), info.Gateway.String()), Check: func(st *terraform.State) error {
 			setHost(s.Target.Host)
-			if err := reportsIP(s.Target.Host, info.IP); err != nil {
+			if err := reportsIP(s.Target.Host, info.IP.String()); err != nil {
 				return err
 			}
 			return s.restoredCheck(t)(st)
@@ -152,18 +151,18 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 			}
 			got, err := c.Info(ctx)
 			_ = c.Close() // read-only client at the end of the check
-			if err == nil && got.IP == want {
+			if err == nil && got.IP.String() == want {
 				t.Logf("found by MAC at %s after %d attempt(s), %s after the move", want, attempt, time.Since(started).Round(time.Millisecond))
 				return nil
 			}
-			last = fmt.Errorf("the switch found by MAC reports ip %q, err %w, want %q", got.IP, err, want)
+			last = fmt.Errorf("the switch found by MAC reports ip %q, err %w, want %q", got.IP.String(), err, want)
 		}
 		return last
 	}
 	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
-		{Config: hcl(s.Target.MoveIP, info.Netmask, info.Gateway), Check: func(*terraform.State) error { return reportsIP(s.Target.MoveIP) }},
-		{Config: hcl(info.IP, info.Netmask, info.Gateway), Check: func(st *terraform.State) error {
-			if err := reportsIP(info.IP); err != nil {
+		{Config: hcl(s.Target.MoveIP, info.Netmask.String(), info.Gateway.String()), Check: func(*terraform.State) error { return reportsIP(s.Target.MoveIP) }},
+		{Config: hcl(info.IP.String(), info.Netmask.String(), info.Gateway.String()), Check: func(st *terraform.State) error {
+			if err := reportsIP(info.IP.String()); err != nil {
 				return err
 			}
 			return s.restoredCheck(t)(st)
@@ -183,18 +182,18 @@ func (s *Session) bringBackFromALease(t *testing.T, mac escp.MAC, original escp.
 		t.Errorf("CANNOT FIND THE SWITCH: %v. Look for MAC %s with a discovery before doing anything else", err, mac)
 		return
 	}
-	if found.IP == original.IP.String() && !found.DHCP {
+	if found.IP.String() == original.IP.String() && !found.DHCP {
 		return
 	}
-	t.Logf("the switch is at %s with DHCP %t; writing %s back", found.IP, found.DHCP, original)
-	c, err := s.dialClient(escp.Config{Host: found.IP, MAC: mac, Username: s.Target.Username, Password: s.Target.Password})
+	t.Logf("the switch is at %s with DHCP %t; writing %s back", found.IP.String(), found.DHCP, original)
+	c, err := s.dialClient(escp.Config{Host: found.IP.String(), MAC: mac, Username: s.Target.Username, Password: s.Target.Password})
 	if err != nil {
-		t.Errorf("CANNOT REACH THE SWITCH at %s: %v", found.IP, err)
+		t.Errorf("CANNOT REACH THE SWITCH at %s: %v", found.IP.String(), err)
 		return
 	}
 	defer func() { _ = c.Close() }() // best effort at the end of the run
 	if err := c.SetIPConfig(ctx, original); err != nil {
-		t.Errorf("CANNOT PUT THE STATIC ADDRESS BACK: %v. The switch may be at %s or at %s; look for MAC %s before doing anything else", err, found.IP, original.IP, mac)
+		t.Errorf("CANNOT PUT THE STATIC ADDRESS BACK: %v. The switch may be at %s or at %s; look for MAC %s before doing anything else", err, found.IP.String(), original.IP, mac)
 	}
 }
 
@@ -224,13 +223,13 @@ func TestScenarioManagementDHCP(t *testing.T) {
 
 	provider := s.ProviderHCLByMAC("", info.MAC.String())
 	dhcp := provider + "resource \"tplinkeasysmart_management_ip\" \"this\" {\n  dhcp             = true\n  allow_disruptive = true\n}\n"
-	static := provider + fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", info.IP, info.Netmask, info.Gateway)
+	static := provider + fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", info.IP.String(), info.Netmask.String(), info.Gateway.String())
 	leased := func(*terraform.State) error {
 		found, err := escp.Locate(ctx, hw, escp.DiscoverOptions{})
 		if err != nil || !found.DHCP {
 			return fmt.Errorf("the switch found by MAC reports %+v, err %w, want DHCP on", found, err)
 		}
-		t.Logf("leased address %s mask %s gateway %s", found.IP, found.Netmask, found.Gateway)
+		t.Logf("leased address %s mask %s gateway %s", found.IP.String(), found.Netmask.String(), found.Gateway.String())
 		return nil
 	}
 	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
@@ -239,8 +238,8 @@ func TestScenarioManagementDHCP(t *testing.T) {
 		{Config: dhcp}, // the second look: nothing to change, the plan after the apply is empty
 		{Config: static, Check: func(st *terraform.State) error {
 			found, err := escp.Locate(ctx, hw, escp.DiscoverOptions{})
-			if err != nil || found.DHCP || found.IP != info.IP {
-				return fmt.Errorf("the switch found by MAC reports %+v, err %w, want %s with DHCP off", found, err, info.IP)
+			if err != nil || found.DHCP || found.IP.String() != info.IP.String() {
+				return fmt.Errorf("the switch found by MAC reports %+v, err %w, want %s with DHCP off", found, err, info.IP.String())
 			}
 			return s.restoredCheck(t)(st)
 		}},

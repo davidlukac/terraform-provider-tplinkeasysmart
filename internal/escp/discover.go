@@ -296,15 +296,15 @@ func listen(ctx context.Context, conn *net.UDPConn, until time.Time, seq uint16,
 	}
 }
 
-// sortedInfos returns the replies ordered by IP address (then MAC); an address that does not
-// parse sorts first.
+// sortedInfos returns the replies ordered by IP address (then MAC); an address the reply
+// did not carry sorts first.
 func sortedInfos(found map[string]Info) []Info {
 	out := make([]Info, 0, len(found))
 	for _, info := range found {
 		out = append(out, info)
 	}
 	slices.SortFunc(out, func(a, b Info) int {
-		if c := bytes.Compare(net.ParseIP(a.IP).To4(), net.ParseIP(b.IP).To4()); c != 0 {
+		if c := a.IP.Compare(b.IP); c != 0 {
 			return c
 		}
 		return bytes.Compare(a.MAC[:], b.MAC[:])

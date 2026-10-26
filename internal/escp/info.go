@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
@@ -87,11 +88,11 @@ func infoFromReply(r reply) Info { return infoFromTLVs(r.tlvs) }
 func infoFromTLVs(tlvs []wire.TLV) Info {
 	r := reply{tlvs: tlvs}
 	str := func(t int16) string { v, _ := r.tlv(t); return wire.CString(v) }
-	ip := func(t int16) string {
-		if v, ok := r.tlv(t); ok && len(v) == 4 {
-			return net.IP(v).String()
+	ip := func(t int16) (a netip.Addr) {
+		if v, ok := r.tlv(t); ok && len(v) == net.IPv4len {
+			a, _ = netip.AddrFromSlice(v)
 		}
-		return ""
+		return a
 	}
 	info := Info{Model: str(wire.TLVModel), Hostname: str(wire.TLVHostname), Firmware: str(wire.TLVFirmware),
 		Hardware: str(wire.TLVHardware), IP: ip(wire.TLVIP), Netmask: ip(wire.TLVNetmask), Gateway: ip(wire.TLVGateway)}
