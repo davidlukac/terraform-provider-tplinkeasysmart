@@ -163,6 +163,8 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 
 ## Compatibility
 
+<!-- compatibility-table:begin (generated from internal/escp/safety/compatibility.json: make compat-table) -->
+
 | Switch | Hardware | Firmware | Status |
 |---|---|---|---|
 | TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads, writes, import and drift checked on a real device. The VLAN mode, 802.1Q group and PVID resources were not tried on this build (they are verified on 20250710; same protocol generation). |
@@ -171,6 +173,8 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 | TL-SG108E | other hardware versions | any | Untested |
 | Other Easy Smart models (TL-SG105E, TL-SG1016DE, ...) | any | any | Untested; reports wanted |
 | Any | any | firmware **before the 2023 RSA key exchange** | Not supported: the client always performs the key exchange and has never been tried against the older login |
+
+<!-- compatibility-table:end -->
 
 Other Easy Smart models are expected to speak the same protocol family; that is a hope, not a claim. Reports (even "the read-only data sources work" or "login is rejected") fill in this table, see [Contributing](#contributing).
 

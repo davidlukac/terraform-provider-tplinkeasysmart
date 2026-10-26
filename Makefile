@@ -57,7 +57,12 @@ regression-live:
 	@test "$(CONFIRM)" = 1 || { echo "this writes to the real switch named in .test.env: rerun with CONFIRM=1"; exit 1; }
 	TPLINK_REGRESSION_ENV_FILE=$(CURDIR)/.test.env TF_ACC=1 go test -count=1 -timeout 60m -v ./internal/regression/...
 
-.PHONY: regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
+# Rewrites the compatibility table in README.md from internal/escp/safety/compatibility.json (the
+# firmware allow-list reads the same file); a test fails when the README is stale.
+compat-table:
+	go test ./internal/escp/safety -run TestReadmeCompatibilityTable -update-readme
+
+.PHONY: compat-table regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
 
 # --- coverage -------------------------------------------------------------
 # `make cover` runs the whole suite with the race detector, writes cover.out

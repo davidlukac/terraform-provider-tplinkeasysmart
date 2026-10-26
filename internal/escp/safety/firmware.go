@@ -10,9 +10,10 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
-// verifiedFirmwareBuilds is the allow-list behind VerifiedFirmwareBuilds. It is unexported so
-// that no code in the process can append to it and weaken the gate.
-var verifiedFirmwareBuilds = []string{"20230218", "20250710"}
+// verifiedFirmwareBuilds is the allow-list behind VerifiedFirmwareBuilds: the builds of the
+// verified rows of the compatibility table (compatibility.json). It is unexported so that no
+// code in the process can append to it and weaken the gate.
+var verifiedFirmwareBuilds = verifiedBuilds(compatibility)
 
 // VerifiedFirmwareBuilds returns the firmware builds (the date in "1.0.0 Build
 // 20230218 Rel.50633") whose protocol behaviour this client was tested
