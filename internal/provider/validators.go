@@ -166,7 +166,7 @@ func mirrorProblem(enabled types.Bool, dest types.Int64, ingress, egress []int) 
 	}
 	if !enabled.ValueBool() {
 		if dest.ValueInt64() != 0 || len(ingress)+len(egress) != 0 {
-			return "mirroring is disabled, so mirror_port, ingress_ports and egress_ports must be empty"
+			return "mirroring is disabled, so mirror_port, ingress_ports and egress_ports must be empty (the switch drops them when the mirror is off)"
 		}
 		return ""
 	}
@@ -191,7 +191,7 @@ func qosProblem(mode types.String, priorities types.Map) string {
 		return ""
 	}
 	if mode.ValueString() != escp.QoSPortBased.String() {
-		return "per-port priorities only take effect when mode is port-based; remove port_priorities or set mode = \"port-based\""
+		return "per-port priorities only take effect when mode is port-based (the switch accepts them in the other modes but does not keep them); remove port_priorities or set mode = \"port-based\""
 	}
 	return ""
 }
