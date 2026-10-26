@@ -19,6 +19,34 @@
 // the record is named for the role (MTUVLAN.UplinkPort, Mirror.MirrorPort). Readers are
 // named for what they return (Ports, QoS, LED, Dot1Q), writers Set... and Delete....
 //
+// # Layout of the package
+//
+// A setting is one file: its types, its reader, its writer, its parser and its validation live
+// together, and its tests sit in the file of the same name with the suffix _test (ports.go,
+// ports_test.go). The settings are leaves: they depend on the client and on the shared
+// helpers, never on each other (except Port, the type most of them refer to).
+//
+//   - Settings: ports, lag, qos, bandwidth, storm, igmp, mirror, loopprevention, led, system,
+//     stats, backup, vlan_mtu, vlan_port, vlan_mode, vlan_8021q (the reads) and
+//     vlan_8021q_write. system.go is the device description, ip.go the management address
+//     (SetIPConfig and its lost-reply handling).
+//   - The client: client.go (Client, Dial, Close, the socket), config.go (Config, WriteGate,
+//     InfoReader, Info), info.go (reading Info), session.go (the key exchange and its retry),
+//     transport.go (packets, encryption, sending, receiving, fragments, deadlines), request.go
+//     (the one place that sends a gated SET and a GET, and the port count) and errors.go.
+//   - Shared: operation.go (the Operation a gate sees and the Impact classes), limits.go (the
+//     public limits and Validate functions), bitmask.go (port masks) and discover.go (finding
+//     switches without credentials).
+//
+// Sub-packages hold what has a boundary of its own: internal/wire (the packet codec, the
+// session crypto and every TLV type number, which no caller needs), internal/udp (sharing the
+// reply port between sockets), safety (the policy gates and the compatibility table) and
+// escptest (a fake switch for tests). Tests are named for the source they exercise; the ones
+// that cut across sources have a name of their own: cancel_test (cancellation), parsers_test,
+// readers_test, write_gate_test, dryrun_test, fake_switch_test (the fake itself) and
+// helpers_test. CONTRIBUTING.md in the repository root is the checklist for adding or
+// changing a setting.
+//
 // # Using a client
 //
 // Dial prepares a Client for one switch; nothing is sent to it until the first call.
@@ -37,9 +65,9 @@
 // keeps only the replies from its own switch. Two Clients for the same switch do not work
 // at all (measured: 30 reads out of 30 failed, and the switch dropped pings meanwhile).
 // The switch appears to keep a single session, so that each key exchange invalidates the
-// other client's. Discover can run next to a Client. This was measured on macOS; port
-// sharing on other systems was not, and where the system offers none the second bind
-// fails with an error.
+// other client's. Discover can run next to a Client. Port sharing was observed on macOS with
+// real switches, and a test shows that on Linux a broadcast reaches every sharing socket; where
+// the system offers no sharing option the second bind fails with an error.
 //
 // Discover finds the switches on the network without credentials and without knowing
 // their addresses.
