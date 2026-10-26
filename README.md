@@ -247,7 +247,7 @@ CI runs the unit suite on the module's Go version and the latest stable, the lif
 
 ## Contributing
 
-Issues and pull requests are welcome. Run `make hooks` once: the pre-commit hook runs the same checks as CI (format, vet, lint, tests with `-race` and the coverage policy), about a minute and a half. Please open an issue first for a new setting. Changes go through a pull request with [Conventional Commits](https://www.conventionalcommits.org/) titles and need green CI; see [`RELEASING.md`](RELEASING.md) for how versions are cut. Reports of other models or firmware are especially useful: use the [hardware report template](https://github.com/davidlukac/terraform-provider-tplinkeasysmart/issues/new?template=hardware_report.yml), which starts from a read-only configuration.
+Issues and pull requests are welcome. Run `make hooks` once: the pre-commit hook runs the same checks as CI (format, vet, lint, tests with `-race` and the coverage policy), about a minute and a half. Please open an issue first for a new setting; [`CONTRIBUTING.md`](CONTRIBUTING.md) is the checklist for any change to the client, a resource or a data source (code, tests, documentation, release). Changes go through a pull request with [Conventional Commits](https://www.conventionalcommits.org/) titles and need green CI; see [`RELEASING.md`](RELEASING.md) for how versions are cut. Reports of other models or firmware are especially useful: use the [hardware report template](https://github.com/davidlukac/terraform-provider-tplinkeasysmart/issues/new?template=hardware_report.yml), which starts from a read-only configuration.
 
 ## License
 
