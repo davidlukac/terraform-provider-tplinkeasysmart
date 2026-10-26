@@ -15,6 +15,9 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
+// lookupAfterMove bounds how long a check keeps looking for a switch by MAC after it moved.
+const lookupAfterMove = 30 * time.Second
+
 // settleTime bounds each look at the switch while it is being brought back.
 const settleTime = 2 * time.Minute
 
@@ -138,18 +141,27 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 		return s.ProviderHCLByMAC("", info.MAC) +
 			fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", ip, mask, gateway)
 	}
-	// reportsIP asks, with a client that has only the MAC, where the switch is now.
+	// reportsIP asks, with a client that has only the MAC, where the switch is now. The switch
+	// takes a moment to answer a broadcast discovery at its new address, so it looks again for a
+	// while and says in the log how long that took: that delay is what a command run right after a
+	// move has to live with.
 	reportsIP := func(want string) error {
-		c, err := s.dialClient(escp.Config{MAC: hw, Username: s.Target.Username, Password: s.Target.Password})
-		if err != nil {
-			return err
+		started := time.Now()
+		var last error
+		for attempt := 1; time.Since(started) < lookupAfterMove; attempt++ {
+			c, err := s.dialClient(escp.Config{MAC: hw, Username: s.Target.Username, Password: s.Target.Password})
+			if err != nil {
+				return err
+			}
+			got, err := c.Info(ctx)
+			_ = c.Close() // read-only client at the end of the check
+			if err == nil && got.IP == want {
+				t.Logf("found by MAC at %s after %d attempt(s), %s after the move", want, attempt, time.Since(started).Round(time.Millisecond))
+				return nil
+			}
+			last = fmt.Errorf("the switch found by MAC reports ip %q, err %w, want %q", got.IP, err, want)
 		}
-		defer func() { _ = c.Close() }() // read-only client at the end of the check
-		got, err := c.Info(ctx)
-		if err != nil || got.IP != want {
-			return fmt.Errorf("the switch found by MAC reports ip %q, err %w, want %q", got.IP, err, want)
-		}
-		return nil
+		return last
 	}
 	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
 		{Config: hcl(s.Target.MoveIP, info.Netmask, info.Gateway), Check: func(*terraform.State) error { return reportsIP(s.Target.MoveIP) }},

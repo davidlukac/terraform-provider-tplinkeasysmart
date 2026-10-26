@@ -47,7 +47,7 @@ c, err := escp.Dial(escp.Config{MAC: mac, Username: user, Password: pw}) // no H
 ```
 
 - With `Config.MAC` set, a device that answers with another MAC is refused (`ErrWrongSwitch`, naming both) and nothing is written to it. The MAC is checked on every reply, the key exchange's included.
-- With no `Host`, or a `Host` that stops answering, the client looks the switch up by its MAC (a discovery probe that stops at the first reply from that switch, normally under a second; `ErrNotFound` when nobody answers). `escp.Locate(ctx, mac, opts)` is the same lookup for a front end.
+- With no `Host`, or a `Host` that stops answering, the client looks the switch up by its MAC (a discovery probe that stops at the first reply from that switch, normally under a second; `ErrNotFound` when nobody answers, after a second try of the lookup, because one right after a management move once missed a switch that was there). `escp.Locate(ctx, mac, opts)` is the same lookup for a front end.
 - `Dial` still sends nothing; the lookup happens on the first request.
 
 ## Writing safely
