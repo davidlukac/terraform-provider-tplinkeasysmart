@@ -9,6 +9,23 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
+func TestMirrorRejectsInvalidSourcePortsBeforeSending(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFast(t, f, "secret")
+	ctx := context.Background()
+	for name, m := range map[string]Mirror{
+		"invalid ingress": {Enabled: true, MirrorPort: 7, IngressPorts: []int{0}},
+		"invalid egress":  {Enabled: true, MirrorPort: 7, IngressPorts: []int{4}, EgressPorts: []int{40}},
+	} {
+		if err := c.SetPortMirror(ctx, m); err == nil {
+			t.Errorf("%s must be rejected", name)
+		}
+	}
+	if n := f.WriteCount(); n != 0 {
+		t.Fatalf("%d SET(s) reached the switch", n)
+	}
+}
+
 func TestParseMirror(t *testing.T) {
 	off, err := parseMirror([]wire.TLV{tlvHex(t, wire.TLVMirror, "00000000000000000000")})
 	if err != nil {

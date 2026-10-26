@@ -2,12 +2,27 @@ package escp
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
+
+func TestSetPortPrioritiesStopsWhenTheCurrentStateCannotBeRead(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFast(t, f, "secret")
+	f.Configure(func(f *escptest.Switch) {
+		f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) { return nil, 0, true }
+	})
+	if err := c.SetPortPriorities(context.Background(), map[int]Priority{3: 2}); !errors.Is(err, ErrNoReply) {
+		t.Fatalf("got %v", err)
+	}
+	if n := f.WriteCount(); n != 0 {
+		t.Fatalf("priorities must not be written blind: %d SET(s)", n)
+	}
+}
 
 func TestParseQoS(t *testing.T) {
 	// captured from a TL-SG108E v6 (fw 20230218): mode 2 (DSCP/802.1p), all ports raw priority 0 = "1 (lowest)"

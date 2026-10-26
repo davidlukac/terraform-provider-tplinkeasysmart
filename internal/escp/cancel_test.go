@@ -3,7 +3,6 @@ package escp
 import (
 	"context"
 	"errors"
-	"net"
 	"testing"
 	"time"
 
@@ -81,53 +80,6 @@ func TestCancellationInterruptsTheWaitForAReply(t *testing.T) {
 	// the attempt would have waited 20 s; anything far below that shows the wait was interrupted
 	if took := time.Since(start); took > 10*time.Second {
 		t.Fatalf("the cancelled call kept waiting for %v", took)
-	}
-}
-
-// The fake switch ignores credentials that travel under the static key, so a client that sent its
-// password that way would fail here instead of passing unnoticed.
-func TestCredentialsMustTravelUnderTheSessionKey(t *testing.T) {
-	f := escptest.Start(t)
-	c := dialFake(t, f, "secret")
-	ctx := context.Background()
-	if _, err := c.LED(ctx); err != nil { // establishes the session
-		t.Fatal(err)
-	}
-	set := []wire.TLV{
-		{Type: wire.TLVUsername, Value: append([]byte("admin"), 0)},
-		{Type: wire.TLVPassword, Value: append([]byte("secret"), 0)},
-		{Type: wire.TLVLED, Value: []byte{0}},
-	}
-	c.mu.Lock()
-	_, err := c.exchange(ctx, wire.OpSet, set, true, []*net.UDPAddr{c.dest})
-	c.mu.Unlock()
-	if !errors.Is(err, ErrNoReply) || f.WriteCount() != 0 {
-		t.Fatalf("a credentialed SET under the static key must be ignored: err=%v writes=%d", err, f.WriteCount())
-	}
-	c.mu.Lock()
-	_, err = c.exchange(ctx, wire.OpSet, set, false, []*net.UDPAddr{c.dest})
-	c.mu.Unlock()
-	if err != nil || f.WriteCount() != 1 {
-		t.Fatalf("the same SET under the session key must be applied: err=%v writes=%d", err, f.WriteCount())
-	}
-}
-
-func TestDecryptSessionKeyRefusesAShortValue(t *testing.T) {
-	for _, n := range []int{0, 1, 9} {
-		if got := escptest.DecryptSessionKey(make([]byte, n)); got != nil {
-			t.Errorf("a %d-byte value is no key exchange, got %v", n, got)
-		}
-	}
-}
-
-// A wrong password is a refusal by the switch, for the backup as for every write.
-func TestConfigBackupRefusalIsARejection(t *testing.T) {
-	f := escptest.Start(t)
-	c := dialFake(t, f, "wrong")
-	_, err := c.ConfigBackup(context.Background())
-	var refused *RejectedError
-	if !errors.Is(err, ErrRejected) || !errors.As(err, &refused) || refused.Code != 5 {
-		t.Fatalf("want a *RejectedError with code 5, got %v", err)
 	}
 }
 

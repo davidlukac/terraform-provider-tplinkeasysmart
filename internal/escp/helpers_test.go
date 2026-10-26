@@ -2,6 +2,7 @@ package escp
 
 import (
 	"testing"
+	"time"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 )
@@ -28,4 +29,24 @@ func newBoundClient(t testing.TB, cfg Config) *Client {
 	}
 	t.Fatalf("no free UDP port after 20 attempts: %v", lastErr)
 	return nil
+}
+
+func dialFake(t *testing.T, f *escptest.Switch, pass string) *Client {
+	t.Helper()
+	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 300 * time.Millisecond,
+		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
+	c.allowLoopback = true
+	t.Cleanup(func() { c.Close() })
+	return c
+}
+
+// dialFast is dialFake with short timeouts and a single retry, for tests that
+// deliberately make the switch stay silent.
+func dialFast(t *testing.T, f *escptest.Switch, pass string) *Client {
+	t.Helper()
+	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 80 * time.Millisecond, Retries: 1,
+		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
+	c.allowLoopback = true
+	t.Cleanup(func() { c.Close() })
+	return c
 }
