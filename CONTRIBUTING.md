@@ -15,6 +15,7 @@ Tags: **[C]** client change (`internal/escp`), **[R]** new or changed resource, 
 
 **Client (`internal/escp`)**
 
+- [ ] **[C]** A setting is one file named after it (`ports.go`: types, reader, writer, parser, validation) with its tests in the file of the same name (`ports_test.go`); the file map is in the package overview of `internal/escp/doc.go`. Settings depend on the client and the shared helpers, never on each other.
 - [ ] **[C]** The wire layout is written down in [`internal/escp/PROTOCOL.md`](internal/escp/PROTOCOL.md) first (TLV id, byte layout, source: capture, vendor code, or measured), including what is not verified.
 - [ ] **[C]** Protocol numbers are named constants with a doc comment (`internal/escp/internal/wire` for TLV ids and sizes); no magic values and no layout bytes outside the client package.
 - [ ] **[C]** A reader returns a domain type (not TLVs). A writer validates every argument before anything is sent and returns an error that matches `ErrInvalid`.
