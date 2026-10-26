@@ -19,9 +19,6 @@ import (
 // Switches answer within milliseconds; the rest is room for a busy LAN or a bridge.
 const defaultDiscoverWindow = 2 * time.Second
 
-// hwAddrLen is the length of an Ethernet MAC address.
-const hwAddrLen = 6
-
 // ErrNoInterface means there is no network interface to send a discovery probe on: none
 // is up with an IPv4 broadcast address, or the one asked for is not among them.
 var ErrNoInterface = errors.New("escp: no network interface to discover on")
@@ -70,7 +67,7 @@ type discoverEnv struct {
 // netInterface is an interface that discovery can use: what is needed to build a probe.
 type netInterface struct {
 	Name       string
-	MAC        [hwAddrLen]byte
+	MAC        MAC
 	Broadcasts []net.IP // subnet broadcast address of each IPv4 address
 }
 
@@ -80,7 +77,7 @@ func usableInterfaces(all []net.Interface, addrs func(net.Interface) ([]net.Addr
 	var out []netInterface
 	for _, ifc := range all {
 		const need = net.FlagUp | net.FlagBroadcast
-		if ifc.Flags&need != need || ifc.Flags&net.FlagLoopback != 0 || len(ifc.HardwareAddr) != hwAddrLen {
+		if ifc.Flags&need != need || ifc.Flags&net.FlagLoopback != 0 || len(ifc.HardwareAddr) != macLen {
 			continue
 		}
 		list, err := addrs(ifc)
@@ -148,7 +145,7 @@ func selectInterfaces(all []netInterface, name string) ([]netInterface, error) {
 // probe is one discovery request: where it goes and which host MAC it carries.
 type probe struct {
 	to  *net.UDPAddr
-	mac [hwAddrLen]byte
+	mac MAC
 }
 
 func discoverWith(ctx context.Context, opts DiscoverOptions, env discoverEnv) ([]Info, error) {
@@ -160,18 +157,18 @@ func discoverWith(ctx context.Context, opts DiscoverOptions, env discoverEnv) ([
 // switch needs 250 to 500 milliseconds to answer). It returns ErrNotFound when nobody with that
 // MAC answers within the window (two seconds unless opts.Window says otherwise). Read-only and
 // not subject to a WriteGate.
-func Locate(ctx context.Context, mac net.HardwareAddr, opts DiscoverOptions) (Info, error) {
+func Locate(ctx context.Context, mac MAC, opts DiscoverOptions) (Info, error) {
 	return locateWith(ctx, mac, opts, discoverEnv{interfaces: hostInterfaces, switchPort: defaultSwitchPort, hostPort: defaultHostPort})
 }
 
-func locateWith(ctx context.Context, mac net.HardwareAddr, opts DiscoverOptions, env discoverEnv) (Info, error) {
-	if len(mac) != hwAddrLen {
-		return Info{}, invalidf("escp: a MAC address has %d bytes, got %d", hwAddrLen, len(mac))
+func locateWith(ctx context.Context, mac MAC, opts DiscoverOptions, env discoverEnv) (Info, error) {
+	if mac.IsZero() {
+		return Info{}, invalidf("escp: Locate needs the MAC address of the switch")
 	}
 	want := mac.String()
 	infos, err := discoverUntil(ctx, opts, env, func(found map[string]Info) bool { _, ok := found[want]; return ok })
 	for _, info := range infos {
-		if info.MAC == want {
+		if info.MAC == mac {
 			return info, nil
 		}
 	}
@@ -286,7 +283,7 @@ func listen(ctx context.Context, conn *net.UDPConn, until time.Time, seq uint16,
 			continue
 		}
 		info := infoFromTLVs(tlvs)
-		key := info.MAC
+		key := info.MAC.String()
 		if key == "" {
 			key = from.IP.String()
 		}
@@ -310,7 +307,7 @@ func sortedInfos(found map[string]Info) []Info {
 		if c := bytes.Compare(net.ParseIP(a.IP).To4(), net.ParseIP(b.IP).To4()); c != 0 {
 			return c
 		}
-		return bytes.Compare([]byte(a.MAC), []byte(b.MAC))
+		return bytes.Compare(a.MAC[:], b.MAC[:])
 	})
 	return out
 }

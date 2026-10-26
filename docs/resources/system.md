@@ -2,18 +2,19 @@
 page_title: "tplinkeasysmart_system Resource - tplinkeasysmart"
 subcategory: "System"
 description: |-
-  System settings (System > System Info > Device Description). Singleton; import with id system. Only the device description is managed. The management IP, DHCP and gateway are never changed: the request re-sends them as read from the switch. A write is skipped when the description already matches. Destroying only removes it from state.
+  System settings (System > System Info > Device Description). Singleton; import with id system. Only the device description is managed. This resource never changes the management IP, DHCP or gateway (the request re-sends them as read from the switch); tplinkeasysmart_management_ip manages them. A write is skipped when the description already matches. Destroying only removes it from state.
 ---
 
 # tplinkeasysmart_system (Resource)
 
-System settings (System > System Info > Device Description). Singleton; import with id `system`. Only the device description is managed. The management IP, DHCP and gateway are never changed: the request re-sends them as read from the switch. A write is skipped when the description already matches. Destroying only removes it from state.
+System settings (System > System Info > Device Description). Singleton; import with id `system`. Only the device description is managed. This resource never changes the management IP, DHCP or gateway (the request re-sends them as read from the switch); `tplinkeasysmart_management_ip` manages them. A write is skipped when the description already matches. Destroying only removes it from state.
 
 ## Example Usage
 
 ```terraform
 # The device description: letters, digits and hyphens only (no dots or underscores).
-# The management IP, DHCP flag and gateway are re-sent unchanged and never modified.
+# The management IP, DHCP flag and gateway are re-sent unchanged and never modified here
+# (tplinkeasysmart_management_ip manages them).
 resource "tplinkeasysmart_system" "this" {
   hostname = "sw01"
 }

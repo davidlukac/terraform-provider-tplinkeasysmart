@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
 func managementIPConfig(ip, mask, gw string, allow bool) string {
@@ -60,20 +62,6 @@ func TestAccManagementIPRefusesWithoutAllowDisruptive(t *testing.T) {
 	})
 	if n := f.extra().ipSetCalls; n != 0 {
 		t.Fatalf("a refused change must not write, got %d writes", n)
-	}
-}
-
-func TestAccManagementIPRefusesDHCP(t *testing.T) {
-	f := newStaticFake("192.0.2.13", "255.255.255.0", "192.0.2.1")
-	f.extra().static = false
-	resource.UnitTest(t, resource.TestCase{
-		ProtoV6ProviderFactories: factories(f),
-		Steps: []resource.TestStep{
-			{Config: managementIPConfig("192.0.2.14", "255.255.255.0", "192.0.2.1", true), ExpectError: regexp.MustCompile(`The switch uses DHCP`)},
-		},
-	})
-	if n := f.extra().ipSetCalls; n != 0 {
-		t.Fatalf("a DHCP switch must not be written, got %d writes", n)
 	}
 }
 
@@ -176,4 +164,139 @@ resource "tplinkeasysmart_management_ip" "m" {
 		ProtoV6ProviderFactories: factories(f),
 		Steps:                    []resource.TestStep{{Config: cfg, Check: resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.m", "ip_address", "192.0.2.14")}},
 	})
+}
+
+// dhcpConfig is the resource with `dhcp = true`: no address is written, the lease is reported.
+func dhcpConfig(allow bool) string {
+	return providerBlock + fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"m\" {\n  dhcp = true\n  allow_disruptive = %t\n}\n", allow)
+}
+
+func TestAccManagementIPDHCPLifecycle(t *testing.T) {
+	f := newStaticFake("192.0.2.13", "255.255.255.0", "192.0.2.1")
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			// Static to a lease: the leased values are what the resource reports.
+			{Config: dhcpConfig(true), Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.m", "dhcp", "true"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.m", "ip_address", "192.0.2.85"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.m", "netmask", "255.255.255.0"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.m", "gateway", "192.0.2.1"),
+			)},
+			// Nothing to do when it already leases (and the plan after the apply is empty, which the harness requires).
+			{Config: dhcpConfig(false)},
+			{ResourceName: "tplinkeasysmart_management_ip.m", ImportState: true, ImportStateId: "management_ip", ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{"allow_disruptive"}},
+			// A renewal that hands out another address is not drift: the configuration names no address.
+			{PreConfig: func() { e := f.extra(); e.mu.Lock(); e.ip = "192.0.2.86"; e.mu.Unlock() }, Config: dhcpConfig(false), PlanOnly: true},
+			// And back to a static address.
+			{Config: managementIPConfig("192.0.2.13", "255.255.255.0", "192.0.2.1", true), Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.m", "dhcp", "false"),
+				resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.m", "ip_address", "192.0.2.13"),
+			)},
+		},
+	})
+	e := f.extra()
+	if e.dhcpCalls != 1 || e.ipSetCalls != 1 || !e.static || e.ip != "192.0.2.13" {
+		t.Fatalf("dhcp writes=%d static writes=%d static=%t ip=%q, want one of each and the switch back at 192.0.2.13", e.dhcpCalls, e.ipSetCalls, e.static, e.ip)
+	}
+}
+
+func TestAccManagementIPDHCPToStaticAtTheLeasedAddress(t *testing.T) {
+	// The flag has to change even when the address is the one that was leased.
+	f := newStaticFake("192.0.2.13", "255.255.255.0", "192.0.2.1")
+	f.extra().static = false
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{{Config: managementIPConfig("192.0.2.13", "255.255.255.0", "192.0.2.1", true),
+			Check: resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.m", "dhcp", "false")}},
+	})
+	if e := f.extra(); !e.static || e.ipSetCalls != 1 {
+		t.Fatalf("static=%t writes=%d, want the flag turned off by one write", e.static, e.ipSetCalls)
+	}
+}
+
+func TestAccManagementIPRefusesToChangeBetweenLeaseAndStaticWithoutAllowDisruptive(t *testing.T) {
+	cases := []struct {
+		name   string
+		leases bool
+		cfg    string
+	}{
+		{"static to lease", false, dhcpConfig(false)},
+		{"lease to static", true, managementIPConfig("192.0.2.14", "255.255.255.0", "192.0.2.1", false)},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newStaticFake("192.0.2.13", "255.255.255.0", "192.0.2.1")
+			f.extra().static = !c.leases
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: factories(f),
+				Steps:                    []resource.TestStep{{Config: c.cfg, ExpectError: regexp.MustCompile(`Refusing to change the management address`)}},
+			})
+			if e := f.extra(); e.ipSetCalls != 0 || e.dhcpCalls != 0 {
+				t.Fatalf("a refused change must not write, got %d static and %d DHCP writes", e.ipSetCalls, e.dhcpCalls)
+			}
+		})
+	}
+}
+
+func TestAccManagementIPDHCPPlanValidation(t *testing.T) {
+	cases := []struct{ name, body, want string }{
+		{"an address next to dhcp", "dhcp = true\n  ip_address = \"192.0.2.14\"", `(?s)A static address next to\s+DHCP.*ip_address`},
+		{"a mask next to dhcp", "dhcp = true\n  netmask = \"255.255.255.0\"", `(?s)A static address next to\s+DHCP.*netmask`},
+		{"no address without dhcp", "dhcp = false\n  netmask = \"255.255.255.0\"\n  gateway = \"192.0.2.1\"", `(?s)Missing static address.*ip_address`},
+		{"nothing at all", "allow_disruptive = true", `(?s)Missing static address`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newStaticFake("192.0.2.13", "255.255.255.0", "192.0.2.1")
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: factories(f),
+				Steps: []resource.TestStep{{Config: providerBlock + "resource \"tplinkeasysmart_management_ip\" \"m\" {\n  " + c.body + "\n}\n",
+					PlanOnly: true, ExpectError: regexp.MustCompile(c.want)}},
+			})
+			if e := f.extra(); e.ipSetCalls != 0 || e.dhcpCalls != 0 {
+				t.Fatalf("plan-time validation must stop before any write, got %d static and %d DHCP writes", e.ipSetCalls, e.dhcpCalls)
+			}
+		})
+	}
+}
+
+// A flag that is only known after another resource is applied cannot be checked yet; it is checked
+// once it is known.
+func TestAccManagementIPDHCPKnownOnlyAfterApply(t *testing.T) {
+	f := newStaticFake("192.0.2.13", "255.255.255.0", "192.0.2.1")
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{{Config: providerBlock + `resource "terraform_data" "d" {
+  input = true
+}
+resource "tplinkeasysmart_management_ip" "m" {
+  dhcp             = terraform_data.d.output
+  allow_disruptive = true
+}
+`, Check: resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.m", "dhcp", "true")}},
+	})
+}
+
+func TestAccManagementIPDHCPErrors(t *testing.T) {
+	cases := []struct {
+		name  string
+		setup func(*extraState)
+		want  string
+	}{
+		{"the client needs a MAC", func(e *extraState) { e.dhcpErr = fmt.Errorf("%w: EnableDHCP needs Config.MAC", escp.ErrInvalid) }, `(?s)Set\s+.mac.\s+in\s+the\s+provider\s+configuration`},
+		{"the write fails", func(e *extraState) { e.dhcpErr = errBoom }, `(?s)look\s+for\s+it\s+by\s+its\s+MAC`},
+		{"the switch stays static", func(e *extraState) { e.dhcpIgnore = true }, `did not change as requested`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newStaticFake("192.0.2.13", "255.255.255.0", "192.0.2.1")
+			c.setup(f.extra())
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: factories(f),
+				Steps:                    []resource.TestStep{{Config: dhcpConfig(true), ExpectError: regexp.MustCompile(c.want)}},
+			})
+		})
+	}
 }

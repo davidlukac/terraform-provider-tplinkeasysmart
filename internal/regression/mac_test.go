@@ -3,7 +3,6 @@ package regression
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"regexp"
 	"testing"
@@ -110,9 +109,9 @@ func TestScenarioMultiSwitchByMAC(t *testing.T) {
 	if target, err := LoadTarget(map[string]string{EnvTarget: os.Getenv(EnvTarget)}); err != nil || target.Real() {
 		t.Skip("the multi-switch scenario runs on the fakes only")
 	}
-	macA, macB := net.HardwareAddr(escptest.DefaultMAC[:]), net.HardwareAddr{0x00, 0x00, 0x5e, 0x00, 0x53, 0x03}
+	macA, macB := escp.MAC(escptest.DefaultMAC), escp.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x03}
 	a, b := startFake(t), startFake(t)
-	b.SetMAC([6]byte(macB))
+	b.SetMAC(macB)
 	fakes := map[string]*escptest.Switch{macA.String(): a, macB.String(): b}
 	dial := func(cfg escp.Config) (provider.SwitchClient, error) {
 		f, ok := fakes[cfg.MAC.String()]

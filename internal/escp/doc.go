@@ -28,13 +28,13 @@
 //
 //   - Settings: ports, lag, qos, bandwidth, storm, igmp, mirror, loopprevention, led, system,
 //     stats, backup, vlan_mtu, vlan_port, vlan_mode, vlan_8021q (the reads) and
-//     vlan_8021q_write. system.go is the device description, ip.go the management address
-//     (SetIPConfig and its lost-reply handling).
+//     vlan_8021q_write. system.go is the device description, ip.go the static management address
+//     (SetIPConfig and its lost-reply handling) and dhcp.go the lease (EnableDHCP).
 //   - The client: client.go (Client, Dial, Close, the socket), config.go (Config, WriteGate,
 //     InfoReader, Info), info.go (reading Info), session.go (the key exchange and its retry),
 //     transport.go (packets, encryption, sending, receiving, fragments, deadlines), request.go
 //     (the one place that sends a gated SET and a GET, and the port count) and errors.go.
-//   - Shared: operation.go (the Operation a gate sees and the Impact classes), limits.go (the
+//   - Shared: mac.go (MAC, the one place a switch's hardware address is parsed, compared and printed), operation.go (the Operation a gate sees and the Impact classes), limits.go (the
 //     public limits and Validate functions), bitmask.go (port masks) and discover.go (finding
 //     switches without credentials).
 //
@@ -43,7 +43,7 @@
 // reply port between sockets), safety (the policy gates and the compatibility table) and
 // escptest (a fake switch for tests). Tests are named for the source they exercise; the ones
 // that cut across sources have a name of their own: cancel_test (cancellation), parsers_test,
-// readers_test, mac_test (identity and lookup by MAC address), write_gate_test, dryrun_test, fake_switch_test (the fake itself) and
+// readers_test, identity_test (identity and lookup by MAC address), write_gate_test, dryrun_test, fake_switch_test (the fake itself) and
 // helpers_test. CONTRIBUTING.md in the repository root is the checklist for adding or
 // changing a setting.
 //

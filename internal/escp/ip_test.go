@@ -89,12 +89,16 @@ func TestSetIPConfigReportsAMoveThatCannotBeConfirmed(t *testing.T) {
 	}
 }
 
+// otherDevice is the MAC of a device that is not the fake.
+var otherDevice = MAC{0xaa, 0xbb, 0xcc, 0, 0, 1}
+
 func TestClassifyLostReply(t *testing.T) {
-	const mac = "00:00:5e:00:53:02"
-	info := func(mac string, cfg IPConfig) Info {
+	mac := MAC(escptest.DefaultMAC)
+	info := func(mac MAC, cfg IPConfig) Info {
 		return Info{MAC: mac, IP: cfg.IP.String(), Netmask: cfg.Netmask.String(), Gateway: cfg.Gateway.String()}
 	}
 	third := cfgOf("127.0.0.1", "255.255.255.128", "127.0.0.3")
+	leasing := func(cfg IPConfig) Info { i := info(mac, cfg); i.DHCP = true; return i }
 	cases := []struct {
 		name  string
 		want  IPConfig
@@ -106,10 +110,12 @@ func TestClassifyLostReply(t *testing.T) {
 		{"only the mask differs from the old settings and matches the wanted ones", cfgOf("127.0.0.1", "255.255.0.0", "127.0.0.254"), info(mac, cfgOf("127.0.0.1", "255.255.0.0", "127.0.0.254")), lostReplyApplied},
 		{"asked for what was already there, either way the switch is where it should be", lostReplyBefore, info(mac, lostReplyBefore), lostReplyApplied},
 		{"settings that are neither", lostReplyWanted, info(mac, third), lostReplyUnexpected},
+		{"the wanted address, but leased: DHCP is still on", lostReplyWanted, leasing(lostReplyWanted), lostReplyUnexpected},
+		{"the old settings, still leased", lostReplyWanted, leasing(lostReplyBefore), lostReplyUnchanged},
 		{"only the gateway differs", lostReplyWanted, info(mac, cfgOf("127.0.0.1", "255.255.0.0", "127.0.0.3")), lostReplyUnexpected},
 		{"a reply without addresses", lostReplyWanted, Info{MAC: mac}, lostReplyUnexpected},
-		{"a different device at the new settings", lostReplyWanted, info("aa:bb:cc:00:00:01", lostReplyWanted), lostReplyOtherDevice},
-		{"a different device at the old settings", lostReplyWanted, info("aa:bb:cc:00:00:01", lostReplyBefore), lostReplyOtherDevice},
+		{"a different device at the new settings", lostReplyWanted, info(otherDevice, lostReplyWanted), lostReplyOtherDevice},
+		{"a different device at the old settings", lostReplyWanted, info(otherDevice, lostReplyBefore), lostReplyOtherDevice},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -128,7 +134,7 @@ func TestSettleLostReplyNamesWhatAnswered(t *testing.T) {
 		f := escptest.Start(t)
 		c := dialFake(t, f, "secret")
 		c.mu.Lock()
-		err := c.settleLostReply(context.Background(), "aa:bb:cc:00:00:01", lostReplyBefore, lostReplyWanted, lost)
+		err := c.settleLostReply(context.Background(), otherDevice, lostReplyBefore, lostReplyWanted, lost)
 		c.mu.Unlock()
 		if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "different device") || !strings.Contains(err.Error(), "00:00:5e:00:53:02") {
 			t.Fatalf("got %v", err)
@@ -300,7 +306,7 @@ func TestSetIPConfigWireLayoutAndReadBack(t *testing.T) {
 	}
 	want := []wire.TLV{
 		{Type: wire.TLVHostname, Value: []byte("TL-SG108E-fake\x00")}, // kept as the switch reports it
-		{Type: wire.TLVDHCP, Value: []byte{1}},                        // kept as the switch reports it
+		{Type: wire.TLVDHCP, Value: []byte{0}},                        // off: a switch that leases its address ignores a static one
 		{Type: wire.TLVIP, Value: []byte{127, 0, 0, 1}}, {Type: wire.TLVNetmask, Value: []byte{255, 255, 0, 0}}, {Type: wire.TLVGateway, Value: []byte{127, 0, 0, 2}},
 	}
 	if len(sets[0]) != len(want) {

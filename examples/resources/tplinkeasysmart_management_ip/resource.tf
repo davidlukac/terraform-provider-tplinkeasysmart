@@ -9,3 +9,12 @@ resource "tplinkeasysmart_management_ip" "this" {
   # Needed for the change itself; remove it again once the switch is at its new address.
   allow_disruptive = true
 }
+
+# Or lease the address from the DHCP server instead. The provider needs the switch's `mac`
+# (provider block or `switches` entry) to find it at the address it is given; the three
+# address attributes then report the lease and must not be set.
+#
+# resource "tplinkeasysmart_management_ip" "this" {
+#   dhcp             = true
+#   allow_disruptive = true
+# }

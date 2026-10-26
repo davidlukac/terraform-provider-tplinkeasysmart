@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
-	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -40,7 +39,7 @@ type Client struct {
 	// wrong is the device that answered the request in flight with a MAC other than Config.MAC.
 	wrong *WrongSwitchError
 	// locator finds a switch by MAC address; tests replace it.
-	locator func(ctx context.Context, mac net.HardwareAddr) (Info, error)
+	locator func(ctx context.Context, mac MAC) (Info, error)
 }
 
 // Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
@@ -68,12 +67,8 @@ func Dial(cfg Config) (*Client, error) {
 	if cfg.BroadcastAddr == "" {
 		cfg.BroadcastAddr = "255.255.255.255"
 	}
-	if len(cfg.MAC) != 0 && len(cfg.MAC) != hwAddrLen {
-		return nil, invalidf("escp: a MAC address has %d bytes, got %d", hwAddrLen, len(cfg.MAC))
-	}
-	cfg.MAC = slices.Clone(cfg.MAC)
 	c := &Client{cfg: cfg, locator: hostLocator}
-	if cfg.Host == "" && len(cfg.MAC) != 0 {
+	if cfg.Host == "" && !cfg.MAC.IsZero() {
 		// no address yet: the first request finds the switch by its MAC address
 		c.dest = &net.UDPAddr{Port: cfg.SwitchPort}
 	} else {
@@ -141,6 +136,6 @@ func localMAC(dst net.IP) (mac [6]byte) {
 // hostLocator is the lookup a client uses: Locate on the interfaces of this host.
 //
 // coverage: ignore - thin wrapper that would probe the real network; Locate is tested through locateWith
-func hostLocator(ctx context.Context, mac net.HardwareAddr) (Info, error) {
+func hostLocator(ctx context.Context, mac MAC) (Info, error) {
 	return Locate(ctx, mac, DiscoverOptions{})
 }

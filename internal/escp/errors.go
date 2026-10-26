@@ -34,7 +34,7 @@ var (
 // WrongSwitchError is the refusal to talk to a device whose MAC address is not Config.MAC. It
 // matches ErrWrongSwitch.
 type WrongSwitchError struct {
-	Want, Got net.HardwareAddr
+	Want, Got MAC
 	IP        net.IP // where the other device answered from, when known
 }
 

@@ -56,7 +56,7 @@ func (r *systemResource) Metadata(_ context.Context, req resource.MetadataReques
 func (r *systemResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "System settings (System > System Info > Device Description). Singleton; import with id `system`. " +
-			"Only the device description is managed. The management IP, DHCP and gateway are never changed: the request re-sends them as read from the switch. " +
+			"Only the device description is managed. This resource never changes the management IP, DHCP or gateway (the request re-sends them as read from the switch); `tplinkeasysmart_management_ip` manages them. " +
 			"A write is skipped when the description already matches. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: resourceSwitchAttribute(),

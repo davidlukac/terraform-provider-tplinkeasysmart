@@ -1,7 +1,6 @@
 package regression
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -115,11 +114,11 @@ func (s *Session) fakeConfig(cfg escp.Config) escp.Config {
 // dialClient builds a client; for the fake each client gets its own local port.
 func (s *Session) dialClient(cfg escp.Config) (*escp.Client, error) {
 	if s.Fake != nil {
-		if cfg.Host == "" && cfg.MAC != nil {
+		if cfg.Host == "" && !cfg.MAC.IsZero() {
 			// A client without an address finds its switch by a discovery on the host's interfaces,
 			// which cannot see a fake on loopback. This stands in for it: the fake is found when the
 			// MAC is its own, and nothing is found otherwise.
-			if !bytes.Equal(cfg.MAC, escptest.DefaultMAC[:]) {
+			if cfg.MAC != escp.MAC(escptest.DefaultMAC) {
 				return nil, fmt.Errorf("%w: %s", escp.ErrNotFound, cfg.MAC)
 			}
 			cfg.Host = loopback

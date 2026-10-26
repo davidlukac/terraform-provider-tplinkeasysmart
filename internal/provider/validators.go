@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net"
 	"regexp"
 	"strconv"
 
@@ -208,31 +207,8 @@ func validVLANName() []validator.String {
 	}
 }
 
-// macLen is the length of an Ethernet MAC address in bytes.
-const (
-	macLen     = 6
-	macTextLen = 3*macLen - 1 // "aa:bb:cc:dd:ee:ff"
-)
-
-// parseMAC reads a switch MAC address (colon or hyphen separated). An empty string is "no MAC"
-// and yields nil without an error.
-func parseMAC(s string) (net.HardwareAddr, error) {
-	if s == "" {
-		return nil, nil
-	}
-	hw, err := net.ParseMAC(s)
-	// ParseMAC also reads dotted and unseparated forms; only the colon and hyphen forms are documented.
-	if err != nil || len(hw) != macLen || len(s) != macTextLen {
-		return nil, notAMAC(s)
-	}
-	return hw, nil
-}
-
-func notAMAC(s string) error {
-	return fmt.Errorf("%q is not a MAC address; write it as aa:bb:cc:dd:ee:ff (colons or hyphens)", s)
-}
-
-// validMAC accepts a six-byte MAC address with one kind of separator.
+// validMAC accepts the text form of a switch MAC address, "aa:bb:cc:dd:ee:ff" (escp.ParseMAC says what
+// is accepted). An empty string is refused: an argument that is set but empty is a mistake.
 func validMAC() validator.String { return macValidator{} }
 
 type macValidator struct{}
@@ -247,9 +223,7 @@ func (macValidator) ValidateString(_ context.Context, req validator.StringReques
 	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
 		return
 	}
-	// parseMAC reads "" as "no MAC"; an explicitly empty argument is a mistake, not an omission.
-	v := req.ConfigValue.ValueString()
-	if _, err := parseMAC(v); err != nil || v == "" {
-		resp.Diagnostics.AddAttributeError(req.Path, "Invalid MAC address", notAMAC(v).Error())
+	if _, err := escp.ParseMAC(req.ConfigValue.ValueString()); err != nil {
+		resp.Diagnostics.AddAttributeError(req.Path, "Invalid MAC address", err.Error())
 	}
 }

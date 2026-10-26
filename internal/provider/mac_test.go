@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"net"
 	"reflect"
 	"regexp"
 	"strings"
@@ -25,7 +24,7 @@ const (
 	macHyphen = "C0-3A-55-6C-81-61"
 )
 
-var wantMAC = net.HardwareAddr{0xc0, 0x3a, 0x55, 0x6c, 0x81, 0x61}
+var wantMAC = escp.MAC{0xc0, 0x3a, 0x55, 0x6c, 0x81, 0x61}
 
 // recordingFactories builds a provider whose client constructor records every configuration it is
 // given, in order, and hands back an empty fake. It is what the MAC tests need: switches without a
@@ -175,7 +174,7 @@ data "tplinkeasysmart_system_info" "this" {
 }`, "")
 	// Entries are built in name order: both, by_host, by_mac.
 	want := []escp.Config{
-		{Host: "192.0.2.11", MAC: net.HardwareAddr{0xa8, 0x42, 0xa1, 0x2a, 0xde, 0x4c}},
+		{Host: "192.0.2.11", MAC: escp.MAC{0xa8, 0x42, 0xa1, 0x2a, 0xde, 0x4c}},
 		{Host: "192.0.2.12"},
 		{MAC: wantMAC},
 	}
@@ -243,22 +242,6 @@ data "tplinkeasysmart_system_info" "this" {
 	}
 }
 
-func TestParseMAC(t *testing.T) {
-	got, err := parseMAC(macHyphen)
-	if err != nil || !reflect.DeepEqual(got, wantMAC) {
-		t.Fatalf("parseMAC(%q) = %v, %v; want %v", macHyphen, got, err, wantMAC)
-	}
-	if got, err := parseMAC(""); got != nil || err != nil {
-		t.Fatalf("an empty string means no MAC, got %v, %v", got, err)
-	}
-	// net.ParseMAC accepts these, but they are not a switch's MAC address.
-	for _, s := range []string{"0000.5e00.5301", "02:00:5e:10:00:00:00:01", "c0:3a:55:6c:81:61:00:00"} {
-		if _, err := parseMAC(s); err == nil {
-			t.Errorf("parseMAC(%q) accepted a MAC that is not six bytes", s)
-		}
-	}
-}
-
 // The schema validator refuses a malformed MAC while planning. Configure still checks what it is
 // handed, so a value that got past the schema (it is the same function, but nothing else
 // guarantees it) never reaches a client as "no MAC", which would silently drop the identity pin.
@@ -291,7 +274,7 @@ func TestConfigureRefusesAMalformedMACThatGotPastTheSchema(t *testing.T) {
 	})
 	resp := &provider.ConfigureResponse{}
 	p.Configure(context.Background(), provider.ConfigureRequest{Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: raw}}, resp)
-	if len(resp.Diagnostics) != 1 || resp.Diagnostics[0].Summary() != "Invalid MAC address" || !strings.Contains(resp.Diagnostics[0].Detail(), `a: "bogus" is not a MAC address`) {
+	if len(resp.Diagnostics) != 1 || resp.Diagnostics[0].Summary() != "Invalid MAC address" || !strings.Contains(resp.Diagnostics[0].Detail(), `a: escp: "bogus" is not a MAC address`) {
 		t.Fatalf("want one Invalid MAC address diagnostic naming the switch, got %v", resp.Diagnostics)
 	}
 	if resp.ResourceData != nil {

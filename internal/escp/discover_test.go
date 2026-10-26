@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"net"
 	"reflect"
@@ -88,8 +89,8 @@ func loopbackEnv(t *testing.T, r *responder, hostPort int, ifaces ...netInterfac
 }
 
 var (
-	macOne = [hwAddrLen]byte{2, 0, 0, 0, 0, 1}
-	macTwo = [hwAddrLen]byte{2, 0, 0, 0, 0, 2}
+	macOne = MAC{2, 0, 0, 0, 0, 1}
+	macTwo = MAC{2, 0, 0, 0, 0, 2}
 	lo     = []net.IP{net.IPv4(127, 0, 0, 1)}
 )
 
@@ -123,7 +124,7 @@ func TestDiscoverReturnsEveryDistinctSwitchSortedByAddress(t *testing.T) {
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("got %v, want %v", names, want)
 	}
-	if got[0].MAC != "c0:3a:55:00:00:09" || got[0].Model != "TL-SG108E" || got[0].Gateway != "192.0.2.1" {
+	if got[0].MAC.String() != "c0:3a:55:00:00:09" || got[0].Model != "TL-SG108E" || got[0].Gateway != "192.0.2.1" {
 		t.Errorf("fields not decoded: %+v", got[0])
 	}
 }
@@ -167,7 +168,7 @@ func TestDiscoverCanBeLimitedToOneInterface(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
-		if h := r.next(t); h.HostMAC != macTwo {
+		if h := r.next(t); MAC(h.HostMAC) != macTwo {
 			t.Fatalf("probe %d came from %x, want only en1 (%x)", i, h.HostMAC, macTwo)
 		}
 	}
@@ -381,11 +382,11 @@ func TestSubnetBroadcast(t *testing.T) {
 
 func TestSortedInfosOrdersByAddressThenMAC(t *testing.T) {
 	got := sortedInfos(map[string]Info{
-		"a": {IP: "192.0.2.10", MAC: "bb"}, "b": {IP: "192.0.2.10", MAC: "aa"}, "c": {IP: "192.0.2.9", MAC: "cc"}, "d": {IP: "", MAC: "dd"},
+		"a": {IP: "192.0.2.10", MAC: MAC{0xbb}}, "b": {IP: "192.0.2.10", MAC: MAC{0xaa}}, "c": {IP: "192.0.2.9", MAC: MAC{0xcc}}, "d": {IP: "", MAC: MAC{0xdd}},
 	})
 	var order []string
 	for _, i := range got {
-		order = append(order, i.MAC)
+		order = append(order, hex.EncodeToString(i.MAC[:1]))
 	}
 	if want := []string{"dd", "cc", "aa", "bb"}; !reflect.DeepEqual(order, want) {
 		t.Fatalf("order %v, want %v", order, want)

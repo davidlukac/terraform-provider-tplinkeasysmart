@@ -35,6 +35,9 @@ const (
 	// address and back. The spare address must be free; it is never probed before the move.
 	EnvAllowMove = "TPLINK_REGRESSION_ALLOW_MANAGEMENT_MOVE"
 	envMoveIP    = "TPLINK_REGRESSION_MOVE_IP"
+	// EnvAllowDHCP ("1") opts in to the scenario that turns DHCP on and back off. The router's DHCP
+	// server must be up: the switch takes whatever address it gives, and is found again by its MAC.
+	EnvAllowDHCP = "TPLINK_REGRESSION_ALLOW_DHCP"
 	// envDisruptPort opts in to the allow_disruptive scenario writing to this device port (a brief
 	// link drop). It must be a protected port other than the first, which is the uplink.
 	envDisruptPort = "TPLINK_REGRESSION_DISRUPT_DEVICE_PORT"
@@ -55,6 +58,8 @@ type Target struct {
 	ProtectedPorts []int
 	// MoveIP is the spare address the management-move scenario may use; empty unless the run opted in.
 	MoveIP string
+	// DHCP is true when the run opted in to the DHCP scenario.
+	DHCP bool
 	// DisruptPort is the device port the allow_disruptive scenario may write to; zero unless the run opted in.
 	DisruptPort int
 	// DisruptivePorts are the device ports the disruptive scenarios may change for real (a link
@@ -133,6 +138,7 @@ func LoadTarget(env map[string]string) (Target, error) {
 			return Target{}, fmt.Errorf("%s: %w", envMoveIP, err)
 		}
 	}
+	t.DHCP = env[EnvAllowDHCP] == "1"
 	if v := env[envDisruptPort]; v != "" {
 		ports, err := parsePorts(v)
 		if err != nil || len(ports) != 1 {

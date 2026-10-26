@@ -53,6 +53,12 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 		return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 8})
 	},
 	"SetPortBasedVLAN": func(ctx context.Context, c *Client) error { return c.SetPortBasedVLAN(ctx, 2, []int{3, 4}) },
+	"EnableDHCP": func(ctx context.Context, c *Client) error {
+		// the client needs the switch's MAC, and a lookup that asks the fake itself
+		c.cfg.MAC = MAC(escptest.DefaultMAC)
+		c.locator = func(ctx context.Context, _ MAC) (Info, error) { return c.discoverOnce(ctx) }
+		return c.EnableDHCP(ctx)
+	},
 	"SetIPConfig": func(ctx context.Context, c *Client) error {
 		// the address the fake switch already has, so an allowed write is confirmed at once
 		return c.SetIPConfig(ctx, IPConfig{IP: net.IPv4(127, 0, 0, 1), Netmask: net.IPv4(255, 0, 0, 0), Gateway: net.IPv4(127, 0, 0, 2)})
@@ -63,7 +69,7 @@ func writeMethodNames() []string {
 	var names []string
 	typ := reflect.TypeOf(&Client{})
 	for i := 0; i < typ.NumMethod(); i++ {
-		if n := typ.Method(i).Name; strings.HasPrefix(n, "Set") || strings.HasPrefix(n, "Delete") {
+		if n := typ.Method(i).Name; strings.HasPrefix(n, "Set") || strings.HasPrefix(n, "Delete") || strings.HasPrefix(n, "Enable") {
 			names = append(names, n)
 		}
 	}
@@ -231,6 +237,7 @@ var writeOperations = map[string]Operation{
 	"SetPVIDs":          {Name: "SetPVIDs", Ports: []int{2}, Impact: ImpactManagement},
 	"SetVLANMode":       {Name: "SetVLANMode", Ports: []int{8}, Impact: ImpactManagement},
 	"SetIPConfig":       {Name: "SetIPConfig", Impact: ImpactManagement},
+	"EnableDHCP":        {Name: "EnableDHCP", Impact: ImpactManagement},
 }
 
 // operationsOf runs call against a client whose gate allows and records what the gate was told.

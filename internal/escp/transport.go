@@ -1,11 +1,9 @@
 package escp
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net"
-	"slices"
 	"sync"
 	"time"
 
@@ -65,9 +63,9 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 	if err != nil || h.Seq != c.seq || h.Op == wire.OpDiscovery {
 		return reply{}, false
 	}
-	if len(c.cfg.MAC) == hwAddrLen && h.SwitchMAC != ([hwAddrLen]byte{}) && !bytes.Equal(h.SwitchMAC[:], c.cfg.MAC) {
+	if got := MAC(h.SwitchMAC); !c.cfg.MAC.IsZero() && !got.IsZero() && got != c.cfg.MAC {
 		// the address answers, but it is another device: remember it and let exchange say so
-		c.wrong = &WrongSwitchError{Want: c.cfg.MAC, Got: net.HardwareAddr(slices.Clone(h.SwitchMAC[:])), IP: from.IP}
+		c.wrong = &WrongSwitchError{Want: c.cfg.MAC, Got: got, IP: from.IP}
 		return reply{}, false
 	}
 	if !c.haveSwMAC {

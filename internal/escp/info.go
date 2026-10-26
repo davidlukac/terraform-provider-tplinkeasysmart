@@ -3,7 +3,6 @@ package escp
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"time"
 
@@ -27,7 +26,7 @@ func (c *Client) discover(ctx context.Context) (Info, error) {
 			return Info{}, err
 		}
 	}
-	if len(c.cfg.MAC) == 0 || c.haveSwMAC {
+	if c.cfg.MAC.IsZero() || c.haveSwMAC {
 		return c.discoverOnce(ctx)
 	}
 	// First contact with a switch that is pinned by MAC: the address gets a short budget (a switch
@@ -58,9 +57,8 @@ func (c *Client) discoverOnce(ctx context.Context) (Info, error) {
 		return Info{}, err
 	}
 	info := infoFromReply(r)
-	if len(c.cfg.MAC) != 0 && info.MAC != "" && info.MAC != c.cfg.MAC.String() {
-		got, _ := net.ParseMAC(info.MAC)
-		return Info{}, &WrongSwitchError{Want: c.cfg.MAC, Got: got, IP: c.dest.IP}
+	if !c.cfg.MAC.IsZero() && !info.MAC.IsZero() && info.MAC != c.cfg.MAC {
+		return Info{}, &WrongSwitchError{Want: c.cfg.MAC, Got: info.MAC, IP: c.dest.IP}
 	}
 	return info, nil
 }
@@ -78,14 +76,7 @@ func (c *Client) relocate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	ip := net.ParseIP(found.IP).To4()
-	if ip == nil {
-		return fmt.Errorf("%w: %s answered without a usable address", ErrNotFound, c.cfg.MAC)
-	}
-	c.dest.IP = ip
-	c.hostMAC = localMAC(ip)
-	c.session = nil
-	return nil
+	return c.follow(found)
 }
 
 // infoFromReply maps the TLVs of a discovery reply to Info; absent or
@@ -104,8 +95,8 @@ func infoFromTLVs(tlvs []wire.TLV) Info {
 	}
 	info := Info{Model: str(wire.TLVModel), Hostname: str(wire.TLVHostname), Firmware: str(wire.TLVFirmware),
 		Hardware: str(wire.TLVHardware), IP: ip(wire.TLVIP), Netmask: ip(wire.TLVNetmask), Gateway: ip(wire.TLVGateway)}
-	if v, ok := r.tlv(wire.TLVMAC); ok && len(v) == 6 {
-		info.MAC = net.HardwareAddr(v).String()
+	if v, ok := r.tlv(wire.TLVMAC); ok {
+		info.MAC, _ = MACFromBytes(v) // a reply with a malformed MAC has none
 	}
 	if v, ok := r.tlv(wire.TLVDHCP); ok && len(v) == 1 {
 		info.DHCP = v[0] != 0

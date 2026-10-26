@@ -118,3 +118,24 @@ func FuzzAcceptDatagram(f *testing.F) {
 		}
 	})
 }
+
+// FuzzParseMAC: no text makes ParseMAC panic, and whatever it accepts prints back as the lower-case
+// colon form that parses to the same value.
+func FuzzParseMAC(f *testing.F) {
+	for _, s := range []string{"c0:3a:55:6c:81:61", "C0-3A-55-6C-81-61", "", "c03a556c8161", "c0:3a-55:6c:81:61", "0000.5e00.5301"} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		m, err := ParseMAC(s)
+		if err != nil {
+			if !m.IsZero() {
+				t.Fatalf("ParseMAC(%q) failed but returned %v", s, m)
+			}
+			return
+		}
+		again, err := ParseMAC(m.String())
+		if err != nil || again != m {
+			t.Fatalf("ParseMAC(%q) = %v, which does not survive String and ParseMAC: %v, %v", s, m, again, err)
+		}
+	})
+}

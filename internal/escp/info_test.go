@@ -32,8 +32,8 @@ func TestInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Model != "TL-SG108E" || info.Hostname != "TL-SG108E-fake" || info.MAC != "00:00:5e:00:53:02" ||
-		info.Hardware != "TL-SG108E 6.0" || info.IP != "127.0.0.1" || !info.DHCP || !info.FactoryDefault {
+	if info.Model != "TL-SG108E" || info.Hostname != "TL-SG108E-fake" || info.MAC.String() != "00:00:5e:00:53:02" ||
+		info.Hardware != "TL-SG108E 6.0" || info.IP != "127.0.0.1" || info.DHCP || !info.FactoryDefault {
 		t.Fatalf("unexpected info: %+v", info)
 	}
 }

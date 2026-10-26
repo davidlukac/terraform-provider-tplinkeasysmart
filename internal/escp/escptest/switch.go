@@ -84,6 +84,9 @@ type Switch struct {
 	stateful         bool               // EnableState was called: SETs are remembered and answered by later GETs
 	store            map[int16][]byte   // the last value of each settings TLV written (or seeded) under EnableState
 	model            bool               // EnableModel was called: cross-setting rules apply
+	lease            *Lease             // what the switch is given when its DHCP flag goes on (see Lease)
+	dhcp             bool               // the switch leases its address
+	acquiring        int                // packets still swallowed while the modelled switch asks for a lease
 	bundles          map[int16][]int16  // requests that the switch answers with more types than asked for
 	rows             map[int16][][]byte // tables with one TLV per row (ports, priorities, rates), keyed by the first byte of a row
 
@@ -136,7 +139,8 @@ func Start(t testing.TB) *Switch {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &Switch{conn: conn, user: Username, password: Password, led: true, firmware: DefaultFirmware}
+	lease := DefaultLease
+	f := &Switch{conn: conn, user: Username, password: Password, led: true, firmware: DefaultFirmware, lease: &lease}
 	t.Cleanup(func() { _ = conn.Close() }) // best effort at the end of the test
 	go f.serve()
 	return f
@@ -310,6 +314,10 @@ func (f *Switch) serve() {
 		f.mu.Lock()
 		f.recv++
 		drop := f.mute || f.recv == f.dropNth || f.recv <= f.dropFirst
+		if f.acquiring > 0 {
+			f.acquiring--
+			drop = true
+		}
 		f.mu.Unlock()
 		if drop {
 			continue
@@ -392,9 +400,10 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		f.mu.Lock()
 		addr, firmware := f.addr, f.firmware
 		mac := f.macAddr()
-		dhcp := byte(1)
-		if f.model {
-			dhcp = 0 // the modelled switch has a static address, like switch 03
+		dhcp := byte(0) // a static address, like switch 03
+		if f.dhcp {
+			dhcp = 1
+			addr = map[int16][]byte{wire.TLVIP: f.lease.IP[:], wire.TLVNetmask: f.lease.Mask[:], wire.TLVGateway: f.lease.Gateway[:]}
 		}
 		name := "TL-SG108E-fake"
 		if f.hostname != "" {
@@ -533,7 +542,14 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			f.hostname = wire.CString(v)
 			f.setIP, _ = find(wire.TLVIP)
 			f.staleDiscoveries = f.StaleAfterSet
-			if ip, ok := find(wire.TLVIP); ok {
+			if v, ok := find(wire.TLVDHCP); ok && len(v) == 1 {
+				if v[0] != 0 && !f.dhcp {
+					f.acquiring = f.lease.Silence // asking for a lease: nothing answers for a moment
+				}
+				f.dhcp = v[0] != 0
+			}
+			// A switch that leases its address ignores the static one in the request (measured).
+			if ip, ok := find(wire.TLVIP); ok && !f.dhcp {
 				mask, _ := find(wire.TLVNetmask)
 				gw, _ := find(wire.TLVGateway)
 				f.addr = map[int16][]byte{wire.TLVIP: ip, wire.TLVNetmask: mask, wire.TLVGateway: gw}
@@ -710,6 +726,26 @@ func rowKeyLen(typ int16) int {
 	}
 	return 1
 }
+
+// Lease is what the modelled switch gets from its DHCP server when its DHCP flag is switched on.
+// The fake can only answer from 127.0.0.1, so a lease that differs from the static address in
+// the mask or the gateway is what tells the two apart, as in SetIPConfig's tests.
+type Lease struct {
+	IP, Mask, Gateway [4]byte
+	// Silence is how many packets the switch swallows after DHCP is switched on, while it asks for
+	// the lease (a real switch was silent for about two seconds).
+	Silence int
+}
+
+// DefaultLease is the lease EnableModel gives the switch: the fake's own address with another mask
+// and gateway.
+var DefaultLease = Lease{IP: [4]byte{127, 0, 0, 1}, Mask: [4]byte{255, 255, 0, 0}, Gateway: [4]byte{127, 0, 0, 2}}
+
+// SetLease changes the lease the fake gives. The fake models the DHCP flag the way switch 03
+// behaves (measured, firmware 20250710) from the start, with DefaultLease: it starts static; a system SET that carries the flag on makes it lease l (discovery
+// reports the lease and DHCP on; a static address in later SETs is ignored); a SET with the flag
+// off gives it the static address of that SET.
+func (f *Switch) SetLease(l Lease) { f.mu.Lock(); f.lease = &l; f.mu.Unlock() }
 
 // DefaultMAC is the address the fake reports unless SetMAC says otherwise (the documentation range, RFC 7042).
 var DefaultMAC = [6]byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}
