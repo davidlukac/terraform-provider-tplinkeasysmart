@@ -10,7 +10,7 @@ import (
 // VLAN8021Q is one 802.1Q VLAN with its tagged and untagged members.
 type VLAN8021Q struct {
 	ID       VLANID
-	Name     string
+	Name     VLANName
 	Tagged   PortSet
 	Untagged PortSet
 }
@@ -51,7 +51,7 @@ func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
 			// Vendor semantics: member and tagged-mask -> tagged; member only -> untagged.
 			members, taggedMask := PortSetFromMask(v[vlan8021QOffMember:]), PortSetFromMask(v[vlan8021QOffTagged:])
 			untagged := members.Minus(taggedMask)
-			out.VLANs = append(out.VLANs, VLAN8021Q{ID: VLANID(int(v[0])<<8 | int(v[1])), Name: wire.CString(v[vlan8021QOffName:]),
+			out.VLANs = append(out.VLANs, VLAN8021Q{ID: VLANID(int(v[0])<<8 | int(v[1])), Name: VLANName(wire.CString(v[vlan8021QOffName:])),
 				Tagged: members.Minus(untagged), Untagged: untagged})
 		case wire.TLVVLAN8021QPVID:
 			if len(v) != pvidEntryLen {

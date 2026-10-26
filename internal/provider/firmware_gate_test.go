@@ -155,7 +155,7 @@ func (g *gatedClient) SetStormControl(ctx context.Context, cfg escp.StormConfig)
 	return g.SwitchClient.SetStormControl(ctx, cfg)
 }
 
-func (g *gatedClient) SetHostname(ctx context.Context, name string) error {
+func (g *gatedClient) SetHostname(ctx context.Context, name escp.Hostname) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}

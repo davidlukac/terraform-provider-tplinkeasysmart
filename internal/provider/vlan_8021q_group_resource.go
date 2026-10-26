@@ -149,7 +149,7 @@ func (m *vlan8021QGroupModel) vlan(ctx context.Context) (escp.VLAN8021Q, error) 
 	if err != nil {
 		return escp.VLAN8021Q{}, err
 	}
-	return escp.VLAN8021Q{ID: escp.VLANID(m.VLAN.ValueInt64()), Name: m.Name.ValueString(), Tagged: tagged, Untagged: untagged}, nil
+	return escp.VLAN8021Q{ID: escp.VLANID(m.VLAN.ValueInt64()), Name: escp.VLANName(m.Name.ValueString()), Tagged: tagged, Untagged: untagged}, nil
 }
 
 // apply binds the resource to the switch the plan selects, then applies it.
@@ -222,7 +222,7 @@ func (r *vlan8021QGroupResource) readBound(ctx context.Context, req resource.Rea
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	state.Name, state.TaggedPorts, state.UntaggedPorts = types.StringValue(got.Name), portsToSet(got.Tagged), portsToSet(got.Untagged)
+	state.Name, state.TaggedPorts, state.UntaggedPorts = types.StringValue(got.Name.String()), portsToSet(got.Tagged), portsToSet(got.Untagged)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 

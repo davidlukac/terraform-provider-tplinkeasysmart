@@ -107,7 +107,7 @@ func (d *vlan8021QDataSource) readBound(ctx context.Context, _ datasource.ReadRe
 	state := vlan8021QModel{ID: qualifiedID(d.sw, "vlan_8021q"), Enabled: types.BoolValue(v.Enabled), MaxVLANs: types.Int64Value(int64(v.MaxVLAN)),
 		VLANs: make([]vlan8021QVLANModel, 0, len(v.VLANs)), PVIDs: make([]pvidModel, 0, len(v.PVIDs))}
 	for _, g := range v.VLANs {
-		state.VLANs = append(state.VLANs, vlan8021QVLANModel{ID: types.Int64Value(int64(g.ID)), Name: types.StringValue(g.Name),
+		state.VLANs = append(state.VLANs, vlan8021QVLANModel{ID: types.Int64Value(int64(g.ID)), Name: types.StringValue(g.Name.String()),
 			Tagged: portInt64s(g.Tagged), Untagged: portInt64s(g.Untagged)})
 	}
 	for _, p := range v.PVIDs {

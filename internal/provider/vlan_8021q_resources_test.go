@@ -333,8 +333,8 @@ func TestAccVLAN8021QGroupValidatesConfiguration(t *testing.T) {
 		{"port both tagged and untagged", groupConfig8021Q(20, "  tagged_ports = [5]\n  untagged_ports = [5, 6]\n"), `port 5 is in tagged_ports and untagged_ports`},
 		{"id zero", groupConfig8021Q(0, "  untagged_ports = [5]\n"), `must be between 1 and 4094`},
 		{"id too big", groupConfig8021Q(4095, "  untagged_ports = [5]\n"), `must be between 1 and 4094`},
-		{"name too long", groupConfig8021Q(20, "  name = \"elevenchars\"\n  untagged_ports = [5]\n"), `string length must be at most 10`},
-		{"name with a space", groupConfig8021Q(20, "  name = \"a b\"\n  untagged_ports = [5]\n"), `only letters, digits, hyphens and underscores`},
+		{"name too long", groupConfig8021Q(20, "  name = \"elevenchars\"\n  untagged_ports = [5]\n"), `(?s)at\s+most\s+10\s+letters`},
+		{"name with a space", groupConfig8021Q(20, "  name = \"a b\"\n  untagged_ports = [5]\n"), `(?s)letters,\s+digits,\s+hyphens\s+or\s+underscores`},
 		{"port out of range", groupConfig8021Q(20, "  untagged_ports = [33]\n"), `must be between 1 and 32`},
 	}
 	for _, tc := range cases {

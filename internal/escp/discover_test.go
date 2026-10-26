@@ -117,7 +117,7 @@ func TestDiscoverReturnsEveryDistinctSwitchSortedByAddress(t *testing.T) {
 	}
 	names := make([]string, len(got))
 	for i, info := range got {
-		names[i] = info.IP.String() + " " + info.Hostname
+		names[i] = info.IP.String() + " " + info.Hostname.String()
 	}
 	// Numeric order (.9 before .30), one entry per MAC, nothing from the other request,
 	// the echo or the garbage; the reply without a MAC appears once.

@@ -101,14 +101,14 @@ func TestParseSystem(t *testing.T) {
 	}
 }
 
-func TestValidateHostname(t *testing.T) {
-	for _, ok := range []string{"a", "TL-SG108E-01", "sw1"} {
-		if err := ValidateHostname(ok); err != nil {
+func TestHostnameValidate(t *testing.T) {
+	for _, ok := range []Hostname{"a", "TL-SG108E-01", "sw1"} {
+		if err := ok.Validate(); err != nil {
 			t.Errorf("%q should be valid: %v", ok, err)
 		}
 	}
-	for _, bad := range []string{"", "-a", "a-", "has space", "under_score", "this-name-is-way-too-long-for-the-switch-0"} {
-		if err := ValidateHostname(bad); err == nil {
+	for _, bad := range []Hostname{"", "-a", "a-", "has space", "under_score", "this-name-is-way-too-long-for-the-switch-0"} {
+		if err := bad.Validate(); err == nil {
 			t.Errorf("%q should be invalid", bad)
 		}
 	}
