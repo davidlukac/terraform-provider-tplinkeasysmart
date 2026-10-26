@@ -135,13 +135,31 @@ A managed switch is the one device you cannot reach when you misconfigure it. Th
 - **Back up first.** The `config_backup` data source returns the device configuration so you can keep a copy before a change.
 - **No hardware needed for tests.** Everything above is exercised against a fake switch, including the failure paths.
 
+## Naming a switch by its MAC address
+
+An IP address can change (DHCP, a move); the MAC address does not. Put it in the configuration, with or without `host`:
+
+```hcl
+provider "tplinkeasysmart" {
+  mac      = "c0:3a:55:6c:81:61" # or TPLINK_EASYSMART_MAC; `system_info` reports it as `mac_address`
+  username = "admin"
+  password = var.switch_password
+}
+```
+
+- **It pins the identity.** Every reply names the device that sent it. A device with another MAC at `host` is refused before anything is written to it (credentials ride on every write, so an address reused by another device would otherwise receive them).
+- **It finds the switch.** Without `host`, or when `host` does not answer, the switch is looked up by a layer-2 discovery on the first request: about half a second, once per switch and run. A dead `host` gets 1.5 s before the lookup.
+- **Both together** is the sturdiest setup for a switch with a fixed address: `host` is tried first and `mac` guards it.
+- The MAC is a claim, not a credential: anyone on the segment can claim any MAC, so it protects against accidents, not against an attacker (which this protocol cannot do anyway).
+- Discovery stays on the layer-2 segment; a Terraform run in another subnet needs `host`. Resource ids and imports do not carry the address, so switching a configuration from `host` to `mac` changes no state.
+
 ## Several switches
 
 Either declare one provider alias per switch, or define them as data and pick one per object:
 
 ```hcl
 variable "switches" {
-  type      = map(object({ host = string, username = string, password = string }))
+  type      = map(object({ host = optional(string), mac = optional(string), username = string, password = string }))
   sensitive = true
 }
 
@@ -159,7 +177,7 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 - `switch` is optional everywhere. Omitted, it means the provider's own switch (`host`) or the only configured one; with several switches and no default, planning fails and lists the names.
 - Ids and import ids of a named switch are prefixed with its name (`sw02:led`, `sw02:7`). The provider's own switch keeps plain ids.
 - Changing `switch` replaces the object, because it is a different device.
-- The same host cannot appear twice. A complete example is in [`examples/multi-switch`](examples/multi-switch).
+- The same host or MAC cannot appear twice. A complete example is in [`examples/multi-switch`](examples/multi-switch).
 
 ## Compatibility
 

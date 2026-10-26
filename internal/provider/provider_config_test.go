@@ -214,6 +214,7 @@ func TestProviderExplainsHowToResolveAnUnknownAttribute(t *testing.T) {
 	objType := schemaResp.Schema.Type().TerraformType(context.Background()).(tftypes.Object)
 	raw := tftypes.NewValue(objType, map[string]tftypes.Value{
 		"host":                      tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
+		"mac":                       tftypes.NewValue(tftypes.String, nil),
 		"username":                  tftypes.NewValue(tftypes.String, "admin"),
 		"password":                  tftypes.NewValue(tftypes.String, "x"),
 		"timeout_seconds":           tftypes.NewValue(tftypes.Number, nil),
