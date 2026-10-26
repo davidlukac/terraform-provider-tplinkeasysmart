@@ -396,8 +396,11 @@ func TestScenarioGuardRefusals(t *testing.T) {
 func TestScenarioAllowDisruptive(t *testing.T) {
 	s := openForScenario(t)
 	port := s.Target.ProtectedPorts[1]
-	if s.Target.Real() && os.Getenv("TPLINK_REGRESSION_DISRUPT_DEVICE_PORT") != strconv.Itoa(port) {
-		t.Skipf("writes to device port %d: set TPLINK_REGRESSION_DISRUPT_DEVICE_PORT=%d to run", port, port)
+	if s.Target.Real() {
+		if s.Target.DisruptPort == 0 {
+			t.Skip("writes to a device port: set TPLINK_REGRESSION_DISRUPT_DEVICE_PORT to one of the device ports to run")
+		}
+		port = s.Target.DisruptPort
 	}
 	ports, err := s.Client.Ports(context.Background())
 	if err != nil {

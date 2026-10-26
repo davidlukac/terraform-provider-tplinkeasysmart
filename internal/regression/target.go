@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -34,6 +35,9 @@ const (
 	// address and back. The spare address must be free; it is never probed before the move.
 	EnvAllowMove = "TPLINK_REGRESSION_ALLOW_MANAGEMENT_MOVE"
 	envMoveIP    = "TPLINK_REGRESSION_MOVE_IP"
+	// envDisruptPort opts in to the allow_disruptive scenario writing to this device port (a brief
+	// link drop). It must be a protected port other than the first, which is the uplink.
+	envDisruptPort = "TPLINK_REGRESSION_DISRUPT_DEVICE_PORT"
 )
 
 // Target says what a run talks to and what it may touch.
@@ -48,6 +52,8 @@ type Target struct {
 	ProtectedPorts []int
 	// MoveIP is the spare address the management-move scenario may use; empty unless the run opted in.
 	MoveIP string
+	// DisruptPort is the device port the allow_disruptive scenario may write to; zero unless the run opted in.
+	DisruptPort int
 }
 
 // Real reports whether the target is hardware.
@@ -120,6 +126,16 @@ func LoadTarget(env map[string]string) (Target, error) {
 		if t.MoveIP, err = moveIP(env[envMoveIP], t.Host, env[envReadOnlyHosts]); err != nil {
 			return Target{}, fmt.Errorf("%s: %w", envMoveIP, err)
 		}
+	}
+	if v := env[envDisruptPort]; v != "" {
+		ports, err := parsePorts(v)
+		if err != nil || len(ports) != 1 {
+			return Target{}, fmt.Errorf("%s: %q is not one port number", envDisruptPort, v)
+		}
+		if !slices.Contains(t.ProtectedPorts[min(1, len(t.ProtectedPorts)):], ports[0]) {
+			return Target{}, fmt.Errorf("%s: port %d is not a device port (the protected ports other than the uplink, which is listed first, are %v)", envDisruptPort, ports[0], t.ProtectedPorts[min(1, len(t.ProtectedPorts)):])
+		}
+		t.DisruptPort = ports[0]
 	}
 	return t, nil
 }
