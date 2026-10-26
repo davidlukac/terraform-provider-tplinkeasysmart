@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strconv"
 	"strings"
 )
@@ -29,6 +30,10 @@ const (
 	envTestPorts      = "TPLINK_REGRESSION_TEST_PORTS"
 	envProtectedPorts = "TPLINK_REGRESSION_PROTECTED_PORTS"
 	envReadOnlyHosts  = "TPLINK_REGRESSION_READONLY_HOSTS"
+	// EnvAllowMove ("1") and envMoveIP opt in to the scenario that moves the switch to a spare
+	// address and back. The spare address must be free; it is never probed before the move.
+	EnvAllowMove = "TPLINK_REGRESSION_ALLOW_MANAGEMENT_MOVE"
+	envMoveIP    = "TPLINK_REGRESSION_MOVE_IP"
 )
 
 // Target says what a run talks to and what it may touch.
@@ -41,6 +46,8 @@ type Target struct {
 	TestPorts []int
 	// ProtectedPorts (the uplink and the ports with devices) are named only by guard-refusal scenarios.
 	ProtectedPorts []int
+	// MoveIP is the spare address the management-move scenario may use; empty unless the run opted in.
+	MoveIP string
 }
 
 // Real reports whether the target is hardware.
@@ -109,7 +116,30 @@ func LoadTarget(env map[string]string) (Target, error) {
 			}
 		}
 	}
+	if env[EnvAllowMove] == "1" {
+		if t.MoveIP, err = moveIP(env[envMoveIP], t.Host, env[envReadOnlyHosts]); err != nil {
+			return Target{}, fmt.Errorf("%s: %w", envMoveIP, err)
+		}
+	}
 	return t, nil
+}
+
+// moveIP checks the spare address for the management move: an IPv4 address that is neither the
+// switch's own nor a read-only switch's.
+func moveIP(ip, host, readOnly string) (string, error) {
+	parsed := net.ParseIP(ip).To4()
+	if parsed == nil {
+		return "", fmt.Errorf("%q is not an IPv4 address", ip)
+	}
+	if ip == host {
+		return "", errors.New("the spare address is the switch's own address")
+	}
+	for _, h := range strings.Split(readOnly, ",") {
+		if strings.TrimSpace(h) == ip {
+			return "", fmt.Errorf("%s is a read-only switch", ip)
+		}
+	}
+	return ip, nil
 }
 
 func parsePorts(s string) ([]int, error) {
