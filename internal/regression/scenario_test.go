@@ -326,7 +326,7 @@ func TestScenarioLAG(t *testing.T) {
 			return err
 		}
 		for _, l := range got {
-			if l.ID == 1 && fmt.Sprint(l.Ports) == fmt.Sprint([]int{a, b}) {
+			if l.ID == 1 && l.Ports == portsOf(a, b) {
 				return nil
 			}
 		}
@@ -363,7 +363,7 @@ func TestScenarioPortMirror(t *testing.T) {
 	s.scenario(t, cfg(fmt.Sprintf("  enabled       = true\n  mirror_port   = %d\n  ingress_ports = %s\n", dest, intSet(src))),
 		cfg("  enabled = false\n"), func(*terraform.State) error {
 			got, err := s.Client.PortMirror(context.Background())
-			if err != nil || !got.Enabled || int(got.MirrorPort) != dest || fmt.Sprint(got.IngressPorts) != fmt.Sprint([]int{src}) {
+			if err != nil || !got.Enabled || int(got.MirrorPort) != dest || got.IngressPorts != portsOf(src) {
 				return fmt.Errorf("mirror on the switch = %+v, err %w, want %d mirrored to %d", got, err, src, dest)
 			}
 			return nil
@@ -380,7 +380,7 @@ func TestScenarioPortBasedVLANGroup(t *testing.T) {
 			return err
 		}
 		for _, v := range got.VLANs {
-			if v.ID == 2 && fmt.Sprint(v.Ports) == fmt.Sprint([]int{a, b}) {
+			if v.ID == 2 && v.Ports == portsOf(a, b) {
 				return nil
 			}
 		}
@@ -518,7 +518,7 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 		}
 		found := false
 		for _, v := range got.VLANs {
-			found = found || v.ID == 20 && v.Name == "regtest" && fmt.Sprint(v.Untagged) == fmt.Sprint([]int{a, b})
+			found = found || v.ID == 20 && v.Name == "regtest" && v.Untagged == portsOf(a, b)
 		}
 		for _, p := range got.PVIDs {
 			if int(p.Port) == a && p.PVID != 20 {
@@ -683,4 +683,14 @@ func TestScenarioManagementAddressRefusals(t *testing.T) {
 		{Config: s.ProviderHCL() + managementIP(info.IP.String(), info.Netmask.String(), info.Gateway.String()), Check: resource.ComposeTestCheckFunc(
 			s.writesUnchanged(writes), s.restoredCheck(t))},
 	}})
+}
+
+// portsOf is the set of the given port numbers (the harness holds ports as plain ints; a number
+// that is no port is a mistake in the scenario and stops it).
+func portsOf(ports ...int) escp.PortSet {
+	ids := make([]escp.PortID, len(ports))
+	for i, p := range ports {
+		ids[i] = escp.PortID(p)
+	}
+	return escp.MustPortSet(ids...)
 }
