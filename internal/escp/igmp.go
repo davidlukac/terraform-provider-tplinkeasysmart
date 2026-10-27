@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"net/netip"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
@@ -20,9 +21,9 @@ const (
 
 // IGMPGroup is one multicast group the switch has learned through IGMP snooping.
 type IGMPGroup struct {
-	IP    string  // the group address, dotted quad
-	VLAN  int     // the VLAN the group was learned in
-	Ports PortSet // the ports that asked to receive it
+	IP    netip.Addr // the group address (IPv4 multicast)
+	VLAN  VLANID     // the VLAN the group was learned in
+	Ports PortSet    // the ports that asked to receive it
 }
 
 // IGMP is the Switching > IGMP Snooping page.
@@ -49,7 +50,7 @@ func parseIGMP(tlvs []wire.TLV) (IGMP, error) {
 			for i := 0; i < len(t.Value); i += igmpGroupLen {
 				e := t.Value[i : i+igmpGroupLen]
 				out.Groups = append(out.Groups, IGMPGroup{
-					IP: net.IP(e[igmpOffIP : igmpOffIP+net.IPv4len]).String(), VLAN: int(binary.BigEndian.Uint16(e[igmpOffVLAN:])), Ports: PortSetFromMask(e[igmpOffPorts:]),
+					IP: netip.AddrFrom4([net.IPv4len]byte(e[igmpOffIP:igmpOffVLAN])), VLAN: VLANID(binary.BigEndian.Uint16(e[igmpOffVLAN:])), Ports: PortSetFromMask(e[igmpOffPorts:]),
 				})
 			}
 		}

@@ -108,7 +108,7 @@ func (f *fakeClient) IGMP(context.Context) (escp.IGMP, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	g := f.igmp
-	g.Groups = []escp.IGMPGroup{{IP: "239.255.255.250", VLAN: 1, Ports: escp.MustPortSet(1, 4)}}
+	g.Groups = []escp.IGMPGroup{{IP: netip.MustParseAddr("239.255.255.250"), VLAN: 1, Ports: escp.MustPortSet(1, 4)}}
 	return g, nil
 }
 
