@@ -36,7 +36,7 @@ type VLANID int
 // Validate reports whether v is within MinVLANID to MaxVLANID; the error matches ErrInvalid.
 func (v VLANID) Validate() error {
 	if v < MinVLANID || v > MaxVLANID {
-		return invalidf("escp: invalid VLAN id %d (valid: %d-%d)", int(v), int(MinVLANID), int(MaxVLANID))
+		return invalidf("escp: invalid VLAN id %d (valid: %d-%d)", v, MinVLANID, MaxVLANID)
 	}
 	return nil
 }

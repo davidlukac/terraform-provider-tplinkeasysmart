@@ -24,7 +24,7 @@ type PortVLANID int
 // Validate reports whether g is an id the switch can hold; the error matches ErrInvalid.
 func (g PortVLANID) Validate() error {
 	if g < 1 || g > MaxPortVLANID {
-		return invalidf("escp: invalid port-based VLAN id %d (valid: 1-%d)", int(g), MaxPortVLANID)
+		return invalidf("escp: invalid port-based VLAN id %d (valid: 1-%d)", g, MaxPortVLANID)
 	}
 	return nil
 }

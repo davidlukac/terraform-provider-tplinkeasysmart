@@ -73,7 +73,7 @@ type LAGID int
 // Validate reports whether g names a group of this switch family; the error matches ErrInvalid.
 func (g LAGID) Validate() error {
 	if g < 1 || g > LAGGroupCount {
-		return invalidf("escp: invalid LAG group %d (valid: 1-%d)", int(g), LAGGroupCount)
+		return invalidf("escp: invalid LAG group %d (valid: 1-%d)", g, LAGGroupCount)
 	}
 	return nil
 }

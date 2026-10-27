@@ -22,7 +22,7 @@ type Kbps int
 // what is allowed.
 func (k Kbps) Validate() error {
 	if k < 0 || k > MaxBandwidthKbps || k%RateStepKbps != 0 {
-		return invalidf("%d kbps is not a valid rate: use 0 (unlimited) or a multiple of %d up to %d", int(k), RateStepKbps, MaxBandwidthKbps)
+		return invalidf("%d kbps is not a valid rate: use 0 (unlimited) or a multiple of %d up to %d", k, RateStepKbps, MaxBandwidthKbps)
 	}
 	return nil
 }

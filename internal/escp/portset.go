@@ -17,7 +17,7 @@ type PortID int
 // ErrInvalid.
 func (p PortID) Validate() error {
 	if p < 1 || p > MaxPort {
-		return invalidf("escp: invalid port %d (valid: 1-%d)", int(p), MaxPort)
+		return invalidf("escp: invalid port %d (valid: 1-%d)", p, MaxPort)
 	}
 	return nil
 }
