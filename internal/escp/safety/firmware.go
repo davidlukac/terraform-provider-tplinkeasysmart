@@ -38,8 +38,7 @@ const (
 // word the message for their users; Error is a neutral description.
 type FirmwareError struct {
 	Reason   FirmwareReason
-	Version  string           // the version string the switch reported (not for FirmwareUnreadable)
-	Build    escp.BuildDate   // the build date (FirmwareUnverified)
+	Firmware escp.Firmware    // the firmware the switch reported, its build date included (not for FirmwareUnreadable)
 	Verified []escp.BuildDate // the builds that would have been accepted
 	Err      error            // the cause (FirmwareUnreadable)
 }
@@ -51,9 +50,9 @@ func (e *FirmwareError) Error() string {
 	case FirmwareUnreadable:
 		return fmt.Sprintf("cannot read the firmware version to check it: %v", e.Err)
 	case FirmwareNoBuildDate:
-		return fmt.Sprintf("the firmware version %q has no build date, so it cannot be matched against the verified builds %v", e.Version, e.Verified)
+		return fmt.Sprintf("the firmware version %q has no build date, so it cannot be matched against the verified builds %v", e.Firmware, e.Verified)
 	default:
-		return fmt.Sprintf("firmware build %s has not been verified with this version of the client (verified: %v)", e.Build, e.Verified)
+		return fmt.Sprintf("firmware build %s has not been verified with this version of the client (verified: %v)", e.Firmware.Build, e.Verified)
 	}
 }
 
@@ -64,10 +63,10 @@ func (e *FirmwareError) Unwrap() error { return e.Err }
 // a build in VerifiedFirmwareBuilds.
 func CheckFirmware(fw escp.Firmware) error {
 	if !fw.HasBuild() {
-		return &FirmwareError{Reason: FirmwareNoBuildDate, Version: fw.String(), Verified: VerifiedFirmwareBuilds()}
+		return &FirmwareError{Reason: FirmwareNoBuildDate, Firmware: fw, Verified: VerifiedFirmwareBuilds()}
 	}
 	if !slices.Contains(verifiedFirmwareBuilds, fw.Build) {
-		return &FirmwareError{Reason: FirmwareUnverified, Version: fw.String(), Build: fw.Build, Verified: VerifiedFirmwareBuilds()}
+		return &FirmwareError{Reason: FirmwareUnverified, Firmware: fw, Verified: VerifiedFirmwareBuilds()}
 	}
 	return nil
 }

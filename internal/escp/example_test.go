@@ -49,7 +49,7 @@ func ExampleClient_SetLED() {
 	var refused *safety.FirmwareError
 	switch {
 	case errors.As(err, &refused):
-		fmt.Println("refused, firmware build", refused.Build)
+		fmt.Println("refused, firmware build", refused.Firmware.Build)
 	case errors.Is(err, escp.ErrRejected):
 		fmt.Println("the switch refused the write:", err)
 	case err != nil:
