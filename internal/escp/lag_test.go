@@ -45,7 +45,7 @@ func TestSetLAGWire(t *testing.T) {
 	}
 	n := f.WriteCount()
 	for _, bad := range []struct {
-		group int
+		group LAGID
 		ports PortSet
 	}{{0, MustPortSet(1, 2)}, {3, MustPortSet(5, 6)}, {1, MustPortSet(4, 5)}, {2, MustPortSet(2, 3)}, {2, MustPortSet(6)}, {1, MustPortSet(1, 2, 3, 4, 5)}} {
 		if c.SetLAG(ctx, bad.group, bad.ports) == nil {
@@ -60,7 +60,7 @@ func TestSetLAGWire(t *testing.T) {
 func TestValidateLAG(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
-		group int
+		group LAGID
 		ports PortSet
 		want  string // empty: valid
 	}{
@@ -138,4 +138,26 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 			t.Fatalf("got %v", err)
 		}
 	})
+}
+
+func TestLAGID(t *testing.T) {
+	for _, g := range []LAGID{1, LAGGroupCount} {
+		if err := g.Validate(); err != nil {
+			t.Errorf("group %d: %v", g, err)
+		}
+	}
+	for _, g := range []LAGID{-1, 0, LAGGroupCount + 1, 255} {
+		if err := g.Validate(); !errors.Is(err, ErrInvalid) {
+			t.Errorf("group %d: got %v, want ErrInvalid", g, err)
+		}
+	}
+	if first, last := LAGID(1).Range(); first != 1 || last != 4 {
+		t.Errorf("group 1 owns ports %d-%d, want 1-4", first, last)
+	}
+	if first, last := LAGID(2).Range(); first != 5 || last != 8 {
+		t.Errorf("group 2 owns ports %d-%d, want 5-8", first, last)
+	}
+	if LAGID(2).String() != "2" {
+		t.Error("a group prints as its number")
+	}
 }

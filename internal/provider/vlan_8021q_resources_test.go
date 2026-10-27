@@ -16,8 +16,8 @@ import (
 // a link, and 3, 5, 6 and 7 are free.
 func vlanPorts() []escp.Port {
 	down, up := escp.SpeedLinkDown, escp.Speed1000Full
-	port := func(id int, lag int, speed escp.Speed) escp.Port {
-		return escp.Port{ID: escp.PortID(id), Enabled: true, LAG: lag, ConfiguredSpeed: "auto", ActualSpeed: speed}
+	port := func(id escp.PortID, lag escp.LAGID, speed escp.Speed) escp.Port {
+		return escp.Port{ID: id, Enabled: true, LAG: lag, ConfiguredSpeed: "auto", ActualSpeed: speed}
 	}
 	return []escp.Port{port(1, 1, up), port(2, 1, up), port(3, 0, down), port(4, 0, up), port(5, 0, down), port(6, 0, down), port(7, 0, down), port(8, 0, up)}
 }

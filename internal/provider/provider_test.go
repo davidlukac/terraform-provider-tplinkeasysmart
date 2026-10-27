@@ -20,7 +20,7 @@ type fakeClient struct {
 	mu      sync.Mutex
 	igmp    escp.IGMP
 	pvlans  map[int]escp.PortSet
-	lags    map[int]escp.PortSet
+	lags    map[escp.LAGID]escp.PortSet
 	mirror  *escp.Mirror
 	storm   map[escp.PortID]escp.PortStorm
 	bw      map[escp.PortID][2]int
@@ -87,7 +87,7 @@ func (f *fakeClient) PortStatistics(context.Context) ([]escp.PortStats, error) {
 	return []escp.PortStats{{ID: 1, Enabled: true, Link: "1000Mbps-full", TxGood: 4000000000, RxGood: 7, RxBad: 1}}, nil
 }
 
-func (f *fakeClient) SetLAG(_ context.Context, group int, ports escp.PortSet) error {
+func (f *fakeClient) SetLAG(_ context.Context, group escp.LAGID, ports escp.PortSet) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.lags[group] = ports
@@ -881,7 +881,7 @@ func lagConfig(group int, body string) string {
 }
 
 func TestAccLAGLifecycleOnUnusedPorts(t *testing.T) {
-	f := &fakeClient{ports: lagPorts(), lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2)}}
+	f := &fakeClient{ports: lagPorts(), lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
@@ -898,7 +898,7 @@ func TestAccLAGLifecycleOnUnusedPorts(t *testing.T) {
 func TestAccLAGGuard(t *testing.T) {
 	ports := lagPorts()
 	ports[6].ActualSpeed = "1000Mbps-full" // port 7 carries a link
-	f := &fakeClient{ports: ports, lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2)}}
+	f := &fakeClient{ports: ports, lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
@@ -917,7 +917,7 @@ func TestAccLAGGuard(t *testing.T) {
 func TestAccLAGGuardToleratesItsOwnIdleMembers(t *testing.T) {
 	ports := lagPorts()
 	ports[5].LAG, ports[6].LAG = 2, 2 // ports 6 and 7 are already LAG2 members, without a link
-	f := &fakeClient{ports: ports, lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2), 2: escp.MustPortSet(6, 7)}}
+	f := &fakeClient{ports: ports, lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2), 2: escp.MustPortSet(6, 7)}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{

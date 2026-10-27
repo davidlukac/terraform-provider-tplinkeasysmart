@@ -97,7 +97,7 @@ func (singleLAGClient) LAGs(context.Context) ([]escp.LAG, error) {
 
 func TestLAGResourceSpecifics(t *testing.T) {
 	newFake := func() *fakeClient {
-		return &fakeClient{ports: lagPorts(), lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2)}}
+		return &fakeClient{ports: lagPorts(), lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}}
 	}
 	t.Run("a LAG needs at least two members", func(t *testing.T) {
 		t.Parallel()
@@ -129,7 +129,7 @@ func TestLAGResourceSpecifics(t *testing.T) {
 	})
 	t.Run("a port that already belongs to another LAG", func(t *testing.T) {
 		t.Parallel()
-		inner := &fakeClient{lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2)}, ports: lagPorts()}
+		inner := &fakeClient{lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}, ports: lagPorts()}
 		inner.ports[4].LAG = 3 // port 5
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),

@@ -23,7 +23,7 @@ const (
 type Port struct {
 	ID                    PortID
 	Enabled               bool
-	LAG                   int   // 0 = not in a LAG
+	LAG                   LAGID // 0 = not in a LAG
 	ConfiguredSpeed       Speed // auto, 10Mbps-half, ... 1000Mbps-full
 	ActualSpeed           Speed // SpeedLinkDown or a negotiated speed
 	ConfiguredFlowControl bool
@@ -108,7 +108,7 @@ func parsePorts(tlvs []wire.TLV) ([]Port, error) {
 			return nil, fmt.Errorf("escp: port TLV too short (%d bytes)", len(v))
 		}
 		ports = append(ports, Port{
-			ID: PortID(v[portOffPort]), Enabled: v[portOffState] == 1, LAG: int(v[portOffLAG]),
+			ID: PortID(v[portOffPort]), Enabled: v[portOffState] == 1, LAG: LAGID(v[portOffLAG]),
 			ConfiguredSpeed: speedFromCode(v[portOffCfgSpeed]), ActualSpeed: speedFromCode(v[portOffActSpeed]),
 			ConfiguredFlowControl: v[portOffCfgFlow] == 1, ActualFlowControl: v[portOffActFlow] == 1,
 		})
