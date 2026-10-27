@@ -49,7 +49,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 		}
 	}
 	// raw prints what the switch really answers, before the parsers decide what to show.
-	raw := func(types ...int16) string {
+	raw := func(types ...wire.TLVType) string {
 		tlvs, err := c.getTLVs(ctx, types...)
 		if err != nil {
 			return "read error: " + err.Error()

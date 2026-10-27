@@ -26,7 +26,7 @@ type reply struct {
 	fragment uint16
 }
 
-func (r reply) tlv(t int16) ([]byte, bool) {
+func (r reply) tlv(t wire.TLVType) ([]byte, bool) {
 	for _, x := range r.tlvs {
 		if x.Type == t {
 			return x.Value, true
@@ -187,7 +187,7 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 // exchangeFragments is exchange for replies that span several packets: it
 // concatenates the values of every TLV of the given type until a packet
 // without the fragment flag arrives. A missing fragment restarts the request.
-func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ int16) ([]byte, error) {
+func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ wire.TLVType) ([]byte, error) {
 	// Callers hold c.mu and run inside withSession, so the socket is open.
 	defer c.interruptOnDone(ctx)()
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {

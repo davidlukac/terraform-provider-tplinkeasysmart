@@ -184,7 +184,7 @@ func boolSuffix(flow bool) string {
 	return ""
 }
 
-func tlvHex(t *testing.T, typ int16, h string) wire.TLV {
+func tlvHex(t *testing.T, typ wire.TLVType, h string) wire.TLV {
 	t.Helper()
 	b, err := hex.DecodeString(h)
 	if err != nil {

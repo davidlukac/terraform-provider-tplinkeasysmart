@@ -55,7 +55,7 @@ func (c *Client) setTLVsSent(ctx context.Context, op Operation, tlvs ...wire.TLV
 
 // getTLVs reads one or more setting types with an authenticated session and
 // returns every TLV of the reply. It never writes.
-func (c *Client) getTLVs(ctx context.Context, types ...int16) ([]wire.TLV, error) {
+func (c *Client) getTLVs(ctx context.Context, types ...wire.TLVType) ([]wire.TLV, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var out []wire.TLV

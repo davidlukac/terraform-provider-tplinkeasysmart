@@ -40,7 +40,7 @@ const tlvEndType = -1
 
 // TLV is one type-length-value element.
 type TLV struct {
-	Type  int16
+	Type  TLVType
 	Value []byte
 }
 
@@ -100,7 +100,7 @@ func Unmarshal(b []byte) (Header, []TLV, error) {
 	var tlvs []TLV
 	p := b[HeaderLen:]
 	for len(p) >= TLVHeaderLen {
-		t := int16(binary.BigEndian.Uint16(p))
+		t := TLVType(binary.BigEndian.Uint16(p))
 		l := int(binary.BigEndian.Uint16(p[2:]))
 		if t == tlvEndType && l == 0 {
 			break

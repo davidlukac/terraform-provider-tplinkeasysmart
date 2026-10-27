@@ -87,8 +87,8 @@ func infoFromReply(r reply) Info { return infoFromTLVs(r.tlvs) }
 // infoFromTLVs is infoFromReply for a bare TLV list, which Discover also has.
 func infoFromTLVs(tlvs []wire.TLV) Info {
 	r := reply{tlvs: tlvs}
-	str := func(t int16) string { v, _ := r.tlv(t); return wire.CString(v) }
-	ip := func(t int16) (a netip.Addr) {
+	str := func(t wire.TLVType) string { v, _ := r.tlv(t); return wire.CString(v) }
+	ip := func(t wire.TLVType) (a netip.Addr) {
 		if v, ok := r.tlv(t); ok && len(v) == net.IPv4len {
 			a, _ = netip.AddrFromSlice(v)
 		}

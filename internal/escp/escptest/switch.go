@@ -67,9 +67,9 @@ type Switch struct {
 	lastSet          []wire.TLV   // settings TLVs (credentials stripped) of the most recent accepted SET
 	port7            []byte
 	setIP            []byte
-	mac              [6]byte          // zero means the default address
-	staleDiscoveries int              // the next n discoveries still report 127.0.0.9, like a network whose caches have not caught up
-	addr             map[int16][]byte // IP, mask and gateway as last set; discovery reports them instead of the defaults
+	mac              [6]byte                 // zero means the default address
+	staleDiscoveries int                     // the next n discoveries still report 127.0.0.9, like a network whose caches have not caught up
+	addr             map[wire.TLVType][]byte // IP, mask and gateway as last set; discovery reports them instead of the defaults
 	led              bool
 	firmware         string
 	session          []byte
@@ -81,20 +81,20 @@ type Switch struct {
 	recv             int
 	mute             bool // swallow everything (switch gone)
 	backupMode       BackupMode
-	departed         bool               // a system SET was applied under OnSystemSet and the switch has left
-	stateful         bool               // EnableState was called: SETs are remembered and answered by later GETs
-	store            map[int16][]byte   // the last value of each settings TLV written (or seeded) under EnableState
-	model            bool               // EnableModel was called: cross-setting rules apply
-	lease            *Lease             // what the switch is given when its DHCP flag goes on (see Lease)
-	dhcp             bool               // the switch leases its address
-	acquiring        int                // packets still swallowed while the modelled switch asks for a lease
-	bundles          map[int16][]int16  // requests that the switch answers with more types than asked for
-	rows             map[int16][][]byte // tables with one TLV per row (ports, priorities, rates), keyed by the first byte of a row
+	departed         bool                            // a system SET was applied under OnSystemSet and the switch has left
+	stateful         bool                            // EnableState was called: SETs are remembered and answered by later GETs
+	store            map[wire.TLVType][]byte         // the last value of each settings TLV written (or seeded) under EnableState
+	model            bool                            // EnableModel was called: cross-setting rules apply
+	lease            *Lease                          // what the switch is given when its DHCP flag goes on (see Lease)
+	dhcp             bool                            // the switch leases its address
+	acquiring        int                             // packets still swallowed while the modelled switch asks for a lease
+	bundles          map[wire.TLVType][]wire.TLVType // requests that the switch answers with more types than asked for
+	rows             map[wire.TLVType][][]byte       // tables with one TLV per row (ports, priorities, rates), keyed by the first byte of a row
 
 	// Programmable misbehaviour. Set these inside Configure, which holds the lock.
 
 	// GetFn scripts the reply to GETs: the settings, the error code, and whether to stay silent.
-	GetFn func(types []int16) (settings []Setting, code int32, drop bool)
+	GetFn func(types []wire.TLVType) (settings []Setting, code int32, drop bool)
 	// RSADrop makes the switch ignore the key exchange.
 	RSADrop bool
 	// RSACode answers the key exchange with this code instead of the success code.
@@ -176,10 +176,10 @@ func (f *Switch) EnableState(seed ...Setting) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.stateful = true
-	f.store = map[int16][]byte{}
-	f.rows = map[int16][][]byte{}
+	f.store = map[wire.TLVType][]byte{}
+	f.rows = map[wire.TLVType][][]byte{}
 	// The real switch answers a request for the IGMP state with report suppression as well.
-	f.bundles = map[int16][]int16{wire.TLVIGMPEnabled: {wire.TLVIGMPSuppression}}
+	f.bundles = map[wire.TLVType][]wire.TLVType{wire.TLVIGMPEnabled: {wire.TLVIGMPSuppression}}
 	for _, s := range seed {
 		f.store[s.Type] = append([]byte(nil), s.Value...)
 	}
@@ -207,11 +207,16 @@ func (f *Switch) SetBackupMode(mode BackupMode) {
 	f.mu.Unlock()
 }
 
+// TLVType is the type number of a Setting. It is the client's own type, named here so that a test
+// outside the escp module can write the func literals the fake takes (GetFn) without importing
+// the client's internals; a plain number is a valid TLVType wherever a constant is expected.
+type TLVType = wire.TLVType
+
 // Setting is one entry of a request or a reply: a protocol type number (the numbers of
 // internal/escp/PROTOCOL.md) and its value. It is the fake's own type, so a test outside the
 // escp module needs nothing from the client's internals to read or script traffic.
 type Setting struct {
-	Type  int16
+	Type  wire.TLVType
 	Value []byte
 }
 
@@ -385,7 +390,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 	if gone {
 		return
 	}
-	find := func(t int16) ([]byte, bool) {
+	find := func(t wire.TLVType) ([]byte, bool) {
 		for _, x := range tlvs {
 			if x.Type == t {
 				return x.Value, true
@@ -408,7 +413,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		dhcp := byte(0) // a static address, like switch 03
 		if f.dhcp {
 			dhcp = 1
-			addr = map[int16][]byte{wire.TLVIP: f.lease.IP[:], wire.TLVNetmask: f.lease.Mask[:], wire.TLVGateway: f.lease.Gateway[:]}
+			addr = map[wire.TLVType][]byte{wire.TLVIP: f.lease.IP[:], wire.TLVNetmask: f.lease.Mask[:], wire.TLVGateway: f.lease.Gateway[:]}
 		}
 		name := "TL-SG108E-fake"
 		if f.hostname != "" {
@@ -416,7 +421,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		}
 		if f.staleDiscoveries > 0 {
 			f.staleDiscoveries--
-			addr = map[int16][]byte{wire.TLVIP: {127, 0, 0, 9}, wire.TLVNetmask: {255, 255, 255, 0}, wire.TLVGateway: {127, 0, 0, 254}}
+			addr = map[wire.TLVType][]byte{wire.TLVIP: {127, 0, 0, 9}, wire.TLVNetmask: {255, 255, 255, 0}, wire.TLVGateway: {127, 0, 0, 254}}
 		}
 		f.mu.Unlock()
 		ip, mask, gw := []byte{127, 0, 0, 1}, []byte{255, 255, 255, 0}, []byte{127, 0, 0, 254}
@@ -557,7 +562,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			if ip, ok := find(wire.TLVIP); ok && !f.dhcp {
 				mask, _ := find(wire.TLVNetmask)
 				gw, _ := find(wire.TLVGateway)
-				f.addr = map[int16][]byte{wire.TLVIP: ip, wire.TLVNetmask: mask, wire.TLVGateway: gw}
+				f.addr = map[wire.TLVType][]byte{wire.TLVIP: ip, wire.TLVNetmask: mask, wire.TLVGateway: gw}
 			}
 			f.sets++
 			f.mu.Unlock()
@@ -587,7 +592,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		GetFn := f.GetFn
 		f.mu.Unlock()
 		if GetFn != nil {
-			types := make([]int16, len(tlvs))
+			types := make([]wire.TLVType, len(tlvs))
 			for i, t := range tlvs {
 				types[i] = t.Type
 			}
@@ -640,7 +645,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 // A write of the port table (TLV 4096) keeps what only the switch decides, the LAG and the
 // actual speed, and derives the actual flow control from the configured one. Call EnableState
 // first.
-func (f *Switch) EnableRows(typ int16, rows ...[]byte) {
+func (f *Switch) EnableRows(typ wire.TLVType, rows ...[]byte) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.rows[typ] = nil
@@ -711,7 +716,7 @@ func (f *Switch) held(req []wire.TLV) []wire.TLV {
 }
 
 // heldType returns the stored TLVs of one type (a table's rows, or the single value).
-func (f *Switch) heldType(typ int16) []wire.TLV {
+func (f *Switch) heldType(typ wire.TLVType) []wire.TLV {
 	var out []wire.TLV
 	if table, ok := f.rows[typ]; ok {
 		for _, row := range table {
@@ -725,7 +730,7 @@ func (f *Switch) heldType(typ int16) []wire.TLV {
 
 // rowKeyLen is how many leading bytes identify a row of a table: the port number, except for
 // the 802.1Q VLANs, which are identified by their 2-byte id.
-func rowKeyLen(typ int16) int {
+func rowKeyLen(typ wire.TLVType) int {
 	if typ == wire.TLVVLAN8021QVLAN {
 		return 2
 	}

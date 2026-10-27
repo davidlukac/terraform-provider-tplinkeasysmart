@@ -88,7 +88,7 @@ func TestDryRunOfAWriteThatReadsFirst(t *testing.T) {
 func TestPortGateThroughTheRealClient(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Switch) {
-		f.GetFn = func(types []int16) ([]escptest.Setting, int32, bool) {
+		f.GetFn = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
 			var out []escptest.Setting
 			for _, typ := range types {
 				switch typ {
