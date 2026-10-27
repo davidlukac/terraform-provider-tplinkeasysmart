@@ -77,7 +77,9 @@ type WriteGate func(ctx context.Context, sw InfoReader, op Operation) error
 
 // Info is what a discovery reply reports about the switch.
 type Info struct {
-	Model, Hostname, Hardware string
+	Model, Hardware string
+	// Hostname is the device description.
+	Hostname Hostname
 	// Firmware is the version the switch reports, read into its parts.
 	Firmware Firmware
 	// MAC is the switch's hardware address; the zero value when the reply carried none.

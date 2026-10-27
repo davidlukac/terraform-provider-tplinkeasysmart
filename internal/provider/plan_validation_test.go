@@ -66,10 +66,10 @@ func TestInvalidConfigurationIsRejectedWhilePlanning(t *testing.T) {
 		{"QoS priority key not a port", qosCfg("  mode = \"port-based\"\n  port_priorities = { \"seven\" = 2 }\n"), `not a port number`},
 		{"QoS priority key out of range", qosCfg("  mode = \"port-based\"\n  port_priorities = { \"40\" = 2 }\n"), `not a port number`},
 		{"QoS priorities outside port-based mode", qosCfg("  mode = \"802.1p\"\n  port_priorities = { \"7\" = 2 }\n"), `only take effect when mode is port-based`},
-		{"hostname with a dot", systemConfig("sw01.local"), `letters, digits and hyphens`},
+		{"hostname with a dot", systemConfig("sw01.local"), `(?s)letters,\s+digits\s+and\s+hyphens`},
 		{"hostname starting with a hyphen", systemConfig("-sw01"), `letters, digits and hyphens`},
 		{"hostname too long", systemConfig(strings.Repeat("a", 33)), `(?s)hostname.*(32|length)`},
-		{"empty hostname", systemConfig(""), `(?s)hostname.*(length|least)`},
+		{"empty hostname", systemConfig(""), `(?s)Invalid\s+device\s+description`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

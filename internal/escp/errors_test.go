@@ -66,9 +66,9 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 		{"ValidateIPConfig gateway", func(*Client) error {
 			return ValidateIPConfig(cfgOf("192.0.2.13", "255.255.255.0", "192.0.2.13"))
 		}, "gateway 192.0.2.13 must be another host address"},
-		{"ValidateHostname", func(*Client) error { return ValidateHostname("-bad-") }, "invalid device description"},
+		{"Hostname.Validate", func(*Client) error { return Hostname("-bad-").Validate() }, "invalid device description"},
 		{"VLANID.Validate", func(*Client) error { return VLANID(4095).Validate() }, "invalid VLAN id 4095"},
-		{"ValidateVLANName", func(*Client) error { return ValidateVLANName("way-too-long-name") }, "invalid VLAN name"},
+		{"VLANName.Validate", func(*Client) error { return VLANName("way-too-long-name").Validate() }, "invalid VLAN name"},
 		{"ParseSpeed", func(*Client) error { _, err := ParseSpeed("warp"); return err }, `unknown speed "warp"`},
 		{"ParseQoSMode", func(*Client) error { _, err := ParseQoSMode("fancy"); return err }, `unknown QoS mode "fancy"`},
 		{"Discover window", func(*Client) error {

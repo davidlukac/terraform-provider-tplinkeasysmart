@@ -170,9 +170,9 @@ func TestScenarioHostname(t *testing.T) {
 		return fmt.Sprintf("resource \"tplinkeasysmart_system\" \"this\" {\n  hostname = %q\n}\n", name)
 	}
 	const renamed = "regression-test"
-	s.scenario(t, cfg(renamed), cfg(info.Hostname), func(*terraform.State) error {
+	s.scenario(t, cfg(renamed), cfg(info.Hostname.String()), func(*terraform.State) error {
 		got, err := s.Client.Info(context.Background())
-		if err != nil || got.Hostname != renamed {
+		if err != nil || got.Hostname.String() != renamed {
 			return fmt.Errorf("hostname on the switch = %q, err %w, want %q", got.Hostname, err, renamed)
 		}
 		return nil

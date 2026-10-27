@@ -41,7 +41,7 @@ type SwitchClient interface {
 	StormControl(ctx context.Context) ([]escp.PortStorm, error)
 	SetStormControl(ctx context.Context, cfg escp.StormConfig) error
 	System(ctx context.Context) (escp.System, error)
-	SetHostname(ctx context.Context, name string) error
+	SetHostname(ctx context.Context, name escp.Hostname) error
 	SetIPConfig(ctx context.Context, cfg escp.IPConfig) error
 	EnableDHCP(ctx context.Context) error
 	ConfigBackup(ctx context.Context) ([]byte, error)

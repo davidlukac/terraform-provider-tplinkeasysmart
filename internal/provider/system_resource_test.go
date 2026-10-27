@@ -61,7 +61,7 @@ func TestAccSystemErrors(t *testing.T) {
 		cfg   string
 		want  string
 	}{
-		{"invalid name never reaches the switch", func(*extraState) {}, "bad.name", `letters, digits and hyphens`},
+		{"invalid name never reaches the switch", func(*extraState) {}, "bad.name", `(?s)letters,\s+digits\s+and\s+hyphens`},
 		{"read fails before writing", func(e *extraState) { e.infoErr = errBoom }, "sw01", `Reading the switch failed`},
 		{"write fails", func(e *extraState) { e.setErr = errBoom }, "sw01", `Setting the device description failed`},
 		{"device ignores the write", func(e *extraState) { e.ignoreSet = true }, "sw01", `did not change`},

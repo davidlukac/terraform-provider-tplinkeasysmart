@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -65,23 +64,10 @@ func splitQualified(id string) (n switchName, rest string) {
 
 // validSwitchName is the validator of every place a switch name is written: the `switch` argument
 // and the keys of the `switches` map.
-func validSwitchName() []validator.String { return []validator.String{switchNameValidator{}} }
-
-type switchNameValidator struct{}
-
-func (switchNameValidator) Description(context.Context) string {
-	return "must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit"
-}
-
-func (v switchNameValidator) MarkdownDescription(ctx context.Context) string {
-	return v.Description(ctx)
-}
-
-func (switchNameValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
-	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
-		return
-	}
-	if err := switchName(req.ConfigValue.ValueString()).validate(); err != nil {
-		resp.Diagnostics.AddAttributeError(req.Path, "Invalid switch name", err.Error())
-	}
+func validSwitchName() []validator.String {
+	return []validator.String{stringRule{
+		description: "must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit",
+		summary:     "Invalid switch name",
+		check:       func(s string) error { return switchName(s).validate() },
+	}}
 }

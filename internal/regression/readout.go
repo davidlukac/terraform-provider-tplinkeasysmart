@@ -42,7 +42,7 @@ func CoreReaders(c *escp.Client) []Reader {
 		}},
 		{"hostname", func(ctx context.Context) (string, error) {
 			v, err := c.Info(ctx)
-			return v.Hostname, err
+			return v.Hostname.String(), err
 		}},
 		{"management-address", func(ctx context.Context) (string, error) {
 			v, err := c.Info(ctx)

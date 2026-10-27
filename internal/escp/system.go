@@ -46,25 +46,30 @@ func (c *Client) System(ctx context.Context) (System, error) {
 	return parseSystem(ports, auto)
 }
 
-// HostnamePattern is the regular expression a device description must match (besides the length limit).
-const HostnamePattern = `^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$`
+// Hostname is the device description of a switch (System > System Info), what the web UI calls the
+// device description and the protocol the hostname: 1 to MaxHostnameLen letters, digits and
+// hyphens, not starting or ending with a hyphen. The rules are the web UI's.
+type Hostname string
 
-var hostnameRE = regexp.MustCompile(HostnamePattern)
+var hostnameRE = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$`)
 
-// ValidateHostname applies the web UI's rules for the device description.
-func ValidateHostname(name string) error {
-	if len(name) > MaxHostnameLen || !hostnameRE.MatchString(name) {
-		return invalidf("escp: invalid device description %q: 1-%d letters, digits and hyphens, not starting or ending with a hyphen", name, MaxHostnameLen)
+// Validate applies the rules; the error matches ErrInvalid.
+func (h Hostname) Validate() error {
+	if len(h) > MaxHostnameLen || !hostnameRE.MatchString(string(h)) {
+		return invalidf("escp: invalid device description %q: 1-%d letters, digits and hyphens, not starting or ending with a hyphen", string(h), MaxHostnameLen)
 	}
 	return nil
 }
+
+// String is the device description.
+func (h Hostname) String() string { return string(h) }
 
 // SetHostname changes the device description. Like the vendor utility, the
 // request carries the current IP settings (read via discovery) unchanged, so
 // the management address is re-asserted as it is. Verified live on firmware
 // 20230218 and 20250710.
-func (c *Client) SetHostname(ctx context.Context, name string) error {
-	if err := ValidateHostname(name); err != nil {
+func (c *Client) SetHostname(ctx context.Context, name Hostname) error {
+	if err := name.Validate(); err != nil {
 		return err
 	}
 	info, err := c.Info(ctx)
@@ -81,7 +86,7 @@ func (c *Client) SetHostname(ctx context.Context, name string) error {
 
 // writeSystem sends the System-page SET: device description, DHCP flag and the
 // static address triple. The switch takes all of them in one request.
-func (c *Client) writeSystem(ctx context.Context, op Operation, name string, dhcp bool, cfg IPConfig) (sent bool, err error) {
+func (c *Client) writeSystem(ctx context.Context, op Operation, name Hostname, dhcp bool, cfg IPConfig) (sent bool, err error) {
 	return c.setTLVsSent(ctx, op,
 		wire.TLV{Type: wire.TLVHostname, Value: append([]byte(name), 0)},
 		wire.TLV{Type: wire.TLVDHCP, Value: []byte{boolByte(dhcp)}},

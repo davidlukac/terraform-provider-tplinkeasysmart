@@ -26,10 +26,7 @@ const (
 	pvidEntryLen = 3
 )
 
-// VLANNamePattern is what a VLAN name may consist of (see ValidateVLANName).
-const VLANNamePattern = `^[A-Za-z0-9_-]*$`
-
-var vlanNamePattern = regexp.MustCompile(VLANNamePattern)
+var vlanNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]*$`)
 
 // VLANID is the id of an 802.1Q VLAN, and the PVID of a port, which is the id of the VLAN its
 // untagged traffic enters. The IEEE range is MinVLANID to MaxVLANID; two bytes carry it on the wire.
@@ -47,13 +44,20 @@ func (v VLANID) Validate() error {
 // String is the id as a number.
 func (v VLANID) String() string { return strconv.Itoa(int(v)) }
 
-// ValidateVLANName checks an 802.1Q VLAN name: empty, or up to MaxVLANNameLen letters, digits, hyphens and underscores.
-func ValidateVLANName(name string) error {
-	if len(name) > MaxVLANNameLen || !vlanNamePattern.MatchString(name) {
-		return invalidf("escp: invalid VLAN name %q (at most %d letters, digits, hyphens or underscores)", name, MaxVLANNameLen)
+// VLANName is the name of an 802.1Q VLAN: empty, or up to MaxVLANNameLen letters, digits, hyphens and
+// underscores (the vendor utility's rules).
+type VLANName string
+
+// Validate applies the rules; the error matches ErrInvalid.
+func (n VLANName) Validate() error {
+	if len(n) > MaxVLANNameLen || !vlanNamePattern.MatchString(string(n)) {
+		return invalidf("escp: invalid VLAN name %q (at most %d letters, digits, hyphens or underscores)", string(n), MaxVLANNameLen)
 	}
 	return nil
 }
+
+// String is the name.
+func (n VLANName) String() string { return string(n) }
 
 // validate checks a VLAN before it is encoded: id, name, ports, no port both
 // tagged and untagged, and at least one member (use DeleteVLAN8021Q to remove).
@@ -61,7 +65,7 @@ func (v VLAN8021Q) validate() error {
 	if err := v.ID.Validate(); err != nil {
 		return err
 	}
-	if err := ValidateVLANName(v.Name); err != nil {
+	if err := v.Name.Validate(); err != nil {
 		return err
 	}
 	if both := v.Tagged.Intersect(v.Untagged); !both.IsEmpty() {
@@ -80,7 +84,7 @@ func (v VLAN8021Q) encode() []byte {
 }
 
 // vlanEntryBytes lays out a TLV 8705 value: id, member mask, tagged mask, name, NUL.
-func vlanEntryBytes(id VLANID, member, tagged []byte, name string) []byte {
+func vlanEntryBytes(id VLANID, member, tagged []byte, name VLANName) []byte {
 	out := binary.BigEndian.AppendUint16(nil, uint16(id)) //nolint:gosec // callers validate the id (at most 4094)
 	out = append(out, member...)
 	out = append(out, tagged...)

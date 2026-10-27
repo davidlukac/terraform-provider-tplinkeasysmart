@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -52,11 +51,11 @@ func validSpeed() validator.String { return stringvalidator.OneOf(speedNames()..
 
 // validHostname accepts what the switch accepts as a device description.
 func validHostname() []validator.String {
-	return []validator.String{
-		stringvalidator.LengthBetween(1, escp.MaxHostnameLen),
-		stringvalidator.RegexMatches(regexp.MustCompile(escp.HostnamePattern),
-			"must contain only letters, digits and hyphens, and not start or end with a hyphen"),
-	}
+	return []validator.String{stringRule{
+		description: "must be a device description: 1 to 32 letters, digits and hyphens, not starting or ending with a hyphen",
+		summary:     "Invalid device description",
+		check:       func(s string) error { return escp.Hostname(s).Validate() },
+	}}
 }
 
 // qosModeNames lists the QoS mode names in mode-number order.
@@ -202,29 +201,41 @@ func validVLANID() validator.Int64 {
 
 // validVLANName accepts what the switch accepts as an 802.1Q VLAN name.
 func validVLANName() []validator.String {
-	return []validator.String{
-		stringvalidator.LengthAtMost(escp.MaxVLANNameLen),
-		stringvalidator.RegexMatches(regexp.MustCompile(escp.VLANNamePattern), "must contain only letters, digits, hyphens and underscores"),
+	return []validator.String{stringRule{
+		description: "must be a VLAN name: up to 10 letters, digits, hyphens and underscores",
+		summary:     "Invalid VLAN name",
+		check:       func(s string) error { return escp.VLANName(s).Validate() },
+	}}
+}
+
+// stringRule is a string validator whose rule is a value type's Validate (a MAC address, a device
+// description, a VLAN name, a switch name), so the rule is written once, in the type, and not again
+// as a pattern and a length in the schema.
+type stringRule struct {
+	description string
+	summary     string
+	check       func(string) error
+}
+
+func (r stringRule) Description(context.Context) string { return r.description }
+
+func (r stringRule) MarkdownDescription(ctx context.Context) string { return r.Description(ctx) }
+
+func (r stringRule) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	if err := r.check(req.ConfigValue.ValueString()); err != nil {
+		resp.Diagnostics.AddAttributeError(req.Path, r.summary, err.Error())
 	}
 }
 
 // validMAC accepts the text form of a switch MAC address, "aa:bb:cc:dd:ee:ff" (escp.ParseMAC says what
 // is accepted). An empty string is refused: an argument that is set but empty is a mistake.
-func validMAC() validator.String { return macValidator{} }
-
-type macValidator struct{}
-
-func (macValidator) Description(context.Context) string {
-	return "must be a MAC address such as aa:bb:cc:dd:ee:ff"
-}
-
-func (v macValidator) MarkdownDescription(ctx context.Context) string { return v.Description(ctx) }
-
-func (macValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
-	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
-		return
-	}
-	if _, err := escp.ParseMAC(req.ConfigValue.ValueString()); err != nil {
-		resp.Diagnostics.AddAttributeError(req.Path, "Invalid MAC address", err.Error())
+func validMAC() validator.String {
+	return stringRule{
+		description: "must be a MAC address such as aa:bb:cc:dd:ee:ff",
+		summary:     "Invalid MAC address",
+		check:       func(s string) error { _, err := escp.ParseMAC(s); return err },
 	}
 }

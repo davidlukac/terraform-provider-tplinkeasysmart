@@ -144,3 +144,16 @@ func TestVLANIDValidate(t *testing.T) {
 		t.Error("a VLAN id prints as its number")
 	}
 }
+
+func TestVLANNameValidate(t *testing.T) {
+	for _, n := range []VLANName{"", "iot", "a-b_C9", "tenletters"} {
+		if err := n.Validate(); err != nil {
+			t.Errorf("%q: %v", n, err)
+		}
+	}
+	for _, n := range []VLANName{"elevenchars", "a b", "dot.ted", "é"} {
+		if err := n.Validate(); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%q: got %v, want ErrInvalid", n, err)
+		}
+	}
+}

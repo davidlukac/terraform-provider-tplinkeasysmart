@@ -35,7 +35,7 @@ type systemResource struct {
 // systemClient is the part of the switch API this resource needs.
 type systemClient interface {
 	Info(ctx context.Context) (escp.Info, error)
-	SetHostname(ctx context.Context, name string) error
+	SetHostname(ctx context.Context, name escp.Hostname) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -79,7 +79,7 @@ func (r *systemResource) apply(ctx context.Context, m *systemResourceModel, add 
 }
 
 func (r *systemResource) applyBound(ctx context.Context, m *systemResourceModel, add func(string, string)) bool {
-	want := m.Hostname.ValueString()
+	want := escp.Hostname(m.Hostname.ValueString())
 	cur, err := r.client.Info(ctx)
 	if err != nil {
 		add("Reading the switch failed", err.Error())
@@ -131,7 +131,7 @@ func (r *systemResource) readBound(ctx context.Context, _ resource.ReadRequest, 
 		resp.Diagnostics.AddError("Reading the switch failed", err.Error())
 		return
 	}
-	m := systemResourceModel{ID: qualifiedID(r.sw, systemID), Hostname: types.StringValue(info.Hostname)}
+	m := systemResourceModel{ID: qualifiedID(r.sw, systemID), Hostname: types.StringValue(info.Hostname.String())}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
 

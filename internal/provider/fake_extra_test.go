@@ -84,7 +84,7 @@ func (e *extraState) info() (escp.Info, bool, error) {
 	if !e.active {
 		return escp.Info{Firmware: escp.ParseFirmware(e.firmwareVersion())}, false, nil
 	}
-	return escp.Info{Model: "TL-SG108E", Hostname: e.hostname, MAC: fakeMAC, Firmware: escp.ParseFirmware(e.firmwareVersion()),
+	return escp.Info{Model: "TL-SG108E", Hostname: escp.Hostname(e.hostname), MAC: fakeMAC, Firmware: escp.ParseFirmware(e.firmwareVersion()),
 		IP: netip.MustParseAddr(e.ip), Netmask: netip.MustParseAddr(orDefault(e.netmask, "255.255.255.0")), Gateway: netip.MustParseAddr(orDefault(e.gateway, "192.0.2.1")), DHCP: !e.static}, true, nil
 }
 
@@ -138,8 +138,8 @@ func newStaticFake(ip, mask, gateway string) *fakeClient {
 	return f
 }
 
-func (f *fakeClient) SetHostname(_ context.Context, name string) error {
-	if err := escp.ValidateHostname(name); err != nil {
+func (f *fakeClient) SetHostname(_ context.Context, name escp.Hostname) error {
+	if err := name.Validate(); err != nil {
 		return err
 	}
 	e := f.extra()
@@ -153,7 +153,7 @@ func (f *fakeClient) SetHostname(_ context.Context, name string) error {
 		return e.setErr
 	}
 	if !e.ignoreSet {
-		e.hostname = name
+		e.hostname = name.String()
 	}
 	if e.mutateIP {
 		e.ip = "192.0.2.250"
