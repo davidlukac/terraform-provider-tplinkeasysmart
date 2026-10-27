@@ -67,12 +67,12 @@ func (f *Switch) EnableModel(links map[int]LinkSpeed) {
 		Setting{Type: wire.TLVVLAN8021QMax, Value: []byte{maxDot1QVLANs}},
 	)
 	f.mu.Lock()
-	f.bundles[wire.TLVVLAN8021QVLAN] = []int16{wire.TLVVLAN8021Q, wire.TLVVLAN8021QMax}
-	f.bundles[wire.TLVVLANPortBased] = []int16{wire.TLVVLANPortBasedMax, wire.TLVVLANPortBasedVID}
+	f.bundles[wire.TLVVLAN8021QVLAN] = []wire.TLVType{wire.TLVVLAN8021Q, wire.TLVVLAN8021QMax}
+	f.bundles[wire.TLVVLANPortBased] = []wire.TLVType{wire.TLVVLANPortBasedMax, wire.TLVVLANPortBasedVID}
 	f.model = true
 	// A static address in the documentation range (RFC 5737): the fake is still reached on
 	// loopback, and nothing that follows this address can leave the machine.
-	f.addr = map[int16][]byte{wire.TLVIP: {192, 0, 2, 13}, wire.TLVNetmask: {255, 255, 255, 0}, wire.TLVGateway: {192, 0, 2, 1}}
+	f.addr = map[wire.TLVType][]byte{wire.TLVIP: {192, 0, 2, 13}, wire.TLVNetmask: {255, 255, 255, 0}, wire.TLVGateway: {192, 0, 2, 1}}
 	f.mu.Unlock()
 	var ports, prio, bwIn, bwOut, storm [][]byte
 	for p := 1; p <= modelPortCount; p++ {
@@ -116,7 +116,7 @@ func portsOf(mask []byte) []int {
 	return out
 }
 
-func (f *Switch) row(typ int16, port int) []byte {
+func (f *Switch) row(typ wire.TLVType, port int) []byte {
 	for _, r := range f.rows[typ] {
 		if int(r[0]) == port {
 			return r
@@ -229,7 +229,7 @@ func (f *Switch) applied(t wire.TLV) {
 		if t.Value[0] != 1 {
 			return
 		}
-		for _, other := range []int16{wire.TLVVLANMTU, wire.TLVVLANPortBased, wire.TLVVLAN8021Q} {
+		for _, other := range []wire.TLVType{wire.TLVVLANMTU, wire.TLVVLANPortBased, wire.TLVVLAN8021Q} {
 			if other != t.Type {
 				f.store[other] = append([]byte{0}, f.store[other][1:]...)
 			}

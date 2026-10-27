@@ -15,7 +15,7 @@ import (
 // how often the port count was asked for.
 func countingPorts(f *escptest.Switch, n int, reads *atomic.Int32) {
 	f.Configure(func(f *escptest.Switch) {
-		f.GetFn = func(types []int16) ([]escptest.Setting, int32, bool) {
+		f.GetFn = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
 			for _, typ := range types {
 				if typ == wire.TLVPortCount {
 					reads.Add(1)
@@ -184,7 +184,7 @@ func TestWriteNeedsThePortCount(t *testing.T) {
 	t.Run("the switch reports zero ports", func(t *testing.T) {
 		f := escptest.Start(t)
 		f.Configure(func(f *escptest.Switch) {
-			f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) {
+			f.GetFn = func([]wire.TLVType) ([]escptest.Setting, int32, bool) {
 				return []escptest.Setting{{Type: wire.TLVPortCount, Value: []byte{0}}}, 0, false
 			}
 		})
@@ -200,7 +200,7 @@ func TestWriteNeedsThePortCount(t *testing.T) {
 	t.Run("the switch is silent", func(t *testing.T) {
 		f := escptest.Start(t)
 		f.Configure(func(f *escptest.Switch) {
-			f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) { return nil, 0, true }
+			f.GetFn = func([]wire.TLVType) ([]escptest.Setting, int32, bool) { return nil, 0, true }
 		})
 		c := dialFast(t, f, "secret")
 		err := c.SetPort(ctx, PortConfig{ID: 2, Enabled: true, Speed: SpeedAuto})

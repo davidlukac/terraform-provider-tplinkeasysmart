@@ -70,7 +70,7 @@ const (
 // MaxBandwidthKbps is the largest limit the web UI offers.
 const MaxBandwidthKbps = 1000000
 
-func bandwidthTLV(typ int16, port PortID, kbps Kbps) (wire.TLV, error) {
+func bandwidthTLV(typ wire.TLVType, port PortID, kbps Kbps) (wire.TLV, error) {
 	if kbps.Validate() != nil {
 		return wire.TLV{}, invalidf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", int(kbps), port, RateStepKbps, MaxBandwidthKbps)
 	}

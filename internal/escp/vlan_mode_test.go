@@ -50,7 +50,7 @@ func TestVLANModesAreTheWritableOnes(t *testing.T) {
 }
 
 // scriptModes makes the fake report the three mode flags the way a switch does.
-func scriptModes(f *escptest.Switch, mtu, portBased, dot1q bool, silentOn int16) {
+func scriptModes(f *escptest.Switch, mtu, portBased, dot1q bool, silentOn wire.TLVType) {
 	flag := func(b bool) string {
 		if b {
 			return "01"
@@ -58,7 +58,7 @@ func scriptModes(f *escptest.Switch, mtu, portBased, dot1q bool, silentOn int16)
 		return "00"
 	}
 	f.Configure(func(f *escptest.Switch) {
-		f.GetFn = func(types []int16) ([]escptest.Setting, int32, bool) {
+		f.GetFn = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
 			var out []escptest.Setting
 			for _, typ := range types {
 				if typ == silentOn {
@@ -114,7 +114,7 @@ func TestVLANModeReadsTheThreeFlags(t *testing.T) {
 
 // Each of the three reads can fail, and the failure is the answer: no guess from two flags.
 func TestVLANModeFailsWhenAnyReadFails(t *testing.T) {
-	for name, typ := range map[string]int16{"MTU": wire.TLVVLANMTU, "port-based": wire.TLVVLANPortBased, "802.1Q": wire.TLVVLAN8021QVLAN} {
+	for name, typ := range map[string]wire.TLVType{"MTU": wire.TLVVLANMTU, "port-based": wire.TLVVLANPortBased, "802.1Q": wire.TLVVLAN8021QVLAN} {
 		t.Run(name, func(t *testing.T) {
 			f := escptest.Start(t)
 			scriptModes(f, false, true, false, typ)

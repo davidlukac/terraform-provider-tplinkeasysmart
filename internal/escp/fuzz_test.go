@@ -45,9 +45,10 @@ func FuzzSettingParsers(f *testing.F) {
 	f.Add(int16(wire.TLVStormControl), mustHex(f, "010000000000000000"))
 	f.Add(int16(wire.TLVLoopPrevention), []byte{1})
 	f.Add(int16(wire.TLVPortCount), []byte{8})
-	f.Fuzz(func(t *testing.T, typ int16, value []byte) {
+	f.Fuzz(func(t *testing.T, rawType int16, value []byte) {
+		typ := wire.TLVType(rawType)
 		// Fixed types as well as the fuzzed one, so a parser also sees values under its own type.
-		for _, ty := range []int16{typ, wire.TLVPorts, wire.TLVPortStats, wire.TLVLAG, wire.TLVIGMPEnabled, wire.TLVIGMPSuppression, wire.TLVIGMPGroups, wire.TLVMirror,
+		for _, ty := range []wire.TLVType{typ, wire.TLVPorts, wire.TLVPortStats, wire.TLVLAG, wire.TLVIGMPEnabled, wire.TLVIGMPSuppression, wire.TLVIGMPGroups, wire.TLVMirror,
 			wire.TLVVLANMTU, wire.TLVVLANPortBased, wire.TLVVLANPortBasedVID, wire.TLVVLANPortBasedMax, wire.TLVVLAN8021Q, wire.TLVVLAN8021QVLAN, wire.TLVVLAN8021QPVID,
 			wire.TLVVLAN8021QMax, wire.TLVQoSMode, wire.TLVQoSPriority, wire.TLVBandwidthIngress, wire.TLVBandwidthEgress, wire.TLVStormControl, wire.TLVLoopPrevention,
 			wire.TLVPortCount, wire.TLVAutoSave} {
