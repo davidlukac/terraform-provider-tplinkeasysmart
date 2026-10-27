@@ -24,7 +24,7 @@ const (
 // PortStats is one row of Monitoring > Port Statistics. Counters are the
 // switch's 32-bit packet counters and wrap.
 type PortStats struct {
-	ID      int
+	ID      PortID
 	Enabled bool
 	Link    Speed // SpeedLinkDown or the negotiated speed
 	TxGood  uint32
@@ -45,7 +45,7 @@ func parsePortStats(tlvs []wire.TLV) ([]PortStats, error) {
 			return nil, fmt.Errorf("escp: port statistics TLV too short (%d bytes)", len(v))
 		}
 		out = append(out, PortStats{
-			ID: int(v[statsOffPort]), Enabled: v[statsOffState] == 1, Link: speedFromCode(v[statsOffLink]),
+			ID: PortID(v[statsOffPort]), Enabled: v[statsOffState] == 1, Link: speedFromCode(v[statsOffLink]),
 			TxGood: binary.BigEndian.Uint32(v[statsOffTxGood:]), TxBad: binary.BigEndian.Uint32(v[statsOffTxBad:]),
 			RxGood: binary.BigEndian.Uint32(v[statsOffRxGood:]), RxBad: binary.BigEndian.Uint32(v[statsOffRxBad:]),
 		})
