@@ -35,22 +35,22 @@ const (
 // ones the vendor utility checks before it sends the write; the switch enforces
 // them itself when the LAG is created.
 const (
-	lagRefusedPortRange    int32 = 4    // ports outside the group's range
-	lagRefusedPortVLAN     int32 = 7401 // a port is in a port-based VLAN other than the default
-	lagRefusedBandwidth    int32 = 7403 // a port has a bandwidth limit
-	lagRefusedStorm        int32 = 7404 // a port has storm control
-	lagRefusedQoS          int32 = 7405 // member ports have different QoS priorities (checked in port-based QoS mode only)
-	lagRefusedSpeed        int32 = 7406 // member ports have different fixed speeds
-	lagRefusedHalfDuplex   int32 = 7407 // a member port is set to half duplex (also refused when a port write would make a member half duplex)
-	lagRefusedNegotiation  int32 = 7410 // member ports mix auto-negotiation with a fixed speed
-	lagRefusedSinglePort   int32 = 7415 // fewer than two ports
-	lagRefusedFlowControl  int32 = 7417 // member ports have different flow control settings
-	lagRefusedEnabled      int32 = 7418 // member ports are not all enabled or all disabled
-	lagRefusedMirrorTarget int32 = 7205 // a port is the mirror destination
-	lagRefusedMirrorSource int32 = 7206 // a port is mirrored
+	lagRefusedPortRange    ReplyCode = 4    // ports outside the group's range
+	lagRefusedPortVLAN     ReplyCode = 7401 // a port is in a port-based VLAN other than the default
+	lagRefusedBandwidth    ReplyCode = 7403 // a port has a bandwidth limit
+	lagRefusedStorm        ReplyCode = 7404 // a port has storm control
+	lagRefusedQoS          ReplyCode = 7405 // member ports have different QoS priorities (checked in port-based QoS mode only)
+	lagRefusedSpeed        ReplyCode = 7406 // member ports have different fixed speeds
+	lagRefusedHalfDuplex   ReplyCode = 7407 // a member port is set to half duplex (also refused when a port write would make a member half duplex)
+	lagRefusedNegotiation  ReplyCode = 7410 // member ports mix auto-negotiation with a fixed speed
+	lagRefusedSinglePort   ReplyCode = 7415 // fewer than two ports
+	lagRefusedFlowControl  ReplyCode = 7417 // member ports have different flow control settings
+	lagRefusedEnabled      ReplyCode = 7418 // member ports are not all enabled or all disabled
+	lagRefusedMirrorTarget ReplyCode = 7205 // a port is the mirror destination
+	lagRefusedMirrorSource ReplyCode = 7206 // a port is mirrored
 )
 
-var lagRefusals = map[int32]string{
+var lagRefusals = map[ReplyCode]string{
 	lagRefusedPortRange:    "the ports do not fit the group: LAG 1 takes ports 1-4 and LAG 2 takes ports 5-8",
 	lagRefusedPortVLAN:     "a member port belongs to a port-based VLAN other than the default one",
 	lagRefusedBandwidth:    "a member port has a bandwidth limit",
@@ -160,7 +160,7 @@ func (c *Client) SetLAG(ctx context.Context, group LAGID, ports PortSet) error {
 
 // nameRefusal adds the reason to a *RejectedError whose code is in reasons; any other
 // error, and a refusal with an unknown code, is returned as it is.
-func nameRefusal(err error, reasons map[int32]string) error {
+func nameRefusal(err error, reasons map[ReplyCode]string) error {
 	var rejected *RejectedError
 	if errors.As(err, &rejected) {
 		if reason, ok := reasons[rejected.Code]; ok {

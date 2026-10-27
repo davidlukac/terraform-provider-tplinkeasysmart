@@ -71,7 +71,7 @@ func TestSpeedNameUnknownCode(t *testing.T) {
 // (switch 03, firmware 20250710, ports 3 and 4 in LAG1); the error must say why.
 func TestSetPortRefusalNamesTheLAGDuplexRule(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom, f.RejectCode = 1, lagRefusedHalfDuplex })
+	f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom, f.RejectCode = 1, int32(lagRefusedHalfDuplex) })
 	c := dialFake(t, f, "secret")
 	err := c.SetPort(context.Background(), PortConfig{ID: 3, Enabled: true, Speed: Speed100Half})
 	var rejected *RejectedError

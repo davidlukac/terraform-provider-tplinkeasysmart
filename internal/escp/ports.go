@@ -167,6 +167,6 @@ func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
 // portRefusals names the refusals of a port write that were provoked on a real switch
 // (firmware 20250710): half duplex on a port that is a member of a LAG. Half duplex on a
 // port that is not a member is accepted.
-var portRefusals = map[int32]string{
+var portRefusals = map[ReplyCode]string{
 	lagRefusedHalfDuplex: "the port is a member of a LAG, and LAG members must be full duplex",
 }

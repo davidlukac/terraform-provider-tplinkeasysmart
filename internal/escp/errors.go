@@ -63,12 +63,17 @@ func invalidf(format string, args ...any) error {
 	return &invalidError{msg: fmt.Sprintf(format, args...)}
 }
 
+// ReplyCode is the result code of a switch reply: zero when the request was accepted,
+// otherwise the code the switch gives for refusing it. Only some codes have a known cause
+// (see RejectedError.Reason); the rest are reported as they came.
+type ReplyCode int32
+
 // RejectedError is a write the switch answered with a non-zero code. It matches
 // ErrRejected (errors.Is) for callers that treat every refusal alike, and names the
 // code for those that want to know which one it was. Reason, when set, says why
 // the switch refused (only for codes whose cause has been established).
 type RejectedError struct {
-	Code   int32
+	Code   ReplyCode
 	Reason string
 }
 
