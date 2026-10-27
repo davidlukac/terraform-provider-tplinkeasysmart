@@ -44,5 +44,5 @@ type SwitchClient interface {
 	SetHostname(ctx context.Context, name escp.Hostname) error
 	SetIPConfig(ctx context.Context, cfg escp.IPConfig) error
 	EnableDHCP(ctx context.Context) error
-	ConfigBackup(ctx context.Context) ([]byte, error)
+	ConfigBackup(ctx context.Context) (escp.ConfigFile, error)
 }

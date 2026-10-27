@@ -93,7 +93,7 @@ if errors.As(err, &refused) { /* the gate refused; nothing was sent */ }
 | MTU VLAN | `MTUVLAN` | (through `SetVLANMode`) | `MTUVLAN` | |
 | Port-based VLAN | `PortBasedVLAN` | `SetPortBasedVLAN` | `PortBasedVLAN`, `PortVLAN` | traffic |
 | 802.1Q VLAN and PVID | `Dot1Q` | `SetVLAN8021Q`, `DeleteVLAN8021Q`, `SetPVIDs` | `Dot1Q`, `VLAN8021Q`, `PortPVID` | traffic, management |
-| Configuration file | `ConfigBackup` | (restore is not offered) | `[]byte` | |
+| Configuration file | `ConfigBackup` | (restore is not offered) | `ConfigFile` | |
 
 Deliberately **not** offered: user account, config restore, reboot, factory reset and firmware upgrade.
 
