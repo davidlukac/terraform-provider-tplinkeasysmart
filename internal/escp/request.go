@@ -40,7 +40,7 @@ func (c *Client) setTLVsSent(ctx context.Context, op Operation, tlvs ...wire.TLV
 	return true, c.withSession(ctx, func() error {
 		req := append([]wire.TLV{
 			{Type: wire.TLVUsername, Value: append([]byte(c.cfg.Username), 0)},
-			{Type: wire.TLVPassword, Value: append([]byte(c.cfg.Password), 0)},
+			{Type: wire.TLVPassword, Value: append([]byte(c.cfg.Password.Reveal()), 0)},
 		}, tlvs...)
 		r, err := c.exchange(ctx, wire.OpSet, req, false, []*net.UDPAddr{c.dest})
 		if err != nil {

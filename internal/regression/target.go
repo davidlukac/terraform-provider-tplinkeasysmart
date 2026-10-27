@@ -52,7 +52,7 @@ type Target struct {
 	Name     string
 	Host     string
 	Username string
-	Password string
+	Password escp.Password
 	// TestPorts are the ports a scenario may change: free, link-down, in no LAG.
 	TestPorts []escp.PortID
 	// ProtectedPorts (the uplink and the ports with devices) are named only by guard-refusal scenarios.
@@ -106,8 +106,8 @@ func LoadTarget(env map[string]string) (Target, error) {
 	default:
 		return Target{}, fmt.Errorf("unknown target %q (use %s or %s)", name, TargetFake, TargetSW03)
 	}
-	t := Target{Name: name, Host: env[envHost], Username: env[envUsername], Password: env[envPassword]}
-	for key, v := range map[string]string{envHost: t.Host, envUsername: t.Username, envPassword: t.Password} {
+	t := Target{Name: name, Host: env[envHost], Username: env[envUsername], Password: escp.Password(env[envPassword])}
+	for key, v := range map[string]string{envHost: t.Host, envUsername: t.Username, envPassword: env[envPassword]} {
 		if v == "" {
 			return Target{}, fmt.Errorf("%s is not set for target %s", key, name)
 		}

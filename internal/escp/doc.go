@@ -66,7 +66,7 @@
 // Reads (Ports, Dot1Q, QoS and the rest; named for what they return) cannot change the
 // switch. Writes are the methods named Set... and Delete...:
 //
-//	c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: pw})
+//	c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: escp.Password(pw)})
 //	if err != nil { ... }
 //	defer c.Close()
 //	ports, err := c.Ports(ctx)

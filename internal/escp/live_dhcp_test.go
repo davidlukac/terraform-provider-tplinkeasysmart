@@ -40,7 +40,7 @@ func TestLiveDHCPProbe(t *testing.T) {
 	obs := func(format string, args ...any) { t.Logf("OBS|"+format, args...) }
 	dial := func(host string) *Client {
 		t.Helper()
-		c, err := Dial(Config{Host: host, MAC: mac, Username: user, Password: pass, Timeout: 3 * time.Second})
+		c, err := Dial(Config{Host: host, MAC: mac, Username: user, Password: Password(pass), Timeout: 3 * time.Second})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -122,7 +122,7 @@ func TestLiveDHCPProbe(t *testing.T) {
 	obs("%s after DHCP on: ip %s mask %s gateway %s dhcp=%t", since(), leased.IP, leased.Netmask, leased.Gateway, leased.DHCP)
 
 	// 2. Is it still reachable and manageable at the lease? A client that has only the MAC finds it.
-	byMAC, err := Dial(Config{MAC: mac, Username: user, Password: pass, Timeout: 3 * time.Second})
+	byMAC, err := Dial(Config{MAC: mac, Username: user, Password: Password(pass), Timeout: 3 * time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}

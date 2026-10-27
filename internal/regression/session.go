@@ -144,7 +144,7 @@ func (s *Session) Factories() map[string]func() (tfprotov6.ProviderServer, error
 // ProviderHCL is the provider block of every scenario's configuration.
 func (s *Session) ProviderHCL() string {
 	return fmt.Sprintf("provider \"tplinkeasysmart\" {\n  host     = %q\n  username = %q\n  password = %q\n}\n",
-		s.Target.Host, s.Target.Username, s.Target.Password)
+		s.Target.Host, s.Target.Username, s.Target.Password.Reveal())
 }
 
 // ProviderHCLByMAC is the provider block naming the switch by its MAC address only: no address
@@ -154,7 +154,7 @@ func (s *Session) ProviderHCLByMAC(host, mac string) string {
 	if host != "" {
 		hostLine = fmt.Sprintf("  host     = %q\n", host)
 	}
-	return fmt.Sprintf("provider \"tplinkeasysmart\" {\n%s  mac      = %q\n  username = %q\n  password = %q\n}\n", hostLine, mac, s.Target.Username, s.Target.Password)
+	return fmt.Sprintf("provider \"tplinkeasysmart\" {\n%s  mac      = %q\n  username = %q\n  password = %q\n}\n", hostLine, mac, s.Target.Username, s.Target.Password.Reveal())
 }
 
 // Before is the readout taken when the session opened: what every scenario must leave behind.
