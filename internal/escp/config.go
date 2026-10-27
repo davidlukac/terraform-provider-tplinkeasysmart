@@ -51,7 +51,7 @@ type Config struct {
 	HostPort   int
 	// BroadcastAddr is where discovery probes go besides the switch's own address;
 	// default 255.255.255.255.
-	BroadcastAddr string
+	BroadcastAddr netip.Addr
 
 	// WriteGate, when set, is consulted before every write; see WriteGate.
 	WriteGate WriteGate

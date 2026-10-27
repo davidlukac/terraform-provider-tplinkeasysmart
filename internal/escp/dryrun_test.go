@@ -21,7 +21,7 @@ func TestDryRunThroughTheRealClient(t *testing.T) {
 	dry := safety.NewDryRun()
 	c, err := escp.Dial(escp.Config{
 		Host: "127.0.0.1", Username: escptest.Username, Password: escptest.Password,
-		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: "127.0.0.1",
+		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback,
 		WriteGate: safety.Chain(safety.FirmwareGate(), safety.MaxImpact(escp.ImpactTraffic), dry.Gate()),
 	})
 	if err != nil {
@@ -65,7 +65,7 @@ func TestDryRunOfAWriteThatReadsFirst(t *testing.T) {
 	dry := safety.NewDryRun()
 	c, err := escp.Dial(escp.Config{
 		Host: "127.0.0.1", Username: escptest.Username, Password: escptest.Password,
-		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: "127.0.0.1",
+		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback,
 		WriteGate: dry.Gate(),
 	})
 	if err != nil {
@@ -107,7 +107,7 @@ func TestPortGateThroughTheRealClient(t *testing.T) {
 	})
 	c, err := escp.Dial(escp.Config{
 		Host: "127.0.0.1", Username: escptest.Username, Password: escptest.Password,
-		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: "127.0.0.1",
+		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback,
 		WriteGate: safety.PortGate(),
 	})
 	if err != nil {

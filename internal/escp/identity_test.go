@@ -3,7 +3,9 @@ package escp
 import (
 	"context"
 	"errors"
+	"net"
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,7 +26,7 @@ var (
 func dialMAC(t *testing.T, f *escptest.Switch, host string, mac MAC, locator func(MAC) (Info, error)) (*Client, *int) {
 	t.Helper()
 	c := newBoundClient(t, Config{Host: host, MAC: mac, Username: "admin", Password: "secret", Timeout: 150 * time.Millisecond, Retries: NoRetries,
-		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
+		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback})
 	c.allowLoopback = true
 	calls := new(int)
 	c.locator = func(_ context.Context, m MAC) (Info, error) {
@@ -106,7 +108,7 @@ func TestADeviceWithAnotherMACIsNeverWrittenTo(t *testing.T) {
 	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("nothing may be written to the wrong device, got %d writes", n)
 	}
-	if got := wrong.Error(); got == "" || wrong.IP == nil {
+	if got := wrong.Error(); got == "" || wrong.IP != escptest.Loopback || !strings.Contains(got, " at 127.0.0.1") {
 		t.Fatalf("the error names both addresses and where the device is: %q %v", got, wrong.IP)
 	}
 }
@@ -236,5 +238,29 @@ func TestADeadAddressGetsAShortBudgetBeforeTheLookup(t *testing.T) {
 	cancel()
 	if _, err := c.Info(ctx); !errors.Is(err, context.Canceled) || *calls != 0 {
 		t.Fatalf("a cancelled call must not look the switch up: %v after %d lookups", err, *calls)
+	}
+}
+
+func TestWrongSwitchErrorWithoutAnAddress(t *testing.T) {
+	err := &WrongSwitchError{Want: MAC{1, 2, 3, 4, 5, 6}, Got: MAC{6, 5, 4, 3, 2, 1}}
+	if got := err.Error(); strings.Contains(got, " at ") || !errors.Is(err, ErrWrongSwitch) {
+		t.Fatalf("an unknown address is left out of the message: %q", got)
+	}
+}
+
+func TestAddrOf(t *testing.T) {
+	for name, tc := range map[string]struct {
+		in   net.IP
+		want netip.Addr
+	}{
+		"nil":              {nil, netip.Addr{}},
+		"not an address":   {net.IP{1, 2, 3}, netip.Addr{}},
+		"IPv4 in 4 bytes":  {net.IP{192, 0, 2, 1}, netip.MustParseAddr("192.0.2.1")},
+		"IPv4 in 16 bytes": {net.IPv4(192, 0, 2, 1), netip.MustParseAddr("192.0.2.1")},
+		"IPv6 stays IPv6":  {net.ParseIP("fe80::1"), netip.MustParseAddr("fe80::1")},
+	} {
+		if got := addrOf(tc.in); got != tc.want {
+			t.Errorf("%s: addrOf(%v) = %v, want %v", name, tc.in, got, tc.want)
+		}
 	}
 }

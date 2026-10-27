@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"slices"
 	"strconv"
 	"time"
@@ -68,7 +69,7 @@ type discoverEnv struct {
 type netInterface struct {
 	Name       string
 	MAC        MAC
-	Broadcasts []net.IP // subnet broadcast address of each IPv4 address
+	Broadcasts []netip.Addr // subnet broadcast address of each IPv4 address
 }
 
 // usableInterfaces keeps the interfaces a probe can leave through. addrs lists the addresses
@@ -87,7 +88,7 @@ func usableInterfaces(all []net.Interface, addrs func(net.Interface) ([]net.Addr
 		u := netInterface{Name: ifc.Name}
 		copy(u.MAC[:], ifc.HardwareAddr)
 		for _, a := range list {
-			if b := subnetBroadcast(a); b != nil {
+			if b := subnetBroadcast(a); b.IsValid() {
 				u.Broadcasts = append(u.Broadcasts, b)
 			}
 		}
@@ -98,23 +99,23 @@ func usableInterfaces(all []net.Interface, addrs func(net.Interface) ([]net.Addr
 	return out
 }
 
-// subnetBroadcast returns the broadcast address of an IPv4 network address, or nil for
+// subnetBroadcast returns the broadcast address of an IPv4 network address, or the invalid Addr for
 // anything else (IPv6, and /31 or /32 networks, which have no broadcast address).
-func subnetBroadcast(a net.Addr) net.IP {
+func subnetBroadcast(a net.Addr) netip.Addr {
 	n, ok := a.(*net.IPNet)
 	if !ok {
-		return nil
+		return netip.Addr{}
 	}
 	ip := n.IP.To4()
 	ones, bits := n.Mask.Size()
 	if ip == nil || bits != 8*net.IPv4len || ones >= bits-1 {
-		return nil
+		return netip.Addr{}
 	}
-	b := make(net.IP, net.IPv4len)
+	var b [net.IPv4len]byte
 	for i := range b {
 		b[i] = ip[i] | ^n.Mask[len(n.Mask)-net.IPv4len+i]
 	}
-	return b
+	return netip.AddrFrom4(b)
 }
 
 // hostInterfaces lists the usable interfaces of this host.
@@ -198,7 +199,7 @@ func discoverUntil(ctx context.Context, opts DiscoverOptions, env discoverEnv, d
 	var probes []probe
 	for _, ifc := range chosen {
 		for _, b := range ifc.Broadcasts {
-			probes = append(probes, probe{to: &net.UDPAddr{IP: b, Port: env.switchPort}, mac: ifc.MAC})
+			probes = append(probes, probe{to: &net.UDPAddr{IP: net.IP(b.AsSlice()), Port: env.switchPort}, mac: ifc.MAC})
 		}
 	}
 	return collectReplies(ctx, env, probes, window, done)

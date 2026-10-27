@@ -130,7 +130,7 @@ func TestMyCode(t *testing.T) {
 	f := escptest.Start(t)
 	f.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full}) // a stateful switch that enforces the measured rules
 	c, _ := escp.Dial(escp.Config{Host: "127.0.0.1", SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t),
-		BroadcastAddr: "127.0.0.1", Username: escptest.Username, Password: escptest.Password})
+		BroadcastAddr: escptest.Loopback, Username: escptest.Username, Password: escptest.Password})
 	// ... use c, then ask f what it received: f.WriteCount(), f.AllSets()
 }
 ```

@@ -189,7 +189,7 @@ func TestSetIPConfigDoesNotClaimTheWriteWasNotAppliedWhenCancelled(t *testing.T)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 5 * time.Second,
-		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
+		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
 		// the gate lets the write go, then the caller gives up before it is sent
 		WriteGate: func(context.Context, InfoReader, Operation) error { cancel(); return nil }})
 	c.allowLoopback = true
@@ -223,7 +223,7 @@ func TestSetIPConfigDoesNotProbeAfterARefusal(t *testing.T) {
 	t.Run("the gate refuses", func(t *testing.T) {
 		f := escptest.Start(t)
 		c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-			SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
+			SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
 			WriteGate: func(context.Context, InfoReader, Operation) error { return errGateRefused }})
 		c.allowLoopback = true
 		t.Cleanup(func() { c.Close() })

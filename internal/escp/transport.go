@@ -65,7 +65,7 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 	}
 	if got := MAC(h.SwitchMAC); !c.cfg.MAC.IsZero() && !got.IsZero() && got != c.cfg.MAC {
 		// the address answers, but it is another device: remember it and let exchange say so
-		c.wrong = &WrongSwitchError{Want: c.cfg.MAC, Got: got, IP: from.IP}
+		c.wrong = &WrongSwitchError{Want: c.cfg.MAC, Got: got, IP: addrOf(from.IP)}
 		return reply{}, false
 	}
 	if !c.haveSwMAC {
@@ -226,5 +226,5 @@ func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV
 }
 
 func (c *Client) discoverTargets() []*net.UDPAddr {
-	return []*net.UDPAddr{c.dest, {IP: net.ParseIP(c.cfg.BroadcastAddr), Port: c.cfg.SwitchPort}}
+	return []*net.UDPAddr{c.dest, {IP: net.IP(c.cfg.BroadcastAddr.AsSlice()), Port: c.cfg.SwitchPort}}
 }

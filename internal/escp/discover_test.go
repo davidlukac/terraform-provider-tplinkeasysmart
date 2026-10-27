@@ -92,7 +92,7 @@ func loopbackEnv(t *testing.T, r *responder, hostPort int, ifaces ...netInterfac
 var (
 	macOne = MAC{2, 0, 0, 0, 0, 1}
 	macTwo = MAC{2, 0, 0, 0, 0, 2}
-	lo     = []net.IP{net.IPv4(127, 0, 0, 1)}
+	lo     = []netip.Addr{netip.MustParseAddr("127.0.0.1")}
 )
 
 func TestDiscoverReturnsEveryDistinctSwitchSortedByAddress(t *testing.T) {
@@ -227,7 +227,7 @@ func TestDiscoverSurvivesOneInterfaceThatCannotSend(t *testing.T) {
 		return [][]byte{packet(wire.OpReply, h.Seq, discoverTLVs([6]byte{1, 2, 3, 4, 5, 6}, [4]byte{192, 0, 2, 7}, "sw"))}
 	})
 	env := loopbackEnv(t, r, hostPort,
-		netInterface{Name: "bad", MAC: macOne, Broadcasts: []net.IP{net.IPv4(192, 0, 2, 255)}},
+		netInterface{Name: "bad", MAC: macOne, Broadcasts: []netip.Addr{netip.MustParseAddr("192.0.2.255")}},
 		netInterface{Name: "en0", MAC: macTwo, Broadcasts: lo})
 	env.write = func(conn *net.UDPConn, pkt []byte, to *net.UDPAddr) error {
 		if to.IP.Equal(net.IPv4(192, 0, 2, 255)) {
@@ -344,7 +344,7 @@ func TestUsableInterfaces(t *testing.T) {
 		}
 		return addrs[i.Name], nil
 	})
-	want := []netInterface{{Name: "en0", MAC: macOne, Broadcasts: []net.IP{net.IPv4(192, 168, 1, 255).To4(), net.IPv4(10, 0, 255, 255).To4()}}}
+	want := []netInterface{{Name: "en0", MAC: macOne, Broadcasts: []netip.Addr{netip.MustParseAddr("192.168.1.255"), netip.MustParseAddr("10.0.255.255")}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v\nwant %+v", got, want)
 	}
@@ -369,7 +369,7 @@ func TestSubnetBroadcast(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got := subnetBroadcast(tc.addr)
 			if tc.want == "" {
-				if got != nil {
+				if got.IsValid() {
 					t.Fatalf("got %v, want none", got)
 				}
 				return
