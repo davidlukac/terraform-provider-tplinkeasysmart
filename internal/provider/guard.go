@@ -21,16 +21,20 @@ type portLister interface {
 // guardPorts refuses to touch ports that carry a link or belong to a LAG unless
 // the caller explicitly opted in. Writes to such ports can cut the management
 // path or the uplink, and the switch has no console to recover from that.
-func guardPorts(ctx context.Context, c portLister, allowDisruptive bool, ports ...int) error {
+func guardPorts(ctx context.Context, c portLister, allowDisruptive bool, named ...escp.PortID) error {
 	if allowDisruptive {
-		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped", map[string]any{"ports": ports})
+		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped", map[string]any{"ports": named})
 		return nil
+	}
+	ports, err := escp.NewPortSet(named...)
+	if err != nil { // a port number no switch has is not "free": refuse, as for a port the switch does not list
+		return err
 	}
 	all, err := c.Ports(ctx)
 	if err != nil {
 		return fmt.Errorf("cannot check whether the port is in use: %w", err)
 	}
-	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{}, ports...), func(used *safety.PortUseError) error {
+	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{}, ports), func(used *safety.PortUseError) error {
 		switch used.Reason {
 		case safety.PortMissing:
 			return errors.New(used.Error())

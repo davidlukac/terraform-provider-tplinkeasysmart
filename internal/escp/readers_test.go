@@ -61,7 +61,7 @@ func readCases() []readCase {
 			script:   map[int16][]wire.TLV{wire.TLVLAG: {th(wire.TLVLAG, "0100000003"), th(wire.TLVLAG, "0200000000")}},
 			requests: [][]int16{{wire.TLVLAG}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.LAGs(ctx) },
-			want:     []LAG{{ID: 1, Ports: []int{1, 2}}, {ID: 2, Ports: []int{}}},
+			want:     []LAG{{ID: 1, Ports: MustPortSet(1, 2)}, {ID: 2, Ports: 0}},
 			bad:      map[int16][]wire.TLV{wire.TLVLAG: {{Type: wire.TLVLAG, Value: []byte{1}}}},
 		},
 		{
@@ -72,7 +72,7 @@ func readCases() []readCase {
 			},
 			requests: [][]int16{{wire.TLVIGMPEnabled}, {wire.TLVIGMPGroups}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.IGMP(ctx) },
-			want:     IGMP{Enabled: true, Groups: []IGMPGroup{{IP: "239.255.255.250", VLAN: 1, Ports: []int{1, 4}}}},
+			want:     IGMP{Enabled: true, Groups: []IGMPGroup{{IP: "239.255.255.250", VLAN: 1, Ports: MustPortSet(1, 4)}}},
 			bad: map[int16][]wire.TLV{
 				wire.TLVIGMPEnabled: {th(wire.TLVIGMPEnabled, "01")},
 				wire.TLVIGMPGroups:  {{Type: wire.TLVIGMPGroups, Value: make([]byte, 7)}},
@@ -91,7 +91,7 @@ func readCases() []readCase {
 			script:   map[int16][]wire.TLV{wire.TLVMirror: {th(wire.TLVMirror, "01080000000300000004")}},
 			requests: [][]int16{{wire.TLVMirror}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.PortMirror(ctx) },
-			want:     Mirror{Enabled: true, MirrorPort: 8, IngressPorts: []int{1, 2}, EgressPorts: []int{3}},
+			want:     Mirror{Enabled: true, MirrorPort: 8, IngressPorts: MustPortSet(1, 2), EgressPorts: MustPortSet(3)},
 			bad:      map[int16][]wire.TLV{wire.TLVMirror: {{Type: wire.TLVMirror, Value: []byte{1, 2, 3}}}},
 		},
 		{
@@ -108,7 +108,7 @@ func readCases() []readCase {
 				th(wire.TLVVLANPortBased, "01"), th(wire.TLVVLANPortBasedVID, "01000000ff"), th(wire.TLVVLANPortBasedMax, "08")}},
 			requests: [][]int16{{wire.TLVVLANPortBased}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.PortBasedVLAN(ctx) },
-			want:     PortBasedVLAN{Enabled: true, MaxVLAN: 8, VLANs: []PortVLAN{{ID: 1, Ports: []int{1, 2, 3, 4, 5, 6, 7, 8}}}},
+			want:     PortBasedVLAN{Enabled: true, MaxVLAN: 8, VLANs: []PortVLAN{{ID: 1, Ports: MustPortSet(1, 2, 3, 4, 5, 6, 7, 8)}}},
 			bad: map[int16][]wire.TLV{wire.TLVVLANPortBased: {
 				th(wire.TLVVLANPortBased, "01"), {Type: wire.TLVVLANPortBasedVID, Value: []byte{1}}}},
 		},

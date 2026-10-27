@@ -11,13 +11,13 @@ import (
 
 // PortBandwidth holds a port's rate limits in kbps; 0 means unlimited.
 type PortBandwidth struct {
-	Port        int
+	Port        PortID
 	IngressKbps int
 	EgressKbps  int
 }
 
 func parseBandwidth(tlvs []wire.TLV) ([]PortBandwidth, error) {
-	byPort := map[int]*PortBandwidth{}
+	byPort := map[PortID]*PortBandwidth{}
 	for _, t := range tlvs {
 		if t.Type != wire.TLVBandwidthIngress && t.Type != wire.TLVBandwidthEgress {
 			continue
@@ -25,7 +25,7 @@ func parseBandwidth(tlvs []wire.TLV) ([]PortBandwidth, error) {
 		if len(t.Value) != bwEntryLen {
 			return nil, fmt.Errorf("escp: bandwidth entry has %d bytes, want %d", len(t.Value), bwEntryLen)
 		}
-		port, rate := int(t.Value[bwOffPort]), int(binary.BigEndian.Uint32(t.Value[bwOffRate:]))
+		port, rate := PortID(t.Value[bwOffPort]), int(binary.BigEndian.Uint32(t.Value[bwOffRate:]))
 		pb := byPort[port]
 		if pb == nil {
 			pb = &PortBandwidth{Port: port}
@@ -70,7 +70,7 @@ const (
 // MaxBandwidthKbps is the largest limit the web UI offers.
 const MaxBandwidthKbps = 1000000
 
-func bandwidthTLV(typ int16, port, kbps int) (wire.TLV, error) {
+func bandwidthTLV(typ int16, port PortID, kbps int) (wire.TLV, error) {
 	if !validateRateKbps(kbps) {
 		return wire.TLV{}, invalidf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", kbps, port, RateStepKbps, MaxBandwidthKbps)
 	}
@@ -89,7 +89,7 @@ func bandwidthTLV(typ int16, port, kbps int) (wire.TLV, error) {
 // it; callers must guard against that. The two requests are not atomic: if the second
 // fails (or its gate refuses, or the call is cancelled) the ingress limit stays applied.
 func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error {
-	if err := ValidatePort(limit.Port); err != nil {
+	if err := limit.Port.Validate(); err != nil {
 		return err
 	}
 	in, err := bandwidthTLV(wire.TLVBandwidthIngress, limit.Port, limit.IngressKbps)
@@ -100,10 +100,10 @@ func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error {
 	if err != nil {
 		return err
 	}
-	if err := c.requirePorts(ctx, limit.Port); err != nil {
+	if err := c.requirePorts(ctx, limit.Port.set()); err != nil {
 		return err
 	}
-	op := Operation{Name: "SetBandwidth", Ports: []int{limit.Port}, Impact: ImpactTraffic}
+	op := Operation{Name: "SetBandwidth", Ports: limit.Port.set(), Impact: ImpactTraffic}
 	if err := c.setTLVs(ctx, op, in); err != nil {
 		return err
 	}

@@ -74,22 +74,22 @@ func FuzzPortMaskRoundTrip(f *testing.F) {
 	f.Add([]byte{})
 	f.Add([]byte{32, 31, 1})
 	f.Fuzz(func(t *testing.T, raw []byte) {
-		var ports []int
-		want := map[int]bool{}
+		var ports []PortID
+		want := map[PortID]bool{}
 		for _, b := range raw {
-			p := int(b)%MaxPort + 1
+			p := PortID(int(b)%MaxPort + 1)
 			ports = append(ports, p)
 			want[p] = true
 		}
-		mask, err := maskFromPorts(ports)
+		set, err := NewPortSet(ports...)
 		if err != nil {
 			t.Fatalf("ports 1-%d must always be accepted: %v", MaxPort, err)
 		}
-		got := portsFromMask(mask)
-		if len(got) != len(want) || !sort.IntsAreSorted(got) {
+		got := PortSetFromMask(set.Mask())
+		if got != set || got.Len() != len(want) || !sort.SliceIsSorted(got.Ports(), func(i, j int) bool { return got.Ports()[i] < got.Ports()[j] }) {
 			t.Fatalf("round trip of %v gave %v", ports, got)
 		}
-		for _, p := range got {
+		for _, p := range got.Ports() {
 			if !want[p] {
 				t.Fatalf("port %d appeared from nowhere (%v -> %v)", p, ports, got)
 			}

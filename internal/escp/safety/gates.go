@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"sync"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
@@ -82,7 +81,6 @@ func (d *DryRun) Gate() escp.WriteGate {
 	return func(_ context.Context, _ escp.InfoReader, op escp.Operation) error {
 		d.mu.Lock()
 		defer d.mu.Unlock()
-		op.Ports = slices.Clone(op.Ports)
 		d.ops = append(d.ops, op)
 		return ErrDryRun
 	}
@@ -93,9 +91,6 @@ func (d *DryRun) Operations() []escp.Operation {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	out := make([]escp.Operation, len(d.ops))
-	for i, op := range d.ops {
-		op.Ports = slices.Clone(op.Ports)
-		out[i] = op
-	}
+	copy(out, d.ops)
 	return out
 }

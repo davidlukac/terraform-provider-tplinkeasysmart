@@ -96,7 +96,7 @@ func (r *portResource) Configure(_ context.Context, req resource.ConfigureReques
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func (r *portResource) find(ctx context.Context, id int) (escp.Port, bool, error) {
+func (r *portResource) find(ctx context.Context, id escp.PortID) (escp.Port, bool, error) {
 	ports, err := r.client.Ports(ctx)
 	if err != nil {
 		return escp.Port{}, false, err
@@ -116,7 +116,7 @@ func (r *portResource) apply(ctx context.Context, m *portResourceModel, add func
 }
 
 func (r *portResource) applyBound(ctx context.Context, m *portResourceModel, add func(string, string)) bool {
-	id := int(m.Port.ValueInt64())
+	id := escp.PortID(m.Port.ValueInt64())
 	if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), id); err != nil {
 		add("Refusing to change port", err.Error())
 		return false
@@ -161,7 +161,7 @@ func (r *portResource) readBound(ctx context.Context, req resource.ReadRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	got, ok, err := r.find(ctx, int(state.Port.ValueInt64()))
+	got, ok, err := r.find(ctx, escp.PortID(state.Port.ValueInt64()))
 	if err != nil {
 		resp.Diagnostics.AddError("Reading port failed", err.Error())
 		return

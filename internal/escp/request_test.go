@@ -45,22 +45,22 @@ func TestWritersRefusePortsTheSwitchDoesNotHave(t *testing.T) {
 		{"SetBandwidth", func(c *Client) error { return c.SetBandwidth(ctx, PortBandwidth{Port: 9}) }},
 		{"SetStormControl", func(c *Client) error { return c.SetStormControl(ctx, StormConfig{Port: 9}) }},
 		{"SetPortMirror destination", func(c *Client) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 9, IngressPorts: []int{2}})
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 9, IngressPorts: MustPortSet(2)})
 		}},
 		{"SetPortMirror ingress", func(c *Client) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, IngressPorts: []int{9}})
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, IngressPorts: MustPortSet(9)})
 		}},
 		{"SetPortMirror egress", func(c *Client) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, EgressPorts: []int{9}})
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, EgressPorts: MustPortSet(9)})
 		}},
-		{"SetPortBasedVLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, 2, []int{2, 9}) }},
+		{"SetPortBasedVLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, 2, MustPortSet(2, 9)) }},
 		{"SetVLAN8021Q tagged", func(c *Client) error {
-			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Tagged: []int{9}, Untagged: []int{2}})
+			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Tagged: MustPortSet(9), Untagged: MustPortSet(2)})
 		}},
 		{"SetVLAN8021Q untagged", func(c *Client) error {
-			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Untagged: []int{9}})
+			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Untagged: MustPortSet(9)})
 		}},
-		{"SetPVIDs", func(c *Client) error { return c.SetPVIDs(ctx, map[int]int{2: 1, 9: 1}) }},
+		{"SetPVIDs", func(c *Client) error { return c.SetPVIDs(ctx, map[PortID]int{2: 1, 9: 1}) }},
 		{"SetVLANMode", func(c *Client) error {
 			return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 9})
 		}},
@@ -90,7 +90,7 @@ func TestSetLAGRefusesPortsBeyondASmallerSwitch(t *testing.T) {
 	var reads atomic.Int32
 	countingPorts(f, 4, &reads)
 	c := dialFake(t, f, "secret")
-	err := c.SetLAG(context.Background(), 2, []int{5, 6})
+	err := c.SetLAG(context.Background(), 2, MustPortSet(5, 6))
 	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "port 5 does not exist: this switch has 4 ports") {
 		t.Fatalf("got %v", err)
 	}
@@ -138,14 +138,14 @@ func TestPortCountIsReadOnce(t *testing.T) {
 	if err := c.SetLED(ctx, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.SetLAG(ctx, 1, nil); err != nil { // removing a group names no ports
+	if err := c.SetLAG(ctx, 1, 0); err != nil { // removing a group names no ports
 		t.Fatal(err)
 	}
 	if n := reads.Load(); n != 0 {
 		t.Fatalf("no port was named, yet the port count was read %d time(s)", n)
 	}
 	for _, id := range []int{2, 3, 4} {
-		if err := c.SetPort(ctx, PortConfig{ID: id, Enabled: true, Speed: SpeedAuto}); err != nil {
+		if err := c.SetPort(ctx, PortConfig{ID: PortID(id), Enabled: true, Speed: SpeedAuto}); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -42,13 +42,13 @@ func TestDryRunThroughTheRealClient(t *testing.T) {
 	}
 	// a write above the ceiling is refused before the dry run sees it
 	var tooMuch *safety.ImpactError
-	if err := c.SetLAG(ctx, 1, []int{2, 3}); !errors.As(err, &tooMuch) || tooMuch.Op.Name != "SetLAG" {
+	if err := c.SetLAG(ctx, 1, escp.MustPortSet(2, 3)); !errors.As(err, &tooMuch) || tooMuch.Op.Name != "SetLAG" {
 		t.Fatalf("SetLAG: got %v, want an *ImpactError for SetLAG", err)
 	}
 
 	want := []escp.Operation{
-		{Name: "SetPort", Ports: []int{3}, Impact: escp.ImpactTraffic},
-		{Name: "SetBandwidth", Ports: []int{4}, Impact: escp.ImpactTraffic}, // two SETs, one operation: the first refusal ends it
+		{Name: "SetPort", Ports: escp.MustPortSet(3), Impact: escp.ImpactTraffic},
+		{Name: "SetBandwidth", Ports: escp.MustPortSet(4), Impact: escp.ImpactTraffic}, // two SETs, one operation: the first refusal ends it
 		{Name: "SetLED", Impact: escp.ImpactCosmetic},
 	}
 	if got := dry.Operations(); !reflect.DeepEqual(got, want) {
@@ -72,10 +72,10 @@ func TestDryRunOfAWriteThatReadsFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = c.Close() })
-	if err := c.SetPortPriorities(context.Background(), map[int]escp.Priority{5: escp.PriorityHighest, 2: escp.PriorityLowest}); !errors.Is(err, safety.ErrDryRun) {
+	if err := c.SetPortPriorities(context.Background(), map[escp.PortID]escp.Priority{5: escp.PriorityHighest, 2: escp.PriorityLowest}); !errors.Is(err, safety.ErrDryRun) {
 		t.Fatalf("got %v, want ErrDryRun", err)
 	}
-	want := []escp.Operation{{Name: "SetPortPriorities", Ports: []int{2, 5}, Impact: escp.ImpactTraffic}}
+	want := []escp.Operation{{Name: "SetPortPriorities", Ports: escp.MustPortSet(2, 5), Impact: escp.ImpactTraffic}}
 	if got := dry.Operations(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("recorded %+v, want %+v", got, want)
 	}
@@ -121,7 +121,7 @@ func TestPortGateThroughTheRealClient(t *testing.T) {
 		t.Fatalf("disabling the uplink: got %v, want a link-up refusal for port 1", err)
 	}
 	// removing LAG 1 names no port, yet its member carries the link
-	if err := c.SetLAG(ctx, 1, nil); !errors.As(err, &used) || used.Port != 1 {
+	if err := c.SetLAG(ctx, 1, 0); !errors.As(err, &used) || used.Port != 1 {
 		t.Fatalf("removing LAG 1: got %v, want a refusal for port 1", err)
 	}
 	if n := f.WriteCount(); n != 0 {

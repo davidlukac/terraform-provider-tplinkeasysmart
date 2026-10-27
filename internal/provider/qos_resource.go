@@ -40,7 +40,7 @@ type qosResource struct {
 // qosClient is the part of the switch API this resource needs.
 type qosClient interface {
 	QoS(ctx context.Context) (escp.QoS, error)
-	SetPortPriorities(ctx context.Context, changes map[int]escp.Priority) error
+	SetPortPriorities(ctx context.Context, changes map[escp.PortID]escp.Priority) error
 	SetQoSMode(ctx context.Context, mode escp.QoSMode) error
 }
 
@@ -85,7 +85,7 @@ func (r *qosResource) Configure(_ context.Context, req resource.ConfigureRequest
 func qosState(sw types.String, q escp.QoS, managed map[string]struct{}) qosResourceModel {
 	vals := map[string]attr.Value{}
 	for _, p := range q.Priorities {
-		k := strconv.Itoa(p.Port)
+		k := p.Port.String()
 		if _, ok := managed[k]; ok {
 			vals[k] = types.Int64Value(int64(p.Priority))
 		}
@@ -107,7 +107,7 @@ func (r *qosResource) applyBound(ctx context.Context, plan *qosResourceModel, ad
 		add("Invalid QoS mode", fmt.Sprintf("%q is not one of %s", plan.Mode.ValueString(), strings.Join(qosModeNames(), ", ")))
 		return false
 	}
-	want := map[int]escp.Priority{}
+	want := map[escp.PortID]escp.Priority{}
 	managed := map[string]struct{}{}
 	for k, v := range plan.Priorities.Elements() {
 		port, err := strconv.Atoi(k)
@@ -115,7 +115,7 @@ func (r *qosResource) applyBound(ctx context.Context, plan *qosResourceModel, ad
 			add("Invalid port key", fmt.Sprintf("port_priorities key %q is not a port number", k))
 			return false
 		}
-		want[port] = escp.Priority(v.(types.Int64).ValueInt64())
+		want[escp.PortID(port)] = escp.Priority(v.(types.Int64).ValueInt64())
 		managed[k] = struct{}{}
 	}
 	if problem := qosProblem(plan.Mode, plan.Priorities); problem != "" {

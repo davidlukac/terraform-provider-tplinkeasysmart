@@ -58,15 +58,14 @@ const (
 type Operation struct {
 	// Name is the name of the client method that is writing ("SetPort", "SetLAG").
 	Name string
-	// Ports are the ports the write names, in the order the method received them: the
-	// mirror's destination and sources, the members of a LAG or a VLAN, the port of a
-	// port setting. Empty for a write that names none. The gate gets its own copy.
+	// Ports are the ports the write names: the mirror's destination and sources, the members
+	// of a LAG or a VLAN, the port of a port setting. Empty for a write that names none.
 	//
 	// These are the ports named, not every port affected: a write that replaces a group
 	// (Replaces below) also takes the ports away that were members before and are not
 	// named now, and removing a group names none. A gate that has to protect those ports
 	// reads the group's members itself (safety.PortGate does).
-	Ports []int
+	Ports PortSet
 	// Impact is the class of the method; see Impact. It is an upper bound for the method,
 	// not a verdict on these arguments: it does not know which port is the uplink.
 	Impact Impact

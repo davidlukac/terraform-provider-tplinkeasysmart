@@ -11,13 +11,13 @@ import (
 type VLAN8021Q struct {
 	ID       int
 	Name     string
-	Tagged   []int
-	Untagged []int
+	Tagged   PortSet
+	Untagged PortSet
 }
 
 // PortPVID is the default VLAN of a port.
 type PortPVID struct {
-	Port int
+	Port PortID
 	PVID int
 }
 
@@ -27,20 +27,6 @@ type Dot1Q struct {
 	MaxVLAN int
 	VLANs   []VLAN8021Q
 	PVIDs   []PortPVID
-}
-
-func subtractPorts(all, minus []int) []int {
-	m := map[int]bool{}
-	for _, p := range minus {
-		m[p] = true
-	}
-	out := []int{}
-	for _, p := range all {
-		if !m[p] {
-			out = append(out, p)
-		}
-	}
-	return out
 }
 
 func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
@@ -63,15 +49,15 @@ func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
 				return out, fmt.Errorf("escp: 802.1Q VLAN entry has %d bytes, want at least %d", len(v), vlan8021QOffName)
 			}
 			// Vendor semantics: member and tagged-mask -> tagged; member only -> untagged.
-			members, taggedMask := portsFromMask(v[vlan8021QOffMember:]), portsFromMask(v[vlan8021QOffTagged:])
-			untagged := subtractPorts(members, taggedMask)
+			members, taggedMask := PortSetFromMask(v[vlan8021QOffMember:]), PortSetFromMask(v[vlan8021QOffTagged:])
+			untagged := members.Minus(taggedMask)
 			out.VLANs = append(out.VLANs, VLAN8021Q{ID: int(v[0])<<8 | int(v[1]), Name: wire.CString(v[vlan8021QOffName:]),
-				Tagged: subtractPorts(members, untagged), Untagged: untagged})
+				Tagged: members.Minus(untagged), Untagged: untagged})
 		case wire.TLVVLAN8021QPVID:
 			if len(v) != pvidEntryLen {
 				return out, fmt.Errorf("escp: 802.1Q PVID entry has %d bytes, want %d", len(v), pvidEntryLen)
 			}
-			out.PVIDs = append(out.PVIDs, PortPVID{Port: int(v[0]), PVID: int(v[1])<<8 | int(v[2])})
+			out.PVIDs = append(out.PVIDs, PortPVID{Port: PortID(v[0]), PVID: int(v[1])<<8 | int(v[2])})
 		}
 	}
 	if !seen {

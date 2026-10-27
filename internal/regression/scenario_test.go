@@ -188,7 +188,7 @@ func TestScenarioQoS(t *testing.T) {
 	}
 	var origPrio escp.Priority
 	for _, p := range orig.Priorities {
-		if p.Port == port {
+		if int(p.Port) == port {
 			origPrio = p.Priority
 		}
 	}
@@ -206,7 +206,7 @@ func TestScenarioQoS(t *testing.T) {
 			return fmt.Errorf("QoS on the switch = %+v, err %w, want port-based", got, err)
 		}
 		for _, p := range got.Priorities {
-			if p.Port == port && p.Priority != changed {
+			if int(p.Port) == port && p.Priority != changed {
 				return fmt.Errorf("port %d priority = %d, want %d", port, p.Priority, changed)
 			}
 		}
@@ -223,7 +223,7 @@ func TestScenarioPort(t *testing.T) {
 	}
 	var orig escp.Port
 	for _, p := range ports {
-		if p.ID == port {
+		if int(p.ID) == port {
 			orig = p
 		}
 	}
@@ -240,7 +240,7 @@ func TestScenarioPort(t *testing.T) {
 			return err
 		}
 		for _, p := range got {
-			if p.ID == port && p.ConfiguredSpeed != changed {
+			if int(p.ID) == port && p.ConfiguredSpeed != changed {
 				return fmt.Errorf("port %d speed = %s, want %s", port, p.ConfiguredSpeed, changed)
 			}
 		}
@@ -257,7 +257,7 @@ func TestScenarioBandwidthLimit(t *testing.T) {
 	}
 	var was escp.PortBandwidth
 	for _, b := range orig {
-		if b.Port == port {
+		if int(b.Port) == port {
 			was = b
 		}
 	}
@@ -270,7 +270,7 @@ func TestScenarioBandwidthLimit(t *testing.T) {
 			return err
 		}
 		for _, b := range got {
-			if b.Port == port && (b.IngressKbps != 10240 || b.EgressKbps != 5120) {
+			if int(b.Port) == port && (b.IngressKbps != 10240 || b.EgressKbps != 5120) {
 				return fmt.Errorf("port %d limits = %+v, want 10240 in, 5120 out", port, b)
 			}
 		}
@@ -287,7 +287,7 @@ func TestScenarioStormLimit(t *testing.T) {
 	}
 	var was escp.PortStorm
 	for _, p := range orig {
-		if p.Port == port {
+		if int(p.Port) == port {
 			was = p
 		}
 	}
@@ -300,7 +300,7 @@ func TestScenarioStormLimit(t *testing.T) {
 			return err
 		}
 		for _, p := range got {
-			if p.Port == port && (!p.Multicast || !p.Broadcast || p.RateKbps != 1024) {
+			if int(p.Port) == port && (!p.Multicast || !p.Broadcast || p.RateKbps != 1024) {
 				return fmt.Errorf("port %d storm control = %+v, want multicast and broadcast at 1024", port, p)
 			}
 		}
@@ -326,7 +326,7 @@ func TestScenarioLAG(t *testing.T) {
 			return err
 		}
 		for _, l := range got {
-			if l.ID == 1 && fmt.Sprint(l.Ports) == fmt.Sprint([]int{a, b}) {
+			if l.ID == 1 && l.Ports == portsOf(a, b) {
 				return nil
 			}
 		}
@@ -363,7 +363,7 @@ func TestScenarioPortMirror(t *testing.T) {
 	s.scenario(t, cfg(fmt.Sprintf("  enabled       = true\n  mirror_port   = %d\n  ingress_ports = %s\n", dest, intSet(src))),
 		cfg("  enabled = false\n"), func(*terraform.State) error {
 			got, err := s.Client.PortMirror(context.Background())
-			if err != nil || !got.Enabled || got.MirrorPort != dest || fmt.Sprint(got.IngressPorts) != fmt.Sprint([]int{src}) {
+			if err != nil || !got.Enabled || int(got.MirrorPort) != dest || got.IngressPorts != portsOf(src) {
 				return fmt.Errorf("mirror on the switch = %+v, err %w, want %d mirrored to %d", got, err, src, dest)
 			}
 			return nil
@@ -380,7 +380,7 @@ func TestScenarioPortBasedVLANGroup(t *testing.T) {
 			return err
 		}
 		for _, v := range got.VLANs {
-			if v.ID == 2 && fmt.Sprint(v.Ports) == fmt.Sprint([]int{a, b}) {
+			if v.ID == 2 && v.Ports == portsOf(a, b) {
 				return nil
 			}
 		}
@@ -443,7 +443,7 @@ func TestScenarioAllowDisruptive(t *testing.T) {
 	}
 	var orig escp.Port
 	for _, p := range ports {
-		if p.ID == port {
+		if int(p.ID) == port {
 			orig = p
 		}
 	}
@@ -499,7 +499,7 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 	a, b := s.Target.TestPorts[0], s.Target.TestPorts[1]
 	origPVID := 1
 	for _, p := range dot1q.PVIDs {
-		if p.Port == a {
+		if int(p.Port) == a {
 			origPVID = p.PVID
 		}
 	}
@@ -518,10 +518,10 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 		}
 		found := false
 		for _, v := range got.VLANs {
-			found = found || v.ID == 20 && v.Name == "regtest" && fmt.Sprint(v.Untagged) == fmt.Sprint([]int{a, b})
+			found = found || v.ID == 20 && v.Name == "regtest" && v.Untagged == portsOf(a, b)
 		}
 		for _, p := range got.PVIDs {
-			if p.Port == a && p.PVID != 20 {
+			if int(p.Port) == a && p.PVID != 20 {
 				return fmt.Errorf("port %d PVID = %d, want 20", a, p.PVID)
 			}
 		}
@@ -563,7 +563,7 @@ func TestScenarioLifecycle(t *testing.T) {
 	}
 	var origPort escp.Port
 	for _, p := range ports {
-		if p.ID == port {
+		if int(p.ID) == port {
 			origPort = p
 		}
 	}
@@ -683,4 +683,14 @@ func TestScenarioManagementAddressRefusals(t *testing.T) {
 		{Config: s.ProviderHCL() + managementIP(info.IP.String(), info.Netmask.String(), info.Gateway.String()), Check: resource.ComposeTestCheckFunc(
 			s.writesUnchanged(writes), s.restoredCheck(t))},
 	}})
+}
+
+// portsOf is the set of the given port numbers (the harness holds ports as plain ints; a number
+// that is no port is a mistake in the scenario and stops it).
+func portsOf(ports ...int) escp.PortSet {
+	ids := make([]escp.PortID, len(ports))
+	for i, p := range ports {
+		ids[i] = escp.PortID(p)
+	}
+	return escp.MustPortSet(ids...)
 }

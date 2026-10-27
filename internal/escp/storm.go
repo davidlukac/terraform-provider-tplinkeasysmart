@@ -21,7 +21,7 @@ const (
 
 // PortStorm is a port's storm control setting: which kinds of traffic are limited and at what rate.
 type PortStorm struct {
-	Port           int
+	Port           PortID
 	UnknownUnicast bool // limit unknown-unicast traffic
 	Multicast      bool // limit multicast traffic
 	Broadcast      bool // limit broadcast traffic
@@ -40,7 +40,7 @@ func parseStorm(tlvs []wire.TLV) ([]PortStorm, error) {
 		if len(v) != stormEntryLen {
 			return nil, fmt.Errorf("escp: storm control entry has %d bytes, want %d", len(v), stormEntryLen)
 		}
-		p := PortStorm{Port: int(v[stormOffPort]), UnknownUnicast: v[stormOffUnknownUnicast] != 0, Multicast: v[stormOffMulticast] != 0,
+		p := PortStorm{Port: PortID(v[stormOffPort]), UnknownUnicast: v[stormOffUnknownUnicast] != 0, Multicast: v[stormOffMulticast] != 0,
 			Broadcast: v[stormOffBroadcast] != 0, RateKbps: int(binary.BigEndian.Uint32(v[stormOffRate:]))}
 		p.Enabled = p.RateKbps != 0 && (p.UnknownUnicast || p.Multicast || p.Broadcast)
 		out = append(out, p)
@@ -60,7 +60,7 @@ func (c *Client) StormControl(ctx context.Context) ([]PortStorm, error) {
 // StormConfig is what SetStormControl writes to one port. Unlike PortStorm (a reading)
 // it has no Enabled flag: storm control is on exactly when a traffic type is selected.
 type StormConfig struct {
-	Port           int
+	Port           PortID
 	UnknownUnicast bool
 	Multicast      bool
 	Broadcast      bool
@@ -73,7 +73,7 @@ type StormConfig struct {
 // rate must be 0. A rate on a port that carries traffic drops its excess
 // broadcast/multicast; callers must guard against that.
 func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
-	if err := ValidatePort(cfg.Port); err != nil {
+	if err := cfg.Port.Validate(); err != nil {
 		return err
 	}
 	any := cfg.UnknownUnicast || cfg.Multicast || cfg.Broadcast
@@ -83,7 +83,7 @@ func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
 	case !any && cfg.RateKbps != 0:
 		return invalidf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.RateKbps)
 	}
-	if err := c.requirePorts(ctx, cfg.Port); err != nil {
+	if err := c.requirePorts(ctx, cfg.Port.set()); err != nil {
 		return err
 	}
 	v := make([]byte, stormEntryLen)
@@ -91,5 +91,5 @@ func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
 	v[stormOffEnabled] = boolByte(any)
 	v[stormOffUnknownUnicast], v[stormOffMulticast], v[stormOffBroadcast] = boolByte(cfg.UnknownUnicast), boolByte(cfg.Multicast), boolByte(cfg.Broadcast)
 	binary.BigEndian.PutUint32(v[stormOffRate:], uint32(cfg.RateKbps))
-	return c.setTLVs(ctx, Operation{Name: "SetStormControl", Ports: []int{cfg.Port}, Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVStormControl, Value: v})
+	return c.setTLVs(ctx, Operation{Name: "SetStormControl", Ports: cfg.Port.set(), Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVStormControl, Value: v})
 }

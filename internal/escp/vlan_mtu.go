@@ -11,7 +11,7 @@ import (
 // others and only talks to the uplink port.
 type MTUVLAN struct {
 	Enabled    bool
-	UplinkPort int
+	UplinkPort PortID
 }
 
 // parseMTUVLAN decodes TLV 8192: enabled, uplink port. As in the vendor
@@ -19,7 +19,7 @@ type MTUVLAN struct {
 func parseMTUVLAN(tlvs []wire.TLV) (MTUVLAN, error) {
 	for _, t := range tlvs {
 		if t.Type == wire.TLVVLANMTU && len(t.Value) == 2 {
-			m := MTUVLAN{Enabled: t.Value[0] == 1, UplinkPort: int(t.Value[1])}
+			m := MTUVLAN{Enabled: t.Value[0] == 1, UplinkPort: PortID(t.Value[1])}
 			if !m.Enabled {
 				m.UplinkPort = 1
 			}

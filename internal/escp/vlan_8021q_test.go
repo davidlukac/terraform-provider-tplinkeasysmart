@@ -34,8 +34,8 @@ func TestParseDot1QVLANs(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []VLAN8021Q{
-		{ID: 10, Name: "iot", Tagged: []int{8}, Untagged: []int{1, 2}},
-		{ID: 1, Name: "Default", Tagged: []int{}, Untagged: []int{1, 2, 3, 4, 5, 6, 7, 8}},
+		{ID: 10, Name: "iot", Tagged: MustPortSet(8), Untagged: MustPortSet(1, 2)},
+		{ID: 1, Name: "Default", Tagged: 0, Untagged: MustPortSet(1, 2, 3, 4, 5, 6, 7, 8)},
 	}
 	if !reflect.DeepEqual(got.VLANs, want) || !got.Enabled {
 		t.Fatalf("got %+v", got)

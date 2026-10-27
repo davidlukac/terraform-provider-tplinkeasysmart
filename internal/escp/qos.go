@@ -3,7 +3,6 @@ package escp
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
@@ -60,7 +59,7 @@ func (p Priority) Valid() bool { return p >= PriorityLowest && p <= PriorityHigh
 
 // PortPriority is a port's priority queue (PriorityLowest to PriorityHighest).
 type PortPriority struct {
-	Port     int
+	Port     PortID
 	Priority Priority
 }
 
@@ -85,7 +84,7 @@ func parseQoS(tlvs []wire.TLV) (QoS, error) {
 			if len(t.Value) != 2 {
 				return out, fmt.Errorf("escp: QoS priority entry has %d bytes, want 2", len(t.Value))
 			}
-			out.Priorities = append(out.Priorities, PortPriority{Port: int(t.Value[0]), Priority: Priority(t.Value[1]) + PriorityLowest})
+			out.Priorities = append(out.Priorities, PortPriority{Port: PortID(t.Value[0]), Priority: Priority(t.Value[1]) + PriorityLowest})
 		}
 	}
 	if !seen {
@@ -124,12 +123,12 @@ func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error {
 // current values are read first (a QoS read, which the write gate does not see) and the
 // ports not mentioned are re-sent unchanged. The priorities only take effect in
 // QoSPortBased mode.
-func (c *Client) SetPortPriorities(ctx context.Context, changes map[int]Priority) error {
+func (c *Client) SetPortPriorities(ctx context.Context, changes map[PortID]Priority) error {
 	cur, err := c.QoS(ctx)
 	if err != nil {
 		return err
 	}
-	prio := map[int]Priority{}
+	prio := map[PortID]Priority{}
 	for _, p := range cur.Priorities {
 		prio[p.Port] = p.Priority
 	}
@@ -142,11 +141,10 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes map[int]Priority
 		}
 		prio[port] = v
 	}
-	named := make([]int, 0, len(changes))
+	var named PortSet
 	for port := range changes {
-		named = append(named, port)
+		named = named.Union(port.set())
 	}
-	sort.Ints(named)
 	tlvs := make([]wire.TLV, 0, len(prio))
 	for _, p := range cur.Priorities { // keep the switch's port order
 		tlvs = append(tlvs, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p.Port), byte(prio[p.Port] - PriorityLowest)}})

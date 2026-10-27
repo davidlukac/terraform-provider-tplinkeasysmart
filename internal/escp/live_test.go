@@ -131,7 +131,7 @@ func TestLiveLoopPreventionToggle(t *testing.T) {
 // chosen with TPLINK_EASYSMART_LIVE_PORTS="a,b" and TPLINK_EASYSMART_LIVE_SOURCE
 // (the port whose traffic the mirror test copies). Every test still aborts
 // unless its ports are link-down and in no LAG.
-func liveTestPorts(t *testing.T) (first, second, source int) {
+func liveTestPorts(t *testing.T) (first, second, source PortID) {
 	t.Helper()
 	first, second, source = 6, 7, 4
 	if v := os.Getenv("TPLINK_EASYSMART_LIVE_PORTS"); v != "" {
@@ -149,7 +149,7 @@ func liveTestPorts(t *testing.T) (first, second, source int) {
 
 // livePort returns the current state of an unused test port, aborting the test
 // if the port is carrying a link or belongs to a LAG.
-func livePort(t *testing.T, c *Client, id int) Port {
+func livePort(t *testing.T, c *Client, id PortID) Port {
 	t.Helper()
 	ports, err := c.Ports(context.Background())
 	if err != nil {
@@ -172,7 +172,7 @@ func TestLivePortWrites(t *testing.T) {
 	c, ctx := liveClient(t), context.Background()
 	orig := livePort(t, c, id)
 	defer func() {
-		if err := c.SetPort(ctx, PortConfig{ID: id, Enabled: orig.Enabled, Speed: orig.ConfiguredSpeed, FlowControl: orig.ConfiguredFlowControl}); err != nil {
+		if err := c.SetPort(ctx, PortConfig{ID: PortID(id), Enabled: orig.Enabled, Speed: orig.ConfiguredSpeed, FlowControl: orig.ConfiguredFlowControl}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if now := livePort(t, c, id); now != orig {
@@ -192,7 +192,7 @@ func TestLivePortWrites(t *testing.T) {
 		steps = append([]portStep{{orig.Enabled, orig.ConfiguredSpeed, flow}}, steps...)
 	}
 	for _, step := range steps {
-		if err := c.SetPort(ctx, PortConfig{ID: id, Enabled: step.enabled, Speed: step.speed, FlowControl: step.flow}); err != nil {
+		if err := c.SetPort(ctx, PortConfig{ID: PortID(id), Enabled: step.enabled, Speed: step.speed, FlowControl: step.flow}); err != nil {
 			t.Fatalf("%+v: %v", step, err)
 		}
 		got := livePort(t, c, id)
@@ -217,7 +217,7 @@ func TestLiveQoS(t *testing.T) {
 		}
 	}
 	defer func() {
-		if err := c.SetPortPriorities(ctx, map[int]Priority{id: origPrio}); err != nil {
+		if err := c.SetPortPriorities(ctx, map[PortID]Priority{id: origPrio}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if err := c.SetQoSMode(ctx, orig.Mode); err != nil {
@@ -236,7 +236,7 @@ func TestLiveQoS(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := origPrio%PriorityHighest + PriorityLowest
-	if err := c.SetPortPriorities(ctx, map[int]Priority{id: want}); err != nil {
+	if err := c.SetPortPriorities(ctx, map[PortID]Priority{id: want}); err != nil {
 		t.Fatal(err)
 	}
 	now, _ := c.QoS(ctx)
@@ -250,7 +250,7 @@ func TestLiveQoS(t *testing.T) {
 	}
 }
 
-func priorityOf(q QoS, port int) Priority {
+func priorityOf(q QoS, port PortID) Priority {
 	for _, p := range q.Priorities {
 		if p.Port == port {
 			return p.Priority
@@ -259,7 +259,7 @@ func priorityOf(q QoS, port int) Priority {
 	return -1
 }
 
-func bandwidthOf(t *testing.T, c *Client, port int) PortBandwidth {
+func bandwidthOf(t *testing.T, c *Client, port PortID) PortBandwidth {
 	t.Helper()
 	rows, err := c.Bandwidth(context.Background())
 	if err != nil {
@@ -280,14 +280,14 @@ func TestLiveBandwidth(t *testing.T) {
 	livePort(t, c, id) // abort unless port 7 is unused
 	orig := bandwidthOf(t, c, id)
 	defer func() {
-		if err := c.SetBandwidth(ctx, PortBandwidth{Port: id, IngressKbps: orig.IngressKbps, EgressKbps: orig.EgressKbps}); err != nil {
+		if err := c.SetBandwidth(ctx, PortBandwidth{Port: PortID(id), IngressKbps: orig.IngressKbps, EgressKbps: orig.EgressKbps}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if now := bandwidthOf(t, c, id); now != orig {
 			t.Errorf("not restored: %+v vs %+v", now, orig)
 		}
 	}()
-	if err := c.SetBandwidth(ctx, PortBandwidth{Port: id, IngressKbps: 1024, EgressKbps: 2048}); err != nil {
+	if err := c.SetBandwidth(ctx, PortBandwidth{Port: PortID(id), IngressKbps: 1024, EgressKbps: 2048}); err != nil {
 		t.Fatal(err)
 	}
 	if got := bandwidthOf(t, c, id); got.IngressKbps != 1024 || got.EgressKbps != 2048 {
@@ -308,7 +308,7 @@ func mustBandwidth(t *testing.T, c *Client) []PortBandwidth {
 	return rows
 }
 
-func stormOf(t *testing.T, c *Client, port int) PortStorm {
+func stormOf(t *testing.T, c *Client, port PortID) PortStorm {
 	t.Helper()
 	rows, err := c.StormControl(context.Background())
 	if err != nil {
@@ -329,14 +329,14 @@ func TestLiveStormControl(t *testing.T) {
 	livePort(t, c, id) // abort unless port 7 is unused
 	orig := stormOf(t, c, id)
 	defer func() {
-		if err := c.SetStormControl(ctx, StormConfig{Port: id, UnknownUnicast: orig.UnknownUnicast, Multicast: orig.Multicast, Broadcast: orig.Broadcast, RateKbps: orig.RateKbps}); err != nil {
+		if err := c.SetStormControl(ctx, StormConfig{Port: PortID(id), UnknownUnicast: orig.UnknownUnicast, Multicast: orig.Multicast, Broadcast: orig.Broadcast, RateKbps: orig.RateKbps}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if now := stormOf(t, c, id); now != orig {
 			t.Errorf("not restored: %+v vs %+v", now, orig)
 		}
 	}()
-	if err := c.SetStormControl(ctx, StormConfig{Port: id, UnknownUnicast: false, Multicast: true, Broadcast: true, RateKbps: 1024}); err != nil {
+	if err := c.SetStormControl(ctx, StormConfig{Port: PortID(id), UnknownUnicast: false, Multicast: true, Broadcast: true, RateKbps: 1024}); err != nil {
 		t.Fatal(err)
 	}
 	got := stormOf(t, c, id)
@@ -350,7 +350,7 @@ func TestLiveStormControl(t *testing.T) {
 		}
 	}
 	// unknown unicast, which the first live run (switch 01) did not cover
-	if err := c.SetStormControl(ctx, StormConfig{Port: id, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 2048}); err != nil {
+	if err := c.SetStormControl(ctx, StormConfig{Port: PortID(id), UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 2048}); err != nil {
 		t.Fatal(err)
 	}
 	if got := stormOf(t, c, id); !got.Enabled || !got.UnknownUnicast || got.Multicast || got.Broadcast || got.RateKbps != 2048 {
@@ -377,7 +377,7 @@ func TestLivePortMirror(t *testing.T) {
 			t.Errorf("not restored: %+v vs %+v", now, orig)
 		}
 	}()
-	want := Mirror{Enabled: true, MirrorPort: dest, IngressPorts: []int{source}, EgressPorts: []int{}}
+	want := Mirror{Enabled: true, MirrorPort: PortID(dest), IngressPorts: MustPortSet(PortID(source)), EgressPorts: 0}
 	if err := c.SetPortMirror(ctx, want); err != nil {
 		t.Fatal(err)
 	}
@@ -387,8 +387,8 @@ func TestLivePortMirror(t *testing.T) {
 	}
 	// egress and both directions, which the first live run (switch 01) did not cover
 	for _, m := range []Mirror{
-		{Enabled: true, MirrorPort: dest, IngressPorts: []int{}, EgressPorts: []int{source}},
-		{Enabled: true, MirrorPort: dest, IngressPorts: []int{source}, EgressPorts: []int{source}},
+		{Enabled: true, MirrorPort: PortID(dest), IngressPorts: 0, EgressPorts: MustPortSet(PortID(source))},
+		{Enabled: true, MirrorPort: PortID(dest), IngressPorts: MustPortSet(PortID(source)), EgressPorts: MustPortSet(PortID(source))},
 	} {
 		if err := c.SetPortMirror(ctx, m); err != nil {
 			t.Fatal(err)
@@ -422,30 +422,30 @@ func TestLiveLAG2(t *testing.T) {
 	a, b, _ := liveTestPorts(t)
 	livePort(t, c, a)
 	livePort(t, c, b)
-	group := (a-1)/LAGPortsPerGroup + 1
-	if other := (b-1)/LAGPortsPerGroup + 1; other != group {
+	group := int((a-1)/LAGPortsPerGroup + 1)
+	if other := int((b-1)/LAGPortsPerGroup + 1); other != group {
 		t.Skipf("ports %d and %d are not in the same LAG range", a, b)
 	}
 	untouched := 3 - group
 	before := lagByID(t, c, untouched)
-	if orig := lagByID(t, c, group); len(orig.Ports) != 0 {
+	if orig := lagByID(t, c, group); !orig.Ports.IsEmpty() {
 		t.Fatalf("LAG%d is already in use: %+v; refusing", group, orig)
 	}
 	defer func() {
-		if err := c.SetLAG(ctx, group, nil); err != nil {
+		if err := c.SetLAG(ctx, group, 0); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
-		if now := lagByID(t, c, group); len(now.Ports) != 0 {
+		if now := lagByID(t, c, group); !now.Ports.IsEmpty() {
 			t.Errorf("LAG%d not removed: %+v", group, now)
 		}
 		if now := lagByID(t, c, untouched); !reflect.DeepEqual(now, before) {
 			t.Errorf("LAG%d changed: %+v vs %+v", untouched, now, before)
 		}
 	}()
-	if err := c.SetLAG(ctx, group, []int{a, b}); err != nil {
+	if err := c.SetLAG(ctx, group, MustPortSet(a, b)); err != nil {
 		t.Fatal(err)
 	}
-	if got := lagByID(t, c, group); !reflect.DeepEqual(got.Ports, []int{a, b}) {
+	if got := lagByID(t, c, group); got.Ports != MustPortSet(a, b) {
 		t.Fatalf("not applied: %+v", got)
 	}
 }
@@ -474,14 +474,14 @@ func TestLivePortBasedVLAN2(t *testing.T) {
 		t.Fatal("port-based VLAN mode is not active; refusing")
 	}
 	vlan1, ok := portVLANByID(orig, 1)
-	if !ok || len(vlan1.Ports) != 8 {
+	if !ok || vlan1.Ports.Len() != 8 {
 		t.Fatalf("VLAN 1 is not the expected all-ports group: %+v; refusing", orig)
 	}
 	if _, exists := portVLANByID(orig, 2); exists {
 		t.Fatal("VLAN 2 already exists; refusing")
 	}
 	defer func() {
-		if err := c.SetPortBasedVLAN(ctx, 2, nil); err != nil {
+		if err := c.SetPortBasedVLAN(ctx, 2, 0); err != nil {
 			t.Errorf("RESTORE FAILED (remove VLAN 2): %v", err)
 		}
 		now, _ := c.PortBasedVLAN(ctx)
@@ -495,11 +495,11 @@ func TestLivePortBasedVLAN2(t *testing.T) {
 			t.Errorf("not restored: %+v", now)
 		}
 	}()
-	if err := c.SetPortBasedVLAN(ctx, 2, []int{a, b}); err != nil {
+	if err := c.SetPortBasedVLAN(ctx, 2, MustPortSet(a, b)); err != nil {
 		t.Fatal(err)
 	}
 	now, _ := c.PortBasedVLAN(ctx)
-	if g, ok := portVLANByID(now, 2); !ok || !reflect.DeepEqual(g.Ports, []int{a, b}) {
+	if g, ok := portVLANByID(now, 2); !ok || g.Ports != MustPortSet(a, b) {
 		t.Fatalf("VLAN 2 not applied: %+v", now)
 	}
 	t.Logf("with VLAN 2: %+v", now.VLANs)
@@ -639,7 +639,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 		}
 		if err != nil || q.Enabled {
 			if _, ok := vlanByID(q, testVLAN); ok || err != nil {
-				if err := c.SetPVIDs(ctx, map[int]int{a: 1, b: 1}); err != nil {
+				if err := c.SetPVIDs(ctx, map[PortID]int{a: 1, b: 1}); err != nil {
 					t.Errorf("RESTORE: PVIDs: %v", err)
 				}
 				if err := c.DeleteVLAN8021Q(ctx, testVLAN); err != nil {
@@ -671,7 +671,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 		t.Fatalf("the mode write had no effect: %+v", q)
 	}
 
-	want := VLAN8021Q{ID: testVLAN, Name: "livetest", Untagged: []int{a}, Tagged: []int{b}}
+	want := VLAN8021Q{ID: testVLAN, Name: "livetest", Untagged: MustPortSet(PortID(a)), Tagged: MustPortSet(PortID(b))}
 	if err := c.SetVLAN8021Q(ctx, want); err != nil {
 		t.Fatal(err)
 	}
@@ -682,7 +682,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 		t.Fatalf("VLAN not applied as requested: %+v", got)
 	}
 
-	if err := c.SetPVIDs(ctx, map[int]int{a: testVLAN}); err != nil {
+	if err := c.SetPVIDs(ctx, map[PortID]int{a: testVLAN}); err != nil {
 		t.Fatal(err)
 	}
 	_, _, q = vlanModes(t, c)
@@ -690,7 +690,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 	if pvid, _ := pvidByPort(q, a); pvid != testVLAN {
 		t.Fatalf("PVID of port %d is %d, want %d", a, pvid, testVLAN)
 	}
-	if err := c.SetPVIDs(ctx, map[int]int{a: 1}); err != nil {
+	if err := c.SetPVIDs(ctx, map[PortID]int{a: 1}); err != nil {
 		t.Fatal(err)
 	}
 	_, _, q = vlanModes(t, c)
@@ -716,7 +716,7 @@ func vlanByID(q Dot1Q, id int) (VLAN8021Q, bool) {
 	return VLAN8021Q{}, false
 }
 
-func pvidByPort(q Dot1Q, port int) (int, bool) {
+func pvidByPort(q Dot1Q, port PortID) (int, bool) {
 	for _, p := range q.PVIDs {
 		if p.Port == port {
 			return p.PVID, true

@@ -2,10 +2,12 @@ package provider
 
 import (
 	"context"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -90,12 +92,12 @@ func TestQoSResourceOnlyManagesTheListedPorts(t *testing.T) {
 type singleLAGClient struct{ *fakeClient }
 
 func (singleLAGClient) LAGs(context.Context) ([]escp.LAG, error) {
-	return []escp.LAG{{ID: 1, Ports: []int{1, 2}}}, nil
+	return []escp.LAG{{ID: 1, Ports: escp.MustPortSet(1, 2)}}, nil
 }
 
 func TestLAGResourceSpecifics(t *testing.T) {
 	newFake := func() *fakeClient {
-		return &fakeClient{ports: lagPorts(), lags: map[int][]int{1: {1, 2}}}
+		return &fakeClient{ports: lagPorts(), lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2)}}
 	}
 	t.Run("a LAG needs at least two members", func(t *testing.T) {
 		t.Parallel()
@@ -127,7 +129,7 @@ func TestLAGResourceSpecifics(t *testing.T) {
 	})
 	t.Run("a port that already belongs to another LAG", func(t *testing.T) {
 		t.Parallel()
-		inner := &fakeClient{lags: map[int][]int{1: {1, 2}}, ports: lagPorts()}
+		inner := &fakeClient{lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2)}, ports: lagPorts()}
 		inner.ports[4].LAG = 3 // port 5
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),
@@ -159,7 +161,7 @@ func TestLAGResourceSpecifics(t *testing.T) {
 				{PreConfig: func() { inner.mutate(func(f *fakeClient) { f.ports[5].ActualSpeed = "link-down" }) }, Config: cfg}, // cleanup destroys
 			},
 		})
-		if len(inner.lags[2]) != 0 {
+		if !inner.lags[2].IsEmpty() {
 			t.Fatalf("the group must be gone after the final destroy, got %v", inner.lags[2])
 		}
 	})
@@ -193,7 +195,7 @@ func TestLAGResourceSpecifics(t *testing.T) {
 
 func TestVLANGroupResourceSpecifics(t *testing.T) {
 	newFake := func() *fakeClient {
-		return &fakeClient{ports: lagPorts(), pvlans: map[int][]int{1: {1, 2, 4, 6, 7}}}
+		return &fakeClient{ports: lagPorts(), pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
 	}
 	t.Run("a group needs at least one member", func(t *testing.T) {
 		t.Parallel()
@@ -229,7 +231,7 @@ func TestVLANGroupResourceSpecifics(t *testing.T) {
 	})
 	t.Run("a port in a LAG cannot be moved", func(t *testing.T) {
 		t.Parallel()
-		inner := &fakeClient{pvlans: map[int][]int{1: {1, 2, 4, 5, 6, 7}},
+		inner := &fakeClient{pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 5, 6, 7)},
 			ports: append(lagPorts(), escp.Port{ID: 5, Enabled: true, LAG: 2, ConfiguredSpeed: "auto", ActualSpeed: "link-down"})}
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),
@@ -351,13 +353,19 @@ func TestResourcesReportUndecodablePlanAndState(t *testing.T) {
 	}
 }
 
-func TestSetToIntsRejectsUnknownSets(t *testing.T) {
-	if _, err := setToInts(context.Background(), types.SetUnknown(types.Int64Type)); err == nil {
+func TestSetToPortsRejectsUnknownSetsAndPortsOutsideTheMask(t *testing.T) {
+	ctx := context.Background()
+	if _, err := setToPorts(ctx, types.SetUnknown(types.Int64Type)); err == nil {
 		t.Fatal("an unknown set cannot be converted and must be reported")
 	}
-	got, err := setToInts(context.Background(), intsToSet([]int{7, 1, 4}))
-	if err != nil || len(got) != 3 || got[0] != 1 || got[1] != 4 || got[2] != 7 {
-		t.Fatalf("a known set is returned sorted, got %v, %v", got, err)
+	for _, bad := range []int64{0, 33, -1} {
+		if _, err := setToPorts(ctx, types.SetValueMust(types.Int64Type, []attr.Value{types.Int64Value(4), types.Int64Value(bad)})); err == nil {
+			t.Fatalf("port %d is no port and must be reported", bad)
+		}
+	}
+	got, err := setToPorts(ctx, portsToSet(escp.MustPortSet(7, 1, 4)))
+	if err != nil || got != escp.MustPortSet(1, 4, 7) || !reflect.DeepEqual(portInt64s(got), []int64{1, 4, 7}) {
+		t.Fatalf("a known set round-trips, got %v, %v", got, err)
 	}
 }
 

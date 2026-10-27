@@ -9,13 +9,15 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
-func TestMirrorRejectsInvalidSourcePortsBeforeSending(t *testing.T) {
+// A source port outside 1 to MaxPort cannot be put in a PortSet at all (see portset_test); the
+// destination is a PortID and is checked by the writer.
+func TestMirrorRejectsAnInvalidDestinationBeforeSending(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")
 	ctx := context.Background()
 	for name, m := range map[string]Mirror{
-		"invalid ingress": {Enabled: true, MirrorPort: 7, IngressPorts: []int{0}},
-		"invalid egress":  {Enabled: true, MirrorPort: 7, IngressPorts: []int{4}, EgressPorts: []int{40}},
+		"destination 0":  {Enabled: true, MirrorPort: 0, IngressPorts: MustPortSet(4)},
+		"destination 40": {Enabled: true, MirrorPort: 40, IngressPorts: MustPortSet(4), EgressPorts: MustPortSet(5)},
 	} {
 		if err := c.SetPortMirror(ctx, m); err == nil {
 			t.Errorf("%s must be rejected", name)
@@ -31,7 +33,7 @@ func TestParseMirror(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(off, Mirror{IngressPorts: []int{}, EgressPorts: []int{}}) {
+	if !reflect.DeepEqual(off, Mirror{IngressPorts: 0, EgressPorts: 0}) {
 		t.Fatalf("disabled: %+v", off)
 	}
 	// layout from the vendor code; mirror port 8, ingress ports 1+2, egress port 3
@@ -39,7 +41,7 @@ func TestParseMirror(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Mirror{Enabled: true, MirrorPort: 8, IngressPorts: []int{1, 2}, EgressPorts: []int{3}}
+	want := Mirror{Enabled: true, MirrorPort: 8, IngressPorts: MustPortSet(1, 2), EgressPorts: MustPortSet(3)}
 	if !reflect.DeepEqual(on, want) {
 		t.Fatalf("enabled: %+v", on)
 	}
@@ -52,7 +54,7 @@ func TestSetMirrorWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	if err := c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 7, IngressPorts: []int{4}, EgressPorts: []int{1, 2}}); err != nil {
+	if err := c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 7, IngressPorts: MustPortSet(4), EgressPorts: MustPortSet(1, 2)}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{1, 7, 0, 0, 0, 8, 0, 0, 0, 3}) {
@@ -67,9 +69,8 @@ func TestSetMirrorWire(t *testing.T) {
 	n := f.WriteCount()
 	for _, bad := range []Mirror{
 		{Enabled: true, MirrorPort: 7},
-		{Enabled: true, MirrorPort: 7, IngressPorts: []int{7}},
-		{Enabled: true, MirrorPort: 0, IngressPorts: []int{1}},
-		{Enabled: true, MirrorPort: 7, IngressPorts: []int{40}},
+		{Enabled: true, MirrorPort: 7, IngressPorts: MustPortSet(7)},
+		{Enabled: true, MirrorPort: 0, IngressPorts: MustPortSet(1)},
 		{MirrorPort: 7},
 	} {
 		if err := c.SetPortMirror(ctx, bad); err == nil {

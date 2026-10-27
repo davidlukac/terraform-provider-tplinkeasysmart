@@ -85,11 +85,7 @@ func (d *lagsDataSource) readBound(ctx context.Context, _ datasource.ReadRequest
 	}
 	state := lagsModel{ID: qualifiedID(d.sw, "lags"), LAGs: make([]lagModel, 0, len(lags))}
 	for _, l := range lags {
-		ports := make([]int64, 0, len(l.Ports))
-		for _, p := range l.Ports {
-			ports = append(ports, int64(p))
-		}
-		state.LAGs = append(state.LAGs, lagModel{ID: types.Int64Value(int64(l.ID)), Ports: ports})
+		state.LAGs = append(state.LAGs, lagModel{ID: types.Int64Value(int64(l.ID)), Ports: portInt64s(l.Ports)})
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

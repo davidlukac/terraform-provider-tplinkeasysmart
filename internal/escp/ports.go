@@ -21,7 +21,7 @@ const (
 
 // Port is one row of the Port Setting page.
 type Port struct {
-	ID                    int
+	ID                    PortID
 	Enabled               bool
 	LAG                   int   // 0 = not in a LAG
 	ConfiguredSpeed       Speed // auto, 10Mbps-half, ... 1000Mbps-full
@@ -108,7 +108,7 @@ func parsePorts(tlvs []wire.TLV) ([]Port, error) {
 			return nil, fmt.Errorf("escp: port TLV too short (%d bytes)", len(v))
 		}
 		ports = append(ports, Port{
-			ID: int(v[portOffPort]), Enabled: v[portOffState] == 1, LAG: int(v[portOffLAG]),
+			ID: PortID(v[portOffPort]), Enabled: v[portOffState] == 1, LAG: int(v[portOffLAG]),
 			ConfiguredSpeed: speedFromCode(v[portOffCfgSpeed]), ActualSpeed: speedFromCode(v[portOffActSpeed]),
 			ConfiguredFlowControl: v[portOffCfgFlow] == 1, ActualFlowControl: v[portOffActFlow] == 1,
 		})
@@ -129,7 +129,7 @@ func (c *Client) Ports(ctx context.Context) ([]Port, error) {
 // takes the whole entry, so a caller changing one field passes the others as read.
 // FlowControl can only be true with a speed for which Speed.AllowsFlowControl is true.
 type PortConfig struct {
-	ID          int
+	ID          PortID
 	Enabled     bool
 	Speed       Speed // a configurable speed; SpeedLinkDown is refused
 	FlowControl bool
@@ -150,18 +150,18 @@ func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
 	if err != nil {
 		return err
 	}
-	if err := ValidatePort(cfg.ID); err != nil {
+	if err := cfg.ID.Validate(); err != nil {
 		return err
 	}
 	if cfg.FlowControl && !cfg.Speed.AllowsFlowControl() {
 		return invalidf("escp: port %d: flow control needs speed %s or %s, not %s (the switch keeps it off at a fixed 10 or 100 Mbps speed)", cfg.ID, SpeedAuto, Speed1000Full, cfg.Speed)
 	}
-	if err := c.requirePorts(ctx, cfg.ID); err != nil {
+	if err := c.requirePorts(ctx, cfg.ID.set()); err != nil {
 		return err
 	}
 	entry := make([]byte, portEntryLen)
 	entry[portOffPort], entry[portOffState], entry[portOffCfgSpeed], entry[portOffCfgFlow] = byte(cfg.ID), boolByte(cfg.Enabled), code, boolByte(cfg.FlowControl)
-	return nameRefusal(c.setTLVs(ctx, Operation{Name: "SetPort", Ports: []int{cfg.ID}, Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVPorts, Value: entry}), portRefusals)
+	return nameRefusal(c.setTLVs(ctx, Operation{Name: "SetPort", Ports: cfg.ID.set(), Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVPorts, Value: entry}), portRefusals)
 }
 
 // portRefusals names the refusals of a port write that were provoked on a real switch

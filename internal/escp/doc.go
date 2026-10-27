@@ -35,7 +35,7 @@
 //     transport.go (packets, encryption, sending, receiving, fragments, deadlines), request.go
 //     (the one place that sends a gated SET and a GET, and the port count) and errors.go.
 //   - Shared: mac.go (MAC, the one place a switch's hardware address is parsed, compared and printed), operation.go (the Operation a gate sees and the Impact classes), limits.go (the
-//     public limits and Validate functions), bitmask.go (port masks) and discover.go (finding
+//     public limits and Validate functions), portset.go (PortID and PortSet: the port numbers and the sets of them, which are the wire bitmap) and discover.go (finding
 //     switches without credentials).
 //
 // Sub-packages hold what has a boundary of its own: internal/wire (the packet codec, the

@@ -64,7 +64,7 @@ func (g *gatedClient) SetPort(ctx context.Context, cfg escp.PortConfig) error {
 	return g.SwitchClient.SetPort(ctx, cfg)
 }
 
-func (g *gatedClient) SetLAG(ctx context.Context, group int, ports []int) error {
+func (g *gatedClient) SetLAG(ctx context.Context, group int, ports escp.PortSet) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (g *gatedClient) SetPortMirror(ctx context.Context, m escp.Mirror) error {
 	return g.SwitchClient.SetPortMirror(ctx, m)
 }
 
-func (g *gatedClient) SetPortBasedVLAN(ctx context.Context, id int, ports []int) error {
+func (g *gatedClient) SetPortBasedVLAN(ctx context.Context, id int, ports escp.PortSet) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (g *gatedClient) DeleteVLAN8021Q(ctx context.Context, id int) error {
 	return g.SwitchClient.DeleteVLAN8021Q(ctx, id)
 }
 
-func (g *gatedClient) SetPVIDs(ctx context.Context, pvids map[int]int) error {
+func (g *gatedClient) SetPVIDs(ctx context.Context, pvids map[escp.PortID]int) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func (g *gatedClient) SetQoSMode(ctx context.Context, mode escp.QoSMode) error {
 	return g.SwitchClient.SetQoSMode(ctx, mode)
 }
 
-func (g *gatedClient) SetPortPriorities(ctx context.Context, changes map[int]escp.Priority) error {
+func (g *gatedClient) SetPortPriorities(ctx context.Context, changes map[escp.PortID]escp.Priority) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}

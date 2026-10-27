@@ -124,7 +124,7 @@ func (portKey) ValidateString(_ context.Context, req validator.StringRequest, re
 	}
 	n, err := strconv.Atoi(req.ConfigValue.ValueString())
 	if err == nil {
-		err = escp.ValidatePort(n)
+		err = escp.PortID(n).Validate()
 	}
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(req.Path, "Invalid port key",
@@ -160,12 +160,12 @@ func stormProblem(unicast, multicast, broadcast types.Bool, rate types.Int64) st
 // mirrorProblem checks port mirroring: enabled needs a destination and at
 // least one source and the destination cannot be a source; disabled must have
 // no ports.
-func mirrorProblem(enabled types.Bool, dest types.Int64, ingress, egress []int) string {
+func mirrorProblem(enabled types.Bool, dest types.Int64, ingress, egress escp.PortSet) string {
 	if enabled.IsUnknown() || dest.IsUnknown() {
 		return ""
 	}
 	if !enabled.ValueBool() {
-		if dest.ValueInt64() != 0 || len(ingress)+len(egress) != 0 {
+		if dest.ValueInt64() != 0 || !ingress.Union(egress).IsEmpty() {
 			return "mirroring is disabled, so mirror_port, ingress_ports and egress_ports must be empty (the switch drops them when the mirror is off)"
 		}
 		return ""
@@ -173,13 +173,12 @@ func mirrorProblem(enabled types.Bool, dest types.Int64, ingress, egress []int) 
 	if dest.ValueInt64() < 1 {
 		return "mirroring is enabled, so mirror_port must be set to the destination port"
 	}
-	if len(ingress)+len(egress) == 0 {
+	sources := ingress.Union(egress)
+	if sources.IsEmpty() {
 		return "mirroring is enabled, so at least one ingress or egress source port is needed"
 	}
-	for _, p := range append(append([]int{}, ingress...), egress...) {
-		if int64(p) == dest.ValueInt64() {
-			return fmt.Sprintf("port %d cannot mirror itself", p)
-		}
+	if sources.Has(escp.PortID(dest.ValueInt64())) {
+		return fmt.Sprintf("port %d cannot mirror itself", dest.ValueInt64())
 	}
 	return ""
 }

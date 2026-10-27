@@ -82,7 +82,7 @@ func (r *stormLimitResource) Configure(_ context.Context, req resource.Configure
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func (r *stormLimitResource) find(ctx context.Context, port int) (escp.PortStorm, bool, error) {
+func (r *stormLimitResource) find(ctx context.Context, port escp.PortID) (escp.PortStorm, bool, error) {
 	rows, err := r.client.StormControl(ctx)
 	if err != nil {
 		return escp.PortStorm{}, false, err
@@ -102,7 +102,7 @@ func (r *stormLimitResource) apply(ctx context.Context, m *stormLimitModel, add 
 }
 
 func (r *stormLimitResource) applyBound(ctx context.Context, m *stormLimitModel, add func(string, string)) bool {
-	port := int(m.Port.ValueInt64())
+	port := escp.PortID(m.Port.ValueInt64())
 	uu, mc, bc, rate := m.UnknownUnicast.ValueBool(), m.Multicast.ValueBool(), m.Broadcast.ValueBool(), int(m.RateKbps.ValueInt64())
 	if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), port); err != nil {
 		add("Refusing to change port", err.Error())
@@ -143,7 +143,7 @@ func (r *stormLimitResource) readBound(ctx context.Context, req resource.ReadReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	got, ok, err := r.find(ctx, int(state.Port.ValueInt64()))
+	got, ok, err := r.find(ctx, escp.PortID(state.Port.ValueInt64()))
 	if err != nil {
 		resp.Diagnostics.AddError("Reading storm control failed", err.Error())
 		return

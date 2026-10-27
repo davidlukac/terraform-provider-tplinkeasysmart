@@ -19,14 +19,14 @@ type fakeVLANs struct {
 	portBased bool
 	enabled   bool // 802.1Q mode
 	vlans     map[int]escp.VLAN8021Q
-	pvids     map[int]int
+	pvids     map[escp.PortID]int
 
 	ignoreModeWrites bool // accept mode writes without applying them
 }
 
 // newFakeVLANs returns a switch in the given mode ("mtu", "port-based", "802.1q" or "").
 func newFakeVLANs(mode string) *fakeVLANs {
-	v := &fakeVLANs{mtu: escp.MTUVLAN{UplinkPort: 1}, vlans: map[int]escp.VLAN8021Q{}, pvids: map[int]int{}}
+	v := &fakeVLANs{mtu: escp.MTUVLAN{UplinkPort: 1}, vlans: map[int]escp.VLAN8021Q{}, pvids: map[escp.PortID]int{}}
 	switch mode {
 	case "mtu":
 		v.mtu = escp.MTUVLAN{Enabled: true, UplinkPort: 8}
@@ -38,10 +38,10 @@ func newFakeVLANs(mode string) *fakeVLANs {
 	return v
 }
 
-func allFakePorts() []int {
-	ports := make([]int, 0, fakePortCount)
+func allFakePorts() escp.PortSet {
+	var ports escp.PortSet
 	for p := 1; p <= fakePortCount; p++ {
-		ports = append(ports, p)
+		ports = ports.Union(escp.MustPortSet(escp.PortID(p)))
 	}
 	return ports
 }
@@ -49,9 +49,9 @@ func allFakePorts() []int {
 // enable8021Q turns the mode on and builds the default VLAN 1 with every port untagged.
 func (v *fakeVLANs) enable8021Q() {
 	v.enabled, v.portBased, v.mtu = true, false, escp.MTUVLAN{UplinkPort: 1}
-	v.vlans = map[int]escp.VLAN8021Q{1: {ID: 1, Name: "Default", Untagged: allFakePorts(), Tagged: []int{}}}
-	v.pvids = map[int]int{}
-	for _, p := range allFakePorts() {
+	v.vlans = map[int]escp.VLAN8021Q{1: {ID: 1, Name: "Default", Untagged: allFakePorts(), Tagged: 0}}
+	v.pvids = map[escp.PortID]int{}
+	for _, p := range allFakePorts().Ports() {
 		v.pvids[p] = 1
 	}
 }
@@ -67,7 +67,7 @@ func (v *fakeVLANs) dot1q() escp.Dot1Q {
 	for _, id := range ids {
 		out.VLANs = append(out.VLANs, v.vlans[id])
 	}
-	for _, p := range allFakePorts() {
+	for _, p := range allFakePorts().Ports() {
 		if pvid, ok := v.pvids[p]; ok {
 			out.PVIDs = append(out.PVIDs, escp.PortPVID{Port: p, PVID: pvid})
 		}
@@ -126,7 +126,7 @@ func (f *fakeClient) DeleteVLAN8021Q(_ context.Context, id int) error {
 	})
 }
 
-func (f *fakeClient) SetPVIDs(_ context.Context, pvids map[int]int) error {
+func (f *fakeClient) SetPVIDs(_ context.Context, pvids map[escp.PortID]int) error {
 	return f.vlanWrite(func(v *fakeVLANs) error {
 		for port, pvid := range pvids {
 			v.pvids[port] = pvid

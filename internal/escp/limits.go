@@ -13,16 +13,6 @@ const (
 	maskLen = 4
 )
 
-// ValidatePort checks that a port number can be addressed in a port mask. It cannot know how
-// many ports the switch has: the writers that take a port also refuse ports beyond the switch's own
-// count (see requirePorts).
-func ValidatePort(port int) error {
-	if port < 1 || port > MaxPort {
-		return invalidf("escp: invalid port %d (valid: 1-%d)", port, MaxPort)
-	}
-	return nil
-}
-
 // validateRateKbps reports whether kbps is a valid rate limit: 0 is
 // unlimited, otherwise a multiple of RateStepKbps up to MaxBandwidthKbps.
 func validateRateKbps(kbps int) bool {

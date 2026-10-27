@@ -7,12 +7,15 @@ import (
 	"net/netip"
 	"strconv"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
 // Attribute names and diagnostic summaries shared by several resources.
@@ -159,15 +162,46 @@ func defaultZero(n types.Int64) types.Int64 {
 
 // portsOf reads a configured port set; ok is false while it is not known yet.
 // An omitted set is null and means "no ports".
-func portsOf(ctx context.Context, s types.Set) (ports []int, ok bool) {
+func portsOf(ctx context.Context, s types.Set) (ports escp.PortSet, ok bool) {
 	if s.IsUnknown() {
-		return nil, false
+		return 0, false
 	}
 	if s.IsNull() {
-		return nil, true
+		return 0, true
 	}
-	ports, err := setToInts(ctx, s)
+	ports, err := setToPorts(ctx, s)
 	return ports, err == nil
+}
+
+// setToPorts reads a Terraform set of port numbers; a number outside 1 to escp.MaxPort is an error.
+func setToPorts(ctx context.Context, s types.Set) (escp.PortSet, error) {
+	var vals []int64
+	if d := s.ElementsAs(ctx, &vals, false); d.HasError() {
+		return 0, fmt.Errorf("%v", d)
+	}
+	ports := make([]escp.PortID, 0, len(vals))
+	for _, v := range vals {
+		ports = append(ports, escp.PortID(v))
+	}
+	return escp.NewPortSet(ports...)
+}
+
+// portsToSet is the Terraform set of a port set's numbers.
+func portsToSet(s escp.PortSet) types.Set {
+	vals := make([]attr.Value, 0, s.Len())
+	for _, p := range s.Ports() {
+		vals = append(vals, types.Int64Value(int64(p)))
+	}
+	return types.SetValueMust(types.Int64Type, vals)
+}
+
+// portInt64s lists a port set's numbers in ascending order, for the data sources' list attributes.
+func portInt64s(s escp.PortSet) []int64 {
+	out := make([]int64, 0, s.Len())
+	for _, p := range s.Ports() {
+		out = append(out, int64(p))
+	}
+	return out
 }
 
 // inactiveModeError means a VLAN setting cannot be read or written because the VLAN mode it

@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -110,60 +109,43 @@ func findVLAN(table []escp.VLAN8021Q, id int) (escp.VLAN8021Q, bool) {
 	return escp.VLAN8021Q{}, false
 }
 
-// members lists every member port of v, tagged and untagged, sorted.
-func members(v escp.VLAN8021Q) []int {
-	all := append(append([]int{}, v.Tagged...), v.Untagged...)
-	sort.Ints(all)
-	return all
-}
+// members is every member port of v, tagged and untagged.
+func members(v escp.VLAN8021Q) escp.PortSet { return v.Tagged.Union(v.Untagged) }
 
 // orphanedPorts returns the ports of affected that would belong to no VLAN
 // once VLAN id has the given member ports (none: it is deleted); the other VLANs of the table stay as they are.
-func orphanedPorts(table []escp.VLAN8021Q, id int, newMembers, affected []int) []int {
-	covered := map[int]bool{}
+func orphanedPorts(table []escp.VLAN8021Q, id int, newMembers, affected escp.PortSet) escp.PortSet {
+	covered := newMembers
 	for _, v := range table {
-		if v.ID == id {
-			continue
-		}
-		for _, p := range members(v) {
-			covered[p] = true
+		if v.ID != id {
+			covered = covered.Union(members(v))
 		}
 	}
-	for _, p := range newMembers {
-		covered[p] = true
-	}
-	orphans := []int{}
-	for _, p := range affected {
-		if !covered[p] {
-			orphans = append(orphans, p)
-		}
-	}
-	sort.Ints(orphans)
-	return orphans
+	return affected.Minus(covered)
 }
 
 // guard refuses a change of VLAN id from the old to the new members when a port
 // involved carries traffic, or would be left in no VLAN.
-func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []escp.VLAN8021Q, id int, old, new []int) error {
-	affected := append(append([]int{}, old...), new...)
-	if err := guardPorts(ctx, r.client, allow, affected...); err != nil {
+func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []escp.VLAN8021Q, id int, old, new escp.PortSet) error {
+	affected := old.Union(new)
+	if err := guardPorts(ctx, r.client, allow, affected.Ports()...); err != nil {
 		return err
 	}
 	if allow {
 		return nil
 	}
-	if orphans := orphanedPorts(table, id, new, affected); len(orphans) > 0 {
-		return fmt.Errorf("the change would leave port(s) %v in no VLAN, so they could not carry any traffic; set allow_disruptive = true to proceed anyway", orphans)
+	if orphans := orphanedPorts(table, id, new, affected); !orphans.IsEmpty() {
+		return fmt.Errorf("the change would leave port(s) %s in no VLAN, so they could not carry any traffic; set allow_disruptive = true to proceed anyway", orphans)
 	}
 	return nil
 }
 
 func (m *vlan8021QGroupModel) vlan(ctx context.Context) (escp.VLAN8021Q, error) {
-	tagged, err := setToInts(ctx, m.TaggedPorts)
+	tagged, err := setToPorts(ctx, m.TaggedPorts)
 	if err != nil {
 		return escp.VLAN8021Q{}, err
 	}
-	untagged, err := setToInts(ctx, m.UntaggedPorts)
+	untagged, err := setToPorts(ctx, m.UntaggedPorts)
 	if err != nil {
 		return escp.VLAN8021Q{}, err
 	}
@@ -198,17 +180,11 @@ func (r *vlan8021QGroupResource) applyBound(ctx context.Context, m *vlan8021QGro
 	}
 	after, err := r.table(ctx)
 	got, ok := findVLAN(after, want.ID)
-	if err != nil || !ok || !sameVLAN(got, want) {
+	if err != nil || !ok || got != want {
 		add("The 802.1Q VLAN did not change as requested", fmt.Sprintf("requested %+v, the switch reports %+v (found=%t, err=%v)", want, got, ok, err))
 		return false
 	}
 	return true
-}
-
-// sameVLAN compares two VLANs by id, name and the sets of tagged and untagged ports.
-func sameVLAN(a, b escp.VLAN8021Q) bool {
-	sorted := func(p []int) string { c := append([]int{}, p...); sort.Ints(c); return fmt.Sprint(c) }
-	return a.ID == b.ID && a.Name == b.Name && sorted(a.Tagged) == sorted(b.Tagged) && sorted(a.Untagged) == sorted(b.Untagged)
 }
 
 func (r *vlan8021QGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -246,7 +222,7 @@ func (r *vlan8021QGroupResource) readBound(ctx context.Context, req resource.Rea
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	state.Name, state.TaggedPorts, state.UntaggedPorts = types.StringValue(got.Name), intsToSet(got.Tagged), intsToSet(got.Untagged)
+	state.Name, state.TaggedPorts, state.UntaggedPorts = types.StringValue(got.Name), portsToSet(got.Tagged), portsToSet(got.Untagged)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -269,7 +245,7 @@ func (r *vlan8021QGroupResource) deleteBound(ctx context.Context, req resource.D
 	if !found {
 		return // already gone
 	}
-	if err := r.guard(ctx, state.AllowDisruptive.ValueBool(), table, id, members(old), nil); err != nil {
+	if err := r.guard(ctx, state.AllowDisruptive.ValueBool(), table, id, members(old), 0); err != nil {
 		resp.Diagnostics.AddError("Refusing to remove the 802.1Q VLAN", err.Error())
 		return
 	}
@@ -305,17 +281,11 @@ func (r *vlan8021QGroupResource) ValidateConfig(ctx context.Context, req resourc
 	if !okT || !okU {
 		return
 	}
-	if len(tagged)+len(untagged) == 0 {
+	if tagged.Union(untagged).IsEmpty() {
 		resp.Diagnostics.AddAttributeError(path.Root("untagged_ports"), "VLAN without ports", "an 802.1Q VLAN needs at least one tagged or untagged port")
 	}
-	seen := map[int]bool{}
-	for _, p := range untagged {
-		seen[p] = true
-	}
-	for _, p := range tagged {
-		if seen[p] {
-			resp.Diagnostics.AddAttributeError(path.Root("tagged_ports"), "Port both tagged and untagged", fmt.Sprintf("port %d is in tagged_ports and untagged_ports", p))
-		}
+	for _, p := range tagged.Intersect(untagged).Ports() {
+		resp.Diagnostics.AddAttributeError(path.Root("tagged_ports"), "Port both tagged and untagged", fmt.Sprintf("port %d is in tagged_ports and untagged_ports", p))
 	}
 }
 

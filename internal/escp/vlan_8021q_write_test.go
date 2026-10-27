@@ -17,18 +17,15 @@ func TestVLAN8021QEncodeMatchesVendorLayout(t *testing.T) {
 		want []byte
 	}{
 		// id 2, ports 4 and 5 untagged: member mask 0x18, tagged mask 0, name "iot".
-		{"untagged", VLAN8021Q{ID: 2, Name: "iot", Untagged: []int{4, 5}}, []byte{0, 2, 0, 0, 0, 0x18, 0, 0, 0, 0, 'i', 'o', 't', 0}},
+		{"untagged", VLAN8021Q{ID: 2, Name: "iot", Untagged: MustPortSet(4, 5)}, []byte{0, 2, 0, 0, 0, 0x18, 0, 0, 0, 0, 'i', 'o', 't', 0}},
 		// id 100, port 1 tagged and port 8 untagged: member 0x81, tagged 0x01, empty name.
-		{"mixed", VLAN8021Q{ID: 100, Tagged: []int{1}, Untagged: []int{8}}, []byte{0, 100, 0, 0, 0, 0x81, 0, 0, 0, 0x01, 0}},
+		{"mixed", VLAN8021Q{ID: 100, Tagged: MustPortSet(1), Untagged: MustPortSet(8)}, []byte{0, 100, 0, 0, 0, 0x81, 0, 0, 0, 0x01, 0}},
 		// highest id, the highest port of the mask.
-		{"edges", VLAN8021Q{ID: 4094, Name: "a-b_C9", Tagged: []int{32}}, []byte{0x0f, 0xfe, 0x80, 0, 0, 0, 0x80, 0, 0, 0, 'a', '-', 'b', '_', 'C', '9', 0}},
+		{"edges", VLAN8021Q{ID: 4094, Name: "a-b_C9", Tagged: MustPortSet(32)}, []byte{0x0f, 0xfe, 0x80, 0, 0, 0, 0x80, 0, 0, 0, 'a', '-', 'b', '_', 'C', '9', 0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.v.encode()
-			if err != nil {
-				t.Fatal(err)
-			}
+			got := tt.v.encode()
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("got % x, want % x", got, tt.want)
 			}
@@ -38,11 +35,8 @@ func TestVLAN8021QEncodeMatchesVendorLayout(t *testing.T) {
 
 // What the client writes must read back as the same VLAN through the parser used for GETs.
 func TestVLAN8021QEncodeRoundTripsThroughParser(t *testing.T) {
-	want := VLAN8021Q{ID: 30, Name: "media", Tagged: []int{1, 6}, Untagged: []int{2, 3}}
-	value, err := want.encode()
-	if err != nil {
-		t.Fatal(err)
-	}
+	want := VLAN8021Q{ID: 30, Name: "media", Tagged: MustPortSet(1, 6), Untagged: MustPortSet(2, 3)}
+	value := want.encode()
 	got, err := parseDot1Q([]wire.TLV{{Type: wire.TLVVLAN8021Q, Value: []byte{1}}, {Type: wire.TLVVLAN8021QVLAN, Value: value}})
 	if err != nil {
 		t.Fatal(err)
@@ -58,11 +52,11 @@ func TestVLAN8021QValidation(t *testing.T) {
 		v    VLAN8021Q
 		frag string
 	}{
-		{"id zero", VLAN8021Q{ID: 0, Untagged: []int{1}}, "invalid VLAN id 0"},
-		{"id too big", VLAN8021Q{ID: 4095, Untagged: []int{1}}, "invalid VLAN id 4095"},
-		{"name too long", VLAN8021Q{ID: 2, Name: "elevenchars", Untagged: []int{1}}, "invalid VLAN name"},
-		{"name with space", VLAN8021Q{ID: 2, Name: "a b", Untagged: []int{1}}, "invalid VLAN name"},
-		{"both tagged and untagged", VLAN8021Q{ID: 2, Tagged: []int{3}, Untagged: []int{3}}, "port 3 is both tagged and untagged"},
+		{"id zero", VLAN8021Q{ID: 0, Untagged: MustPortSet(1)}, "invalid VLAN id 0"},
+		{"id too big", VLAN8021Q{ID: 4095, Untagged: MustPortSet(1)}, "invalid VLAN id 4095"},
+		{"name too long", VLAN8021Q{ID: 2, Name: "elevenchars", Untagged: MustPortSet(1)}, "invalid VLAN name"},
+		{"name with space", VLAN8021Q{ID: 2, Name: "a b", Untagged: MustPortSet(1)}, "invalid VLAN name"},
+		{"both tagged and untagged", VLAN8021Q{ID: 2, Tagged: MustPortSet(3), Untagged: MustPortSet(3)}, "port 3 is both tagged and untagged"},
 		{"no members", VLAN8021Q{ID: 2}, "no member ports"},
 	}
 	f := escptest.Start(t)
@@ -75,11 +69,8 @@ func TestVLAN8021QValidation(t *testing.T) {
 			}
 		})
 	}
-	if err := c.SetVLAN8021Q(context.Background(), VLAN8021Q{ID: 2, Untagged: []int{33}}); err == nil {
-		t.Fatal("port 33 does not fit in the mask")
-	}
-	if err := c.SetVLAN8021Q(context.Background(), VLAN8021Q{ID: 2, Tagged: []int{33}}); err == nil {
-		t.Fatal("tagged port 33 does not fit in the mask")
+	if err := c.SetVLAN8021Q(context.Background(), VLAN8021Q{ID: 2}); err == nil {
+		t.Fatal("a VLAN without a member port must be rejected")
 	}
 	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("rejected requests reached the switch (%d sets)", n)
@@ -90,7 +81,7 @@ func TestSetVLAN8021QWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	if err := c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 2, Name: "iot", Untagged: []int{4, 5}}); err != nil {
+	if err := c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 2, Name: "iot", Untagged: MustPortSet(4, 5)}); err != nil {
 		t.Fatal(err)
 	}
 	got := f.LastSet()
@@ -117,7 +108,7 @@ func TestSetPVIDsWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	if err := c.SetPVIDs(ctx, map[int]int{5: 300, 4: 2}); err != nil {
+	if err := c.SetPVIDs(ctx, map[PortID]int{5: 300, 4: 2}); err != nil {
 		t.Fatal(err)
 	}
 	got := f.LastSet()
@@ -127,7 +118,7 @@ func TestSetPVIDsWire(t *testing.T) {
 		t.Fatalf("wire %+v, want %+v", got, want)
 	}
 	n := f.WriteCount()
-	for name, bad := range map[string]map[int]int{"empty": {}, "port 0": {0: 2}, "port 33": {33: 2}, "pvid 0": {4: 0}, "pvid 4095": {4: 4095}} {
+	for name, bad := range map[string]map[PortID]int{"empty": {}, "port 0": {0: 2}, "port 33": {33: 2}, "pvid 0": {4: 0}, "pvid 4095": {4: 4095}} {
 		if c.SetPVIDs(ctx, bad) == nil {
 			t.Fatalf("%s must be rejected", name)
 		}

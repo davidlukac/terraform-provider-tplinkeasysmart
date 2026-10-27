@@ -15,12 +15,12 @@ func CheckTestPorts(ctx context.Context, c *escp.Client, t Target) error {
 	if err != nil {
 		return fmt.Errorf("cannot read the ports to check the test ports: %w", err)
 	}
-	byID := map[int]escp.Port{}
+	byID := map[escp.PortID]escp.Port{}
 	for _, p := range ports {
 		byID[p.ID] = p
 	}
 	for _, id := range t.TestPorts {
-		p, ok := byID[id]
+		p, ok := byID[escp.PortID(id)]
 		switch {
 		case !ok:
 			return fmt.Errorf("test port %d does not exist on the switch", id)

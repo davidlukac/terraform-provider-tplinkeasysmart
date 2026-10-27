@@ -20,9 +20,9 @@ const (
 
 // IGMPGroup is one multicast group the switch has learned through IGMP snooping.
 type IGMPGroup struct {
-	IP    string // the group address, dotted quad
-	VLAN  int    // the VLAN the group was learned in
-	Ports []int  // the ports that asked to receive it
+	IP    string  // the group address, dotted quad
+	VLAN  int     // the VLAN the group was learned in
+	Ports PortSet // the ports that asked to receive it
 }
 
 // IGMP is the Switching > IGMP Snooping page.
@@ -49,7 +49,7 @@ func parseIGMP(tlvs []wire.TLV) (IGMP, error) {
 			for i := 0; i < len(t.Value); i += igmpGroupLen {
 				e := t.Value[i : i+igmpGroupLen]
 				out.Groups = append(out.Groups, IGMPGroup{
-					IP: net.IP(e[igmpOffIP : igmpOffIP+net.IPv4len]).String(), VLAN: int(binary.BigEndian.Uint16(e[igmpOffVLAN:])), Ports: portsFromMask(e[igmpOffPorts:]),
+					IP: net.IP(e[igmpOffIP : igmpOffIP+net.IPv4len]).String(), VLAN: int(binary.BigEndian.Uint16(e[igmpOffVLAN:])), Ports: PortSetFromMask(e[igmpOffPorts:]),
 				})
 			}
 		}

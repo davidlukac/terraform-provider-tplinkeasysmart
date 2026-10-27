@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -40,7 +39,7 @@ type portVLANResource struct {
 type portVLANClient interface {
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
 	Ports(ctx context.Context) ([]escp.Port, error)
-	SetPortBasedVLAN(ctx context.Context, id int, ports []int) error
+	SetPortBasedVLAN(ctx context.Context, id int, ports escp.PortSet) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -83,7 +82,7 @@ func (r *portVLANResource) Configure(_ context.Context, req resource.ConfigureRe
 // guardVLAN checks every port of the old and new membership: none may have a
 // link up or belong to a LAG, because VLAN membership is exclusive and a
 // change moves the port out of its previous group.
-func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new []int) error {
+func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new escp.PortSet) error {
 	if allow {
 		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped")
 		return nil
@@ -92,7 +91,7 @@ func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new [
 	if err != nil {
 		return fmt.Errorf("cannot check whether the ports are in use: %w", err)
 	}
-	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{}, append(append([]int{}, old...), new...)...), func(used *safety.PortUseError) error {
+	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{}, old.Union(new)), func(used *safety.PortUseError) error {
 		switch used.Reason {
 		case safety.PortMissing:
 			return errors.New(used.Error())
@@ -104,22 +103,20 @@ func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new [
 	})
 }
 
-func (r *portVLANResource) current(ctx context.Context, group int) ([]int, error) {
+func (r *portVLANResource) current(ctx context.Context, group int) (escp.PortSet, error) {
 	v, err := r.client.PortBasedVLAN(ctx)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	if !v.Enabled {
-		return nil, &inactiveModeError{"port-based VLAN mode is not active on the switch; refusing to manage groups in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the groups when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the groups depend on it"}
+		return 0, &inactiveModeError{"port-based VLAN mode is not active on the switch; refusing to manage groups in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the groups when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the groups depend on it"}
 	}
 	for _, g := range v.VLANs {
 		if g.ID == group {
-			p := append([]int(nil), g.Ports...)
-			sort.Ints(p)
-			return p, nil
+			return g.Ports, nil
 		}
 	}
-	return []int{}, nil // group does not exist yet
+	return 0, nil // group does not exist yet
 }
 
 // apply binds the resource to the switch the plan selects, then applies it.
@@ -130,8 +127,8 @@ func (r *portVLANResource) apply(ctx context.Context, m *portVLANResourceModel, 
 
 func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceModel, add func(string, string)) bool {
 	group := int(m.VLAN.ValueInt64())
-	ports, err := setToInts(ctx, m.Ports)
-	if err != nil || len(ports) == 0 {
+	ports, err := setToPorts(ctx, m.Ports)
+	if err != nil || ports.IsEmpty() {
 		add("Invalid ports", "a VLAN group needs at least one member port")
 		return false
 	}
@@ -149,8 +146,8 @@ func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceMo
 		return false
 	}
 	got, err := r.current(ctx, group)
-	if err != nil || fmt.Sprint(got) != fmt.Sprint(ports) {
-		add("VLAN group did not change as requested", fmt.Sprintf("requested %v, switch reports %v (err=%v)", ports, got, err))
+	if err != nil || got != ports {
+		add("VLAN group did not change as requested", fmt.Sprintf("requested %s, switch reports %s (err=%v)", ports, got, err))
 		return false
 	}
 	return true
@@ -186,11 +183,11 @@ func (r *portVLANResource) readBound(ctx context.Context, req resource.ReadReque
 		}
 		return
 	}
-	if len(got) == 0 {
+	if got.IsEmpty() {
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	state.Ports = intsToSet(got)
+	state.Ports = portsToSet(got)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -209,11 +206,11 @@ func (r *portVLANResource) deleteBound(ctx context.Context, req resource.DeleteR
 		}
 		return
 	}
-	if err := r.guardVLAN(ctx, state.AllowDisruptive.ValueBool(), old, nil); err != nil {
+	if err := r.guardVLAN(ctx, state.AllowDisruptive.ValueBool(), old, 0); err != nil {
 		resp.Diagnostics.AddError("Refusing to remove VLAN group", err.Error())
 		return
 	}
-	if err := r.client.SetPortBasedVLAN(ctx, group, nil); err != nil {
+	if err := r.client.SetPortBasedVLAN(ctx, group, 0); err != nil {
 		resp.Diagnostics.AddError("Removing VLAN group failed", err.Error())
 	}
 }

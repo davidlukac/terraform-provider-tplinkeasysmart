@@ -151,7 +151,7 @@ func (w *faultyClient) LAGs(ctx context.Context) ([]escp.LAG, error) {
 	return w.SwitchClient.LAGs(ctx)
 }
 
-func (w *faultyClient) SetLAG(ctx context.Context, group int, ports []int) error {
+func (w *faultyClient) SetLAG(ctx context.Context, group int, ports escp.PortSet) error {
 	return w.write("SetLAG", func() error { return w.SwitchClient.SetLAG(ctx, group, ports) })
 }
 
@@ -202,7 +202,7 @@ func (w *faultyClient) PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, e
 	return w.SwitchClient.PortBasedVLAN(ctx)
 }
 
-func (w *faultyClient) SetPortBasedVLAN(ctx context.Context, id int, ports []int) error {
+func (w *faultyClient) SetPortBasedVLAN(ctx context.Context, id int, ports escp.PortSet) error {
 	return w.write("SetPortBasedVLAN", func() error { return w.SwitchClient.SetPortBasedVLAN(ctx, id, ports) })
 }
 
@@ -224,7 +224,7 @@ func (w *faultyClient) SetQoSMode(ctx context.Context, mode escp.QoSMode) error 
 	return w.write("SetQoSMode", func() error { return w.SwitchClient.SetQoSMode(ctx, mode) })
 }
 
-func (w *faultyClient) SetPortPriorities(ctx context.Context, changes map[int]escp.Priority) error {
+func (w *faultyClient) SetPortPriorities(ctx context.Context, changes map[escp.PortID]escp.Priority) error {
 	return w.write("SetPortPriorities", func() error { return w.SwitchClient.SetPortPriorities(ctx, changes) })
 }
 
@@ -269,6 +269,6 @@ func (w *faultyClient) DeleteVLAN8021Q(ctx context.Context, id int) error {
 	return w.write("DeleteVLAN8021Q", func() error { return w.SwitchClient.DeleteVLAN8021Q(ctx, id) })
 }
 
-func (w *faultyClient) SetPVIDs(ctx context.Context, pvids map[int]int) error {
+func (w *faultyClient) SetPVIDs(ctx context.Context, pvids map[escp.PortID]int) error {
 	return w.write("SetPVIDs", func() error { return w.SwitchClient.SetPVIDs(ctx, pvids) })
 }

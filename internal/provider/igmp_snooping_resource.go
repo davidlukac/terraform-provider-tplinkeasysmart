@@ -89,8 +89,8 @@ var igmpGroupType = types.ObjectType{AttrTypes: map[string]attr.Type{
 func igmpToModel(sw types.String, s escp.IGMP) igmpModel {
 	groups := make([]attr.Value, 0, len(s.Groups))
 	for _, g := range s.Groups {
-		ports := make([]attr.Value, 0, len(g.Ports))
-		for _, p := range g.Ports {
+		ports := make([]attr.Value, 0, g.Ports.Len())
+		for _, p := range g.Ports.Ports() {
 			ports = append(ports, types.Int64Value(int64(p)))
 		}
 		groups = append(groups, types.ObjectValueMust(igmpGroupType.AttrTypes, map[string]attr.Value{
