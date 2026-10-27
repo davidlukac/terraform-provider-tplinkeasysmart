@@ -92,7 +92,7 @@ func (g *gatedClient) SetPortMirror(ctx context.Context, m escp.Mirror) error {
 	return g.SwitchClient.SetPortMirror(ctx, m)
 }
 
-func (g *gatedClient) SetPortBasedVLAN(ctx context.Context, id int, ports escp.PortSet) error {
+func (g *gatedClient) SetPortBasedVLAN(ctx context.Context, id escp.PortVLANID, ports escp.PortSet) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}

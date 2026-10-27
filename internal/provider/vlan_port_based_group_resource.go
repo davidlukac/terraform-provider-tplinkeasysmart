@@ -39,7 +39,7 @@ type portVLANResource struct {
 type portVLANClient interface {
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
 	Ports(ctx context.Context) ([]escp.Port, error)
-	SetPortBasedVLAN(ctx context.Context, id int, ports escp.PortSet) error
+	SetPortBasedVLAN(ctx context.Context, id escp.PortVLANID, ports escp.PortSet) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -67,7 +67,7 @@ func (r *portVLANResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: resourceSwitchAttribute(),
 			"vlan": schema.Int64Attribute{Required: true, Description: "VLAN group id.",
-				Validators:    []validator.Int64{validByteID()},
+				Validators:    []validator.Int64{validPortVLANID()},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
 			"ports":             schema.SetAttribute{Required: true, ElementType: types.Int64Type, Validators: []validator.Set{validPortSet(), setvalidator.SizeAtLeast(1)}, Description: "Member ports (at least one)."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow touching ports that have a link up or belong to a LAG. Defaults to false."),
@@ -103,7 +103,7 @@ func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new e
 	})
 }
 
-func (r *portVLANResource) current(ctx context.Context, group int) (escp.PortSet, error) {
+func (r *portVLANResource) current(ctx context.Context, group escp.PortVLANID) (escp.PortSet, error) {
 	v, err := r.client.PortBasedVLAN(ctx)
 	if err != nil {
 		return 0, err
@@ -126,7 +126,7 @@ func (r *portVLANResource) apply(ctx context.Context, m *portVLANResourceModel, 
 }
 
 func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceModel, add func(string, string)) bool {
-	group := int(m.VLAN.ValueInt64())
+	group := escp.PortVLANID(m.VLAN.ValueInt64())
 	ports, err := setToPorts(ctx, m.Ports)
 	if err != nil || ports.IsEmpty() {
 		add("Invalid ports", "a VLAN group needs at least one member port")
@@ -176,7 +176,7 @@ func (r *portVLANResource) readBound(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	got, err := r.current(ctx, int(state.VLAN.ValueInt64()))
+	got, err := r.current(ctx, escp.PortVLANID(state.VLAN.ValueInt64()))
 	if err != nil {
 		if !warnInactiveMode(&resp.Diagnostics, err, "the port-based VLAN groups", "The state of this resource is kept as it is and cannot be checked until the mode is switched back; changes are refused meanwhile") {
 			resp.Diagnostics.AddError("Reading VLAN group failed", err.Error())
@@ -198,7 +198,7 @@ func (r *portVLANResource) deleteBound(ctx context.Context, req resource.DeleteR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	group := int(state.VLAN.ValueInt64())
+	group := escp.PortVLANID(state.VLAN.ValueInt64())
 	old, err := r.current(ctx, group)
 	if err != nil {
 		if !warnInactiveMode(&resp.Diagnostics, err, "the port-based VLAN groups", "The group cannot be removed meanwhile, so the resource is only forgotten and the switch is left as it is") {

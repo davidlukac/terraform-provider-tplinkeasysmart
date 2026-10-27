@@ -136,7 +136,7 @@ func faultScenarios() []faultScenario {
 		{
 			name: "port-based vlan group", addr: "tplinkeasysmart_vlan_port_based_group.v",
 			fake: func() *fakeClient {
-				return &fakeClient{ports: lagPorts(), pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
+				return &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
 			},
 			create: vlanGroupConfig(2, "  ports = [6, 7]\n"), update: vlanGroupConfig(2, "  ports = [6]\n"),
 			writeMethod: "SetPortBasedVLAN", writeErr: "Setting VLAN group failed",
@@ -306,7 +306,7 @@ func TestGuardCannotBeBypassedByAFailingPortLookup(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			inner := &fakeClient{ports: lagPorts(), lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}, pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)},
+			inner := &fakeClient{ports: lagPorts(), lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}, pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)},
 				bw: map[escp.PortID][2]int{}, storm: map[escp.PortID]escp.PortStorm{}, mirror: &escp.Mirror{}}
 			// testPorts has port 7; lagPorts too
 			fc := newFaulty(inner)
@@ -369,7 +369,7 @@ func TestAllowDisruptiveReallyAllowsTheWrite(t *testing.T) {
 			func(f *fakeClient) bool { return f.lags[1] == escp.MustPortSet(3, 4) }},
 		{"VLAN group over a linked port", vlanGroupConfig(2, "  ports = [4]\n  allow_disruptive = true\n"),
 			func() *fakeClient {
-				return &fakeClient{ports: lagPorts(), pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
+				return &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
 			},
 			func(f *fakeClient) bool { return f.pvlans[2] == escp.MustPortSet(4) }},
 	}
