@@ -82,9 +82,9 @@ func (e *extraState) info() (escp.Info, bool, error) {
 		return escp.Info{}, true, e.infoErr
 	}
 	if !e.active {
-		return escp.Info{Firmware: e.firmwareVersion()}, false, nil
+		return escp.Info{Firmware: escp.ParseFirmware(e.firmwareVersion())}, false, nil
 	}
-	return escp.Info{Model: "TL-SG108E", Hostname: e.hostname, MAC: fakeMAC, Firmware: e.firmwareVersion(),
+	return escp.Info{Model: "TL-SG108E", Hostname: e.hostname, MAC: fakeMAC, Firmware: escp.ParseFirmware(e.firmwareVersion()),
 		IP: netip.MustParseAddr(e.ip), Netmask: netip.MustParseAddr(orDefault(e.netmask, "255.255.255.0")), Gateway: netip.MustParseAddr(orDefault(e.gateway, "192.0.2.1")), DHCP: !e.static}, true, nil
 }
 

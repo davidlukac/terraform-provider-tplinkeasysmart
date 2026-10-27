@@ -10,34 +10,9 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
-func TestFirmwareBuild(t *testing.T) {
-	tests := []struct {
-		version string
-		want    string
-		ok      bool
-	}{
-		{"1.0.0 Build 20230218 Rel.50633", "20230218", true}, // switch 01, as reported by discovery
-		{"1.0.0 Build 20250710 Rel.71093", "20250710", true}, // switch 03
-		{"1.0.0 Build 20230218", "20230218", true},
-		{"1.0.0", "", false},
-		{"", "", false},
-		{"Build 2023021", "", false},                // seven digits is not a date
-		{"1.0.0 Build 2025071012 Rel.1", "", false}, // ten digits are not a verified date with a tail
-		{"1.0.0 Build 202302189 Rel.1", "", false},
-		{"1.0.0 Build 20230218Rel.50633", "", false}, // glued to a letter is not the format the switch reports
-		{"1.0.0 Build 20230218.", "20230218", true},
-	}
-	for _, tt := range tests {
-		got, ok := FirmwareBuild(tt.version)
-		if got != tt.want || ok != tt.ok {
-			t.Errorf("FirmwareBuild(%q) = %q, %t; want %q, %t", tt.version, got, ok, tt.want, tt.ok)
-		}
-	}
-}
-
 func TestCheckFirmware(t *testing.T) {
 	for _, v := range []string{"1.0.0 Build 20230218 Rel.50633", "1.0.0 Build 20250710 Rel.71093"} {
-		if err := CheckFirmware(v); err != nil {
+		if err := CheckFirmware(escp.ParseFirmware(v)); err != nil {
 			t.Errorf("%q must be verified: %v", v, err)
 		}
 	}
@@ -52,7 +27,7 @@ func TestCheckFirmware(t *testing.T) {
 		{"", "has no build date", FirmwareNoBuildDate, ""},
 	}
 	for _, tt := range tests {
-		err := CheckFirmware(tt.version)
+		err := CheckFirmware(escp.ParseFirmware(tt.version))
 		var fe *FirmwareError
 		if !errors.As(err, &fe) || fe.Reason != tt.reason || fe.Build != tt.build || fe.Version != tt.version || !strings.Contains(err.Error(), tt.frag) {
 			t.Errorf("CheckFirmware(%q) = %#v, want reason %d build %q containing %q", tt.version, err, tt.reason, tt.build, tt.frag)
@@ -66,7 +41,7 @@ func TestCheckFirmware(t *testing.T) {
 // The verified list in an error is a copy: a caller cannot change the allow-list through it.
 func TestFirmwareErrorDoesNotExposeTheAllowList(t *testing.T) {
 	var fe *FirmwareError
-	if !errors.As(CheckFirmware("1.0.0 Build 20990101 Rel.1"), &fe) {
+	if !errors.As(CheckFirmware(escp.ParseFirmware("1.0.0 Build 20990101 Rel.1")), &fe) {
 		t.Fatal("want a FirmwareError")
 	}
 	fe.Verified[0] = "tampered"
@@ -82,10 +57,10 @@ func TestVerifiedFirmwareBuildsIsACopy(t *testing.T) {
 		t.Fatalf("the two builds tested on real switches must be listed, got %v", got)
 	}
 	got[0] = "20990101" // overwrite an entry of the copy with a build nobody verified
-	if err := CheckFirmware("1.0.0 Build 20990101 Rel.1"); err == nil {
+	if err := CheckFirmware(escp.ParseFirmware("1.0.0 Build 20990101 Rel.1")); err == nil {
 		t.Error("a build written into the copy passed the gate")
 	}
-	if err := CheckFirmware("1.0.0 Build 20230218 Rel.50633"); err != nil {
+	if err := CheckFirmware(escp.ParseFirmware("1.0.0 Build 20230218 Rel.50633")); err != nil {
 		t.Errorf("a verified build was refused after the copy was changed: %v", err)
 	}
 }
@@ -99,7 +74,7 @@ type infoSource struct {
 
 func (s *infoSource) Info(context.Context) (escp.Info, error) {
 	s.reads++
-	return escp.Info{Firmware: s.firmware}, s.err
+	return escp.Info{Firmware: escp.ParseFirmware(s.firmware)}, s.err
 }
 
 func TestFirmwareGateAllowsVerifiedBuildsAndReadsTheFirmwareOnce(t *testing.T) {
