@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -51,5 +52,21 @@ func TestSetPortBasedVLANWire(t *testing.T) {
 	}
 	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")
+	}
+}
+
+func TestPortVLANID(t *testing.T) {
+	for _, g := range []PortVLANID{1, 2, MaxPortVLANID} {
+		if err := g.Validate(); err != nil {
+			t.Errorf("id %d: %v", g, err)
+		}
+	}
+	for _, g := range []PortVLANID{-1, 0, MaxPortVLANID + 1} {
+		if err := g.Validate(); !errors.Is(err, ErrInvalid) {
+			t.Errorf("id %d: got %v, want ErrInvalid", g, err)
+		}
+	}
+	if PortVLANID(12).String() != "12" {
+		t.Error("an id prints as its number")
 	}
 }

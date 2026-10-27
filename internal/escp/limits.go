@@ -9,8 +9,6 @@ const (
 	RateStepKbps = 64
 	// MaxHostnameLen is the longest device description the switch accepts.
 	MaxHostnameLen = 32
-	// MaxByteID is the largest LAG group or VLAN id: ids are one byte on the wire.
-	MaxByteID = 255
 	// maskLen is the size of a port mask on the wire.
 	maskLen = 4
 )
@@ -31,11 +29,3 @@ func (k Kbps) Validate() error {
 
 // String is the rate with its unit, "128 kbps".
 func (k Kbps) String() string { return strconv.Itoa(int(k)) + " kbps" }
-
-// validateByteID checks an id (LAG group, port-based VLAN) that is one byte on the wire.
-func validateByteID(kind string, id int) error {
-	if id < 1 || id > MaxByteID {
-		return invalidf("escp: invalid %s %d (valid: 1-%d)", kind, id, MaxByteID)
-	}
-	return nil
-}

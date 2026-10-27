@@ -74,7 +74,7 @@ func TestAccVLAN8021QPVIDDestroyWhileTheModeIsOffOnlyForgets(t *testing.T) {
 }
 
 func TestAccVLANPortBasedGroupReadAndDestroyWhileTheModeIsOff(t *testing.T) {
-	f := &fakeClient{ports: lagPorts(), pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
+	f := &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
 	cfg := vlanGroupConfig(2, "  ports = [6, 7]\n")
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),

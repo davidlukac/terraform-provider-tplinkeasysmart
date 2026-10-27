@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
@@ -13,10 +14,28 @@ const (
 	pvlanEntryLen = pvlanOffMask + maskLen
 )
 
-// PortVLAN is one port-based VLAN group: the VLAN id (1 to MaxByteID) and its member ports.
+// MaxPortVLANID is the largest port-based VLAN id: the id is one byte on the wire.
+const MaxPortVLANID = 255
+
+// PortVLANID is the id of a port-based VLAN group, 1 to MaxPortVLANID. It is not an 802.1Q VLAN
+// id (VLANID): the two modes have their own groups and their own ranges.
+type PortVLANID int
+
+// Validate reports whether g is an id the switch can hold; the error matches ErrInvalid.
+func (g PortVLANID) Validate() error {
+	if g < 1 || g > MaxPortVLANID {
+		return invalidf("escp: invalid port-based VLAN id %d (valid: 1-%d)", int(g), MaxPortVLANID)
+	}
+	return nil
+}
+
+// String is the id as a number.
+func (g PortVLANID) String() string { return strconv.Itoa(int(g)) }
+
+// PortVLAN is one port-based VLAN group: the VLAN id (1 to MaxPortVLANID) and its member ports.
 // Membership is exclusive: a port is in one group at a time.
 type PortVLAN struct {
-	ID    int
+	ID    PortVLANID
 	Ports PortSet
 }
 
@@ -46,7 +65,7 @@ func parsePortBasedVLAN(tlvs []wire.TLV) (PortBasedVLAN, error) {
 			if len(t.Value) != pvlanEntryLen {
 				return out, fmt.Errorf("escp: port-based VLAN entry has %d bytes, want %d", len(t.Value), pvlanEntryLen)
 			}
-			out.VLANs = append(out.VLANs, PortVLAN{ID: int(t.Value[0]), Ports: PortSetFromMask(t.Value[pvlanOffMask:])})
+			out.VLANs = append(out.VLANs, PortVLAN{ID: PortVLANID(t.Value[0]), Ports: PortSetFromMask(t.Value[pvlanOffMask:])})
 		}
 	}
 	if !seen {
@@ -68,12 +87,12 @@ func (c *Client) PortBasedVLAN(ctx context.Context) (PortBasedVLAN, error) {
 // the VLAN id (1 byte) and the member port mask. An empty port set removes
 // the group. The mode itself (enabled/disabled) is not touched. Changing a
 // group whose ports carry traffic can cut connectivity; callers must guard.
-func (c *Client) SetPortBasedVLAN(ctx context.Context, id int, ports PortSet) error {
-	if err := validateByteID("port-based VLAN id", id); err != nil {
+func (c *Client) SetPortBasedVLAN(ctx context.Context, id PortVLANID, ports PortSet) error {
+	if err := id.Validate(); err != nil {
 		return err
 	}
 	if err := c.requirePorts(ctx, ports); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, Operation{Name: "SetPortBasedVLAN", Ports: ports, Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: id}, wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(id)}, ports.Mask()...)})
+	return c.setTLVs(ctx, Operation{Name: "SetPortBasedVLAN", Ports: ports, Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: int(id)}, wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(id)}, ports.Mask()...)})
 }

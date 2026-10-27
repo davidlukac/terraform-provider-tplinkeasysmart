@@ -195,7 +195,7 @@ func TestLAGResourceSpecifics(t *testing.T) {
 
 func TestVLANGroupResourceSpecifics(t *testing.T) {
 	newFake := func() *fakeClient {
-		return &fakeClient{ports: lagPorts(), pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
+		return &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
 	}
 	t.Run("a group needs at least one member", func(t *testing.T) {
 		t.Parallel()
@@ -231,7 +231,7 @@ func TestVLANGroupResourceSpecifics(t *testing.T) {
 	})
 	t.Run("a port in a LAG cannot be moved", func(t *testing.T) {
 		t.Parallel()
-		inner := &fakeClient{pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 5, 6, 7)},
+		inner := &fakeClient{pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 5, 6, 7)},
 			ports: append(lagPorts(), escp.Port{ID: 5, Enabled: true, LAG: 2, ConfiguredSpeed: "auto", ActualSpeed: "link-down"})}
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),

@@ -19,7 +19,7 @@ import (
 type fakeClient struct {
 	mu      sync.Mutex
 	igmp    escp.IGMP
-	pvlans  map[int]escp.PortSet
+	pvlans  map[escp.PortVLANID]escp.PortSet
 	lags    map[escp.LAGID]escp.PortSet
 	mirror  *escp.Mirror
 	storm   map[escp.PortID]escp.PortStorm
@@ -164,7 +164,7 @@ func (f *fakeClient) MTUVLAN(context.Context) (escp.MTUVLAN, error) {
 	return escp.MTUVLAN{Enabled: true, UplinkPort: 8}, nil
 }
 
-func (f *fakeClient) SetPortBasedVLAN(_ context.Context, id int, ports escp.PortSet) error {
+func (f *fakeClient) SetPortBasedVLAN(_ context.Context, id escp.PortVLANID, ports escp.PortSet) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	// membership is exclusive: take the ports out of every other group, return them to VLAN 1 on delete
@@ -188,7 +188,7 @@ func (f *fakeClient) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) 
 	}
 	if f.pvlans != nil {
 		v := escp.PortBasedVLAN{Enabled: !f.pvlanOff, MaxVLAN: 8}
-		for _, id := range []int{1, 2} {
+		for _, id := range []escp.PortVLANID{1, 2} {
 			if ps, ok := f.pvlans[id]; ok {
 				v.VLANs = append(v.VLANs, escp.PortVLAN{ID: id, Ports: ps})
 			}
@@ -931,7 +931,7 @@ func vlanGroupConfig(id int, body string) string {
 }
 
 func TestAccVLANGroupLifecycleOnUnusedPorts(t *testing.T) {
-	f := &fakeClient{ports: lagPorts(), pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
+	f := &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
@@ -946,7 +946,7 @@ func TestAccVLANGroupLifecycleOnUnusedPorts(t *testing.T) {
 }
 
 func TestAccVLANGroupGuard(t *testing.T) {
-	f := &fakeClient{ports: lagPorts(), pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
+	f := &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{

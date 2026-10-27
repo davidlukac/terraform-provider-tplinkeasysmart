@@ -84,8 +84,9 @@ func membersOf(ctx context.Context, r portReader, kind escp.GroupKind, id int) (
 		if err != nil {
 			return 0, err
 		}
+		want := escp.PortVLANID(id)
 		for _, g := range v.VLANs {
-			if g.ID == id {
+			if g.ID == want {
 				return g.Ports, nil
 			}
 		}

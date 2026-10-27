@@ -450,7 +450,7 @@ func TestLiveLAG2(t *testing.T) {
 	}
 }
 
-func portVLANByID(v PortBasedVLAN, id int) (PortVLAN, bool) {
+func portVLANByID(v PortBasedVLAN, id PortVLANID) (PortVLAN, bool) {
 	for _, g := range v.VLANs {
 		if g.ID == id {
 			return g, true

@@ -49,7 +49,7 @@ func TestAllowDisruptiveAloneNeverTouchesTheSwitch(t *testing.T) {
 			lagConfig(1, "  ports = [2, 3, 4]\n"), `link up`},
 		{"vlan_port_based_group", "tplinkeasysmart_vlan_port_based_group.v",
 			func() *fakeClient {
-				return &fakeClient{ports: lagPorts(), pvlans: map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
+				return &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
 			},
 			vlanGroupConfig(2, "  ports = [4]\n  allow_disruptive = true\n"), vlanGroupConfig(2, "  ports = [4]\n"),
 			vlanGroupConfig(2, "  ports = [4, 6]\n"), `port 4 has a link up`},

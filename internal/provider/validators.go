@@ -34,8 +34,8 @@ func validPortSet() validator.Set {
 	return setvalidator.ValueInt64sAre(int64validator.Between(1, escp.MaxPort))
 }
 
-// validByteID accepts an id that is one byte on the wire (LAG group, VLAN id).
-func validByteID() validator.Int64 { return int64validator.Between(1, escp.MaxByteID) }
+// validPortVLANID accepts the id of a port-based VLAN group.
+func validPortVLANID() validator.Int64 { return int64validator.Between(1, escp.MaxPortVLANID) }
 
 // speedNames are the configurable port speeds as Terraform spells them.
 func speedNames() []string {

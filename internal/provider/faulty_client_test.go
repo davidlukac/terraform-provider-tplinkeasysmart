@@ -202,7 +202,7 @@ func (w *faultyClient) PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, e
 	return w.SwitchClient.PortBasedVLAN(ctx)
 }
 
-func (w *faultyClient) SetPortBasedVLAN(ctx context.Context, id int, ports escp.PortSet) error {
+func (w *faultyClient) SetPortBasedVLAN(ctx context.Context, id escp.PortVLANID, ports escp.PortSet) error {
 	return w.write("SetPortBasedVLAN", func() error { return w.SwitchClient.SetPortBasedVLAN(ctx, id, ports) })
 }
 

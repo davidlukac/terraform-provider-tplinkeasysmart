@@ -20,7 +20,7 @@ func pvFakes() *fakeClient {
 	f := newFakeQoS()
 	f.ports = lagPorts()
 	f.lags = map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}
-	f.pvlans = map[int]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}
+	f.pvlans = map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}
 	f.mirror = &escp.Mirror{}
 	f.storm = map[escp.PortID]escp.PortStorm{}
 	f.bw = map[escp.PortID][2]int{}
