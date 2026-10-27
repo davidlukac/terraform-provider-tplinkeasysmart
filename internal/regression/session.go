@@ -31,8 +31,8 @@ type Session struct {
 	// Fake is the in-process switch, nil on hardware.
 	Fake   *escptest.Switch
 	Client *escp.Client
-	// MAC is the MAC address the target reports about itself, in the form the client prints it.
-	MAC    string
+	// MAC is the MAC address the target reports about itself.
+	MAC    escp.MAC
 	before Readout
 	rd     []Reader
 	tb     testing.TB
@@ -88,7 +88,7 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 	if s.before, err = Take(context.Background(), s.rd); err != nil {
 		t.Fatalf("first readout of %s: %v", target.Name, err)
 	}
-	s.MAC = s.before["mac"]
+	s.MAC, _ = escp.ParseMAC(s.before["mac"]) // the readout prints MAC.String(), which always parses
 	if err := CheckTestPorts(context.Background(), s.Client, target); err != nil {
 		t.Fatalf("%s: %v", target.Name, err)
 	}
@@ -149,12 +149,12 @@ func (s *Session) ProviderHCL() string {
 
 // ProviderHCLByMAC is the provider block naming the switch by its MAC address only: no address
 // anywhere, so the provider has to find it. host, when not empty, is added as an address to try first.
-func (s *Session) ProviderHCLByMAC(host, mac string) string {
+func (s *Session) ProviderHCLByMAC(host string, mac escp.MAC) string {
 	hostLine := ""
 	if host != "" {
 		hostLine = fmt.Sprintf("  host     = %q\n", host)
 	}
-	return fmt.Sprintf("provider \"tplinkeasysmart\" {\n%s  mac      = %q\n  username = %q\n  password = %q\n}\n", hostLine, mac, s.Target.Username, s.Target.Password.Reveal())
+	return fmt.Sprintf("provider \"tplinkeasysmart\" {\n%s  mac      = %q\n  username = %q\n  password = %q\n}\n", hostLine, mac.String(), s.Target.Username, s.Target.Password.Reveal())
 }
 
 // Before is the readout taken when the session opened: what every scenario must leave behind.

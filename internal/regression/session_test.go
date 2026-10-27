@@ -191,14 +191,10 @@ func TestOpenStopsWhenATestPortHasALink(t *testing.T) {
 
 func TestAClientWithOnlyAMACFindsTheFakeWhenTheMACIsItsOwn(t *testing.T) {
 	s := Open(t, noEnv)
-	if s.MAC != escp.MAC(escptest.DefaultMAC).String() {
+	if s.MAC != escp.MAC(escptest.DefaultMAC) {
 		t.Fatalf("the session reports MAC %q, want the fake's %v", s.MAC, escptest.DefaultMAC)
 	}
-	hw, err := escp.ParseMAC(s.MAC)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c, err := s.dialClient(escp.Config{MAC: hw, Username: s.Target.Username, Password: s.Target.Password})
+	c, err := s.dialClient(escp.Config{MAC: s.MAC, Username: s.Target.Username, Password: s.Target.Password})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,11 +211,11 @@ func TestAClientWithOnlyAMACFindsTheFakeWhenTheMACIsItsOwn(t *testing.T) {
 func TestProviderBlockByMAC(t *testing.T) {
 	s := Open(t, noEnv)
 	only := s.ProviderHCLByMAC("", s.MAC)
-	if !strings.Contains(only, `mac      = "`+s.MAC+`"`) || strings.Contains(only, "host") {
+	if !strings.Contains(only, `mac      = "`+s.MAC.String()+`"`) || strings.Contains(only, "host") {
 		t.Errorf("a block by MAC alone must name no host: %q", only)
 	}
 	both := s.ProviderHCLByMAC("192.0.2.9", s.MAC)
-	if !strings.Contains(both, `host     = "192.0.2.9"`) || !strings.Contains(both, `mac      = "`+s.MAC+`"`) {
+	if !strings.Contains(both, `host     = "192.0.2.9"`) || !strings.Contains(both, `mac      = "`+s.MAC.String()+`"`) {
 		t.Errorf("a block with both: %q", both)
 	}
 }

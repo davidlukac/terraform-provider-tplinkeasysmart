@@ -134,7 +134,7 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 	t.Cleanup(func() { s.bringBack(t, original) }) // registered before the first write
 
 	hcl := func(ip, mask, gateway string) string {
-		return s.ProviderHCLByMAC("", info.MAC.String()) +
+		return s.ProviderHCLByMAC("", info.MAC) +
 			fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", ip, mask, gateway)
 	}
 	// reportsIP asks, with a client that has only the MAC, where the switch is now. The switch
@@ -221,7 +221,7 @@ func TestScenarioManagementDHCP(t *testing.T) {
 	original := ipConfigOfInfo(info)
 	t.Cleanup(func() { s.bringBackFromALease(t, hw, original) }) // registered before the first write
 
-	provider := s.ProviderHCLByMAC("", info.MAC.String())
+	provider := s.ProviderHCLByMAC("", info.MAC)
 	dhcp := provider + "resource \"tplinkeasysmart_management_ip\" \"this\" {\n  dhcp             = true\n  allow_disruptive = true\n}\n"
 	static := provider + fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", info.IP.String(), info.Netmask.String(), info.Gateway.String())
 	leased := func(*terraform.State) error {
