@@ -399,7 +399,7 @@ func TestLivePortMirror(t *testing.T) {
 	}
 }
 
-func lagByID(t *testing.T, c *Client, id int) LAG {
+func lagByID(t *testing.T, c *Client, id LAGID) LAG {
 	t.Helper()
 	lags, err := c.LAGs(context.Background())
 	if err != nil {
@@ -422,8 +422,8 @@ func TestLiveLAG2(t *testing.T) {
 	a, b, _ := liveTestPorts(t)
 	livePort(t, c, a)
 	livePort(t, c, b)
-	group := int((a-1)/LAGPortsPerGroup + 1)
-	if other := int((b-1)/LAGPortsPerGroup + 1); other != group {
+	group := LAGID((a-1)/LAGPortsPerGroup + 1)
+	if other := LAGID((b-1)/LAGPortsPerGroup + 1); other != group {
 		t.Skipf("ports %d and %d are not in the same LAG range", a, b)
 	}
 	untouched := 3 - group

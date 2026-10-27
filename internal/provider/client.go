@@ -17,7 +17,7 @@ type SwitchClient interface {
 	SetPort(ctx context.Context, cfg escp.PortConfig) error
 	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
 	LAGs(ctx context.Context) ([]escp.LAG, error)
-	SetLAG(ctx context.Context, group int, ports escp.PortSet) error
+	SetLAG(ctx context.Context, group escp.LAGID, ports escp.PortSet) error
 	IGMP(ctx context.Context) (escp.IGMP, error)
 	SetIGMP(ctx context.Context, cfg escp.IGMPConfig) error
 	LoopPrevention(ctx context.Context) (bool, error)

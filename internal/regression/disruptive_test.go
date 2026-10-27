@@ -91,7 +91,7 @@ func TestScenarioDisruptivePortDisable(t *testing.T) {
 func TestScenarioDisruptiveLAG(t *testing.T) {
 	s := openForScenario(t)
 	var a, b escp.PortID
-	var group int
+	var group escp.LAGID
 	for _, x := range s.disruptivePorts(t) {
 		for _, y := range s.disruptivePorts(t) {
 			px, py := s.portOf(t, x), s.portOf(t, y)
@@ -114,7 +114,7 @@ func TestScenarioDisruptiveLAG(t *testing.T) {
 			return err
 		}
 		for _, l := range got {
-			if l.ID == group && l.Ports == escp.MustPortSet(escp.PortID(a), escp.PortID(b)) {
+			if l.ID == group && l.Ports == escp.MustPortSet(a, b) {
 				return nil
 			}
 		}

@@ -43,7 +43,7 @@ func TestAllowDisruptiveAloneNeverTouchesTheSwitch(t *testing.T) {
 			mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [6, 7]\n"), `port 4 has a link up`},
 		{"lag", "tplinkeasysmart_lag.l",
 			func() *fakeClient {
-				return &fakeClient{ports: lagPorts(), lags: map[int]escp.PortSet{1: escp.MustPortSet(1, 2)}}
+				return &fakeClient{ports: lagPorts(), lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}}
 			},
 			lagConfig(1, "  ports = [3, 4]\n  allow_disruptive = true\n"), lagConfig(1, "  ports = [3, 4]\n"),
 			lagConfig(1, "  ports = [2, 3, 4]\n"), `link up`},

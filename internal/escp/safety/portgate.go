@@ -59,7 +59,7 @@ func PortGate() escp.WriteGate {
 		}
 		rule := PortRule{}
 		if op.Replaces == escp.GroupLAG {
-			rule.TolerateLAG = op.ID
+			rule.TolerateLAG = escp.LAGID(op.ID) // the group number of a LAG write is the LAG id
 		}
 		return CheckPorts(all, rule, touched)
 	}
@@ -73,8 +73,9 @@ func membersOf(ctx context.Context, r portReader, kind escp.GroupKind, id int) (
 		if err != nil {
 			return 0, err
 		}
+		want := escp.LAGID(id)
 		for _, l := range lags {
-			if l.ID == id {
+			if l.ID == want {
 				return l.Ports, nil
 			}
 		}

@@ -151,7 +151,7 @@ func (w *faultyClient) LAGs(ctx context.Context) ([]escp.LAG, error) {
 	return w.SwitchClient.LAGs(ctx)
 }
 
-func (w *faultyClient) SetLAG(ctx context.Context, group int, ports escp.PortSet) error {
+func (w *faultyClient) SetLAG(ctx context.Context, group escp.LAGID, ports escp.PortSet) error {
 	return w.write("SetLAG", func() error { return w.SwitchClient.SetLAG(ctx, group, ports) })
 }
 

@@ -18,7 +18,7 @@ type PortUse struct {
 	// without a link).
 	Speed escp.Speed
 	// LAG is the link aggregation group the port belongs to, 0 for none.
-	LAG int
+	LAG escp.LAGID
 }
 
 // LinkUp reports whether the port carries a link, and so may carry traffic or the
@@ -71,7 +71,7 @@ type PortUseError struct {
 	Port   escp.PortID
 	Reason PortReason
 	Speed  escp.Speed // the negotiated speed (PortLinkUp)
-	LAG    int        // the group (PortInLAG)
+	LAG    escp.LAGID // the group (PortInLAG)
 }
 
 // Error names the port and why it may not be written: it does not exist, it has a link, or it is in a
@@ -91,7 +91,7 @@ func (e *PortUseError) Error() string {
 type PortRule struct {
 	// TolerateLAG is a group whose members are fine, for an edit of that very group; zero for
 	// none. A link is never tolerated.
-	TolerateLAG int
+	TolerateLAG escp.LAGID
 }
 
 // CheckPorts returns a *PortUseError for the lowest-numbered of ports that does not exist, has a link up, or belongs to a LAG the rule does not tolerate, in

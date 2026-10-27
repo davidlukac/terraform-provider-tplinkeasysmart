@@ -64,7 +64,7 @@ func (g *gatedClient) SetPort(ctx context.Context, cfg escp.PortConfig) error {
 	return g.SwitchClient.SetPort(ctx, cfg)
 }
 
-func (g *gatedClient) SetLAG(ctx context.Context, group int, ports escp.PortSet) error {
+func (g *gatedClient) SetLAG(ctx context.Context, group escp.LAGID, ports escp.PortSet) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
