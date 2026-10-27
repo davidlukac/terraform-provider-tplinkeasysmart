@@ -161,7 +161,7 @@ func (f *fakeClient) SetHostname(_ context.Context, name escp.Hostname) error {
 	return nil
 }
 
-func (f *fakeClient) ConfigBackup(context.Context) ([]byte, error) {
+func (f *fakeClient) ConfigBackup(context.Context) (escp.ConfigFile, error) {
 	e := f.extra()
 	e.mu.Lock()
 	defer e.mu.Unlock()

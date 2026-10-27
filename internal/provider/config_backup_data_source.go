@@ -2,13 +2,12 @@ package provider
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
 var (
@@ -27,7 +26,7 @@ type configBackupDataSource struct {
 
 // configBackupReader is the part of the switch API this data source reads.
 type configBackupReader interface {
-	ConfigBackup(ctx context.Context) ([]byte, error)
+	ConfigBackup(ctx context.Context) (escp.ConfigFile, error)
 }
 
 // bound returns a copy of the data source wired to the client of the named switch.
@@ -91,14 +90,13 @@ func (d *configBackupDataSource) read(ctx context.Context, cfg configBackupModel
 		resp.Diagnostics.AddError("Reading the configuration backup failed", err.Error())
 		return
 	}
-	sum := sha256.Sum256(data)
 	state := configBackupModel{
 		ID: qualifiedID(d.sw, "config_backup"), IncludeContent: cfg.IncludeContent,
-		Size: types.Int64Value(int64(len(data))), SHA256: types.StringValue(hex.EncodeToString(sum[:])),
+		Size: types.Int64Value(int64(data.Size())), SHA256: types.StringValue(data.SHA256()),
 		ContentBase64: types.StringNull(),
 	}
 	if cfg.IncludeContent.ValueBool() {
-		state.ContentBase64 = types.StringValue(base64.StdEncoding.EncodeToString(data))
+		state.ContentBase64 = types.StringValue(data.Base64())
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
