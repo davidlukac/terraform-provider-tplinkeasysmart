@@ -112,7 +112,7 @@ func (c *Client) QoS(ctx context.Context) (QoS, error) {
 // QoSPortBased; the switch accepts them in the other modes and ignores them.
 func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error {
 	if !mode.Valid() {
-		return invalidf("escp: invalid QoS mode %d (valid: 0, 1, 2)", int(mode))
+		return invalidf("escp: invalid QoS mode %d (valid: 0, 1, 2)", mode)
 	}
 	return c.setTLVs(ctx, Operation{Name: "SetQoSMode", Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
 }
@@ -137,7 +137,7 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes map[PortID]Prior
 			return invalidf("escp: port %d does not exist", port)
 		}
 		if !v.Valid() {
-			return invalidf("escp: invalid priority %d for port %d (valid: %d-%d)", int(v), port, int(PriorityLowest), int(PriorityHighest))
+			return invalidf("escp: invalid priority %d for port %d (valid: %d-%d)", v, port, PriorityLowest, PriorityHighest)
 		}
 		prio[port] = v
 	}

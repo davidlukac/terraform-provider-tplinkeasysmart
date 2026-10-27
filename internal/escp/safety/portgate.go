@@ -102,7 +102,7 @@ func membersOf(ctx context.Context, r portReader, kind escp.GroupKind, id int) (
 			}
 		}
 	default:
-		return 0, fmt.Errorf("unknown group kind %d", int(kind))
+		return 0, fmt.Errorf("unknown group kind %d", kind)
 	}
 	return 0, nil
 }

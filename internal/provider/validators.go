@@ -88,7 +88,7 @@ func stormRateRangeText() string {
 	return fmt.Sprintf("%d..%d kbps, multiple of %d", escp.RateStepKbps, escp.MaxBandwidthKbps, escp.RateStepKbps)
 }
 
-func vlanIDRangeText() string { return fmt.Sprintf("%d-%d", int(escp.MinVLANID), int(escp.MaxVLANID)) }
+func vlanIDRangeText() string { return fmt.Sprintf("%d-%d", escp.MinVLANID, escp.MaxVLANID) }
 
 // rateKbps accepts 0 (unlimited) or a multiple of 64 up to the maximum.
 type rateKbps struct{}
