@@ -23,7 +23,7 @@ import (
 // identity pin refuses another device, and that nothing is written when it does.
 
 // notTheTarget is a MAC address (locally administered, so no vendor owns it) that no switch has.
-const notTheTarget = "02:00:00:00:00:01"
+var notTheTarget = escp.MAC{0x02, 0, 0, 0, 0, 0x01}
 
 // ledScenarioByMAC flips the LED through a provider block that names the switch as given, and puts
 // it back: the smallest write that proves the whole path works.
@@ -68,7 +68,7 @@ func TestScenarioAnotherDeviceAtTheHostIsNeverWrittenTo(t *testing.T) {
 	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{{
 		Config: s.ProviderHCLByMAC(s.Target.Host, notTheTarget) + "resource \"tplinkeasysmart_led\" \"this\" {\n  enabled = false\n}\n",
 		// (?s): Terraform wraps the diagnostic at its own line width.
-		ExpectError: regexp.MustCompile(`(?s)not\s+the\s+configured\s+switch.*configuration\s+names\s+` + notTheTarget),
+		ExpectError: regexp.MustCompile(`(?s)not\s+the\s+configured\s+switch.*configuration\s+names\s+` + notTheTarget.String()),
 	}}})
 	if s.Fake != nil && s.Fake.WriteCount() != writes {
 		t.Fatalf("the refused configuration wrote to the switch: write count %d, was %d", s.Fake.WriteCount(), writes)
