@@ -44,7 +44,7 @@ func TestCancellationBetweenTwoWritesStopsTheSecond(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var consulted int
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
+		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
 		WriteGate: func(context.Context, InfoReader, Operation) error {
 			if consulted++; consulted == 2 {
 				cancel()
@@ -67,7 +67,7 @@ func TestCancellationInterruptsTheWaitForAReply(t *testing.T) {
 	f := escptest.Start(t)
 	f.Mute()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 20 * time.Second,
-		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
+		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback})
 	c.allowLoopback = true
 	t.Cleanup(func() { c.Close() })
 	ctx, cancel := context.WithCancel(context.Background())

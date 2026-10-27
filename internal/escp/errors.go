@@ -3,7 +3,7 @@ package escp
 import (
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 )
 
 var (
@@ -35,13 +35,13 @@ var (
 // matches ErrWrongSwitch.
 type WrongSwitchError struct {
 	Want, Got MAC
-	IP        net.IP // where the other device answered from, when known
+	IP        netip.Addr // where the other device answered from; invalid when unknown
 }
 
 // Error names both addresses and where the other device was.
 func (e *WrongSwitchError) Error() string {
 	where := ""
-	if e.IP != nil {
+	if e.IP.IsValid() {
 		where = " at " + e.IP.String()
 	}
 	return fmt.Sprintf("%s: the device%s has MAC %s, the configuration names %s", ErrWrongSwitch.Error(), where, e.Got, e.Want)

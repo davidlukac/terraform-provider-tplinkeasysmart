@@ -102,7 +102,7 @@ func TestWriteGateRefusalSendsNothingForAnyWriteMethod(t *testing.T) {
 			f := escptest.Start(t)
 			var consulted int
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-				SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
+				SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
 				WriteGate: func(context.Context, InfoReader, Operation) error { consulted++; return errGateRefused }})
 			c.allowLoopback = true
 			t.Cleanup(func() { c.Close() })
@@ -130,7 +130,7 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := escptest.Start(t)
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-				SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
+				SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
 				WriteGate: func(context.Context, InfoReader, Operation) error { return nil }})
 			c.allowLoopback = true
 			t.Cleanup(func() { c.Close() })
@@ -148,7 +148,7 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 func TestWriteGateDoesNotAffectReads(t *testing.T) {
 	f := escptest.Start(t)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
+		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
 		WriteGate: func(context.Context, InfoReader, Operation) error { return errGateRefused }})
 	t.Cleanup(func() { c.Close() })
 	ctx := context.Background()
@@ -169,7 +169,7 @@ func TestWriteGateMayReadThroughTheClient(t *testing.T) {
 	f := escptest.Start(t)
 	var firmware Firmware
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
+		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
 		WriteGate: func(ctx context.Context, sw InfoReader, _ Operation) error {
 			info, err := sw.Info(ctx)
 			firmware = info.Firmware
@@ -245,7 +245,7 @@ func operationsOf(t *testing.T, call func(context.Context, *Client) error) []Ope
 	f := escptest.Start(t)
 	var seen []Operation
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
+		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
 		WriteGate: func(_ context.Context, _ InfoReader, op Operation) error { seen = append(seen, op); return nil }})
 	c.allowLoopback = true
 	t.Cleanup(func() { c.Close() })
@@ -324,7 +324,7 @@ func TestOperationPortsFollowTheArguments(t *testing.T) {
 func TestGateChangingItsOperationChangesNothingThatIsSent(t *testing.T) {
 	f := escptest.Start(t)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-		SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1",
+		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
 		WriteGate: func(_ context.Context, _ InfoReader, op Operation) error {
 			op.Ports = MustPortSet(8)
 			return nil

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math/big"
 	"net"
+	"net/netip"
 	"sync"
 	"testing"
 
@@ -119,6 +120,10 @@ var (
 	fakeP = big.NewInt(3443843009)
 	fakeQ = big.NewInt(3765816959)
 )
+
+// Loopback is the address a fake switch listens on: a Config that aims at the fake gives it as
+// BroadcastAddr, so discovery stays on this machine.
+var Loopback = netip.MustParseAddr("127.0.0.1")
 
 // FreeUDPPort returns a currently unused UDP port so tests never bind the
 // protocol's real client port 29809.

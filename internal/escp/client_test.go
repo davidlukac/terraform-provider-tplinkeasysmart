@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"reflect"
 	"strings"
 	"testing"
@@ -18,7 +19,7 @@ func TestDialAppliesDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	if c.cfg.Timeout != 3*time.Second || c.cfg.Retries != 2 || c.cfg.SwitchPort != defaultSwitchPort ||
-		c.cfg.HostPort != defaultHostPort || c.cfg.BroadcastAddr != "255.255.255.255" {
+		c.cfg.HostPort != defaultHostPort || c.cfg.BroadcastAddr != netip.MustParseAddr("255.255.255.255") {
 		t.Fatalf("defaults not applied: %+v", c.cfg)
 	}
 	if c.conn != nil {
@@ -30,7 +31,7 @@ func TestDialAppliesDefaults(t *testing.T) {
 }
 
 func TestDialKeepsExplicitValues(t *testing.T) {
-	want := Config{Host: "127.0.0.1", Timeout: time.Second, Retries: 5, SwitchPort: 1111, HostPort: 2222, BroadcastAddr: "10.0.0.255"}
+	want := Config{Host: "127.0.0.1", Timeout: time.Second, Retries: 5, SwitchPort: 1111, HostPort: 2222, BroadcastAddr: netip.MustParseAddr("10.0.0.255")}
 	c, err := Dial(want)
 	if err != nil {
 		t.Fatal(err)
@@ -65,7 +66,7 @@ func TestNoRetriesSendsEachRequestOnce(t *testing.T) {
 			f := escptest.Start(t)
 			f.DropFirst(2) // both datagrams of the first attempt are lost
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Timeout: 80 * time.Millisecond, Retries: tc.retries,
-				SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
+				SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback})
 			c.allowLoopback = true
 			t.Cleanup(func() { c.Close() })
 			_, err := c.Info(context.Background())
@@ -113,7 +114,7 @@ func TestBusyHostPortIsReportedOnFirstUse(t *testing.T) {
 	defer busy.Close()
 	port := busy.LocalAddr().(*net.UDPAddr).Port
 	c, err := Dial(Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 80 * time.Millisecond,
-		SwitchPort: f.Port(), HostPort: port, BroadcastAddr: "127.0.0.1"})
+		SwitchPort: f.Port(), HostPort: port, BroadcastAddr: escptest.Loopback})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,5 +187,11 @@ func TestSeveralClientsShareTheReplyPort(t *testing.T) {
 		if err := c.Close(); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestDialRefusesABroadcastAddressThatIsNotIPv4(t *testing.T) {
+	if _, err := Dial(Config{Host: "127.0.0.1", BroadcastAddr: netip.MustParseAddr("fe80::1")}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("got %v, want ErrInvalid", err)
 	}
 }

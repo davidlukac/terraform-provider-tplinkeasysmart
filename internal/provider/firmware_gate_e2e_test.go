@@ -28,7 +28,7 @@ func realClientFactories(t *testing.T, sw *escptest.Switch) map[string]func() (t
 			newClient: func(cfg escp.Config) (SwitchClient, error) {
 				cfg.SwitchPort = sw.Port()
 				cfg.HostPort = escptest.FreeUDPPort(t) // the client shares its socket, so a free port is enough
-				cfg.BroadcastAddr = "127.0.0.1"
+				cfg.BroadcastAddr = escptest.Loopback
 				c, err := escp.Dial(cfg)
 				if err != nil {
 					return nil, err

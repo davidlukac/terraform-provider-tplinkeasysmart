@@ -41,7 +41,7 @@ func TestScenarioMultiSwitch(t *testing.T) {
 		if !ok {
 			return nil, fmt.Errorf("no fake for host %q", cfg.Host)
 		}
-		cfg.Host, cfg.SwitchPort, cfg.BroadcastAddr, cfg.Timeout = "127.0.0.1", f.Port(), "127.0.0.1", fakeTimeout
+		cfg.Host, cfg.SwitchPort, cfg.BroadcastAddr, cfg.Timeout = "127.0.0.1", f.Port(), escptest.Loopback, fakeTimeout
 		cfg.HostPort = escptest.FreeUDPPort(t)
 		return escp.Dial(cfg)
 	}

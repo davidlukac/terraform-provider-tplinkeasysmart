@@ -103,7 +103,7 @@ func TestSendFailureIsReported(t *testing.T) {
 func TestContextDeadlineBeatsTheConfiguredTimeout(t *testing.T) {
 	f := escptest.Start(t)
 	f.Mute()
-	c := newBoundClient(t, Config{Host: "127.0.0.1", Timeout: 5 * time.Second, SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
+	c := newBoundClient(t, Config{Host: "127.0.0.1", Timeout: 5 * time.Second, SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback})
 	defer c.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()

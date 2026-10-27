@@ -20,7 +20,7 @@ import (
 func dialLeasing(t *testing.T, f *escptest.Switch) (*Client, *int) {
 	t.Helper()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", MAC: MAC(escptest.DefaultMAC), Username: "admin", Password: "secret",
-		Timeout: 150 * time.Millisecond, Retries: 1, SwitchPort: f.Port(), BroadcastAddr: "127.0.0.1"})
+		Timeout: 150 * time.Millisecond, Retries: 1, SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback})
 	c.allowLoopback = true
 	lookups := new(int)
 	c.locator = func(ctx context.Context, _ MAC) (Info, error) { *lookups++; return c.discoverOnce(ctx) }

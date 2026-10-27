@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
+	"net/netip"
 	"strconv"
 	"sync"
 	"time"
@@ -64,8 +65,11 @@ func Dial(cfg Config) (*Client, error) {
 	if cfg.HostPort == 0 {
 		cfg.HostPort = defaultHostPort
 	}
-	if cfg.BroadcastAddr == "" {
-		cfg.BroadcastAddr = "255.255.255.255"
+	if !cfg.BroadcastAddr.IsValid() {
+		cfg.BroadcastAddr = netip.AddrFrom4([net.IPv4len]byte{255, 255, 255, 255})
+	}
+	if !cfg.BroadcastAddr.Is4() {
+		return nil, invalidf("escp: BroadcastAddr %s is not an IPv4 address", cfg.BroadcastAddr)
 	}
 	c := &Client{cfg: cfg, locator: hostLocator}
 	if cfg.Host == "" && !cfg.MAC.IsZero() {

@@ -59,7 +59,7 @@ func (c *Client) discoverOnce(ctx context.Context) (Info, error) {
 	}
 	info := infoFromReply(r)
 	if !c.cfg.MAC.IsZero() && !info.MAC.IsZero() && info.MAC != c.cfg.MAC {
-		return Info{}, &WrongSwitchError{Want: c.cfg.MAC, Got: info.MAC, IP: c.dest.IP}
+		return Info{}, &WrongSwitchError{Want: c.cfg.MAC, Got: info.MAC, IP: addrOf(c.dest.IP)}
 	}
 	return info, nil
 }

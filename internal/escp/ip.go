@@ -86,6 +86,16 @@ func validateIPConfig(cfg IPConfig, allowLoopback bool) error {
 	return nil
 }
 
+// addrOf converts an address of the net package; nil and anything that is no address give the
+// invalid Addr, and an IPv4 address in its IPv6 form is the IPv4 address.
+func addrOf(ip net.IP) netip.Addr {
+	a, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return netip.Addr{}
+	}
+	return a.Unmap()
+}
+
 func broadcastOf(n net.IPNet) net.IP {
 	out := make(net.IP, len(n.IP))
 	for i := range n.IP {

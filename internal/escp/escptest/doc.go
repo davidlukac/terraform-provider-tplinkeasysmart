@@ -13,7 +13,7 @@
 //	sw := escptest.Start(t)
 //	c, err := escp.Dial(escp.Config{
 //		Host: "127.0.0.1", Username: escptest.Username, Password: escptest.Password,
-//		SwitchPort: sw.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: "127.0.0.1",
+//		SwitchPort: sw.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback,
 //	})
 //
 // Faults are set inside Configure, which holds the switch's lock; what the switch
