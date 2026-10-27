@@ -52,7 +52,7 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 		want string
 	}{
 		{"PortID.Validate", func(*Client) error { return PortID(0).Validate() }, "invalid port 0 (valid: 1-32)"},
-		{"ValidateRateKbps", func(*Client) error { return ValidateRateKbps(100) }, "100 kbps is not a valid rate"},
+		{"Kbps.Validate", func(*Client) error { return Kbps(100).Validate() }, "100 kbps is not a valid rate"},
 		{"ValidateLAG group", func(*Client) error { return ValidateLAG(0, MustPortSet(1, 2)) }, "invalid LAG group 0"},
 		{"ValidateLAG port count", func(*Client) error { return ValidateLAG(1, MustPortSet(1)) }, "a LAG takes"},
 		{"ValidateLAG port outside its group", func(*Client) error { return ValidateLAG(1, MustPortSet(1, 9)) }, "cannot be in LAG 1"},

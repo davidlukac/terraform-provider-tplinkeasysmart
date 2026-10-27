@@ -103,7 +103,7 @@ func (r *stormLimitResource) apply(ctx context.Context, m *stormLimitModel, add 
 
 func (r *stormLimitResource) applyBound(ctx context.Context, m *stormLimitModel, add func(string, string)) bool {
 	port := escp.PortID(m.Port.ValueInt64())
-	uu, mc, bc, rate := m.UnknownUnicast.ValueBool(), m.Multicast.ValueBool(), m.Broadcast.ValueBool(), int(m.RateKbps.ValueInt64())
+	uu, mc, bc, rate := m.UnknownUnicast.ValueBool(), m.Multicast.ValueBool(), m.Broadcast.ValueBool(), escp.Kbps(m.RateKbps.ValueInt64())
 	if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), port); err != nil {
 		add("Refusing to change port", err.Error())
 		return false

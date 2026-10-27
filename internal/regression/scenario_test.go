@@ -264,7 +264,7 @@ func TestScenarioBandwidthLimit(t *testing.T) {
 	cfg := func(in, out int) string {
 		return fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"this\" {\n  port         = %d\n  ingress_kbps = %d\n  egress_kbps  = %d\n}\n", port, in, out)
 	}
-	s.scenario(t, cfg(10240, 5120), cfg(was.IngressKbps, was.EgressKbps), func(*terraform.State) error {
+	s.scenario(t, cfg(10240, 5120), cfg(int(was.IngressKbps), int(was.EgressKbps)), func(*terraform.State) error {
 		got, err := s.Client.Bandwidth(context.Background())
 		if err != nil {
 			return err
@@ -294,7 +294,7 @@ func TestScenarioStormLimit(t *testing.T) {
 	cfg := func(uu, mc, bc bool, rate int) string {
 		return fmt.Sprintf("resource \"tplinkeasysmart_storm_limit\" \"this\" {\n  port            = %d\n  unknown_unicast = %t\n  multicast       = %t\n  broadcast       = %t\n  rate_kbps       = %d\n}\n", port, uu, mc, bc, rate)
 	}
-	s.scenario(t, cfg(false, true, true, 1024), cfg(was.UnknownUnicast, was.Multicast, was.Broadcast, was.RateKbps), func(*terraform.State) error {
+	s.scenario(t, cfg(false, true, true, 1024), cfg(was.UnknownUnicast, was.Multicast, was.Broadcast, int(was.RateKbps)), func(*terraform.State) error {
 		got, err := s.Client.StormControl(context.Background())
 		if err != nil {
 			return err

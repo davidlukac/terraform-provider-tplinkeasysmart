@@ -66,7 +66,7 @@ func TestSetStormWire(t *testing.T) {
 	n := f.WriteCount()
 	for _, bad := range []struct {
 		uu, mc, bc bool
-		rate       int
+		rate       Kbps
 	}{{false, false, true, 0}, {false, false, true, 100}, {false, false, false, 64}, {true, false, false, 2000000}} {
 		if err := c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: bad.uu, Multicast: bad.mc, Broadcast: bad.bc, RateKbps: bad.rate}); err == nil {
 			t.Errorf("%+v must be rejected", bad)

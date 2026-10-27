@@ -12,8 +12,8 @@ import (
 // PortBandwidth holds a port's rate limits in kbps; 0 means unlimited.
 type PortBandwidth struct {
 	Port        PortID
-	IngressKbps int
-	EgressKbps  int
+	IngressKbps Kbps
+	EgressKbps  Kbps
 }
 
 func parseBandwidth(tlvs []wire.TLV) ([]PortBandwidth, error) {
@@ -25,7 +25,7 @@ func parseBandwidth(tlvs []wire.TLV) ([]PortBandwidth, error) {
 		if len(t.Value) != bwEntryLen {
 			return nil, fmt.Errorf("escp: bandwidth entry has %d bytes, want %d", len(t.Value), bwEntryLen)
 		}
-		port, rate := PortID(t.Value[bwOffPort]), int(binary.BigEndian.Uint32(t.Value[bwOffRate:]))
+		port, rate := PortID(t.Value[bwOffPort]), Kbps(binary.BigEndian.Uint32(t.Value[bwOffRate:]))
 		pb := byPort[port]
 		if pb == nil {
 			pb = &PortBandwidth{Port: port}
@@ -70,9 +70,9 @@ const (
 // MaxBandwidthKbps is the largest limit the web UI offers.
 const MaxBandwidthKbps = 1000000
 
-func bandwidthTLV(typ int16, port PortID, kbps int) (wire.TLV, error) {
-	if !validateRateKbps(kbps) {
-		return wire.TLV{}, invalidf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", kbps, port, RateStepKbps, MaxBandwidthKbps)
+func bandwidthTLV(typ int16, port PortID, kbps Kbps) (wire.TLV, error) {
+	if kbps.Validate() != nil {
+		return wire.TLV{}, invalidf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", int(kbps), port, RateStepKbps, MaxBandwidthKbps)
 	}
 	v := make([]byte, bwEntryLen)
 	v[bwOffPort] = byte(port)

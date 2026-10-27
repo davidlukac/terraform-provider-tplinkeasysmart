@@ -43,7 +43,7 @@ func TestSetBandwidthWire(t *testing.T) {
 	if h[1][0].Type != wire.TLVBandwidthEgress || !reflect.DeepEqual(h[1][0].Value, []byte{7, 0, 0, 0, 0, 0}) {
 		t.Fatalf("egress wire: %+v", h[1])
 	}
-	for _, bad := range []int{-64, 100, 2000000} {
+	for _, bad := range []Kbps{-64, 100, 2000000} {
 		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: bad, EgressKbps: 0}); err == nil {
 			t.Errorf("rate %d must be rejected", bad)
 		}
