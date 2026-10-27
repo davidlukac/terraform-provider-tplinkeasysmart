@@ -93,8 +93,9 @@ func membersOf(ctx context.Context, r portReader, kind escp.GroupKind, id int) (
 		if err != nil {
 			return 0, err
 		}
+		want := escp.VLANID(id) // the group number of a 802.1Q write is the VLAN id
 		for _, v := range q.VLANs {
-			if int(v.ID) == id {
+			if v.ID == want {
 				return v.Tagged.Union(v.Untagged), nil
 			}
 		}

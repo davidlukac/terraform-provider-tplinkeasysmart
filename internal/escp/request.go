@@ -90,8 +90,9 @@ func (c *Client) requirePorts(ctx context.Context, ports PortSet) error {
 	if err != nil {
 		return err
 	}
+	last := PortID(have) // the ports are numbered 1 to the count
 	for _, p := range ports.Ports() {
-		if int(p) > have {
+		if p > last {
 			return invalidf("escp: port %d does not exist: this switch has %d ports", p, have)
 		}
 	}

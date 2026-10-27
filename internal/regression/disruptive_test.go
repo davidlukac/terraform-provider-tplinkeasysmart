@@ -18,7 +18,7 @@ import (
 // switch identical to the first one, restored by explicit configuration.
 
 // disruptivePorts returns the device ports the run may disturb, or skips the scenario.
-func (s *Session) disruptivePorts(t *testing.T) []int {
+func (s *Session) disruptivePorts(t *testing.T) []escp.PortID {
 	t.Helper()
 	if len(s.Target.DisruptivePorts) == 0 {
 		t.Skip("set TPLINK_REGRESSION_DISRUPTIVE_PORTS to the device ports this scenario may disturb")
@@ -27,14 +27,14 @@ func (s *Session) disruptivePorts(t *testing.T) []int {
 }
 
 // portOf reads one port from the switch.
-func (s *Session) portOf(t *testing.T, id int) escp.Port {
+func (s *Session) portOf(t *testing.T, id escp.PortID) escp.Port {
 	t.Helper()
 	ports, err := s.Client.Ports(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range ports {
-		if int(p.ID) == id {
+		if p.ID == id {
 			return p
 		}
 	}
@@ -43,7 +43,7 @@ func (s *Session) portOf(t *testing.T, id int) escp.Port {
 }
 
 // portConfig is a port resource with allow_disruptive, which is needed to change a port in use.
-func portConfig(port int, enabled bool, speed escp.Speed, flow bool) string {
+func portConfig(port escp.PortID, enabled bool, speed escp.Speed, flow bool) string {
 	return fmt.Sprintf("resource \"tplinkeasysmart_port\" \"this\" {\n  port             = %d\n  enabled          = %t\n  speed            = %q\n  flow_control     = %t\n  allow_disruptive = true\n}\n", port, enabled, string(speed), flow)
 }
 
@@ -90,7 +90,8 @@ func TestScenarioDisruptivePortDisable(t *testing.T) {
 // the same link speed and in the same group range (group 1 takes ports 1-4, group 2 ports 5-8).
 func TestScenarioDisruptiveLAG(t *testing.T) {
 	s := openForScenario(t)
-	var a, b, group int
+	var a, b escp.PortID
+	var group int
 	for _, x := range s.disruptivePorts(t) {
 		for _, y := range s.disruptivePorts(t) {
 			px, py := s.portOf(t, x), s.portOf(t, y)
@@ -117,7 +118,7 @@ func TestScenarioDisruptiveLAG(t *testing.T) {
 				return nil
 			}
 		}
-		return fmt.Errorf("LAG %d not %v on the switch: %v", group, []int{a, b}, got)
+		return fmt.Errorf("LAG %d not %v on the switch: %v", group, escp.MustPortSet(a, b), got)
 	})
 }
 
@@ -132,7 +133,7 @@ func TestScenarioDisruptiveMirrorDestination(t *testing.T) {
 	s.scenario(t, cfg(fmt.Sprintf("  enabled       = true\n  mirror_port   = %d\n  ingress_ports = %s\n", dest, intSet(src))), cfg("  enabled = false\n"),
 		func(*terraform.State) error {
 			got, err := s.Client.PortMirror(context.Background())
-			if err != nil || !got.Enabled || int(got.MirrorPort) != dest || got.IngressPorts != escp.MustPortSet(escp.PortID(src)) {
+			if err != nil || !got.Enabled || got.MirrorPort != dest || got.IngressPorts != escp.MustPortSet(src) {
 				return fmt.Errorf("mirror on the switch = %+v, err %w, want %d mirrored to %d", got, err, src, dest)
 			}
 			return nil
@@ -162,6 +163,6 @@ func TestScenarioDisruptiveVLANGroup(t *testing.T) {
 				return nil
 			}
 		}
-		return fmt.Errorf("VLAN 2 not %v on the switch: %v", []int{free, device}, got.VLANs)
+		return fmt.Errorf("VLAN 2 not %v on the switch: %v", escp.MustPortSet(free, device), got.VLANs)
 	})
 }
