@@ -29,7 +29,7 @@ func TestRegistryResolvesSwitchesByName(t *testing.T) {
 	cases := []struct {
 		name    string
 		reg     *switchRegistry
-		ask     string
+		ask     switchName
 		want    SwitchClient
 		wantErr string
 	}{
@@ -116,8 +116,8 @@ func TestIdsAreQualifiedByTheSwitch(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct{ in, sw, rest string }{{"7", "", "7"}, {"sw02:7", "sw02", "7"}, {"sw02:led", "sw02", "led"}, {":x", "", "x"}} {
-		if sw, rest := splitImportID(tc.in); sw != tc.sw || rest != tc.rest {
-			t.Errorf("splitImportID(%q) = %q,%q want %q,%q", tc.in, sw, rest, tc.sw, tc.rest)
+		if sw, rest := splitQualified(tc.in); string(sw) != tc.sw || rest != tc.rest {
+			t.Errorf("splitQualified(%q) = %q,%q want %q,%q", tc.in, sw, rest, tc.sw, tc.rest)
 		}
 	}
 }
