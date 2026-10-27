@@ -98,7 +98,7 @@ func TestValidateLAG(t *testing.T) {
 // of blaming the credentials.
 func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 	for _, tc := range []struct {
-		code int32
+		code ReplyCode
 		want string
 	}{
 		{4, "LAG 1 takes ports 1-4"},
@@ -117,7 +117,7 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 	} {
 		t.Run(fmt.Sprint(tc.code), func(t *testing.T) {
 			f := escptest.Start(t)
-			f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom, f.RejectCode = 1, tc.code })
+			f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom, f.RejectCode = 1, int32(tc.code) })
 			c := dialFake(t, f, "secret")
 			err := c.SetLAG(context.Background(), 1, MustPortSet(2, 3))
 			var rejected *RejectedError

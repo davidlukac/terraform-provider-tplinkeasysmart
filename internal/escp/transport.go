@@ -20,7 +20,7 @@ const maxFragmentedReply = 64 << 10
 
 type reply struct {
 	op   byte
-	err  int32
+	err  ReplyCode
 	tlvs []wire.TLV
 	// fragment is non-zero when more packets of the same reply follow.
 	fragment uint16
@@ -71,7 +71,7 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 	if !c.haveSwMAC {
 		c.swMAC, c.haveSwMAC = h.SwitchMAC, true
 	}
-	return reply{op: h.Op, err: h.ErrCode, tlvs: t, fragment: h.Fragment}, true
+	return reply{op: h.Op, err: ReplyCode(h.ErrCode), tlvs: t, fragment: h.Fragment}, true
 }
 
 // recv reads packets until one is an acceptable reply to the current request
