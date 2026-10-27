@@ -14,12 +14,12 @@ func TestCheckTestPorts(t *testing.T) {
 	ctx := context.Background()
 	for _, tc := range []struct {
 		name  string
-		ports []int
+		ports []escp.PortID
 		want  string
 	}{
-		{"free ports", []int{2, 3, 4, 5}, ""},
-		{"a port with a link", []int{2, 6}, "port 6 has a link"},
-		{"a port that does not exist", []int{2, 9}, "port 9 does not exist"},
+		{"free ports", []escp.PortID{2, 3, 4, 5}, ""},
+		{"a port with a link", []escp.PortID{2, 6}, "port 6 has a link"},
+		{"a port that does not exist", []escp.PortID{2, 9}, "port 9 does not exist"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := CheckTestPorts(ctx, s.Client, Target{TestPorts: tc.ports})
@@ -32,7 +32,7 @@ func TestCheckTestPorts(t *testing.T) {
 	if err := s.Client.SetLAG(ctx, 1, escp.MustPortSet(3, 4)); err != nil {
 		t.Fatal(err)
 	}
-	if err := CheckTestPorts(ctx, s.Client, Target{TestPorts: []int{3}}); err == nil || !strings.Contains(err.Error(), "member of LAG 1") {
+	if err := CheckTestPorts(ctx, s.Client, Target{TestPorts: []escp.PortID{3}}); err == nil || !strings.Contains(err.Error(), "member of LAG 1") {
 		t.Errorf("err = %v, want the LAG named", err)
 	}
 }
@@ -42,7 +42,7 @@ func TestCheckTestPortsUnreadable(t *testing.T) {
 	s.Fake.Configure(func(f *escptest.Switch) {
 		f.GetFn = func([]int16) ([]escptest.Setting, int32, bool) { return nil, 1, false }
 	})
-	if err := CheckTestPorts(context.Background(), s.Client, Target{TestPorts: []int{2}}); err == nil || !strings.Contains(err.Error(), "cannot read the ports") {
+	if err := CheckTestPorts(context.Background(), s.Client, Target{TestPorts: []escp.PortID{2}}); err == nil || !strings.Contains(err.Error(), "cannot read the ports") {
 		t.Errorf("err = %v", err)
 	}
 }

@@ -22,6 +22,19 @@ func TestPortIDValidate(t *testing.T) {
 	}
 }
 
+func TestParsePortID(t *testing.T) {
+	for in, want := range map[string]PortID{"1": 1, "8": 8, "32": MaxPort} {
+		if got, err := ParsePortID(in); err != nil || got != want {
+			t.Errorf("ParsePortID(%q) = %d, %v; want %d", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"", "x", "2.5", " 3", "0", "-1", "33"} {
+		if _, err := ParsePortID(in); !errors.Is(err, ErrInvalid) {
+			t.Errorf("ParsePortID(%q): got %v, want ErrInvalid", in, err)
+		}
+	}
+}
+
 func TestNewPortSetRefusesAPortOutsideTheMask(t *testing.T) {
 	for _, bad := range [][]PortID{{0}, {33}, {1, 2, 40}, {-3}} {
 		if s, err := NewPortSet(bad...); !errors.Is(err, ErrInvalid) || s != 0 {

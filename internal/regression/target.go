@@ -7,8 +7,9 @@ import (
 	"io"
 	"net"
 	"slices"
-	"strconv"
 	"strings"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
 // The targets a run can be aimed at.
@@ -53,18 +54,18 @@ type Target struct {
 	Username string
 	Password string
 	// TestPorts are the ports a scenario may change: free, link-down, in no LAG.
-	TestPorts []int
+	TestPorts []escp.PortID
 	// ProtectedPorts (the uplink and the ports with devices) are named only by guard-refusal scenarios.
-	ProtectedPorts []int
+	ProtectedPorts []escp.PortID
 	// MoveIP is the spare address the management-move scenario may use; empty unless the run opted in.
 	MoveIP string
 	// DHCP is true when the run opted in to the DHCP scenario.
 	DHCP bool
 	// DisruptPort is the device port the allow_disruptive scenario may write to; zero unless the run opted in.
-	DisruptPort int
+	DisruptPort escp.PortID
 	// DisruptivePorts are the device ports the disruptive scenarios may change for real (a link
 	// drop, a LAG, a VLAN, a mirror destination); empty unless the run opted in. Never the uplink.
-	DisruptivePorts []int
+	DisruptivePorts []escp.PortID
 }
 
 // Real reports whether the target is hardware.
@@ -98,7 +99,7 @@ func LoadTarget(env map[string]string) (Target, error) {
 	switch name {
 	case "", TargetFake:
 		return Target{Name: TargetFake, Host: "127.0.0.1", Username: "admin", Password: "secret",
-			TestPorts: []int{2, 3, 4, 5}, ProtectedPorts: []int{1, 6, 7, 8}, DisruptivePorts: []int{7, 8}}, nil
+			TestPorts: []escp.PortID{2, 3, 4, 5}, ProtectedPorts: []escp.PortID{1, 6, 7, 8}, DisruptivePorts: []escp.PortID{7, 8}}, nil
 	case TargetSW03:
 	case targetSW01:
 		return Target{}, errors.New("switch 01 is read-only for the regression suite and is never a target")
@@ -183,17 +184,17 @@ func moveIP(ip, host, readOnly string) (string, error) {
 	return ip, nil
 }
 
-func parsePorts(s string) ([]int, error) {
-	var out []int
+func parsePorts(s string) ([]escp.PortID, error) {
+	var out []escp.PortID
 	for _, f := range strings.Split(s, ",") {
 		if f = strings.TrimSpace(f); f == "" {
 			continue
 		}
-		n, err := strconv.Atoi(f)
-		if err != nil || n < 1 {
+		p, err := escp.ParsePortID(f)
+		if err != nil {
 			return nil, fmt.Errorf("%q is not a port number", f)
 		}
-		out = append(out, n)
+		out = append(out, p)
 	}
 	return out, nil
 }
