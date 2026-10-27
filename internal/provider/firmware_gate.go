@@ -41,7 +41,7 @@ func writeRefusal(err error) error {
 	case safety.FirmwareUnreadable:
 		return fmt.Errorf("refusing to write: %w", err)
 	case safety.FirmwareUnverified:
-		detail = fmt.Sprintf("firmware build %s has not been verified with this provider version (verified: %v)", fe.Build, fe.Verified)
+		detail = fmt.Sprintf("firmware build %s has not been verified with this provider version (verified: %v)", fe.Firmware.Build, fe.Verified)
 	}
 	return fmt.Errorf("refusing to write: %s. Reads work on any firmware; set allow_unverified_firmware = true (provider or switch) to write anyway, at your own risk", detail)
 }
