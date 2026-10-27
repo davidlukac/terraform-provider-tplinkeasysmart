@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
 var updateReadme = flag.Bool("update-readme", false, "rewrite the compatibility table in README.md from compatibility.json")
@@ -17,17 +19,17 @@ const (
 )
 
 func TestCompatibilityFeedsTheAllowList(t *testing.T) {
-	if got, want := VerifiedFirmwareBuilds(), []string{"20230218", "20250710"}; !slices.Equal(got, want) {
+	if got, want := VerifiedFirmwareBuilds(), []escp.BuildDate{"20230218", "20250710"}; !slices.Equal(got, want) {
 		t.Fatalf("allow-list = %v, want %v", got, want)
 	}
 	// An untried or unsupported row never adds a build to the allow-list.
 	rows := []Row{
-		{Model: "m", Hardware: "h", Firmware: "f", Builds: []string{"20250101"}, Support: SupportVerified},
-		{Model: "m", Hardware: "h", Firmware: "f", Builds: []string{"20260101"}, Support: SupportUntried},
-		{Model: "m", Hardware: "h", Firmware: "f", Builds: []string{"20240101"}, Support: SupportUnsupported},
-		{Model: "m", Hardware: "h", Firmware: "f", Builds: []string{"20230101"}, Support: SupportVerified},
+		{Model: "m", Hardware: "h", Firmware: "f", Builds: []escp.BuildDate{"20250101"}, Support: SupportVerified},
+		{Model: "m", Hardware: "h", Firmware: "f", Builds: []escp.BuildDate{"20260101"}, Support: SupportUntried},
+		{Model: "m", Hardware: "h", Firmware: "f", Builds: []escp.BuildDate{"20240101"}, Support: SupportUnsupported},
+		{Model: "m", Hardware: "h", Firmware: "f", Builds: []escp.BuildDate{"20230101"}, Support: SupportVerified},
 	}
-	if got, want := verifiedBuilds(rows), []string{"20230101", "20250101"}; !slices.Equal(got, want) {
+	if got, want := verifiedBuilds(rows), []escp.BuildDate{"20230101", "20250101"}; !slices.Equal(got, want) {
 		t.Fatalf("verifiedBuilds = %v, want %v (sorted, verified rows only)", got, want)
 	}
 }

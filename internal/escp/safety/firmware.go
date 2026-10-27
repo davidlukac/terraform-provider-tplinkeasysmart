@@ -19,7 +19,7 @@ var verifiedFirmwareBuilds = verifiedBuilds(compatibility)
 // against on real switches: reads, and writes on unused ports. Any other build
 // may have changed layouts or authentication, so writes to it are refused
 // unless the user opts in. The result is a copy: changing it changes nothing.
-func VerifiedFirmwareBuilds() []string { return slices.Clone(verifiedFirmwareBuilds) }
+func VerifiedFirmwareBuilds() []escp.BuildDate { return slices.Clone(verifiedFirmwareBuilds) }
 
 // FirmwareReason says why a firmware check refused a write.
 type FirmwareReason int
@@ -38,10 +38,10 @@ const (
 // word the message for their users; Error is a neutral description.
 type FirmwareError struct {
 	Reason   FirmwareReason
-	Version  string   // the version string the switch reported (not for FirmwareUnreadable)
-	Build    string   // the build date (FirmwareUnverified)
-	Verified []string // the builds that would have been accepted
-	Err      error    // the cause (FirmwareUnreadable)
+	Version  string           // the version string the switch reported (not for FirmwareUnreadable)
+	Build    escp.BuildDate   // the build date (FirmwareUnverified)
+	Verified []escp.BuildDate // the builds that would have been accepted
+	Err      error            // the cause (FirmwareUnreadable)
 }
 
 // Error describes the refusal in neutral words (which build, what would have been accepted); front

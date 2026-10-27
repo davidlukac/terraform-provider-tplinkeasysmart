@@ -166,7 +166,14 @@ func (p *tplinkProvider) ValidateConfig(ctx context.Context, req provider.Valida
 }
 
 // verifiedBuilds lists the verified firmware builds for the attribute description.
-func verifiedBuilds() string { return strings.Join(safety.VerifiedFirmwareBuilds(), ", ") }
+func verifiedBuilds() string {
+	builds := safety.VerifiedFirmwareBuilds()
+	names := make([]string, len(builds))
+	for i, b := range builds {
+		names[i] = b.String()
+	}
+	return strings.Join(names, ", ")
+}
 
 func envOr(v types.String, env string) string {
 	if !v.IsNull() && !v.IsUnknown() {

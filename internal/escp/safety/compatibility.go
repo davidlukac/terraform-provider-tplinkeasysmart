@@ -4,9 +4,10 @@ import (
 	_ "embed" // the compatibility table is embedded
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
 )
 
 // Support says how far a hardware and firmware combination has been verified.
@@ -29,18 +30,16 @@ const (
 // and what is known about the combination. The table is compatibility.json, embedded in the
 // package; it is the one place the README table and the firmware allow-list come from.
 type Row struct {
-	Model    string   `json:"model"`
-	Hardware string   `json:"hardware"`
-	Firmware string   `json:"firmware"`
-	Builds   []string `json:"builds,omitempty"` // the build dates the row covers (8 digits)
-	Support  Support  `json:"support"`
-	Summary  string   `json:"summary,omitempty"` // markdown, what was verified or what to do
+	Model    string           `json:"model"`
+	Hardware string           `json:"hardware"`
+	Firmware string           `json:"firmware"`
+	Builds   []escp.BuildDate `json:"builds,omitempty"` // the build dates the row covers
+	Support  Support          `json:"support"`
+	Summary  string           `json:"summary,omitempty"` // markdown, what was verified or what to do
 }
 
 //go:embed compatibility.json
 var compatibilityJSON []byte
-
-var buildDatePattern = regexp.MustCompile(`^\d{8}$`)
 
 // compatibility is the parsed table; it is loaded once and validated, and a table that is not
 // valid stops the program at start, because the firmware gate depends on it.
@@ -63,7 +62,7 @@ func parseCompatibility(data []byte) ([]Row, error) {
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{}
+	seen := map[escp.BuildDate]bool{}
 	for i, r := range doc.Rows {
 		switch r.Support {
 		case SupportVerified, SupportUntried, SupportUntested, SupportUnsupported:
@@ -77,9 +76,6 @@ func parseCompatibility(data []byte) ([]Row, error) {
 			return nil, fmt.Errorf("row %d: a verified row names the builds it covers", i+1)
 		}
 		for _, b := range r.Builds {
-			if !buildDatePattern.MatchString(b) {
-				return nil, fmt.Errorf("row %d: %q is not a build date (8 digits)", i+1, b)
-			}
 			if seen[b] {
 				return nil, fmt.Errorf("row %d: build %s appears twice", i+1, b)
 			}
@@ -100,8 +96,8 @@ func Compatibility() []Row {
 }
 
 // verifiedBuilds lists the builds of the verified rows, in order.
-func verifiedBuilds(rows []Row) []string {
-	var out []string
+func verifiedBuilds(rows []Row) []escp.BuildDate {
+	var out []escp.BuildDate
 	for _, r := range rows {
 		if r.Support == SupportVerified {
 			out = append(out, r.Builds...)

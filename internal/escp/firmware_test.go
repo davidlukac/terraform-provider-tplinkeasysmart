@@ -1,11 +1,15 @@
 package escp
 
-import "testing"
+import (
+	"encoding/json"
+	"errors"
+	"testing"
+)
 
 func TestParseFirmware(t *testing.T) {
 	tests := []struct {
 		version string
-		want    string
+		want    BuildDate
 		ok      bool
 	}{
 		{"1.0.0 Build 20230218 Rel.50633", "20230218", true}, // switch 01, as reported by discovery
@@ -37,5 +41,28 @@ func TestFirmwareIsAComparableValue(t *testing.T) {
 	}
 	if !(Firmware{}).IsZero() || a.IsZero() {
 		t.Fatal("IsZero is true only for no firmware at all")
+	}
+}
+
+func TestParseBuildDate(t *testing.T) {
+	if got, err := ParseBuildDate("20230218"); err != nil || got != "20230218" || got.String() != "20230218" {
+		t.Errorf("ParseBuildDate = %q, %v", got, err)
+	}
+	for _, in := range []string{"", "2023021", "202302189", "2025-07", "2023021a", " 20230218"} {
+		if _, err := ParseBuildDate(in); !errors.Is(err, ErrInvalid) {
+			t.Errorf("ParseBuildDate(%q): got %v, want ErrInvalid", in, err)
+		}
+	}
+}
+
+func TestBuildDateReadsFromJSON(t *testing.T) {
+	var rows struct {
+		Builds []BuildDate `json:"builds"`
+	}
+	if err := json.Unmarshal([]byte(`{"builds":["20230218","20250710"]}`), &rows); err != nil || len(rows.Builds) != 2 || rows.Builds[1] != "20250710" {
+		t.Fatalf("got %v, %v", rows.Builds, err)
+	}
+	if err := json.Unmarshal([]byte(`{"builds":["2025-07"]}`), &rows); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("a malformed build date must be refused: %v", err)
 	}
 }
