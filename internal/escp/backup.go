@@ -25,7 +25,7 @@ func (c *Client) ConfigBackup(ctx context.Context) ([]byte, error) {
 	err := c.withSession(ctx, func() error {
 		req := []wire.TLV{
 			{Type: wire.TLVUsername, Value: append([]byte(c.cfg.Username), 0)},
-			{Type: wire.TLVPassword, Value: append([]byte(c.cfg.Password), 0)},
+			{Type: wire.TLVPassword, Value: append([]byte(c.cfg.Password.Reveal()), 0)},
 			{Type: wire.TLVConfigFile, Value: nil},
 		}
 		data, err := c.exchangeFragments(ctx, wire.OpSet, req, wire.TLVConfigFile)

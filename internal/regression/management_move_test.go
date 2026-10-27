@@ -79,7 +79,7 @@ func TestScenarioManagementMove(t *testing.T) {
 	}
 	setHost(s.Target.Host)
 	hcl := func(ip, mask, gateway string) string {
-		return fmt.Sprintf("provider \"tplinkeasysmart\" {\n  host     = trimspace(file(%q))\n  username = %q\n  password = %q\n}\n", hostFile, s.Target.Username, s.Target.Password) +
+		return fmt.Sprintf("provider \"tplinkeasysmart\" {\n  host     = trimspace(file(%q))\n  username = %q\n  password = %q\n}\n", hostFile, s.Target.Username, s.Target.Password.Reveal()) +
 			fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", ip, mask, gateway)
 	}
 	// reportsIP checks, with a client of its own at the address the switch is expected to have, what discovery says.

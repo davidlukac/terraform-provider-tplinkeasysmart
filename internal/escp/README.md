@@ -21,7 +21,7 @@ The file layout inside `escp` (one file per setting) is described in the package
 ## Quick start
 
 ```go
-c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: pw})
+c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: escp.Password(pw)})
 if err != nil { /* ... */ }
 defer c.Close()
 

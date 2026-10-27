@@ -279,7 +279,7 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			}
 			seen[key] = label
 		}
-		c, err := p.newClient(escp.Config{Host: h, MAC: hw, Username: u, Password: pw, Timeout: timeout, WriteGate: firmwareWriteGate(allowUnverified)})
+		c, err := p.newClient(escp.Config{Host: h, MAC: hw, Username: u, Password: escp.Password(pw), Timeout: timeout, WriteGate: firmwareWriteGate(allowUnverified)})
 		if err != nil {
 			resp.Diagnostics.AddError("Cannot configure switch client", fmt.Sprintf("%s: %s", label, err))
 			return

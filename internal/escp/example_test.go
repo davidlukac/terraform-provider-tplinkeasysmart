@@ -100,7 +100,7 @@ func ExampleLocate() {
 // have the switch's MAC: it looks the switch up by it and follows it to the lease.
 func ExampleClient_EnableDHCP() {
 	mac, _ := escp.ParseMAC("c0:3a:55:6c:81:61")
-	c, err := escp.Dial(escp.Config{MAC: mac, Username: "admin", Password: os.Getenv("SWITCH_PASSWORD")})
+	c, err := escp.Dial(escp.Config{MAC: mac, Username: "admin", Password: escp.Password(os.Getenv("SWITCH_PASSWORD"))})
 	if err != nil {
 		fmt.Println(err)
 		return

@@ -31,7 +31,7 @@ func newBoundClient(t testing.TB, cfg Config) *Client {
 	return nil
 }
 
-func dialFake(t *testing.T, f *escptest.Switch, pass string) *Client {
+func dialFake(t *testing.T, f *escptest.Switch, pass Password) *Client {
 	t.Helper()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 300 * time.Millisecond,
 		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback})
@@ -42,7 +42,7 @@ func dialFake(t *testing.T, f *escptest.Switch, pass string) *Client {
 
 // dialFast is dialFake with short timeouts and a single retry, for tests that
 // deliberately make the switch stay silent.
-func dialFast(t *testing.T, f *escptest.Switch, pass string) *Client {
+func dialFast(t *testing.T, f *escptest.Switch, pass Password) *Client {
 	t.Helper()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 80 * time.Millisecond, Retries: 1,
 		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback})

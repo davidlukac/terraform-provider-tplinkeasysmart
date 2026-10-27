@@ -21,7 +21,8 @@ const NoRetries = -1
 const defaultRetries = 2
 
 // Config configures a Client. Zero values select sensible defaults, except Host, which is
-// required. A Config holds the switch's password: keep it out of logs and error messages.
+// required. A Config holds the switch's password as a Password, which prints as [redacted], so a
+// Config can be logged or put in an error message; keep the text itself (Reveal) out of both.
 type Config struct {
 	// Host is the switch's IPv4 address or hostname. It is required unless MAC is set, in which
 	// case the address is found by discovery on the first request.
@@ -34,7 +35,7 @@ type Config struct {
 	MAC MAC
 	// Username and Password are sent with every write and every authenticated read.
 	Username string
-	Password string
+	Password Password
 	Timeout  time.Duration // how long to wait for a reply per attempt, default 3s
 	// Retries is the number of additional attempts after the first when the switch stays
 	// silent: zero selects the default (2), NoRetries (any negative value) selects none.

@@ -23,7 +23,7 @@ import (
 func liveClient(t *testing.T) *Client {
 	t.Helper()
 	c, err := Dial(Config{Host: os.Getenv("TPLINK_EASYSMART_HOST"), Username: os.Getenv("TPLINK_EASYSMART_USERNAME"),
-		Password: os.Getenv("TPLINK_EASYSMART_PASSWORD"), Timeout: 3 * time.Second})
+		Password: Password(os.Getenv("TPLINK_EASYSMART_PASSWORD")), Timeout: 3 * time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -779,7 +779,7 @@ func TestLiveIPChange(t *testing.T) {
 		}
 		if cur.IP != orig.IP || cur.Netmask != orig.Netmask || cur.Gateway != orig.Gateway {
 			r, err := Dial(Config{Host: cur.IP.String(), Username: os.Getenv("TPLINK_EASYSMART_USERNAME"),
-				Password: os.Getenv("TPLINK_EASYSMART_PASSWORD"), Timeout: 3 * time.Second})
+				Password: Password(os.Getenv("TPLINK_EASYSMART_PASSWORD")), Timeout: 3 * time.Second})
 			if err != nil {
 				t.Errorf("RESTORE dial %s: %v", cur.IP, err)
 				return
