@@ -107,7 +107,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 	// QoS, mirror and IGMP as they were, then the comparison with the start state.
 	defer func() {
 		if q, err := c.Dot1Q(ctx); err == nil && q.Enabled {
-			if err := c.SetPVIDs(ctx, map[PortID]int{a: 1, b: 1}); err != nil {
+			if err := c.SetPVIDs(ctx, map[PortID]VLANID{a: 1, b: 1}); err != nil {
 				t.Errorf("RESTORE: PVIDs: %v", err)
 			}
 			if err := c.DeleteVLAN8021Q(ctx, 20); err != nil {
@@ -166,7 +166,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 	err = c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Name: "staged", Untagged: MustPortSet(PortID(a)), Tagged: MustPortSet(PortID(b))})
 	obs("A1 SetVLAN8021Q(20) while 802.1Q is off: %s", result(err))
 	obs("A1 read right after: %s | raw %s", dot1q(), raw(wire.TLVVLAN8021Q, wire.TLVVLAN8021QVLAN, wire.TLVVLAN8021QPVID))
-	err = c.SetPVIDs(ctx, map[PortID]int{a: 20})
+	err = c.SetPVIDs(ctx, map[PortID]VLANID{a: 20})
 	obs("A2 SetPVIDs(a=20) while 802.1Q is off: %s", result(err))
 	obs("A2 read right after: %s", dot1q())
 	setMode(VLANModeDot1Q)
@@ -175,7 +175,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 	// leave 802.1Q clean before the next probe
 	if q, err := c.Dot1Q(ctx); err == nil {
 		if _, ok := vlanByID(q, 20); ok {
-			_ = c.SetPVIDs(ctx, map[PortID]int{a: 1, b: 1})
+			_ = c.SetPVIDs(ctx, map[PortID]VLANID{a: 1, b: 1})
 			if err := c.DeleteVLAN8021Q(ctx, 20); err != nil {
 				t.Fatalf("cleaning VLAN 20: %v", err)
 			}
@@ -210,7 +210,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 	obs("C2 in port-based mode: %s | raw 802.1Q %s", portBased(), raw(wire.TLVVLAN8021Q, wire.TLVVLAN8021QVLAN))
 	setMode(VLANModeDot1Q)
 	obs("C2 back in 802.1Q mode (trip through port-based): %s", dot1q())
-	_ = c.SetPVIDs(ctx, map[PortID]int{a: 1, b: 1})
+	_ = c.SetPVIDs(ctx, map[PortID]VLANID{a: 1, b: 1})
 	_ = c.DeleteVLAN8021Q(ctx, 20)
 	setMode(VLANModePortBased)
 

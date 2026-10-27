@@ -113,14 +113,14 @@ func (g *gatedClient) SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error 
 	return g.SwitchClient.SetVLAN8021Q(ctx, v)
 }
 
-func (g *gatedClient) DeleteVLAN8021Q(ctx context.Context, id int) error {
+func (g *gatedClient) DeleteVLAN8021Q(ctx context.Context, id escp.VLANID) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.DeleteVLAN8021Q(ctx, id)
 }
 
-func (g *gatedClient) SetPVIDs(ctx context.Context, pvids map[escp.PortID]int) error {
+func (g *gatedClient) SetPVIDs(ctx context.Context, pvids map[escp.PortID]escp.VLANID) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}

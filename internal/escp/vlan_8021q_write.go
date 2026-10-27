@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"regexp"
+	"strconv"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
@@ -12,9 +13,9 @@ import (
 // id range is the IEEE one; the name rules are those of the vendor utility
 // (at most ten characters from letters, digits, hyphen and underscore).
 const (
-	MinVLANID      = 1
-	MaxVLANID      = 4094
-	MaxVLANNameLen = 10
+	MinVLANID      VLANID = 1
+	MaxVLANID      VLANID = 4094
+	MaxVLANNameLen        = 10
 
 	// Layout of a 802.1Q VLAN entry (TLV 8705): id (2 bytes), member mask, tagged mask, name, NUL.
 	vlan8021QOffMember = 2
@@ -30,13 +31,21 @@ const VLANNamePattern = `^[A-Za-z0-9_-]*$`
 
 var vlanNamePattern = regexp.MustCompile(VLANNamePattern)
 
-// ValidateVLANID checks an 802.1Q VLAN id or PVID.
-func ValidateVLANID(id int) error {
-	if id < MinVLANID || id > MaxVLANID {
-		return invalidf("escp: invalid VLAN id %d (valid: %d-%d)", id, MinVLANID, MaxVLANID)
+// VLANID is the id of an 802.1Q VLAN, and the PVID of a port, which is the id of the VLAN its
+// untagged traffic enters. The IEEE range is MinVLANID to MaxVLANID; two bytes carry it on the wire.
+// (Port-based VLAN groups and LAG groups have ids of their own, one byte each, and are plain ints.)
+type VLANID int
+
+// Validate reports whether v is within MinVLANID to MaxVLANID; the error matches ErrInvalid.
+func (v VLANID) Validate() error {
+	if v < MinVLANID || v > MaxVLANID {
+		return invalidf("escp: invalid VLAN id %d (valid: %d-%d)", int(v), int(MinVLANID), int(MaxVLANID))
 	}
 	return nil
 }
+
+// String is the id as a number.
+func (v VLANID) String() string { return strconv.Itoa(int(v)) }
 
 // ValidateVLANName checks an 802.1Q VLAN name: empty, or up to MaxVLANNameLen letters, digits, hyphens and underscores.
 func ValidateVLANName(name string) error {
@@ -49,7 +58,7 @@ func ValidateVLANName(name string) error {
 // validate checks a VLAN before it is encoded: id, name, ports, no port both
 // tagged and untagged, and at least one member (use DeleteVLAN8021Q to remove).
 func (v VLAN8021Q) validate() error {
-	if err := ValidateVLANID(v.ID); err != nil {
+	if err := v.ID.Validate(); err != nil {
 		return err
 	}
 	if err := ValidateVLANName(v.Name); err != nil {
@@ -71,7 +80,7 @@ func (v VLAN8021Q) encode() []byte {
 }
 
 // vlanEntryBytes lays out a TLV 8705 value: id, member mask, tagged mask, name, NUL.
-func vlanEntryBytes(id int, member, tagged []byte, name string) []byte {
+func vlanEntryBytes(id VLANID, member, tagged []byte, name string) []byte {
 	out := binary.BigEndian.AppendUint16(nil, uint16(id)) //nolint:gosec // callers validate the id (at most 4094)
 	out = append(out, member...)
 	out = append(out, tagged...)
@@ -90,23 +99,23 @@ func (c *Client) SetVLAN8021Q(ctx context.Context, v VLAN8021Q) error {
 	if err := c.requirePorts(ctx, members); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, Operation{Name: "SetVLAN8021Q", Ports: members, Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: v.ID}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: v.encode()})
+	return c.setTLVs(ctx, Operation{Name: "SetVLAN8021Q", Ports: members, Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: int(v.ID)}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: v.encode()})
 }
 
 // DeleteVLAN8021Q removes an 802.1Q VLAN: TLV 8705 with both masks empty and an
 // empty name, as the vendor utility sends it.
-func (c *Client) DeleteVLAN8021Q(ctx context.Context, id int) error {
-	if err := ValidateVLANID(id); err != nil {
+func (c *Client) DeleteVLAN8021Q(ctx context.Context, id VLANID) error {
+	if err := id.Validate(); err != nil {
 		return err
 	}
 	empty := make([]byte, maskLen)
-	return c.setTLVs(ctx, Operation{Name: "DeleteVLAN8021Q", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: id}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
+	return c.setTLVs(ctx, Operation{Name: "DeleteVLAN8021Q", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: int(id)}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
 }
 
 // SetPVIDs sets the default VLAN of the given ports (port -> pvid): one TLV
 // 8706 per port with the port (1 byte) and the pvid (2 bytes). The VLAN must
 // exist and the 802.1Q mode must be on; callers must guard linked ports.
-func (c *Client) SetPVIDs(ctx context.Context, pvids map[PortID]int) error {
+func (c *Client) SetPVIDs(ctx context.Context, pvids map[PortID]VLANID) error {
 	if len(pvids) == 0 {
 		return invalidf("escp: no PVIDs to set")
 	}
@@ -115,7 +124,7 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids map[PortID]int) error {
 		if err := p.Validate(); err != nil {
 			return err
 		}
-		if err := ValidateVLANID(id); err != nil {
+		if err := id.Validate(); err != nil {
 			return err
 		}
 		named = named.Union(p.set())

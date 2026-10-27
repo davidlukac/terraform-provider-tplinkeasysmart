@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"net/netip"
 	"reflect"
 	"testing"
 
@@ -23,8 +24,8 @@ func TestParseIGMP(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := IGMP{ReportSuppression: true, Groups: []IGMPGroup{
-		{IP: "239.255.255.250", VLAN: 1, Ports: MustPortSet(1, 4)},
-		{IP: "224.0.1.1", VLAN: 10, Ports: MustPortSet(8)},
+		{IP: netip.MustParseAddr("239.255.255.250"), VLAN: 1, Ports: MustPortSet(1, 4)},
+		{IP: netip.MustParseAddr("224.0.1.1"), VLAN: 10, Ports: MustPortSet(8)},
 	}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v\nwant %+v", got, want)

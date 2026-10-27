@@ -500,7 +500,7 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 	origPVID := 1
 	for _, p := range dot1q.PVIDs {
 		if int(p.Port) == a {
-			origPVID = p.PVID
+			origPVID = int(p.PVID)
 		}
 	}
 	mode := func(body string) string {

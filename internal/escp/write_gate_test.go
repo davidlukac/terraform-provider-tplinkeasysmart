@@ -47,7 +47,7 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 		return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 10, Name: "test", Untagged: MustPortSet(2)})
 	},
 	"DeleteVLAN8021Q": func(ctx context.Context, c *Client) error { return c.DeleteVLAN8021Q(ctx, 10) },
-	"SetPVIDs":        func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, map[PortID]int{2: 1}) },
+	"SetPVIDs":        func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, map[PortID]VLANID{2: 1}) },
 	"SetVLANMode": func(ctx context.Context, c *Client) error {
 		return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 8})
 	},
@@ -295,7 +295,7 @@ func TestOperationPortsFollowTheArguments(t *testing.T) {
 		{"an 802.1Q VLAN names its tagged and its untagged ports", func(c *Client) error {
 			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Tagged: MustPortSet(8), Untagged: MustPortSet(3, 4)})
 		}, MustPortSet(8, 3, 4)},
-		{"several PVIDs are all named", func(c *Client) error { return c.SetPVIDs(ctx, map[PortID]int{6: 1, 2: 1, 4: 1}) }, MustPortSet(2, 4, 6)},
+		{"several PVIDs are all named", func(c *Client) error { return c.SetPVIDs(ctx, map[PortID]VLANID{6: 1, 2: 1, 4: 1}) }, MustPortSet(2, 4, 6)},
 		{"several priorities are all named", func(c *Client) error {
 			return c.SetPortPriorities(ctx, map[PortID]Priority{7: 1, 3: 2})
 		}, MustPortSet(3, 7)},

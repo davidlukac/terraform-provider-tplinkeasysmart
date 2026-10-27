@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"net/netip"
 	"reflect"
 	"strings"
 	"sync"
@@ -72,7 +73,7 @@ func readCases() []readCase {
 			},
 			requests: [][]int16{{wire.TLVIGMPEnabled}, {wire.TLVIGMPGroups}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.IGMP(ctx) },
-			want:     IGMP{Enabled: true, Groups: []IGMPGroup{{IP: "239.255.255.250", VLAN: 1, Ports: MustPortSet(1, 4)}}},
+			want:     IGMP{Enabled: true, Groups: []IGMPGroup{{IP: netip.MustParseAddr("239.255.255.250"), VLAN: 1, Ports: MustPortSet(1, 4)}}},
 			bad: map[int16][]wire.TLV{
 				wire.TLVIGMPEnabled: {th(wire.TLVIGMPEnabled, "01")},
 				wire.TLVIGMPGroups:  {{Type: wire.TLVIGMPGroups, Value: make([]byte, 7)}},

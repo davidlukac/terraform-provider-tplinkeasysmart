@@ -94,7 +94,7 @@ func igmpToModel(sw types.String, s escp.IGMP) igmpModel {
 			ports = append(ports, types.Int64Value(int64(p)))
 		}
 		groups = append(groups, types.ObjectValueMust(igmpGroupType.AttrTypes, map[string]attr.Value{
-			"ip":    types.StringValue(g.IP),
+			"ip":    types.StringValue(g.IP.String()),
 			"vlan":  types.Int64Value(int64(g.VLAN)),
 			"ports": types.ListValueMust(types.Int64Type, ports),
 		}))
