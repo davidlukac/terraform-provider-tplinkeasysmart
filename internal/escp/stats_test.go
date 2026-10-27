@@ -28,3 +28,19 @@ func TestParsePortStats(t *testing.T) {
 		t.Fatal("expected error for short TLV")
 	}
 }
+
+// The row's port is a PortID, so it feeds the port types without a conversion: the ports of a
+// statistics read are a PortSet, and a row names a port the Port Setting read lists too.
+func TestPortStatsIDsAreUsablePortIDs(t *testing.T) {
+	rows, err := parsePortStats([]wire.TLV{
+		tlvHex(t, wire.TLVPortStats, "0101061434f1b7000000002873fb8a00000000"),
+		tlvHex(t, wire.TLVPortStats, "03010000000000000000000000000000000000"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, err := NewPortSet(rows[0].ID, rows[1].ID)
+	if err != nil || set != MustPortSet(1, 3) || !set.Has(rows[1].ID) {
+		t.Fatalf("got %v, %v; want ports 1,3", set, err)
+	}
+}
