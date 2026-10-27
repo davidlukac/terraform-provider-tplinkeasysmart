@@ -19,7 +19,7 @@ func TestCheckFirmware(t *testing.T) {
 	tests := []struct {
 		version, frag string
 		reason        FirmwareReason
-		build         string
+		build         escp.BuildDate
 	}{
 		{"1.0.0 Build 20260101 Rel.1", "build 20260101 has not been verified", FirmwareUnverified, "20260101"},
 		{"1.0.0 Build 20220930 Rel.1", "build 20220930 has not been verified", FirmwareUnverified, "20220930"},
