@@ -2,7 +2,7 @@
 
 ## 0.30.1
 
-- No change in behaviour; the library behind the provider now uses typed values (value objects) for what used to be plain numbers and strings. Visible only in texts: port lists in messages read `2,5` instead of `[2 5]`; a bad device description, VLAN name or switch name is refused with one sentence each ("Invalid device description", "Invalid VLAN name", "Invalid switch name") that says what is allowed; a `broadcast_addr` that is not an IPv4 address is refused. Library API (`internal/escp`, not a Terraform interface): `Config.Password` is an `escp.Password` that prints as `[redacted]`, `ConfigBackup` returns an `escp.ConfigFile`, `FirmwareError` carries the `escp.Firmware` instead of `Version` and `Build`, results codes are `escp.ReplyCode`, and addresses, ports, VLAN ids, build dates and TLV types have their own types.
+- No change in behaviour; the library behind the provider now uses typed values (value objects) for what used to be plain numbers and strings. Visible only in texts: port lists in messages read `2,5` instead of `[2 5]`; a bad device description, VLAN name or switch name is refused with one sentence each ("Invalid device description", "Invalid VLAN name", "Invalid switch name") that says what is allowed. Library API (`internal/escp`, not a Terraform interface): `Config.Password` is an `escp.Password` that prints as `[redacted]`, `ConfigBackup` returns an `escp.ConfigFile`, `FirmwareError` carries the `escp.Firmware` instead of `Version` and `Build`, `Config.BroadcastAddr` that is not an IPv4 address is refused, result codes are `escp.ReplyCode`, and addresses, ports, VLAN ids, build dates and TLV types have their own types.
 
 ## 0.30.0
 
