@@ -184,10 +184,12 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 	return reply{}, ErrNoReply
 }
 
-// exchangeFragments is exchange for replies that span several packets: it
-// concatenates the values of every TLV of the given type until a packet
-// without the fragment flag arrives. A missing fragment restarts the request.
-func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ wire.TLVType) ([]byte, error) {
+// exchangeFragments is exchange for replies that span several packets: it collects the values
+// of the TLVs of the given type, one element per packet, until a packet without the fragment
+// flag arrives. A missing final fragment restarts the request. The flag says only that more
+// packets follow (the header carries no index, no total and no checksum), so nothing here can
+// tell that an earlier packet was lost: the caller checks what it gets (see assembleConfig).
+func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ wire.TLVType) ([][]byte, error) {
 	// Callers hold c.mu and run inside withSession, so the socket is open.
 	defer c.interruptOnDone(ctx)()
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
@@ -197,7 +199,8 @@ func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV
 		if err := c.send(op, tlvs, false, []*net.UDPAddr{c.dest}); err != nil {
 			return nil, err
 		}
-		var out []byte
+		var parts [][]byte
+		total := 0
 		for {
 			rep, ok := c.recv(ctx, c.attemptDeadline(ctx))
 			if !ok {
@@ -206,16 +209,22 @@ func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV
 			if rep.err != 0 {
 				return nil, &RejectedError{Code: rep.err}
 			}
+			var part []byte
+			found := false
 			for _, x := range rep.tlvs {
 				if x.Type == typ {
-					out = append(out, x.Value...)
+					part, found = append(part, x.Value...), true
 				}
 			}
-			if len(out) > maxFragmentedReply {
+			if found {
+				parts = append(parts, part)
+				total += len(part)
+			}
+			if total > maxFragmentedReply {
 				return nil, ErrReplyTooLarge
 			}
 			if rep.fragment == 0 {
-				return out, nil
+				return parts, nil
 			}
 		}
 		if err := expired(ctx); err != nil {

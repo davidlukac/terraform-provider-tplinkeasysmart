@@ -33,6 +33,8 @@ const (
 	BackupDropFirst  BackupMode = "dropfirst"  // only the last fragment arrives
 	BackupSilent     BackupMode = "silent"     // no reply at all
 	BackupFlood      BackupMode = "flood"      // fragments that never end
+	BackupCorrupt    BackupMode = "corrupt"    // every packet arrives, but one byte of the file is wrong
+	BackupDuplicate  BackupMode = "duplicate"  // the first fragment arrives twice
 )
 
 // SystemSetBehaviour is what the switch does after it applies a system SET, the write that
@@ -81,6 +83,7 @@ type Switch struct {
 	recv             int
 	mute             bool // swallow everything (switch gone)
 	backupMode       BackupMode
+	backupScript     []BackupMode                    // consumed one per backup request before backupMode applies
 	departed         bool                            // a system SET was applied under OnSystemSet and the switch has left
 	stateful         bool                            // EnableState was called: SETs are remembered and answered by later GETs
 	store            map[wire.TLVType][]byte         // the last value of each settings TLV written (or seeded) under EnableState
@@ -204,6 +207,15 @@ func (f *Switch) Configure(fn func(f *Switch)) { f.mu.Lock(); fn(f); f.mu.Unlock
 func (f *Switch) SetBackupMode(mode BackupMode) {
 	f.mu.Lock()
 	f.backupMode = mode
+	f.mu.Unlock()
+}
+
+// SetBackupScript makes the next backup requests misbehave one mode each, in order (BackupOK for a
+// request that goes well); after the last one the mode of SetBackupMode applies again. It plays a
+// loss that happens once, as on a real network.
+func (f *Switch) SetBackupScript(modes ...BackupMode) {
+	f.mu.Lock()
+	f.backupScript = append([]BackupMode(nil), modes...)
 	f.mu.Unlock()
 }
 
@@ -448,6 +460,9 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			}
 			f.mu.Lock()
 			mode := f.backupMode
+			if len(f.backupScript) > 0 {
+				mode, f.backupScript = f.backupScript[0], f.backupScript[1:]
+			}
 			f.mu.Unlock()
 			if mode == BackupSilent {
 				return
@@ -467,6 +482,8 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 				cfg[0] = 0
 			case BackupShort:
 				cfg = cfg[:4]
+			case BackupCorrupt:
+				cfg[1500] ^= 0xff // in the second fragment
 			}
 			first, second := cfg, []byte(nil)
 			if len(cfg) > 1400 {
@@ -478,6 +495,9 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 				h1.Fragment = 0
 			}
 			if mode != BackupDropFirst {
+				f.send(from, wire.OpSetReply, h1, 0, []wire.TLV{{Type: wire.TLVConfigFile, Value: first}}, true)
+			}
+			if mode == BackupDuplicate {
 				f.send(from, wire.OpSetReply, h1, 0, []wire.TLV{{Type: wire.TLVConfigFile, Value: first}}, true)
 			}
 			if second != nil && mode != BackupDropSecond {
