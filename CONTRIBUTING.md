@@ -54,7 +54,7 @@ Coverage must stay at 100% of reachable statements (`make cover`, exclusions onl
 ## 3. Documentation
 
 - [ ] **[R][D]** Provider docs regenerated with `make generate` and committed; `make docs-check` clean. Safety text for a resource lives in `templates/resources/<name>.md.tmpl` (guards, destroy behaviour, ordering with other resources).
-- [ ] **[R][D]** An example in `examples/resources/<type>/resource.tf` (or `examples/data-sources/...`) that passes `make validate-examples`, plus `import.sh` for a resource. Documentation addresses and variables only: no real IPs, MAC addresses or credentials.
+- [ ] **[R][D]** An example in `examples/resources/<type>/resource.tf` (or `examples/data-sources/...`) that passes `make validate-examples` and plans against the fake switch, plus `import.sh` for a resource. `go test ./internal/provider` enforces it (`examples_test.go`): every registered type has its example, no example is left without a type, and each example is planned through real Terraform. Documentation addresses and variables only: no real IPs, MAC addresses or credentials.
 - [ ] **[R][D]** The README tables are updated: *What you can manage* (resource, web UI page, guard) and, when the verified hardware or firmware changed, *Compatibility*.
 - [ ] **[C]** Client documentation is current: doc comments on the exported API, the package overview (`doc.go`), runnable examples (`example_test.go`) for new public entry points, and the data structures a caller sees.
 - [ ] **[C]** [`internal/escp/PROTOCOL.md`](internal/escp/PROTOCOL.md) describes the layout and its status (verified live on which firmware, vendor code only, or assumed).
