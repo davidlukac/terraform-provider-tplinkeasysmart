@@ -2,6 +2,7 @@ package regression
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -170,6 +171,43 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 	}})
 }
 
+// A discovery right after the switch changed its address can come back empty or still show the old
+// address (seen on switch 03 twice: the neighbour caches and the switch's own table are catching
+// up), so a look-up that must see a new state asks again for a few seconds. This is the tolerance of
+// the check, not of the product: the provider's own look-up repeats once and its apply read the
+// switch back fine each time.
+const (
+	locateTries = 5
+	locatePause = time.Second
+)
+
+func locateByMAC(mac escp.MAC) func(context.Context) (escp.Info, error) {
+	return func(ctx context.Context) (escp.Info, error) { return escp.Locate(ctx, mac, escp.DiscoverOptions{}) }
+}
+
+func anyAnswer(escp.Info) bool { return true }
+
+// locateSettled asks up to tries times, pause apart, until the switch answers and ok accepts what it
+// says; it returns the last answer and error, so a switch that never settled is described by what
+// it last reported. A cancelled context ends the asking.
+func locateSettled(ctx context.Context, locate func(context.Context) (escp.Info, error), ok func(escp.Info) bool, tries int, pause time.Duration) (escp.Info, error) {
+	var found escp.Info
+	var err error
+	for attempt := 1; attempt <= tries; attempt++ {
+		if found, err = locate(ctx); err == nil && ok(found) {
+			return found, nil
+		}
+		if attempt < tries {
+			select {
+			case <-ctx.Done():
+				return found, ctx.Err()
+			case <-time.After(pause):
+			}
+		}
+	}
+	return found, err
+}
+
 // bringBackFromALease puts the switch back on its static address whatever happened to the run: when
 // the switch is already there with DHCP off it does nothing; otherwise it looks the switch up by its
 // MAC address, wherever the lease put it, and writes the static address back. It runs even when the
@@ -177,7 +215,7 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 func (s *Session) bringBackFromALease(t *testing.T, mac escp.MAC, original escp.IPConfig) {
 	ctx, cancel := context.WithTimeout(context.Background(), settleTime)
 	defer cancel()
-	found, err := escp.Locate(ctx, mac, escp.DiscoverOptions{})
+	found, err := locateSettled(ctx, locateByMAC(mac), anyAnswer, locateTries, locatePause)
 	if err != nil {
 		t.Errorf("CANNOT FIND THE SWITCH: %v. Look for MAC %s with a discovery before doing anything else", err, mac)
 		return
@@ -225,7 +263,7 @@ func TestScenarioManagementDHCP(t *testing.T) {
 	dhcp := provider + "resource \"tplinkeasysmart_management_ip\" \"this\" {\n  dhcp             = true\n  allow_disruptive = true\n}\n"
 	static := provider + fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", info.IP.String(), info.Netmask.String(), info.Gateway.String())
 	leased := func(*terraform.State) error {
-		found, err := escp.Locate(ctx, hw, escp.DiscoverOptions{})
+		found, err := locateSettled(ctx, locateByMAC(hw), func(in escp.Info) bool { return in.DHCP }, locateTries, locatePause)
 		if err != nil || !found.DHCP {
 			return fmt.Errorf("the switch found by MAC reports %+v, err %w, want DHCP on", found, err)
 		}
@@ -237,11 +275,47 @@ func TestScenarioManagementDHCP(t *testing.T) {
 			resource.TestCheckResourceAttrSet("tplinkeasysmart_management_ip.this", "ip_address"))},
 		{Config: dhcp}, // the second look: nothing to change, the plan after the apply is empty
 		{Config: static, Check: func(st *terraform.State) error {
-			found, err := escp.Locate(ctx, hw, escp.DiscoverOptions{})
+			found, err := locateSettled(ctx, locateByMAC(hw), func(in escp.Info) bool { return !in.DHCP && in.IP.String() == info.IP.String() }, locateTries, locatePause)
 			if err != nil || found.DHCP || found.IP.String() != info.IP.String() {
 				return fmt.Errorf("the switch found by MAC reports %+v, err %w, want %s with DHCP off", found, err, info.IP.String())
 			}
 			return s.restoredCheck(t)(st)
 		}},
 	}})
+}
+
+func TestLocateSettledAsksAgainUntilTheStateIsSeen(t *testing.T) {
+	ctx := context.Background()
+	stale, fresh := escp.Info{DHCP: true}, escp.Info{DHCP: false}
+	var calls int
+	script := func(answers ...func() (escp.Info, error)) func(context.Context) (escp.Info, error) {
+		calls = 0
+		return func(context.Context) (escp.Info, error) {
+			a := answers[min(calls, len(answers)-1)]
+			calls++
+			return a()
+		}
+	}
+	miss := func() (escp.Info, error) { return escp.Info{}, escp.ErrNotFound }
+	old := func() (escp.Info, error) { return stale, nil }
+	now := func() (escp.Info, error) { return fresh, nil }
+	notDHCP := func(in escp.Info) bool { return !in.DHCP }
+
+	if got, err := locateSettled(ctx, script(miss, old, now), notDHCP, 5, 0); err != nil || got != fresh || calls != 3 {
+		t.Errorf("a miss, the old state, then the new: got %+v, err %v after %d asks, want the new state after 3", got, err, calls)
+	}
+	if got, err := locateSettled(ctx, script(now), notDHCP, 5, 0); err != nil || got != fresh || calls != 1 {
+		t.Errorf("an answer that is right at once: got %+v, err %v after %d asks, want 1", got, err, calls)
+	}
+	if got, err := locateSettled(ctx, script(old), notDHCP, 3, 0); err != nil || got != stale || calls != 3 {
+		t.Errorf("a state that never changes: got %+v, err %v after %d asks, want the last answer after 3", got, err, calls)
+	}
+	if _, err := locateSettled(ctx, script(miss), notDHCP, 3, 0); !errors.Is(err, escp.ErrNotFound) || calls != 3 {
+		t.Errorf("a switch that never answers: err %v after %d asks, want ErrNotFound after 3", err, calls)
+	}
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := locateSettled(cancelled, script(miss), notDHCP, 3, time.Hour); !errors.Is(err, context.Canceled) || calls != 1 {
+		t.Errorf("a cancelled context: err %v after %d asks, want it to stop after 1", err, calls)
+	}
 }
