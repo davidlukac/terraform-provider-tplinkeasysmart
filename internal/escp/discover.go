@@ -220,7 +220,7 @@ func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window
 
 	var n [2]byte
 	_, _ = rand.Read(n[:])
-	seq := (uint16(n[0])<<8 | uint16(n[1])) % 1000
+	seq := discoverySeq(n)
 
 	found := map[string]Info{}
 	start := time.Now()
