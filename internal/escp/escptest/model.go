@@ -235,7 +235,7 @@ func (f *Switch) applied(t wire.TLV) {
 			}
 		}
 	case wire.TLVBandwidthIngress:
-		// One limiter per port for incoming traffic (firmware 20250710, probed on switch 03): an ingress limit
+		// One limiter per port for incoming traffic (firmware 20250710 and 20230218, probed on switches 03 and 01): an ingress limit
 		// turns storm control on that port off, without a refusal.
 		if t.Value[1] == 1 {
 			clear(f.row(wire.TLVStormControl, int(t.Value[0]))[1:])
