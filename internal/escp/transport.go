@@ -146,7 +146,7 @@ func (c *Client) attemptDeadline(ctx context.Context) time.Time {
 
 // send transmits one request with a fresh sequence number.
 func (c *Client) send(op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) error {
-	c.seq = (c.seq + 1) % 1000
+	c.seq = nextSeq(c.seq)
 	pkt := c.encrypt(wire.Marshal(wire.Header{Op: op, SwitchMAC: c.swMAC, HostMAC: c.hostMAC, Seq: c.seq}, tlvs), static)
 	for _, d := range to {
 		if _, err := c.conn.WriteToUDP(pkt, d); err != nil {

@@ -147,6 +147,9 @@ func TestDiscoverProbesEveryInterfaceTwice(t *testing.T) {
 		macs[h.HostMAC]++
 		if i == 0 {
 			seq = h.Seq
+			if seq < discoverySeqBase || seq >= discoverySeqBase+discoverySeqSpace {
+				t.Errorf("the probe's sequence number %d is outside the discovery range", seq)
+			}
 		}
 		if h.Seq != seq {
 			t.Errorf("probe %d has sequence %d, want %d", i, h.Seq, seq)

@@ -34,8 +34,14 @@ type Session struct {
 	// MAC is the MAC address the target reports about itself.
 	MAC    escp.MAC
 	before Readout
-	rd     []Reader
-	tb     testing.TB
+	// mode and mirror are the two settings the safety net puts back (see Rescue), as they were
+	// when the session opened.
+	mode   escp.VLANModeSetting
+	mirror escp.Mirror
+	// net is the client the safety net uses; the session's own, replaceable in tests.
+	net rescueClient
+	rd  []Reader
+	tb  testing.TB
 }
 
 // Getenv is os.Getenv, replaceable in tests.
@@ -82,10 +88,14 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 	if err != nil {
 		t.Fatalf("cannot dial %s: %v", target.Name, err)
 	}
-	s.Client = c
+	s.Client, s.net = c, c
 	t.Cleanup(func() { _ = s.Client.Close() }) // best effort: the run is over
 	s.rd = CoreReaders(s.Client)
-	if s.before, err = Take(context.Background(), s.rd); err != nil {
+	err = s.capture(context.Background())
+	if err == nil {
+		s.before, err = Take(context.Background(), s.rd)
+	}
+	if err != nil {
 		t.Fatalf("first readout of %s: %v", target.Name, err)
 	}
 	s.MAC, _ = escp.ParseMAC(s.before["mac"]) // the readout prints MAC.String(), which always parses
@@ -93,6 +103,17 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 		t.Fatalf("%s: %v", target.Name, err)
 	}
 	return s
+}
+
+// capture records the VLAN mode and the port mirror, as typed values the safety net can write back.
+func (s *Session) capture(ctx context.Context) (err error) {
+	if s.mode, err = s.net.VLANMode(ctx); err != nil {
+		return fmt.Errorf("reading the VLAN mode: %w", err)
+	}
+	if s.mirror, err = s.net.PortMirror(ctx); err != nil {
+		return fmt.Errorf("reading the port mirror: %w", err)
+	}
+	return nil
 }
 
 // startFake starts the model of a freshly reset switch with the port shape of switch 03: the
