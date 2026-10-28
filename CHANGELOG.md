@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.30.2
+
+- **Fix:** an ingress bandwidth limit and storm control on the same port are no longer written together. The switch keeps only one of them per port and turns the other off without a word (probed on firmware 20230218 and 20250710), so a configuration with both never converged: every apply undid the other and the next refresh showed one gone. `tplinkeasysmart_bandwidth_limit` with an `ingress_kbps` other than 0 is now refused while storm control is on for the port, and `tplinkeasysmart_storm_limit` with a traffic type is refused while an ingress limit is set, before anything is written; the error names the port and what to do. To change over, turn the first off and order the applies with `depends_on`. The egress limit, an ingress limit of 0 and storm control switched off are unaffected. A configuration that set both on one port now fails at apply instead of flapping.
+
 ## 0.30.1
 
 - No change in behaviour; the library behind the provider now uses typed values (value objects) for what used to be plain numbers and strings. Visible only in texts: port lists in messages read `2,5` instead of `[2 5]`; a bad device description, VLAN name or switch name is refused with one sentence each ("Invalid device description", "Invalid VLAN name", "Invalid switch name") that says what is allowed. Library API (`internal/escp`, not a Terraform interface): `Config.Password` is an `escp.Password` that prints as `[redacted]`, `ConfigBackup` returns an `escp.ConfigFile`, `FirmwareError` carries the `escp.Firmware` instead of `Version` and `Build`, `Config.BroadcastAddr` that is not an IPv4 address is refused, result codes are `escp.ReplyCode`, and addresses, ports, VLAN ids, build dates and TLV types have their own types.
