@@ -69,6 +69,7 @@ func (c *Client) discoverOnce(ctx context.Context) (Info, error) {
 func (c *Client) relocate(ctx context.Context) error {
 	found, err := c.locator(ctx, c.cfg.MAC)
 	if errors.Is(err, ErrNotFound) && ctx.Err() == nil {
+		c.log.WarnContext(ctx, "lookup by MAC found nobody; asking once more")
 		// Once in a while a lookup finds nobody although the switch is there: seen right after a
 		// management move, when the first lookup missed and the next one, half a second later, found it.
 		// Failing a whole run for that costs more than the second window of a lookup that was going to fail.
@@ -77,6 +78,7 @@ func (c *Client) relocate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	c.log.InfoContext(ctx, "switch located by MAC", "ip", found.IP.String())
 	return c.follow(found)
 }
 

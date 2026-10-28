@@ -122,6 +122,17 @@
 // ErrInvalid (an argument refused before any write was sent; the message names the value and
 // what is allowed), ErrReplyTooLarge (a fragmented reply bigger than any switch sends).
 //
+// # Logging
+//
+// The library writes nowhere on its own. Pass a *slog.Logger in Config.Logger (a Client) or
+// DiscoverOptions.Logger (Discover, Locate) and it reports through that, with the context of the
+// call so a handler can reach what the caller put there; nil discards everything. Debug lines are
+// the protocol (each request and reply with the operation, sequence number, TLV types and sizes, and
+// each fragment), Info lines the lifecycle (a session, the switch located by MAC, a write with its
+// operation and impact, a lease), Warn lines a recoverable anomaly (no reply and a retry, a session
+// reopened, a download repeated). Failures are returned, not logged. TLV values are never logged, so
+// no message carries the password, the user name or the session key.
+//
 // # Security
 //
 // ESCP has no real secrecy. The password travels in every write, protected only by RC4

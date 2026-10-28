@@ -74,9 +74,11 @@ func (c *Client) awaitLease(ctx context.Context, before IPConfig, lost error) er
 		if found, err := c.locator(ctx, c.cfg.MAC); err == nil {
 			last, seen = found, true
 			if _, perr := ipConfigFromInfo(found); found.DHCP && perr == nil {
+				c.log.InfoContext(ctx, "lease obtained", "ip", found.IP.String())
 				return c.follow(found)
 			}
 		}
+		c.log.DebugContext(ctx, "no lease reported yet; asking again", "poll", ipMovePoll.String())
 		select {
 		case <-ctx.Done():
 			return leaseNotConfirmed(before, last, seen, lost)

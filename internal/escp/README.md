@@ -137,6 +137,10 @@ func TestMyCode(t *testing.T) {
 
 `SwitchPort`, `HostPort` and `BroadcastAddr` exist only for this; a real switch always uses 29808 and 29809.
 
+## Logging
+
+`Config.Logger` and `DiscoverOptions.Logger` take a `*slog.Logger`; the library logs nowhere else, and nil discards. Debug is the protocol (each request and reply: operation, sequence number, TLV types and sizes, never values), Info the lifecycle (session, lookup by MAC, writes), Warn a recoverable anomaly (lost packet, repeated download). No message carries the password, user name or session key. The Terraform provider routes it to `tflog`, so `TF_LOG=DEBUG terraform plan` shows what the client does. A `forbidigo` lint rule keeps `fmt.Print*` and `log.*` out of the package.
+
 ## Security
 
 ESCP has no real secrecy: the password travels in every write, protected only by RC4 with a key exchanged under a 64-bit RSA key that anyone who can capture the traffic can break. Use it on a network you trust, never log a `Config`, and do not reuse the switch password elsewhere.
