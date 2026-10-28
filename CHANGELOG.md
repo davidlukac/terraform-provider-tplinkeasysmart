@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.30.3
+
+- **Fix:** a configuration backup is complete and verified, or it fails. The switch sends the file in UDP packets that carry no index, total or checksum, so a lost packet used to give a shorter file that looked valid. The download (the `tplinkeasysmart_config_backup` data source and the library's `ConfigBackup`) is now accepted only when it starts with the configuration magic, its packets are the expected lengths, and a second, separate download is byte for byte the same; otherwise it is repeated (up to the configured retries) and then fails with an error that says why. A rejection, a missing reply and a cancelled run still end the call at once. Internal: `tools/configbackup`, a small command that writes a verified backup file, and the documentation of when to run the Terraform scenarios.
+
 ## 0.30.2
 
 - **Fix:** an ingress bandwidth limit and storm control on the same port are no longer written together. The switch keeps only one of them per port and turns the other off without a word (probed on firmware 20230218 and 20250710), so a configuration with both never converged: every apply undid the other and the next refresh showed one gone. `tplinkeasysmart_bandwidth_limit` with an `ingress_kbps` other than 0 is now refused while storm control is on for the port, and `tplinkeasysmart_storm_limit` with a traffic type is refused while an ingress limit is set, before anything is written; the error names the port and what to do. To change over, turn the first off and order the applies with `depends_on`. The egress limit, an ingress limit of 0 and storm control switched off are unaffected. A configuration that set both on one port now fails at apply instead of flapping.
