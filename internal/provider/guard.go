@@ -65,3 +65,14 @@ func wordPortRefusal(err error, word func(used *safety.PortUseError) error) erro
 func allowDisruptiveAttribute(description string) schema.BoolAttribute {
 	return schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: description}
 }
+
+// ingressStormNote is the paragraph both limit resources carry about the switch's one limiter per port for
+// incoming traffic: it serves an ingress limit or storm control, never both, and the client refuses the second.
+// other is the setting that must be off, otherResource the resource that manages it, and trigger what is refused
+// while the other is on.
+func ingressStormNote(other, otherResource, trigger string) string {
+	return "**One limiter per port:** the switch keeps either an ingress limit or storm control on a port (writing one turns the other off without a word), " +
+		"so " + trigger + " is refused while " + other + " is on for the port, before anything is written. " +
+		"To change over, turn " + other + " off with " + otherResource + " first and make this resource `depends_on` it, so that the applies run in that order " +
+		"(without an order, one of the two can be refused). The egress limit is independent of both. Verified on firmware 20230218 and 20250710."
+}

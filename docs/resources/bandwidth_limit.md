@@ -2,12 +2,12 @@
 page_title: "tplinkeasysmart_bandwidth_limit Resource - tplinkeasysmart"
 subcategory: "QoS"
 description: |-
-  Rate limits of one port (QoS > Bandwidth Control). Import with the port number. Safety: a limit throttles the port, so by default the provider refuses to change a port that has a link up or is in a LAG; set allow_disruptive = true to override. Destroying only removes it from state.
+  Rate limits of one port (QoS > Bandwidth Control). Import with the port number. Safety: a limit throttles the port, so by default the provider refuses to change a port that has a link up or is in a LAG; set allow_disruptive = true to override. Destroying only removes it from state. One limiter per port: the switch keeps either an ingress limit or storm control on a port (writing one turns the other off without a word), so an ingress_kbps other than 0 is refused while storm control is on for the port, before anything is written. To change over, turn storm control off with tplinkeasysmart_storm_limit first and make this resource depends_on it, so that the applies run in that order (without an order, one of the two can be refused). The egress limit is independent of both. Verified on firmware 20230218 and 20250710.
 ---
 
 # tplinkeasysmart_bandwidth_limit (Resource)
 
-Rate limits of one port (QoS > Bandwidth Control). Import with the port number. **Safety:** a limit throttles the port, so by default the provider refuses to change a port that has a link up or is in a LAG; set `allow_disruptive = true` to override. Destroying only removes it from state.
+Rate limits of one port (QoS > Bandwidth Control). Import with the port number. **Safety:** a limit throttles the port, so by default the provider refuses to change a port that has a link up or is in a LAG; set `allow_disruptive = true` to override. Destroying only removes it from state. **One limiter per port:** the switch keeps either an ingress limit or storm control on a port (writing one turns the other off without a word), so an `ingress_kbps` other than 0 is refused while storm control is on for the port, before anything is written. To change over, turn storm control off with `tplinkeasysmart_storm_limit` first and make this resource `depends_on` it, so that the applies run in that order (without an order, one of the two can be refused). The egress limit is independent of both. Verified on firmware 20230218 and 20250710.
 
 ~> **Safety** A limit throttles the port. The provider refuses to change a port that has a link up or belongs to a LAG unless `allow_disruptive = true`.
 

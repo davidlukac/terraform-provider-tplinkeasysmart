@@ -41,6 +41,7 @@ func TestCancelledContextSendsNothing(t *testing.T) {
 // second: the first was applied, the second is not sent.
 func TestCancellationBetweenTwoWritesStopsTheSecond(t *testing.T) {
 	f := escptest.Start(t)
+	f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 	ctx, cancel := context.WithCancel(context.Background())
 	var consulted int
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,

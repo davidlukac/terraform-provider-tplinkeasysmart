@@ -307,6 +307,87 @@ func TestScenarioStormLimit(t *testing.T) {
 	})
 }
 
+// The switch keeps either an ingress limit or storm control on a port, and turns the other off without a word
+// (probed on switch 03): the library refuses the second one, the apply fails with the reason and nothing is
+// written, and a change from one to the other works when the applies are ordered with depends_on, in both
+// directions. Everything is put back by configuration at the end.
+func TestScenarioIngressLimitAndStormControlExclude(t *testing.T) {
+	s := openForScenario(t)
+	ctx := context.Background()
+	port := s.Target.TestPorts[0]
+	bws, err := s.Client.Bandwidth(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storms, err := s.Client.StormControl(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wasBW escp.PortBandwidth
+	var wasStorm escp.PortStorm
+	for _, b := range bws {
+		if b.Port == port {
+			wasBW = b
+		}
+	}
+	for _, p := range storms {
+		if p.Port == port {
+			wasStorm = p
+		}
+	}
+	storm := func(on bool, dependsOn string) string {
+		rate, types := 0, "false"
+		if on {
+			rate, types = 1024, "true"
+		}
+		return fmt.Sprintf("resource \"tplinkeasysmart_storm_limit\" \"this\" {\n  port = %d\n  multicast = %s\n  broadcast = %s\n  rate_kbps = %d\n%s}\n", port, types, types, rate, dependsOn)
+	}
+	ingress := func(kbps int, dependsOn string) string {
+		return fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"this\" {\n  port = %d\n  ingress_kbps = %d\n  egress_kbps = 5120\n%s}\n", port, kbps, dependsOn)
+	}
+	restoreBW := fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"this\" {\n  port = %d\n  ingress_kbps = %d\n  egress_kbps = %d\n}\n", port, wasBW.IngressKbps, wasBW.EgressKbps)
+	restoreStorm := fmt.Sprintf("resource \"tplinkeasysmart_storm_limit\" \"this\" {\n  port = %d\n  unknown_unicast = %t\n  multicast = %t\n  broadcast = %t\n  rate_kbps = %d\n}\n",
+		port, wasStorm.UnknownUnicast, wasStorm.Multicast, wasStorm.Broadcast, wasStorm.RateKbps)
+	state := func(wantIngress escp.Kbps, wantStorm bool) resource.TestCheckFunc {
+		return func(*terraform.State) error {
+			bws, err := s.Client.Bandwidth(ctx)
+			if err != nil {
+				return err
+			}
+			storms, err := s.Client.StormControl(ctx)
+			if err != nil {
+				return err
+			}
+			for _, b := range bws {
+				if b.Port == port && b.IngressKbps != wantIngress {
+					return fmt.Errorf("port %d ingress limit = %s, want %s", port, b.IngressKbps, wantIngress)
+				}
+			}
+			for _, p := range storms {
+				if p.Port == port && p.Enabled != wantStorm {
+					return fmt.Errorf("port %d storm control enabled = %t, want %t", port, p.Enabled, wantStorm)
+				}
+			}
+			return nil
+		}
+	}
+	p := s.ProviderHCL()
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: s.Factories(),
+		Steps: []resource.TestStep{
+			{Config: p + storm(true, ""), Check: state(0, true)},
+			// both at once: the ingress limit is refused, storm control stays
+			{Config: p + storm(true, "") + ingress(10240, ""), ExpectError: regexp.MustCompile(`(?s)storm\s+control\s+on.*Turn\s+storm\s+control\s+off\s+first`)},
+			{Config: p + storm(true, ""), Check: state(0, true)},
+			// storm control to an ingress limit: storm control goes off first
+			{Config: p + storm(false, "") + ingress(10240, "  depends_on = [tplinkeasysmart_storm_limit.this]\n"), Check: state(10240, false)},
+			// and back: the ingress limit goes to 0 first
+			{Config: p + ingress(0, "") + storm(true, "  depends_on = [tplinkeasysmart_bandwidth_limit.this]\n"), Check: state(0, true)},
+			{Config: p + restoreBW + restoreStorm, Check: s.restoredCheck(t)},
+		},
+	})
+}
+
 func intSet(ports ...escp.PortID) string {
 	var s []string
 	for _, p := range ports {

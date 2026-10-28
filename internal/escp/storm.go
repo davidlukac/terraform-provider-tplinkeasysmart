@@ -71,7 +71,8 @@ type StormConfig struct {
 // utility: selecting any traffic type requires a rate (a multiple of 64 kbps,
 // at least 64, at most MaxBandwidthKbps); selecting none disables it and the
 // rate must be 0. A rate on a port that carries traffic drops its excess
-// broadcast/multicast; callers must guard against that.
+// broadcast/multicast; callers must guard against that. Storm control is refused (ErrInvalid) on a port that has an
+// ingress limit: the switch would remove the limit without saying so.
 func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
 	if err := cfg.Port.Validate(); err != nil {
 		return err
@@ -85,6 +86,11 @@ func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
 	}
 	if err := c.requirePorts(ctx, cfg.Port.set()); err != nil {
 		return err
+	}
+	if any {
+		if err := c.requireNoIngressLimit(ctx, cfg.Port); err != nil {
+			return err
+		}
 	}
 	v := make([]byte, stormEntryLen)
 	v[stormOffPort] = byte(cfg.Port)

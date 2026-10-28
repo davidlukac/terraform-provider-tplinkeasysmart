@@ -181,6 +181,7 @@ func TestWrongPasswordIsRejectedForEverySetter(t *testing.T) {
 	for name, call := range setters {
 		t.Run(name, func(t *testing.T) {
 			f := escptest.Start(t)
+			f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 			c := dialFast(t, f, "wrong-password")
 			if err := call(c, context.Background()); !errors.Is(err, ErrRejected) {
 				t.Fatalf("want ErrRejected, got %v", err)

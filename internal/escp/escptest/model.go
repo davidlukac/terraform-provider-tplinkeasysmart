@@ -234,6 +234,17 @@ func (f *Switch) applied(t wire.TLV) {
 				f.store[other] = append([]byte{0}, f.store[other][1:]...)
 			}
 		}
+	case wire.TLVBandwidthIngress:
+		// One limiter per port for incoming traffic (firmware 20250710 and 20230218, probed on switches 03 and 01): an ingress limit
+		// turns storm control on that port off, without a refusal.
+		if t.Value[1] == 1 {
+			clear(f.row(wire.TLVStormControl, int(t.Value[0]))[1:])
+		}
+	case wire.TLVStormControl:
+		// The other way round: storm control with a traffic type selected removes the port's ingress limit.
+		if t.Value[1] == 1 {
+			clear(f.row(wire.TLVBandwidthIngress, int(t.Value[0]))[1:])
+		}
 	case wire.TLVVLAN8021QVLAN:
 		// A VLAN written with no member ports is deleted.
 		var kept [][]byte
