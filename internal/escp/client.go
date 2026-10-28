@@ -85,8 +85,7 @@ func Dial(cfg Config) (*Client, error) {
 	}
 	var n [2]byte
 	_, _ = rand.Read(n[:])
-	c.seq = uint16(n[0])<<8 | uint16(n[1])
-	c.seq %= 1000
+	c.seq = startSeq(n)
 	return c, nil
 }
 
