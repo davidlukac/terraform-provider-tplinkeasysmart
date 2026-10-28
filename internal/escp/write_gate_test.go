@@ -100,6 +100,7 @@ func TestWriteGateRefusalSendsNothingForAnyWriteMethod(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			f := escptest.Start(t)
+			f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 			var consulted int
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 				SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
@@ -129,6 +130,7 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			f := escptest.Start(t)
+			f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 				SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
 				WriteGate: func(context.Context, InfoReader, Operation) error { return nil }})
@@ -243,6 +245,7 @@ var writeOperations = map[string]Operation{
 func operationsOf(t *testing.T, call func(context.Context, *Client) error) []Operation {
 	t.Helper()
 	f := escptest.Start(t)
+	f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 	var seen []Operation
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,

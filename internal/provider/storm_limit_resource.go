@@ -62,7 +62,8 @@ func (r *stormLimitResource) Metadata(_ context.Context, req resource.MetadataRe
 func (r *stormLimitResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Storm control of one port (QoS > Storm Control). Selecting traffic types requires a rate (" + stormRateRangeText() + "); selecting none disables it with rate 0. Import with the port number. **Safety:** a rate drops excess traffic of the chosen types, so by default " +
-			"the provider refuses to change a port that has a link up or is in a LAG; set `allow_disruptive = true` to override. Destroying only removes it from state.",
+			"the provider refuses to change a port that has a link up or is in a LAG; set `allow_disruptive = true` to override. Destroying only removes it from state. " +
+			ingressStormNote("an ingress limit", "`tplinkeasysmart_bandwidth_limit`", "storm control with a traffic type selected"),
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: resourceSwitchAttribute(),
 			"port": schema.Int64Attribute{Required: true, Description: "Port number (1-based).",

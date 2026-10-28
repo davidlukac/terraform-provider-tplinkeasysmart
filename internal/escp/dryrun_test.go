@@ -18,6 +18,7 @@ import (
 // have been written.
 func TestDryRunThroughTheRealClient(t *testing.T) {
 	f := escptest.Start(t)
+	f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 	dry := safety.NewDryRun()
 	c, err := escp.Dial(escp.Config{
 		Host: "127.0.0.1", Username: escptest.Username, Password: escptest.Password,

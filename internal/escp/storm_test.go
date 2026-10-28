@@ -47,6 +47,7 @@ func TestParseStorm(t *testing.T) {
 
 func TestSetStormWire(t *testing.T) {
 	f := escptest.Start(t)
+	f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
 	if err := c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: false, Multicast: true, Broadcast: true, RateKbps: 1024}); err != nil {
@@ -92,6 +93,7 @@ func TestSetStormWireOneTrafficTypeAtATime(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := escptest.Start(t)
+			f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 			c := dialFake(t, f, "secret")
 			if err := c.SetStormControl(context.Background(), tc.cfg); err != nil {
 				t.Fatal(err)
