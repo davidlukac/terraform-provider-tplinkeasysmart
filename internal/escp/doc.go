@@ -118,7 +118,7 @@
 // Test errors with errors.Is and errors.As, never by message: ErrNoReply (the switch did
 // not answer in time), ErrRejected and *RejectedError (the switch refused a write),
 // ErrNoInterface (Discover has nowhere to send), ErrMoveUnconfirmed (SetIPConfig lost
-// track of the switch), ErrInvalidConfig (a configuration backup that is not one) and
+// track of the switch), ErrInvalidConfig (a configuration backup that is not complete, after the download was repeated) and
 // ErrInvalid (an argument refused before any write was sent; the message names the value and
 // what is allowed), ErrReplyTooLarge (a fragmented reply bigger than any switch sends).
 //
