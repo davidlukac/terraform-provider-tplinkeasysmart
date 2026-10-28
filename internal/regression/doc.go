@@ -8,5 +8,10 @@
 // whole switch is taken and compared, and how the provider is aimed at a target. The scenarios
 // live in the package's tests and run when TF_ACC is set (make regression).
 //
+// A safety net runs when each scenario ends (Session.GuardRestore): the VLAN mode and the port
+// mirror, which Terraform cannot undo because destroying them only forgets them, are compared with
+// the state recorded at the start and written back if a failed scenario left them changed. The
+// scenario is failed for it; everything else is left to the readout comparison, which names it.
+//
 // Switch 01 is never a target: the harness refuses it by name and by address.
 package regression

@@ -71,6 +71,7 @@ func openForScenario(t *testing.T) *Session {
 		t.Skip("scenarios need TF_ACC=1 (make regression)")
 	}
 	s := Open(t, os.Getenv)
+	s.GuardRestore(t)
 	t.Log(s.Describe())
 	return s
 }
