@@ -8,6 +8,7 @@ Full list: [`CONTRIBUTING.md`](../CONTRIBUTING.md) (client, resource and data so
 
 - [ ] Title follows Conventional Commits (`feat:`, `fix:`, `docs:`, `ci:`, ...)
 - [ ] `make pre-commit` passes locally (format, vet, lint, tests with `-race`, coverage policy)
+- [ ] `make regression` passes locally (the Terraform scenarios; the pre-commit hook skips them without `TF_ACC=1`)
 - [ ] Docs regenerated (`make generate`) and examples validated (`make validate-examples`) when the schema changed
 - [ ] `CHANGELOG.md` updated for user-visible changes
 - [ ] Writes that could cut management access are guarded and covered by tests (zero writes on a refusal)
