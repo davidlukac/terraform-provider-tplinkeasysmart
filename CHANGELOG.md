@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.30.1
+
+- No change in behaviour; the library behind the provider now uses typed values (value objects) for what used to be plain numbers and strings. Visible only in texts: port lists in messages read `2,5` instead of `[2 5]`; a bad device description, VLAN name or switch name is refused with one sentence each ("Invalid device description", "Invalid VLAN name", "Invalid switch name") that says what is allowed; a `broadcast_addr` that is not an IPv4 address is refused. Library API (`internal/escp`, not a Terraform interface): `Config.Password` is an `escp.Password` that prints as `[redacted]`, `ConfigBackup` returns an `escp.ConfigFile`, `FirmwareError` carries the `escp.Firmware` instead of `Version` and `Build`, results codes are `escp.ReplyCode`, and addresses, ports, VLAN ids, build dates and TLV types have their own types.
+
 ## 0.30.0
 
 - **New: name a switch by its MAC address.** `mac` on the provider block and on each entry of `switches` (environment variable `TPLINK_EASYSMART_MAC`; `aa:bb:cc:dd:ee:ff`, colons or hyphens, any case, checked while planning). The MAC pins the identity: a device with another MAC at `host` is refused before anything is written to it (credentials ride on every write, so a reused address would otherwise receive them). Without `host`, or when `host` does not answer, the switch is found by a layer-2 discovery on the first request (about half a second; a lookup that finds nobody is repeated once). `host` is optional when `mac` is set; an entry of `switches` needs one of the two. The same host or MAC cannot be configured twice. The lookup needs the switch on the same layer-2 segment as the machine running Terraform; the MAC is a claim, not a credential, so it protects against accidents (a reused or changed address), not against an attacker on the segment.
