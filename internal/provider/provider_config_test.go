@@ -66,7 +66,7 @@ func checkClientConfig(t *testing.T, got, want escp.Config, wantGate bool) {
 
 func clearProviderEnv(t *testing.T) {
 	t.Helper()
-	for _, k := range []string{"TPLINK_EASYSMART_HOST", "TPLINK_EASYSMART_USERNAME", "TPLINK_EASYSMART_PASSWORD"} {
+	for _, k := range []string{"TPLINK_EASYSMART_HOST", "TPLINK_EASYSMART_USERNAME", "TPLINK_EASYSMART_PASSWORD", "TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE"} {
 		t.Setenv(k, "")
 	}
 }
