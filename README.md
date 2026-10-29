@@ -154,6 +154,16 @@ provider "tplinkeasysmart" {
 - The MAC is a claim, not a credential: anyone on the segment can claim any MAC, so it protects against accidents, not against an attacker (which this protocol cannot do anyway).
 - Discovery stays on the layer-2 segment; a Terraform run in another subnet needs `host`. Resource ids and imports do not carry the address, so switching a configuration from `host` to `mac` changes no state.
 
+### Adopting a switch by its MAC address
+
+For a switch you already manage by `host`, or one you are setting up:
+
+1. **Find the MAC.** It is usually printed on the label on the case, and the router's DHCP lease table lists it next to the switch's address. Or read it from the switch itself: with `host` set, add `output "mac" { value = data.tplinkeasysmart_system_info.this.mac_address }` next to the `system_info` data source and run `terraform apply` (only reads happen; the state records the output).
+2. **Add it next to `host`** in the provider block (or in the switch's entry of `switches`), and run `terraform plan`: it shows no changes, and any other device at that address would now be refused.
+3. **Drop `host` later if you like** (for example when the switch leases its address): the switch is then found by its MAC on the first request. Nothing in the state changes, because resource ids do not carry the address.
+
+A switch that leases its address (`dhcp = true` on `tplinkeasysmart_management_ip`) needs `mac`, because the leased address is not known in advance.
+
 ## Several switches
 
 Either declare one provider alias per switch, or define them as data and pick one per object:
