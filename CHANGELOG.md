@@ -2,7 +2,9 @@
 
 ## 0.32.0
 
-- allow_unverified_firmware also comes from TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE; a port-based VLAN group id is checked against the switch and an existing group is no longer overwritten
+- **New:** `allow_unverified_firmware` also comes from the environment variable `TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE`, for configurations that take everything from the environment. The argument wins over the variable and a switch entry over both; a value that is not a boolean stops the run before anything is written.
+- **Fix, behaviour change:** a port-based VLAN group is checked against the switch before anything is written. An id above what the switch holds (the larger of the group count it reports and its number of ports, so larger models of the family are not refused) is refused, even with `allow_disruptive`. Creating a group that already exists is now an error that points to `terraform import`, and two resources for the same id no longer overwrite each other. A configuration that relied on either will fail at apply.
+- Internal: the group limit is a value object (`PortVLANLimit`), the fake switch never hands out a UDP port twice, and the library's limits are compared with the ones the web UI enforces in a test. No behaviour change.
 
 ## 0.31.0
 
