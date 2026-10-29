@@ -38,8 +38,8 @@ type Client struct {
 	// switchPorts is the switch's number of ports, read on the first write that names a port
 	// (zero until then) and kept: it is hardware. Guarded by mu.
 	switchPorts int
-	// groupLimit is the number of port-based VLAN groups the switch supports (its ids are 1 to that
-	// number), read on the first group write and kept: it is hardware. Guarded by mu.
+	// groupLimit is the highest port-based VLAN group id the switch has (see PortBasedVLAN.CheckGroup),
+	// read on the first group write and kept: it is hardware. Guarded by mu.
 	groupLimit int
 	// wrong is the device that answered the request in flight with a MAC other than Config.MAC.
 	wrong *WrongSwitchError

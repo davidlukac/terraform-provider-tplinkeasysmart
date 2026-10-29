@@ -60,7 +60,7 @@ func (r *portVLANResource) Metadata(_ context.Context, req resource.MetadataRequ
 
 func (r *portVLANResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "A port-based VLAN group (VLAN > Port Based VLAN). Import with the VLAN id. The VLAN **mode** is not managed here. The id must be one the switch has (1 to the number of groups it supports, 8 on a TL-SG108E; see the `tplinkeasysmart_vlan_port_based` data source) and is checked before anything is written; creating a group that already exists is refused (import it instead). Membership is exclusive: " +
+		Description: "A port-based VLAN group (VLAN > Port Based VLAN). Import with the VLAN id. The VLAN **mode** is not managed here. The id must be one the switch has (1 to the larger of the number of groups it supports and its number of ports, 8 on a TL-SG108E; see the `tplinkeasysmart_vlan_port_based` data source) and is checked before anything is written; creating a group that already exists is refused (import it instead). Membership is exclusive: " +
 			"adding ports to a group removes them from their previous group, and removing a group returns its ports to VLAN 1. **Safety:** the provider refuses to " +
 			"create, change or destroy a group when any port involved (old or new members) has a link up or belongs to a LAG, because that can cut connectivity or " +
 			"management access; set `allow_disruptive = true` to override. Import VLAN 1 (the default group) only together with `lifecycle { prevent_destroy = true }`.",
@@ -144,12 +144,6 @@ func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceMo
 		add("Reading VLAN group failed", err.Error())
 		return false
 	}
-	// The ids this switch has, before anything is written: the same rule the client applies to the
-	// write, here as a diagnostic about the attribute.
-	if err := v.CheckGroup(group); err != nil {
-		add("Invalid VLAN group", err.Error())
-		return false
-	}
 	old, exists := v.Group(group)
 	if create && exists {
 		add("VLAN group already exists", fmt.Sprintf("group %d is already on the switch (ports %s). Creating it again would overwrite it, and two resources with the same `vlan` would overwrite each other. Import it to manage it (terraform import <address> %d), or use another id.", group, old, group))
@@ -160,6 +154,12 @@ func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceMo
 		return false
 	}
 	if err := r.client.SetPortBasedVLAN(ctx, group, ports); err != nil {
+		// The client refuses, before sending anything, an id the switch does not have (its group
+		// limit or its port count, whichever is larger: no model of the family is held below its own).
+		if errors.Is(err, escp.ErrInvalid) {
+			add("Invalid VLAN group", err.Error())
+			return false
+		}
 		add("Setting VLAN group failed", err.Error())
 		return false
 	}

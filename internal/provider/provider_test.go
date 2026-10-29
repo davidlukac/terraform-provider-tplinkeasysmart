@@ -188,7 +188,7 @@ func (f *fakeClient) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) 
 	}
 	if f.pvlans != nil {
 		v := escp.PortBasedVLAN{Enabled: !f.pvlanOff, MaxVLAN: 8}
-		for _, id := range []escp.PortVLANID{1, 2} {
+		for id := escp.PortVLANID(1); id <= escp.MaxPortVLANID; id++ {
 			if ps, ok := f.pvlans[id]; ok {
 				v.VLANs = append(v.VLANs, escp.PortVLAN{ID: id, Ports: ps})
 			}

@@ -11,24 +11,10 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
 )
 
-// A port-based VLAN group is checked against what the switch has before anything is written: the id
-// (1 to the number of groups it reports, as the web UI takes them), that the group does not already
-// exist when it is created, and the ports (the client refuses ports the switch lacks even when the
-// guard is overridden).
-
-func TestAccVLANGroupRefusesAnIdTheSwitchDoesNotHave(t *testing.T) {
-	f := &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}} // the fake reports 8 groups
-	resource.UnitTest(t, resource.TestCase{
-		ProtoV6ProviderFactories: factories(f),
-		Steps: []resource.TestStep{
-			{Config: vlanGroupConfig(9, "  ports = [6, 7]\n"), ExpectError: regexp.MustCompile(`(?s)Invalid VLAN group.*supports\s+ids\s+1-8`)},
-			{Config: vlanGroupConfig(255, "  ports = [6, 7]\n  allow_disruptive = true\n"), ExpectError: regexp.MustCompile(`(?s)Invalid VLAN group.*supports\s+ids\s+1-8`)},
-		},
-	})
-	if f.sets != 0 {
-		t.Fatalf("an id the switch does not have must not reach it, got %d writes", f.sets)
-	}
-}
+// A port-based VLAN group is checked against what the switch has before anything is written: that
+// the group does not already exist when it is created (here, on the fake), and the id and the ports,
+// which the client refuses when the switch lacks them even when the guard is overridden (here, with
+// the real client against the fake switch; the client's own tests cover the rule, 24-port switch included).
 
 func TestAccVLANGroupRefusesToCreateOneThatExists(t *testing.T) {
 	f := &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4), 2: escp.MustPortSet(6)}}
