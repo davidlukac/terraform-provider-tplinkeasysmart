@@ -16,7 +16,7 @@ import (
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name tplinkeasysmart --rendered-provider-name "TP-Link Easy Smart"
 
 // version is set by the release build (-ldflags "-X main.version=...").
-var version = "0.31.0"
+var version = "0.32.0"
 
 // registryAddress is the provider's source address; Terraform matches it
 // against `required_providers` (and `dev_overrides`).

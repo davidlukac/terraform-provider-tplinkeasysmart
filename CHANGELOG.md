@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.32.0
+
+- **New:** `allow_unverified_firmware` also comes from the environment variable `TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE`, for configurations that take everything from the environment. The argument wins over the variable and a switch entry over both; a value that is not a boolean stops the run before anything is written.
+- **Fix, behaviour change:** a port-based VLAN group is checked against the switch before anything is written. An id above what the switch holds (the larger of the group count it reports and its number of ports, so larger models of the family are not refused) is refused, even with `allow_disruptive`. Creating a group that already exists is now an error that points to `terraform import`, and two resources for the same id no longer overwrite each other. A configuration that relied on either will fail at apply.
+- Internal: the group limit is a value object (`PortVLANLimit`), the fake switch never hands out a UDP port twice, and the library's limits are compared with the ones the web UI enforces in a test. No behaviour change.
+
 ## 0.31.0
 
 - **New: a debug log of what the client does.** `TF_LOG=DEBUG terraform plan` now shows each request and reply the provider exchanges with a switch (operation, sequence number, the types and sizes of the values, never the values), the sessions it opens, the lookups by MAC, the writes it sends with their impact, and the lease and address-change steps; a lost packet or a repeated download shows as a warning. Every line carries `component=escp`, `host` and `mac`, and is attributed to the resource operation that caused it. No password, user name or session key reaches the log (tested). The library takes a `*slog.Logger` in `Config.Logger` and `DiscoverOptions.Logger` (nil discards), so a program that embeds it gets the lines in its own format. **Fix:** a late discovery reply can no longer be mistaken for a client's reply: discovery probes now draw their sequence numbers from 1000-1999 and clients from 0-999 (a rare lost-or-wrong answer when a discovery and a request ran close together). Internal: the regression suite puts the VLAN mode and the mirror back when a scenario fails halfway, asks again after an address change, prints the library trace of a failed scenario, and a test checks that every resource and data source has an example that plans.
