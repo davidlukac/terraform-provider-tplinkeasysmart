@@ -58,7 +58,7 @@ func TestLibraryLimitsMatchTheWebUI(t *testing.T) {
 		library int
 		why     string
 	}{
-		"port_based_vlan_id_max_digits": {digits(MaxPortVLANID), "the web UI takes port-based VLAN ids 2 to the port count (page text and pvlan.js); the library accepts 1 to 255, the wire's one byte. Whether the switch accepts ids above the port count is not probed (TODO: probe on switch 03, then narrow the validator or record the answer)"},
+		"port_based_vlan_id_max_digits": {digits(MaxPortVLANID), "the web UI takes port-based VLAN ids 2 to the port count (page text and pvlan.js); the type allows the wire's 1 to 255, because it does not know the switch, and SetPortBasedVLAN and the provider refuse an id above the number of groups the switch reports (TLV 8450, 8 on a TL-SG108E), as the web UI does. Whether the switch itself would accept a higher id is not probed"},
 	}
 	// Limits the library does not model: it does not write them (user account, CLI only) or does not
 	// need them (the table size and port count are read from the switch).

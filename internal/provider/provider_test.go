@@ -952,7 +952,8 @@ func TestAccVLANGroupGuard(t *testing.T) {
 		Steps: []resource.TestStep{
 			{Config: vlanGroupConfig(2, "  ports = [4, 6]\n"), ExpectError: regexp.MustCompile(`port 4 has a link up`)},
 			{Config: vlanGroupConfig(2, "  ports = [1, 6]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
-			{Config: vlanGroupConfig(1, "  ports = [6, 7]\n"), ExpectError: regexp.MustCompile(`has a link up`)},
+			// group 1 exists (the default group): creating it again is refused before the guard is asked
+			{Config: vlanGroupConfig(1, "  ports = [6, 7]\n"), ExpectError: regexp.MustCompile(`VLAN group already exists`)},
 		},
 	})
 	if f.sets != 0 {
