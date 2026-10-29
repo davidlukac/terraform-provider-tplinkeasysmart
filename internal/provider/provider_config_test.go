@@ -51,6 +51,14 @@ func checkClientConfig(t *testing.T, got, want escp.Config, wantGate bool) {
 		t.Fatalf("client configured with a write gate = %t, want %t", got.WriteGate != nil, wantGate)
 	}
 	got.WriteGate = nil
+	// Every client logs into Terraform's log; the logger is a pointer and cannot be compared either.
+	if got.Logger == nil {
+		t.Fatal("client configured without a logger: its messages would be lost to TF_LOG")
+	}
+	if _, ok := got.Logger.Handler().(tflogHandler); !ok {
+		t.Fatalf("client logs through %T, want the tflog handler", got.Logger.Handler())
+	}
+	got.Logger = nil
 	if !reflect.DeepEqual(got, want) { // Config holds a func, so == does not compile
 		t.Fatalf("client configured as %+v, want %+v", got, want)
 	}

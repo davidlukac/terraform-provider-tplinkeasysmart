@@ -32,11 +32,13 @@ func (c *Client) setTLVs(ctx context.Context, op Operation, tlvs ...wire.TLV) er
 func (c *Client) setTLVsSent(ctx context.Context, op Operation, tlvs ...wire.TLV) (sent bool, err error) {
 	if gate := c.cfg.WriteGate; gate != nil {
 		if err := gate(ctx, c, op); err != nil {
+			c.log.DebugContext(ctx, "write refused by the gate", "operation", op.Name, "impact", op.Impact.String())
 			return false, err
 		}
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.log.InfoContext(ctx, "write", "operation", op.Name, "impact", op.Impact.String(), "ports", op.Ports.String())
 	return true, c.withSession(ctx, func() error {
 		req := append([]wire.TLV{
 			{Type: wire.TLVUsername, Value: append([]byte(c.cfg.Username), 0)},

@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"log/slog"
 	"net/netip"
 	"time"
 )
@@ -56,6 +57,12 @@ type Config struct {
 
 	// WriteGate, when set, is consulted before every write; see WriteGate.
 	WriteGate WriteGate
+
+	// Logger receives the client's messages: requests and replies (types and sizes, never
+	// values) at Debug, sessions, lookups and writes at Info, retries and repeated downloads
+	// at Warn. Nil discards them. The library writes nowhere else, and no message carries the
+	// password, the username or the session key.
+	Logger *slog.Logger
 }
 
 // InfoReader is the part of a Client that a WriteGate may use. It only reads.

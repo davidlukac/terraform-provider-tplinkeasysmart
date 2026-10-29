@@ -137,6 +137,21 @@ func TestMyCode(t *testing.T) {
 
 `SwitchPort`, `HostPort` and `BroadcastAddr` exist only for this; a real switch always uses 29808 and 29809.
 
+## Logging
+
+`Config.Logger` and `DiscoverOptions.Logger` take a `*slog.Logger`; the library logs nowhere else, and nil discards. You own the format, destination and level, so the library's lines look like the rest of your logs:
+
+```go
+logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+client, err := escp.Dial(escp.Config{ /* ... */ Logger: logger.With("request_id", id)})
+```
+
+- **Identification.** Every line carries `component=escp` (the logger name of other frameworks); filter on it to keep or drop the library's lines. A client also attaches `host` and `mac`.
+- **Context fields.** What you attach with `Logger.With` comes along on every line. Every message is logged with the call's context (`...Context` methods), so a handler can add what lives there (trace id, tenant): the mapped diagnostic context of log4j and friends.
+- **Levels** are slog's four. Debug is the protocol (each request and reply: operation, sequence number, TLV types and sizes, never values), Info the lifecycle (session, lookup by MAC, writes), Warn a recoverable anomaly (lost packet, repeated download). Error is not used: failures are returned. Handlers for zap, zerolog and logr exist (`zapslog`, `logr.FromSlogHandler` and their kin) if your program does not use slog.
+- **Attribute names are the contract** (lower snake case, one meaning each). New ones can be added in any release, for example for hardware with PoE; none is renamed or removed before a major version. Message texts may change.
+- No message carries the password, user name or session key. The Terraform provider routes the logger to `tflog`, so `TF_LOG=DEBUG terraform plan` shows what the client does. A `forbidigo` lint rule keeps `fmt.Print*` and `log.*` out of the package.
+
 ## Security
 
 ESCP has no real secrecy: the password travels in every write, protected only by RC4 with a key exchanged under a 64-bit RSA key that anyone who can capture the traffic can break. Use it on a network you trust, never log a `Config`, and do not reuse the switch password elsewhere.

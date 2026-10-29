@@ -46,6 +46,7 @@ func (c *Client) ensureSession(ctx context.Context) error {
 		c.session = nil
 		return fmt.Errorf("session key exchange: unexpected error code %d", r.err)
 	}
+	c.log.InfoContext(ctx, "session established")
 	return nil
 }
 
@@ -59,6 +60,7 @@ func (c *Client) withSession(ctx context.Context, fn func() error) error {
 		err := fn()
 		if errors.Is(err, ErrNoReply) && attempt == 0 {
 			c.session = nil
+			c.log.WarnContext(ctx, "no reply; opening a new session", "lookup_by_mac", !c.cfg.MAC.IsZero())
 			if !c.cfg.MAC.IsZero() {
 				_ = c.relocate(ctx) // best effort: the address may have changed; the retry says if not
 			}

@@ -75,3 +75,11 @@ func TestRSASessionTLVTrimsLeadingZeroWords(t *testing.T) {
 		t.Fatalf("the trimmed TLV must still decrypt to the key, got %q", back)
 	}
 }
+
+func TestOpNameNamesEveryOpAndNumbersTheRest(t *testing.T) {
+	for op, want := range map[byte]string{wire.OpDiscovery: "discovery", wire.OpGet: "get", wire.OpReply: "reply", wire.OpSet: "set", wire.OpSetReply: "set-reply", 9: "op-9"} {
+		if got := wire.OpName(op); got != want {
+			t.Errorf("OpName(%d) = %q, want %q", op, got, want)
+		}
+	}
+}

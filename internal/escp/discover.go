@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/netip"
 	"slices"
@@ -33,6 +34,8 @@ type DiscoverOptions struct {
 	Interface string
 	// Window is how long to listen for replies; zero means two seconds.
 	Window time.Duration
+	// Logger receives the probes sent and the replies found (Debug); nil discards them.
+	Logger *slog.Logger
 }
 
 // Discover broadcasts an unauthenticated discovery probe and returns every switch that
@@ -170,6 +173,7 @@ func locateWith(ctx context.Context, mac MAC, opts DiscoverOptions, env discover
 	infos, err := discoverUntil(ctx, opts, env, func(found map[string]Info) bool { _, ok := found[want]; return ok })
 	for _, info := range infos {
 		if info.MAC == mac {
+			identified(orDiscard(opts.Logger)).DebugContext(ctx, "lookup by MAC found the switch", "mac", want, "ip", info.IP.String())
 			return info, nil
 		}
 	}
@@ -202,7 +206,11 @@ func discoverUntil(ctx context.Context, opts DiscoverOptions, env discoverEnv, d
 			probes = append(probes, probe{to: &net.UDPAddr{IP: net.IP(b.AsSlice()), Port: env.switchPort}, mac: ifc.MAC})
 		}
 	}
-	return collectReplies(ctx, env, probes, window, done)
+	log := identified(orDiscard(opts.Logger))
+	log.DebugContext(ctx, "discovery probes", "interfaces", len(chosen), "probes", len(probes), "window", window.String())
+	infos, err := collectReplies(ctx, env, probes, window, done)
+	log.DebugContext(ctx, "discovery replies", "switches", len(infos))
+	return infos, err
 }
 
 // collectReplies sends the probes, listens for the window and returns the distinct replies.

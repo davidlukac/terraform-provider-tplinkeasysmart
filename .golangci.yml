@@ -16,7 +16,16 @@ linters:
     - staticcheck
     - unused
     - gosec
+    - forbidigo
   settings:
+    forbidigo:
+      # The ESCP library writes nowhere on its own: every message goes through the
+      # *slog.Logger the caller passes in (Config.Logger, DiscoverOptions.Logger).
+      forbid:
+        - pattern: ^(fmt\.Print(f|ln)?|print|println)$
+          msg: the library logs through its slog.Logger (Config.Logger), never to stdout
+        - pattern: ^log\.(Print|Fatal|Panic)(f|ln)?$
+          msg: the library logs through its slog.Logger (Config.Logger), not the log package
     revive:
       rules:
         - name: exported
@@ -38,6 +47,10 @@ linters:
         - G505
   exclusions:
     rules:
+      # forbidigo guards the library only; the provider, the tools and main may print.
+      - path: ^(main\.go|tools/|internal/provider/|internal/regression/)
+        linters:
+          - forbidigo
       # G115 (integer conversion overflow): the protocol is a fixed-width binary
       # format. Conversions are either bit-level masking/shifting by design or
       # operate on values range-checked beforehand (ports 1-32, rates up to
@@ -51,6 +64,7 @@ linters:
           - gosec
           - errcheck
           - revive
+          - forbidigo
 
 formatters:
   enable:

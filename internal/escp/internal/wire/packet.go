@@ -14,6 +14,23 @@ const (
 	OpSetReply  = 4
 )
 
+// OpName names an op code for a log line; a code that is none is "op-<n>".
+func OpName(op byte) string {
+	switch op {
+	case OpDiscovery:
+		return "discovery"
+	case OpGet:
+		return "get"
+	case OpReply:
+		return "reply"
+	case OpSet:
+		return "set"
+	case OpSetReply:
+		return "set-reply"
+	}
+	return fmt.Sprintf("op-%d", op)
+}
+
 // Layout of the packet header (all fields big-endian).
 const (
 	protocolVersion = 1 // first header byte

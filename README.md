@@ -211,6 +211,10 @@ Behaviour of other models and firmware is documented in the [protocol notes](int
 - **One client per switch at a time.** Don't run two clients against the same switch concurrently; an old client that binds the reply port exclusively (for example an old Easy Smart utility) blocks the provider until it is closed. Several *different* switches work at once.
 - **No real security on the wire.** The protocol's encryption keys are public or trivially breakable (see the [protocol notes](internal/escp/PROTOCOL.md)). Keep the switches on a trusted management network.
 
+## Troubleshooting
+
+Set `TF_LOG=DEBUG` (or `INFO`) to see what the client does: every request and reply with its operation, sequence number and the TLV types and sizes, a lost packet and the retry, a session reopened, the switch located by MAC, the writes sent. Values are never logged, so the output holds no password or user name; it is still a log of your network, so look it over before sharing it.
+
 ## How it works
 
 The provider talks UDP port 29808/29809 on the switch's own layer-2 segment: discovery, an RSA session-key exchange, RC4-encrypted TLV requests, then reads and writes with read-back. The wire format, every TLV layout and what was verified live are in [`internal/escp/PROTOCOL.md`](internal/escp/PROTOCOL.md).

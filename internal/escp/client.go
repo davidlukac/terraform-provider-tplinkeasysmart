@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/netip"
 	"strconv"
@@ -41,6 +42,8 @@ type Client struct {
 	wrong *WrongSwitchError
 	// locator finds a switch by MAC address; tests replace it.
 	locator func(ctx context.Context, mac MAC) (Info, error)
+	// log is Config.Logger, or a logger that discards, with the switch's host and MAC attached.
+	log *slog.Logger
 }
 
 // Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
@@ -71,7 +74,9 @@ func Dial(cfg Config) (*Client, error) {
 	if !cfg.BroadcastAddr.Is4() {
 		return nil, invalidf("escp: BroadcastAddr %s is not an IPv4 address", cfg.BroadcastAddr)
 	}
-	c := &Client{cfg: cfg, locator: hostLocator}
+	base := clientLogger(cfg)
+	c := &Client{cfg: cfg, log: identified(base)}
+	c.locator = hostLocator(base) // Locate identifies itself
 	if cfg.Host == "" && !cfg.MAC.IsZero() {
 		// no address yet: the first request finds the switch by its MAC address
 		c.dest = &net.UDPAddr{Port: cfg.SwitchPort}
@@ -136,9 +141,25 @@ func localMAC(dst net.IP) (mac [6]byte) {
 	return
 }
 
-// hostLocator is the lookup a client uses: Locate on the interfaces of this host.
+// hostLocator is the lookup a client uses: Locate on the interfaces of this host, logging to the
+// client's logger (before it is identified: Locate does that).
 //
 // coverage: ignore - thin wrapper that would probe the real network; Locate is tested through locateWith
-func hostLocator(ctx context.Context, mac MAC) (Info, error) {
-	return Locate(ctx, mac, DiscoverOptions{})
+func hostLocator(log *slog.Logger) func(ctx context.Context, mac MAC) (Info, error) {
+	return func(ctx context.Context, mac MAC) (Info, error) {
+		return Locate(ctx, mac, DiscoverOptions{Logger: log})
+	}
+}
+
+// clientLogger is Config.Logger (discarding when nil) with the switch the client talks to attached,
+// so the lines of several clients in one log can be told apart. The caller identifies it.
+func clientLogger(cfg Config) *slog.Logger {
+	l := orDiscard(cfg.Logger)
+	if cfg.Host != "" {
+		l = l.With("host", cfg.Host)
+	}
+	if !cfg.MAC.IsZero() {
+		l = l.With("mac", cfg.MAC.String())
+	}
+	return l
 }

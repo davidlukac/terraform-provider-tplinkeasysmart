@@ -171,7 +171,9 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 		if err := c.send(op, tlvs, static, to); err != nil {
 			return reply{}, err
 		}
+		c.log.DebugContext(ctx, "request sent", "op", wire.OpName(op), "seq", c.seq, "attempt", attempt+1, "tlvs", tlvTypes(tlvs), "bytes", tlvBytes(tlvs))
 		if rep, ok := c.recv(ctx, c.attemptDeadline(ctx)); ok {
+			c.log.DebugContext(ctx, "reply received", "op", wire.OpName(rep.op), "seq", c.seq, "error_code", int(rep.err), "tlvs", tlvTypes(rep.tlvs), "bytes", tlvBytes(rep.tlvs))
 			return rep, nil
 		}
 		if c.wrong != nil {
@@ -180,6 +182,7 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 		if err := expired(ctx); err != nil {
 			return reply{}, err
 		}
+		c.log.WarnContext(ctx, "no reply", "op", wire.OpName(op), "seq", c.seq, "attempt", attempt+1, "attempts", c.cfg.Retries+1)
 	}
 	return reply{}, ErrNoReply
 }
@@ -199,6 +202,7 @@ func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV
 		if err := c.send(op, tlvs, false, []*net.UDPAddr{c.dest}); err != nil {
 			return nil, err
 		}
+		c.log.DebugContext(ctx, "request sent", "op", wire.OpName(op), "seq", c.seq, "attempt", attempt+1, "tlvs", tlvTypes(tlvs), "bytes", tlvBytes(tlvs))
 		var parts [][]byte
 		total := 0
 		for {
@@ -219,6 +223,7 @@ func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV
 			if found {
 				parts = append(parts, part)
 				total += len(part)
+				c.log.DebugContext(ctx, "fragment received", "seq", c.seq, "packet", len(parts), "bytes", len(part), "more", rep.fragment != 0)
 			}
 			if total > maxFragmentedReply {
 				return nil, ErrReplyTooLarge
@@ -230,6 +235,7 @@ func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV
 		if err := expired(ctx); err != nil {
 			return nil, err
 		}
+		c.log.WarnContext(ctx, "final fragment missing; asking again", "seq", c.seq, "attempt", attempt+1, "attempts", c.cfg.Retries+1, "packets", len(parts), "bytes", total)
 	}
 	return nil, ErrNoReply
 }

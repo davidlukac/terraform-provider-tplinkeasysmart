@@ -209,6 +209,7 @@ func classifyLostReply(mac MAC, before, want IPConfig, after Info) lostReplyOutc
 // that the switch has the new settings, and otherwise an error that says what is known.
 // Callers hold c.mu.
 func (c *Client) settleLostReply(ctx context.Context, mac MAC, before, want IPConfig, lost error) error {
+	c.log.WarnContext(ctx, "the write got no reply; asking the switch what it has", "error", lost.Error())
 	after, err := c.discover(ctx)
 	if err != nil {
 		return fmt.Errorf("%w: the write got no reply and a probe found nothing at %s or %s", ErrMoveUnconfirmed, before.IP, want.IP)
@@ -245,6 +246,7 @@ func (c *Client) awaitAddress(ctx context.Context, want IPConfig) error {
 		if info, err := c.discover(ctx); err == nil && info.IP == want.IP && !info.DHCP {
 			return nil
 		}
+		c.log.DebugContext(ctx, "the switch is not at the new address yet; asking again", "want", want.IP.String(), "poll", ipMovePoll.String())
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("%w (%s)", ErrMoveUnconfirmed, want.IP)

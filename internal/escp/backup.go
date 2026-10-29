@@ -93,6 +93,7 @@ func (c *Client) verifiedConfig(ctx context.Context) ([]byte, error) {
 		if !errors.Is(err, ErrInvalidConfig) {
 			return nil, err
 		}
+		c.log.WarnContext(ctx, "configuration download not usable; repeating", "round", round+1, "rounds", c.cfg.Retries+1, "reason", err.Error())
 		last = err // a cancelled context is reported by the next download, which checks it before it sends
 	}
 	return nil, last
