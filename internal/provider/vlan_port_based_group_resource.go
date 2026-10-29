@@ -60,7 +60,7 @@ func (r *portVLANResource) Metadata(_ context.Context, req resource.MetadataRequ
 
 func (r *portVLANResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "A port-based VLAN group (VLAN > Port Based VLAN). Import with the VLAN id. The VLAN **mode** is not managed here. Membership is exclusive: " +
+		Description: "A port-based VLAN group (VLAN > Port Based VLAN). Import with the VLAN id. The VLAN **mode** is not managed here. The id must be one the switch has (1 to the larger of the number of groups it supports and its number of ports, 8 on a TL-SG108E; see the `tplinkeasysmart_vlan_port_based` data source) and is checked before anything is written; creating a group that already exists is refused (import it instead). Membership is exclusive: " +
 			"adding ports to a group removes them from their previous group, and removing a group returns its ports to VLAN 1. **Safety:** the provider refuses to " +
 			"create, change or destroy a group when any port involved (old or new members) has a link up or belongs to a LAG, because that can cut connectivity or " +
 			"management access; set `allow_disruptive = true` to override. Import VLAN 1 (the default group) only together with `lifecycle { prevent_destroy = true }`.",
@@ -103,38 +103,50 @@ func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new e
 	})
 }
 
-func (r *portVLANResource) current(ctx context.Context, group escp.PortVLANID) (escp.PortSet, error) {
+// state reads the port-based VLAN groups, refusing when the port-based mode is not the active one.
+func (r *portVLANResource) state(ctx context.Context) (escp.PortBasedVLAN, error) {
 	v, err := r.client.PortBasedVLAN(ctx)
+	if err != nil {
+		return escp.PortBasedVLAN{}, err
+	}
+	if !v.Enabled {
+		return escp.PortBasedVLAN{}, &inactiveModeError{"port-based VLAN mode is not active on the switch; refusing to manage groups in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the groups when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the groups depend on it"}
+	}
+	return v, nil
+}
+
+// current is the member set of a group; empty when the group does not exist.
+func (r *portVLANResource) current(ctx context.Context, group escp.PortVLANID) (escp.PortSet, error) {
+	v, err := r.state(ctx)
 	if err != nil {
 		return 0, err
 	}
-	if !v.Enabled {
-		return 0, &inactiveModeError{"port-based VLAN mode is not active on the switch; refusing to manage groups in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the groups when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the groups depend on it"}
-	}
-	for _, g := range v.VLANs {
-		if g.ID == group {
-			return g.Ports, nil
-		}
-	}
-	return 0, nil // group does not exist yet
+	ports, _ := v.Group(group)
+	return ports, nil
 }
 
-// apply binds the resource to the switch the plan selects, then applies it.
-func (r *portVLANResource) apply(ctx context.Context, m *portVLANResourceModel, add func(string, string)) bool {
+// apply binds the resource to the switch the plan selects, then applies it. A creation (create)
+// refuses a group that already exists; an update changes the group the state already holds.
+func (r *portVLANResource) apply(ctx context.Context, m *portVLANResourceModel, add func(string, string), create bool) bool {
 	b := r.bound(add, m.Switch)
-	return b != nil && b.applyBound(ctx, m, add)
+	return b != nil && b.applyBound(ctx, m, add, create)
 }
 
-func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceModel, add func(string, string)) bool {
+func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceModel, add func(string, string), create bool) bool {
 	group := escp.PortVLANID(m.VLAN.ValueInt64())
 	ports, err := setToPorts(ctx, m.Ports)
 	if err != nil || ports.IsEmpty() {
 		add("Invalid ports", "a VLAN group needs at least one member port")
 		return false
 	}
-	old, err := r.current(ctx, group)
+	v, err := r.state(ctx)
 	if err != nil {
 		add("Reading VLAN group failed", err.Error())
+		return false
+	}
+	old, exists := v.Group(group)
+	if create && exists {
+		add("VLAN group already exists", fmt.Sprintf("group %d is already on the switch (ports %s). Creating it again would overwrite it, and two resources with the same `vlan` would overwrite each other. Import it to manage it (terraform import <address> %d), or use another id.", group, old, group))
 		return false
 	}
 	if err := r.guardVLAN(ctx, m.AllowDisruptive.ValueBool(), old, ports); err != nil {
@@ -142,6 +154,12 @@ func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceMo
 		return false
 	}
 	if err := r.client.SetPortBasedVLAN(ctx, group, ports); err != nil {
+		// The client refuses, before sending anything, an id the switch does not have (its group
+		// limit or its port count, whichever is larger: no model of the family is held below its own).
+		if errors.Is(err, escp.ErrInvalid) {
+			add("Invalid VLAN group", err.Error())
+			return false
+		}
 		add("Setting VLAN group failed", err.Error())
 		return false
 	}
@@ -154,11 +172,15 @@ func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceMo
 }
 
 func (r *portVLANResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, func(ctx context.Context, m *portVLANResourceModel, add func(string, string)) bool {
+		return r.apply(ctx, m, add, true)
+	})
 }
 
 func (r *portVLANResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	applyUpdate(ctx, req, resp, r.apply)
+	applyUpdate(ctx, req, resp, func(ctx context.Context, m *portVLANResourceModel, add func(string, string)) bool {
+		return r.apply(ctx, m, add, false)
+	})
 }
 
 // Read binds the resource to the switch recorded in state, then reads it.

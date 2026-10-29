@@ -683,6 +683,15 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			f.send(from, wire.OpReply, h, 0, []wire.TLV{{Type: wire.TLVPortCount, Value: []byte{8}}}, true)
 			return
 		}
+		if _, ok := find(wire.TLVVLANPortBased); ok {
+			// the port-based VLAN state of a fresh switch: mode on, VLAN 1 holding every port, up to 8 groups
+			f.send(from, wire.OpReply, h, 0, []wire.TLV{
+				{Type: wire.TLVVLANPortBased, Value: []byte{1}},
+				{Type: wire.TLVVLANPortBasedMax, Value: []byte{8}},
+				{Type: wire.TLVVLANPortBasedVID, Value: []byte{1, 0, 0, 0, 0xff}},
+			}, true)
+			return
+		}
 		if _, ok := find(wire.TLVAutoSave); ok {
 			f.send(from, wire.OpReply, h, 0, []wire.TLV{{Type: wire.TLVAutoSave, Value: []byte{1}}}, true)
 			return
