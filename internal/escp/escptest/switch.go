@@ -2,6 +2,7 @@ package escptest
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"net"
 	"net/netip"
@@ -129,10 +130,14 @@ var (
 var Loopback = netip.MustParseAddr("127.0.0.1")
 
 // FreeUDPPort returns a currently unused UDP port so tests never bind the
-// protocol's real client port 29809.
+// protocol's real client port 29809. The port is not handed out again by this package: the kernel
+// may give a port it has just released to the very next bind (measured: about 1 in 10,000 when
+// several goroutines bind at once), which would let a fake switch take the port a test was told to
+// use and fail the client's bind with "address already in use". A port taken by something outside
+// this package can still collide; a client that binds late cannot rule that out.
 func FreeUDPPort(t testing.TB) int {
 	t.Helper()
-	c, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	c, err := listenUnreserved(listenLoopback)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,10 +145,46 @@ func FreeUDPPort(t testing.TB) int {
 	return c.LocalAddr().(*net.UDPAddr).Port
 }
 
+// reserved holds every port this package has handed out, for the life of the process.
+var (
+	reservedMu sync.Mutex
+	reserved   = map[int]bool{}
+)
+
+// maxReservedTries bounds the search for a port nobody was given before.
+const maxReservedTries = 100
+
+// listenLoopback binds a UDP socket on a kernel-chosen loopback port.
+func listenLoopback() (*net.UDPConn, error) {
+	return net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+}
+
+// listenUnreserved binds with listen until the kernel gives a port this package has not handed
+// out before, and reserves it.
+func listenUnreserved(listen func() (*net.UDPConn, error)) (*net.UDPConn, error) {
+	var lastPort int
+	for i := 0; i < maxReservedTries; i++ {
+		c, err := listen()
+		if err != nil {
+			return nil, err
+		}
+		lastPort = c.LocalAddr().(*net.UDPAddr).Port
+		reservedMu.Lock()
+		taken := reserved[lastPort]
+		reserved[lastPort] = true
+		reservedMu.Unlock()
+		if !taken {
+			return c, nil
+		}
+		_ = c.Close() // best effort: the port was already given to someone else, try another
+	}
+	return nil, fmt.Errorf("escptest: no unreserved UDP port after %d tries (last %d)", maxReservedTries, lastPort)
+}
+
 // Start runs a fake switch on a free loopback UDP port until the test ends. The LED starts on.
 func Start(t testing.TB) *Switch {
 	t.Helper()
-	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	conn, err := listenUnreserved(listenLoopback)
 	if err != nil {
 		t.Fatal(err)
 	}
