@@ -125,13 +125,28 @@
 // # Logging
 //
 // The library writes nowhere on its own. Pass a *slog.Logger in Config.Logger (a Client) or
-// DiscoverOptions.Logger (Discover, Locate) and it reports through that, with the context of the
-// call so a handler can reach what the caller put there; nil discards everything. Debug lines are
-// the protocol (each request and reply with the operation, sequence number, TLV types and sizes, and
-// each fragment), Info lines the lifecycle (a session, the switch located by MAC, a write with its
-// operation and impact, a lease), Warn lines a recoverable anomaly (no reply and a retry, a session
-// reopened, a download repeated). Failures are returned, not logged. TLV values are never logged, so
-// no message carries the password, the user name or the session key.
+// DiscoverOptions.Logger (Discover, Locate) and it reports through that; nil discards everything.
+// The caller owns format, destination and level, so the lines look like the rest of the caller's
+// logs: a JSON handler gives JSON, a handler bridging to zap, zerolog or logr gives theirs.
+//
+// Every line carries component=escp, which identifies the library the way a logger name does;
+// filter on it to keep or drop the library's lines. The switch a client talks to is attached to
+// its lines as host and mac, so several clients in one log can be told apart. Fields the caller
+// attached with Logger.With (a request id, a tenant) come along on every line, and every message
+// is logged with the context of the call (slog's ...Context methods), so a handler can add what
+// lives in the context, such as a trace id: that is the mapped diagnostic context of other
+// frameworks.
+//
+// The levels are slog's four. Debug lines are the protocol (each request and reply with the
+// operation, sequence number, TLV types and sizes, and each fragment), Info lines the lifecycle (a
+// session, the switch located by MAC, a write with its operation and impact, a lease), Warn lines
+// a recoverable anomaly (no reply and a retry, a session reopened, a download repeated). Error is
+// not used: failures are returned, not logged. TLV values are never logged, so no message carries
+// the password, the user name or the session key.
+//
+// Attribute names are the contract: lower case, snake_case, one meaning each. New names may be
+// added in any release (a setting the hardware of a later model has, such as PoE, brings its own);
+// an existing name is not renamed or removed before a major version. Message texts may change.
 //
 // # Security
 //

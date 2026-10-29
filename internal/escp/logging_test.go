@@ -20,6 +20,7 @@ type logLine struct {
 	level slog.Level
 	msg   string
 	attrs map[string]any
+	dupes []string // attribute names that arrived more than once
 }
 
 // logRecorder is a slog handler that keeps every line, for tests that assert on what the library says.
@@ -27,6 +28,7 @@ type logRecorder struct {
 	mu    *sync.Mutex
 	lines *[]logLine
 	with  map[string]any
+	dupes []string // names given to With more than once
 }
 
 func newLogRecorder() (*slog.Logger, *logRecorder) {
@@ -37,12 +39,19 @@ func newLogRecorder() (*slog.Logger, *logRecorder) {
 func (r *logRecorder) Enabled(context.Context, slog.Level) bool { return true }
 func (r *logRecorder) Handle(_ context.Context, rec slog.Record) error {
 	attrs := map[string]any{}
+	var dupes []string
 	for k, v := range r.with {
 		attrs[k] = v
 	}
-	rec.Attrs(func(a slog.Attr) bool { attrs[a.Key] = a.Value.Any(); return true })
+	rec.Attrs(func(a slog.Attr) bool {
+		if _, again := attrs[a.Key]; again {
+			dupes = append(dupes, a.Key)
+		}
+		attrs[a.Key] = a.Value.Any()
+		return true
+	})
 	r.mu.Lock()
-	*r.lines = append(*r.lines, logLine{level: rec.Level, msg: rec.Message, attrs: attrs})
+	*r.lines = append(*r.lines, logLine{level: rec.Level, msg: rec.Message, attrs: attrs, dupes: append(dupes, r.dupes...)})
 	r.mu.Unlock()
 	return nil
 }
@@ -51,12 +60,34 @@ func (r *logRecorder) WithAttrs(as []slog.Attr) slog.Handler {
 	for k, v := range r.with {
 		with[k] = v
 	}
+	dupes := append([]string(nil), r.dupes...)
 	for _, a := range as {
+		if _, again := with[a.Key]; again {
+			dupes = append(dupes, a.Key)
+		}
 		with[a.Key] = a.Value.Any()
 	}
-	return &logRecorder{mu: r.mu, lines: r.lines, with: with}
+	return &logRecorder{mu: r.mu, lines: r.lines, with: with, dupes: dupes}
 }
 func (r *logRecorder) WithGroup(string) slog.Handler { return r }
+
+// assertIdentified fails unless there is at least one line and every line carries component=escp
+// exactly once (and no other attribute twice): the identification a consumer filters on.
+func (r *logRecorder) assertIdentified(t *testing.T) {
+	t.Helper()
+	lines := r.all()
+	if len(lines) == 0 {
+		t.Fatal("the library logged nothing")
+	}
+	for _, l := range lines {
+		if l.attrs[componentKey] != componentName {
+			t.Errorf("line %q has component=%v, want %s", l.msg, l.attrs[componentKey], componentName)
+		}
+		if len(l.dupes) > 0 {
+			t.Errorf("line %q repeats the attributes %v", l.msg, l.dupes)
+		}
+	}
+}
 
 // all returns a copy of the lines logged so far.
 func (r *logRecorder) all() []logLine {
@@ -111,6 +142,7 @@ func TestLoggerSeesTheRequestsAndRepliesAndNeverASecret(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	rec.assertIdentified(t)
 	if got := rec.named("session established"); len(got) != 1 || got[0].level != slog.LevelInfo {
 		t.Errorf("session lines = %+v, want one Info", got)
 	}
@@ -347,6 +379,7 @@ func TestDiscoveryLogsItsProbesAndWhatItFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	rec.assertIdentified(t)
 	probes := rec.named("discovery probes")
 	if len(probes) != 1 || probes[0].level != slog.LevelDebug || probes[0].attrs["interfaces"] != int64(1) || probes[0].attrs["probes"] != int64(1) {
 		t.Errorf("probe lines = %+v", probes)
@@ -364,6 +397,7 @@ func TestLocateLogsWhereItFoundTheSwitch(t *testing.T) {
 		netInterface{Name: "en0", MAC: macOne, Broadcasts: lo})); err != nil {
 		t.Fatal(err)
 	}
+	rec.assertIdentified(t)
 	if got := rec.named("lookup by MAC found the switch"); len(got) != 1 || got[0].level != slog.LevelDebug || got[0].attrs["mac"] != MAC(oneSwitchMAC).String() || got[0].attrs["ip"] != "192.0.2.30" {
 		t.Errorf("lookup lines = %+v", got)
 	}
@@ -374,4 +408,19 @@ var oneSwitchMAC = [6]byte{0xa8, 0x42, 0xa1, 0, 0, 0x30}
 
 func answerAsOneSwitch(h wire.Header) [][]byte {
 	return [][]byte{packet(wire.OpReply, h.Seq, discoverTLVs(oneSwitchMAC, [4]byte{192, 0, 2, 30}, "sw-a"))}
+}
+
+// The client hands Locate its logger before identifying it, so a lookup the client makes is not
+// marked twice.
+func TestClientLoggerIsIdentifiedByTheClientNotBeforeIt(t *testing.T) {
+	log, rec := newLogRecorder()
+	base := clientLogger(Config{Host: "192.0.2.1", MAC: MAC(oneSwitchMAC), Logger: log})
+	base.Info("probe")
+	if got := rec.all(); len(got) != 1 || got[0].attrs[componentKey] != nil || got[0].attrs["host"] != "192.0.2.1" {
+		t.Fatalf("lines = %+v, want host attached and no component yet", got)
+	}
+	identified(base).Info("probe")
+	if lines := rec.all(); lines[1].attrs[componentKey] != componentName || len(lines[1].dupes) > 0 {
+		t.Errorf("identified line = %+v", lines[1])
+	}
 }

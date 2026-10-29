@@ -173,7 +173,7 @@ func locateWith(ctx context.Context, mac MAC, opts DiscoverOptions, env discover
 	infos, err := discoverUntil(ctx, opts, env, func(found map[string]Info) bool { _, ok := found[want]; return ok })
 	for _, info := range infos {
 		if info.MAC == mac {
-			orDiscard(opts.Logger).DebugContext(ctx, "lookup by MAC found the switch", "mac", want, "ip", info.IP.String())
+			identified(orDiscard(opts.Logger)).DebugContext(ctx, "lookup by MAC found the switch", "mac", want, "ip", info.IP.String())
 			return info, nil
 		}
 	}
@@ -206,7 +206,7 @@ func discoverUntil(ctx context.Context, opts DiscoverOptions, env discoverEnv, d
 			probes = append(probes, probe{to: &net.UDPAddr{IP: net.IP(b.AsSlice()), Port: env.switchPort}, mac: ifc.MAC})
 		}
 	}
-	log := orDiscard(opts.Logger)
+	log := identified(orDiscard(opts.Logger))
 	log.DebugContext(ctx, "discovery probes", "interfaces", len(chosen), "probes", len(probes), "window", window.String())
 	infos, err := collectReplies(ctx, env, probes, window, done)
 	log.DebugContext(ctx, "discovery replies", "switches", len(infos))

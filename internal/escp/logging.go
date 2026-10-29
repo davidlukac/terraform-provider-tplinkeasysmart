@@ -18,8 +18,17 @@ import (
 //
 // Secrets never reach a message: TLV values are not logged, only their types and the number of
 // bytes they carry, so neither the password, the username nor the session key can appear.
+// Every line carries component=escp, which identifies the library the way a logger name does.
 // Attribute names are stable (op, seq, attempt, attempts, tlvs, bytes, error_code, host, mac,
-// operation, impact, ports, round) and are what a consumer filters on.
+// operation, impact, ports, round) and are what a consumer filters on; new ones may be added, none
+// is renamed or removed before a major version.
+
+// componentKey and componentName identify every line the library logs, like the logger name of
+// log4j: a consumer that ships its logs elsewhere filters on component=escp to keep or drop them.
+const (
+	componentKey  = "component"
+	componentName = "escp"
+)
 
 // orDiscard is l, or a logger that discards everything when l is nil.
 func orDiscard(l *slog.Logger) *slog.Logger {
@@ -27,6 +36,13 @@ func orDiscard(l *slog.Logger) *slog.Logger {
 		return slog.New(slog.DiscardHandler)
 	}
 	return l
+}
+
+// identified marks l as the library's: every line carries component=escp, exactly once, so it is
+// applied where the caller's logger enters the library (the client, Discover, Locate) and nowhere
+// below.
+func identified(l *slog.Logger) *slog.Logger {
+	return l.With(componentKey, componentName)
 }
 
 // tlvTypes lists the types of the TLVs of a packet, in order: what a request asked for or a reply
