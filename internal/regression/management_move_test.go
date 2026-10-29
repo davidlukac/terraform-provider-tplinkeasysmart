@@ -181,8 +181,10 @@ const (
 	locatePause = time.Second
 )
 
-func locateByMAC(mac escp.MAC) func(context.Context) (escp.Info, error) {
-	return func(ctx context.Context) (escp.Info, error) { return escp.Locate(ctx, mac, escp.DiscoverOptions{}) }
+func (s *Session) locateByMAC(mac escp.MAC) func(context.Context) (escp.Info, error) {
+	return func(ctx context.Context) (escp.Info, error) {
+		return escp.Locate(ctx, mac, escp.DiscoverOptions{Logger: s.trace.logger()})
+	}
 }
 
 func anyAnswer(escp.Info) bool { return true }
@@ -215,7 +217,7 @@ func locateSettled(ctx context.Context, locate func(context.Context) (escp.Info,
 func (s *Session) bringBackFromALease(t *testing.T, mac escp.MAC, original escp.IPConfig) {
 	ctx, cancel := context.WithTimeout(context.Background(), settleTime)
 	defer cancel()
-	found, err := locateSettled(ctx, locateByMAC(mac), anyAnswer, locateTries, locatePause)
+	found, err := locateSettled(ctx, s.locateByMAC(mac), anyAnswer, locateTries, locatePause)
 	if err != nil {
 		t.Errorf("CANNOT FIND THE SWITCH: %v. Look for MAC %s with a discovery before doing anything else", err, mac)
 		return
@@ -263,7 +265,7 @@ func TestScenarioManagementDHCP(t *testing.T) {
 	dhcp := provider + "resource \"tplinkeasysmart_management_ip\" \"this\" {\n  dhcp             = true\n  allow_disruptive = true\n}\n"
 	static := provider + fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", info.IP.String(), info.Netmask.String(), info.Gateway.String())
 	leased := func(*terraform.State) error {
-		found, err := locateSettled(ctx, locateByMAC(hw), func(in escp.Info) bool { return in.DHCP }, locateTries, locatePause)
+		found, err := locateSettled(ctx, s.locateByMAC(hw), func(in escp.Info) bool { return in.DHCP }, locateTries, locatePause)
 		if err != nil || !found.DHCP {
 			return fmt.Errorf("the switch found by MAC reports %+v, err %w, want DHCP on", found, err)
 		}
@@ -275,7 +277,7 @@ func TestScenarioManagementDHCP(t *testing.T) {
 			resource.TestCheckResourceAttrSet("tplinkeasysmart_management_ip.this", "ip_address"))},
 		{Config: dhcp}, // the second look: nothing to change, the plan after the apply is empty
 		{Config: static, Check: func(st *terraform.State) error {
-			found, err := locateSettled(ctx, locateByMAC(hw), func(in escp.Info) bool { return !in.DHCP && in.IP.String() == info.IP.String() }, locateTries, locatePause)
+			found, err := locateSettled(ctx, s.locateByMAC(hw), func(in escp.Info) bool { return !in.DHCP && in.IP.String() == info.IP.String() }, locateTries, locatePause)
 			if err != nil || found.DHCP || found.IP.String() != info.IP.String() {
 				return fmt.Errorf("the switch found by MAC reports %+v, err %w, want %s with DHCP off", found, err, info.IP.String())
 			}

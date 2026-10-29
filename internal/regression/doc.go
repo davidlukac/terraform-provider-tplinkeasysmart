@@ -13,5 +13,10 @@
 // the state recorded at the start and written back if a failed scenario left them changed. The
 // scenario is failed for it; everything else is left to the readout comparison, which names it.
 //
+// Every client of a session logs into a flight recorder (trace.go): the library's own log at Debug,
+// every request and reply with the operation, sequence number and TLV types and sizes, never a
+// value or a credential. Nothing is printed while a scenario passes; when it fails, the test log
+// ends with the last 4000 lines, so the protocol of the failing step is in the report.
+//
 // Switch 01 is never a target: the harness refuses it by name and by address.
 package regression

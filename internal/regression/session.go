@@ -42,6 +42,8 @@ type Session struct {
 	net rescueClient
 	rd  []Reader
 	tb  testing.TB
+	// trace keeps what the library logs, for a failing scenario (see trace).
+	trace *trace
 }
 
 // Getenv is os.Getenv, replaceable in tests.
@@ -75,7 +77,8 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 	if err != nil {
 		t.Fatalf("regression target: %v", err)
 	}
-	s := &Session{Target: target, tb: t}
+	s := &Session{Target: target, tb: t, trace: &trace{}}
+	t.Cleanup(func() { s.trace.dumpIfFailed(t) }) // registered first, so it runs last
 	cfg := escp.Config{Host: target.Host, Username: target.Username, Password: target.Password}
 	if !target.Real() {
 		s.Fake = startFake(t)
@@ -132,8 +135,9 @@ func (s *Session) fakeConfig(cfg escp.Config) escp.Config {
 	return cfg
 }
 
-// dialClient builds a client; for the fake each client gets its own local port.
+// dialClient builds a client that logs into the session's trace; for the fake each client gets its own local port.
 func (s *Session) dialClient(cfg escp.Config) (*escp.Client, error) {
+	cfg.Logger = s.trace.logger()
 	if s.Fake != nil {
 		if cfg.Host == "" && !cfg.MAC.IsZero() {
 			// A client without an address finds its switch by a discovery on the host's interfaces,
