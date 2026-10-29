@@ -47,20 +47,40 @@ type PortBasedVLAN struct {
 	VLANs   []PortVLAN // never nil
 }
 
-// CheckGroup reports whether id is a group this switch can hold: 1 to the larger of MaxVLAN (the
-// number of groups it says it supports) and portCount (its number of ports). Both are 8 on a
-// TL-SG108E; the web UI takes new ids from 2 to the port count, and group 1 is the default group
-// that always exists. Taking the larger of the two means a model whose group limit and port count
-// differ (a 24-port TL-SG1024DE, say) is never refused an id one of them allows. With neither known
-// (both 0) only the wire's range is checked. The error matches ErrInvalid.
-func (v PortBasedVLAN) CheckGroup(id PortVLANID, portCount int) error {
+// PortVLANLimit is the highest port-based VLAN group id a switch holds: the larger of the number of
+// groups it says it supports and its number of ports. Both are 8 on a TL-SG108E; the web UI takes
+// new ids from 2 to the port count, and group 1 is the default group that always exists. Taking the
+// larger of the two means a model whose group limit and port count differ (a 24-port TL-SG1024DE,
+// say) is never refused an id one of them allows. The zero value is an unknown limit: only the
+// wire's range (PortVLANID.Validate) applies.
+type PortVLANLimit int
+
+// NewPortVLANLimit is the limit of a switch that supports groups groups and has ports ports; either
+// may be 0 when the switch did not say.
+func NewPortVLANLimit(groups, ports int) PortVLANLimit { return PortVLANLimit(max(groups, ports)) }
+
+// Known reports whether the switch said anything that bounds the ids.
+func (l PortVLANLimit) Known() bool { return l > 0 }
+
+// String is the limit as a number.
+func (l PortVLANLimit) String() string { return strconv.Itoa(int(l)) }
+
+// Check reports whether id is an id the switch can hold: within the wire's range and, when the limit
+// is known, not above it. The error matches ErrInvalid.
+func (l PortVLANLimit) Check(id PortVLANID) error {
 	if err := id.Validate(); err != nil {
 		return err
 	}
-	if limit := max(v.MaxVLAN, portCount); limit > 0 && int(id) > limit {
-		return invalidf("escp: port-based VLAN id %d does not exist on this switch, which supports ids 1-%d", id, limit)
+	if l.Known() && int(id) > int(l) {
+		return invalidf("escp: port-based VLAN id %d does not exist on this switch, which supports ids 1-%d", id, l)
 	}
 	return nil
+}
+
+// GroupLimit is the highest group id of the switch whose state v is and which has portCount ports
+// (0 when unknown).
+func (v PortBasedVLAN) GroupLimit(portCount int) PortVLANLimit {
+	return NewPortVLANLimit(v.MaxVLAN, portCount)
 }
 
 // Group returns the member ports of group id and whether the group exists.
@@ -123,10 +143,10 @@ func (c *Client) SetPortBasedVLAN(ctx context.Context, id PortVLANID, ports Port
 	return c.setTLVs(ctx, Operation{Name: "SetPortBasedVLAN", Ports: ports, Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: int(id)}, wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(id)}, ports.Mask()...)})
 }
 
-// requirePortVLANGroup refuses a group id the switch does not have. The limit (see CheckGroup) is
-// read once and kept, in the same way as the port count, so the first group write costs the reads
-// of the group state and of the port count; if one fails, so does the write, with that error. The
-// id's own range is checked first, before anything is read.
+// requirePortVLANGroup refuses a group id the switch does not have. The limit is read once and kept,
+// in the same way as the port count, so the first group write costs the reads of the group state
+// and of the port count; if one fails, so does the write, with that error. The id's own range is
+// checked first, before anything is read.
 func (c *Client) requirePortVLANGroup(ctx context.Context, id PortVLANID) error {
 	if err := id.Validate(); err != nil {
 		return err
@@ -134,7 +154,7 @@ func (c *Client) requirePortVLANGroup(ctx context.Context, id PortVLANID) error 
 	c.mu.Lock()
 	limit := c.groupLimit
 	c.mu.Unlock()
-	if limit == 0 {
+	if !limit.Known() { // not read yet: a read always yields a known limit, as the port count must be reported
 		v, err := c.PortBasedVLAN(ctx)
 		if err != nil {
 			return err
@@ -143,10 +163,10 @@ func (c *Client) requirePortVLANGroup(ctx context.Context, id PortVLANID) error 
 		if err != nil {
 			return err
 		}
-		limit = max(v.MaxVLAN, ports)
+		limit = v.GroupLimit(ports)
 		c.mu.Lock()
 		c.groupLimit = limit
 		c.mu.Unlock()
 	}
-	return PortBasedVLAN{MaxVLAN: limit}.CheckGroup(id, 0)
+	return limit.Check(id)
 }
