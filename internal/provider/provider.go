@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -30,6 +29,8 @@ const (
 	envMAC      = "TPLINK_EASYSMART_MAC"
 	envUsername = "TPLINK_EASYSMART_USERNAME"
 	envPassword = "TPLINK_EASYSMART_PASSWORD" //nolint:gosec // the name of an environment variable, not a credential
+	// envAllowUnverified backs allow_unverified_firmware for the provider's default; a switch entry still overrides it.
+	envAllowUnverified = "TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE"
 )
 
 var (
@@ -118,7 +119,7 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				Optional: true,
 				Description: "Write to switches whose firmware build this provider version was not verified against. Defaults to false: reads and imports always work, " +
 					"but every write is refused on an unverified build, because a newer firmware may have changed the protocol. Verified builds: " + verifiedBuilds() + ". " +
-					"Can be overridden per switch in the `switches` map.",
+					"Falls back to TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE (`true` or `false`). Can be overridden per switch in the `switches` map.",
 			},
 			"switches": schema.MapNestedAttribute{
 				Optional: true,
@@ -173,13 +174,6 @@ func verifiedBuilds() string {
 		names[i] = b.String()
 	}
 	return strings.Join(names, ", ")
-}
-
-func envOr(v types.String, env string) string {
-	if !v.IsNull() && !v.IsUnknown() {
-		return v.ValueString()
-	}
-	return os.Getenv(env)
 }
 
 // defaultTimeout is the per-request timeout when none is configured.
@@ -253,7 +247,11 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	providerTimeout := timeoutOr(cfg.TimeoutSeconds, defaultTimeout)
 	reg := &switchRegistry{named: map[string]SwitchClient{}}
 	seen := map[string]string{} // "host x" or "mac x" -> switch, so one device is never configured twice
-	providerAllow := cfg.AllowUnverifiedFirmware.ValueBool()
+	providerAllow, err := envBoolOr(cfg.AllowUnverifiedFirmware, envAllowUnverified)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(pathRoot("allow_unverified_firmware"), "Invalid allow_unverified_firmware", err.Error())
+		return
+	}
 	build := func(name, h, m, u, pw string, timeout time.Duration, allowUnverified bool) {
 		label := name
 		if label == "" {

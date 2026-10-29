@@ -29,7 +29,8 @@ provider "tplinkeasysmart" {
   # timeout_seconds = 3
 
   # Writes are refused on firmware builds this provider version was not
-  # verified against (reads and imports always work). Opt in at your own risk:
+  # verified against (reads and imports always work). Opt in at your own risk
+  # (or export TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE=true):
   # allow_unverified_firmware = true
 }
 

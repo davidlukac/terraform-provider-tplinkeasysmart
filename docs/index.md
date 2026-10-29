@@ -43,7 +43,8 @@ provider "tplinkeasysmart" {
   # timeout_seconds = 3
 
   # Writes are refused on firmware builds this provider version was not
-  # verified against (reads and imports always work). Opt in at your own risk:
+  # verified against (reads and imports always work). Opt in at your own risk
+  # (or export TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE=true):
   # allow_unverified_firmware = true
 }
 
@@ -72,7 +73,7 @@ provider "tplinkeasysmart" {
 
 ### Optional
 
-- `allow_unverified_firmware` (Boolean) Write to switches whose firmware build this provider version was not verified against. Defaults to false: reads and imports always work, but every write is refused on an unverified build, because a newer firmware may have changed the protocol. Verified builds: 20230218, 20250710. Can be overridden per switch in the `switches` map.
+- `allow_unverified_firmware` (Boolean) Write to switches whose firmware build this provider version was not verified against. Defaults to false: reads and imports always work, but every write is refused on an unverified build, because a newer firmware may have changed the protocol. Verified builds: 20230218, 20250710. Falls back to TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE (`true` or `false`). Can be overridden per switch in the `switches` map.
 - `host` (String) IPv4 address or hostname of the switch. Falls back to TPLINK_EASYSMART_HOST. Optional when `mac` is set.
 - `mac` (String) MAC address of the switch (`aa:bb:cc:dd:ee:ff`, colons or hyphens, any case; `system_info` reports it as `mac_address`). It pins the identity: a device with another MAC at `host` is never written to. Without `host`, or when `host` does not answer, the switch is found by a layer-2 discovery on the first request, so its address may change (for example under DHCP). Discovery needs the same layer-2 segment; use `host` as well when Terraform runs elsewhere. Falls back to TPLINK_EASYSMART_MAC.
 - `password` (String, Sensitive) Admin password. Falls back to TPLINK_EASYSMART_PASSWORD.
