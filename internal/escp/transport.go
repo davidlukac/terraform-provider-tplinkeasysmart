@@ -144,9 +144,31 @@ func (c *Client) attemptDeadline(ctx context.Context) time.Time {
 	return deadline
 }
 
-// send transmits one request with a fresh sequence number.
+// drainWait is how long discard waits for a datagram that is not there: the last, empty read.
+const drainWait = time.Millisecond
+
+// maxDiscarded bounds discard, so a sender that never stops cannot hold a request back.
+const maxDiscarded = 64
+
+// discard drops the datagrams already waiting in the socket. A request has not been sent yet, so
+// nothing that has arrived can be its reply: it is a late reply to an earlier request or to a
+// discovery, or a reply meant for another client, which share the port (see PROTOCOL.md). Left in
+// the buffer, one that carries the number the request is about to use would be taken for its reply.
+func (c *Client) discard() {
+	buf := make([]byte, maxDatagram)
+	for range maxDiscarded {
+		_ = c.conn.SetReadDeadline(time.Now().Add(drainWait))
+		if _, _, err := c.conn.ReadFromUDP(buf); err != nil {
+			return
+		}
+	}
+}
+
+// send transmits one request with a fresh sequence number, after dropping what was left in the
+// socket.
 func (c *Client) send(op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) error {
-	c.seq = nextSeq(c.seq)
+	c.discard()
+	c.seq = requestSeq(c.seq, op)
 	pkt := c.encrypt(wire.Marshal(wire.Header{Op: op, SwitchMAC: c.swMAC, HostMAC: c.hostMAC, Seq: c.seq}, tlvs), static)
 	for _, d := range to {
 		if _, err := c.conn.WriteToUDP(pkt, d); err != nil {
