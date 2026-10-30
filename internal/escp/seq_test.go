@@ -1,6 +1,10 @@
 package escp
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+)
 
 // Every random input maps into its own range, and the two ranges share no number: a reply to a
 // discovery probe can never be taken for the reply to a client's request, and the other way round.
@@ -40,5 +44,25 @@ func TestClientSequenceStaysInItsRange(t *testing.T) {
 	}
 	if got := nextSeq(41); got != 42 {
 		t.Errorf("nextSeq(41) = %d, want 42", got)
+	}
+}
+
+func TestRequestSeqKeepsCountingAcrossBothRanges(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		last uint16
+		op   byte
+		want uint16
+	}{
+		{"a request after a request", 41, wire.OpGet, 42},
+		{"the counter wraps within the request range", clientSeqSpace - 1, wire.OpSet, 0},
+		{"a discovery takes the next number in the discovery range", 41, wire.OpDiscovery, discoverySeqBase + 42},
+		{"a request after a discovery goes on from its offset, back in the request range", discoverySeqBase + 42, wire.OpGet, 43},
+		{"a discovery after a discovery", discoverySeqBase + 42, wire.OpDiscovery, discoverySeqBase + 43},
+		{"the discovery range wraps too", discoverySeqBase + clientSeqSpace - 1, wire.OpDiscovery, discoverySeqBase},
+	} {
+		if got := requestSeq(c.last, c.op); got != c.want {
+			t.Errorf("%s: requestSeq(%d, op %d) = %d, want %d", c.name, c.last, c.op, got, c.want)
+		}
 	}
 }
