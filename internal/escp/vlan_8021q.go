@@ -66,6 +66,25 @@ func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
 	return out, nil
 }
 
+// CheckRoom reports whether the table can take VLAN id: it holds it already (changing a VLAN needs no
+// room), or it has fewer entries than the most the switch supports. MaxVLAN counts VLAN 1: probed on
+// switch 03, which reports 32, it took 31 more VLANs beside VLAN 1 and refused the next with code 7505.
+// A switch that did not report its maximum is not bounded here. The error matches ErrInvalid.
+func (q Dot1Q) CheckRoom(id VLANID) error {
+	if q.MaxVLAN == 0 {
+		return nil
+	}
+	for _, v := range q.VLANs {
+		if v.ID == id {
+			return nil
+		}
+	}
+	if len(q.VLANs) >= q.MaxVLAN {
+		return invalidf("escp: the 802.1Q VLAN table is full: the switch holds at most %d VLANs (VLAN 1 among them) and has %d, so VLAN %d cannot be added", q.MaxVLAN, len(q.VLANs), id)
+	}
+	return nil
+}
+
 // Dot1Q reads the 802.1Q mode, VLAN table and per-port PVIDs.
 func (c *Client) Dot1Q(ctx context.Context) (Dot1Q, error) {
 	// Separate requests, like the vendor utility (combined ones are rejected on some pages).

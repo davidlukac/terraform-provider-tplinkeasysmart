@@ -22,6 +22,7 @@ type fakeVLANs struct {
 	pvids     map[escp.PortID]escp.VLANID
 
 	ignoreModeWrites bool // accept mode writes without applying them
+	maxVLANs         int  // the 802.1Q table size, VLAN 1 included (0: the real switch's 32)
 }
 
 // newFakeVLANs returns a switch in the given mode ("mtu", "port-based", "802.1q" or "").
@@ -56,9 +57,17 @@ func (v *fakeVLANs) enable8021Q() {
 	}
 }
 
+// tableSize is the most VLANs the table holds.
+func (v *fakeVLANs) tableSize() int {
+	if v.maxVLANs > 0 {
+		return v.maxVLANs
+	}
+	return 32
+}
+
 // dot1q is the 802.1Q state as the switch reports it, VLANs and PVIDs sorted.
 func (v *fakeVLANs) dot1q() escp.Dot1Q {
-	out := escp.Dot1Q{Enabled: v.enabled, MaxVLAN: 32, VLANs: []escp.VLAN8021Q{}, PVIDs: []escp.PortPVID{}}
+	out := escp.Dot1Q{Enabled: v.enabled, MaxVLAN: v.tableSize(), VLANs: []escp.VLAN8021Q{}, PVIDs: []escp.PortPVID{}}
 	ids := make([]escp.VLANID, 0, len(v.vlans))
 	for id := range v.vlans {
 		ids = append(ids, id)
@@ -114,6 +123,9 @@ func (f *fakeClient) SetVLANMode(_ context.Context, s escp.VLANModeSetting) erro
 
 func (f *fakeClient) SetVLAN8021Q(_ context.Context, vlan escp.VLAN8021Q) error {
 	return f.vlanWrite(func(v *fakeVLANs) error {
+		if _, exists := v.vlans[vlan.ID]; !exists && len(v.vlans) >= v.tableSize() {
+			return &escp.RejectedError{Code: 7505} // what switch 03 answered to the 33rd VLAN
+		}
 		v.vlans[vlan.ID] = vlan
 		return nil
 	})
