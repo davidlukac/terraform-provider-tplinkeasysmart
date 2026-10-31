@@ -116,12 +116,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # A second worktree: the main checkout stays on the commit the job was built from,
+          # because the job's post step for ./.github/actions/setup reads that action from it.
           if git ls-remote --exit-code --heads origin badges >/dev/null 2>&1; then
             git fetch --depth=1 origin badges:refs/remotes/origin/badges
-            git switch --force -c badges origin/badges
+            git worktree add --force -B badges "$RUNNER_TEMP/badges" origin/badges
           else
-            git switch --orphan badges
+            git worktree add --orphan -b badges "$RUNNER_TEMP/badges"
           fi
+          cd "$RUNNER_TEMP/badges"
           cp "$RUNNER_TEMP/coverage.json" coverage.json
           git add coverage.json
           git diff --cached --quiet && { echo "coverage unchanged"; exit 0; }
