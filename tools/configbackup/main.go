@@ -27,7 +27,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // Environment variables, the provider's own names.

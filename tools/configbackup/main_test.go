@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/escptest"
 )
 
 // aimedAt returns the dependencies that reach the fake switch instead of the network.
@@ -21,7 +21,7 @@ func aimedAt(t *testing.T, f *escptest.Switch) deps {
 	t.Helper()
 	return deps{
 		dial: func(cfg escp.Config) (*escp.Client, error) {
-			cfg.SwitchPort, cfg.HostPort, cfg.BroadcastAddr = f.Port(), escptest.FreeUDPPort(t), escptest.Loopback
+			cfg.SwitchPort, cfg.HostPort, cfg.BroadcastAddr = f.Port(), escptest.FreeUDPPort(t), escptest.Loopback()
 			cfg.Timeout = 200 * time.Millisecond
 			return escp.Dial(cfg)
 		},
