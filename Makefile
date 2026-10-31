@@ -1,11 +1,16 @@
 .DEFAULT_GOAL := test
 
+# Development tools (the linter, the vulnerability scanner) are pinned in devtools/go.mod, a module of
+# their own so that their dependencies stay out of this module's go.mod; Dependabot bumps them there.
+# `go tool` builds the pinned version on first use (cached afterwards): nothing to install by hand.
+DEVTOOL := go tool -modfile=devtools/go.mod
+
 # Regenerate docs/ from the schema and examples/ (needs the terraform binary on PATH).
 generate:
 	go generate ./...
 
 lint:
-	golangci-lint run ./...
+	$(DEVTOOL) golangci-lint run ./...
 
 # Unit tests plus Terraform lifecycle tests against fakes. No hardware is touched.
 test:
@@ -20,9 +25,9 @@ testacc:
 docs-check: generate
 	git diff --compact-summary --exit-code -- docs
 
-# Known vulnerabilities in the code and its dependencies (needs: go install golang.org/x/vuln/cmd/govulncheck@latest).
+# Known vulnerabilities in the code and its dependencies.
 vuln:
-	govulncheck ./...
+	$(DEVTOOL) govulncheck ./...
 
 # Validates every documentation example against the schemas (no switch needed).
 validate-examples:
@@ -39,7 +44,7 @@ pre-commit:
 	@test -z "$$(gofmt -l .)" || { echo "gofmt needed on:"; gofmt -l .; exit 1; }
 	go vet ./...
 	go vet -tags live ./...
-	golangci-lint run ./...
+	$(MAKE) lint
 	$(MAKE) cover
 
 # Local dry-run of the signed release pipeline (no signing, no publishing).

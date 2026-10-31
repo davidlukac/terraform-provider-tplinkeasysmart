@@ -10,6 +10,16 @@ updates:
       terraform-plugin:
         patterns:
           - "github.com/hashicorp/*"
+  - package-ecosystem: gomod
+    directory: /devtools
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      dev-tools:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directories:
       - /

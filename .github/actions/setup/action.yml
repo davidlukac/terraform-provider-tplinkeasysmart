@@ -17,6 +17,10 @@ runs:
         go-version: ${{ inputs.go-version != '' && inputs.go-version != 'go.mod' && inputs.go-version || '' }}
         go-version-file: ${{ (inputs.go-version == '' || inputs.go-version == 'go.mod') && 'go.mod' || '' }}
         cache: true
+        # the pinned linter and vulnerability scanner (devtools/go.mod) are built from source and cached too
+        cache-dependency-path: |
+          go.sum
+          devtools/go.sum
     - if: inputs.terraform != ''
       # The lifecycle tests drive a real Terraform CLI. Without one on PATH each
       # test downloads its own and the job times out.
