@@ -68,14 +68,12 @@ compat-table:
 # `make cover` runs the whole suite with the race detector, writes cover.out
 # and enforces the policy: every statement covered except functions whose doc
 # comment says `// coverage: ignore - <reason>` (see README, "Testing and coverage").
-.PHONY: cover cover-html cover-selftest
+.PHONY: cover cover-html
 
-cover: cover-selftest
+# The policy checker is Go (tools/coverpolicy) and is tested, and measured, by the same run.
+cover:
 	go test ./... -race -count=1 -coverpkg=./... -coverprofile=cover.out
-	python3 scripts/covercheck.py cover.out .
+	go run ./tools/coverpolicy check cover.out .
 
 cover-html: cover
 	go tool cover -html=cover.out -o coverage.html
-
-cover-selftest:
-	cd scripts && python3 -m unittest test_covercheck test_coverbadge
