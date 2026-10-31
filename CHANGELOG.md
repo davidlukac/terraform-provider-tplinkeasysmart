@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.32.1
+
+- a new 802.1Q VLAN in a full table is refused before anything is written; a bad static management address stops the apply at once; golang.org/x/net v0.62.0
+
 ## 0.32.0
 
 - **New:** `allow_unverified_firmware` also comes from the environment variable `TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE`, for configurations that take everything from the environment. The argument wins over the variable and a switch entry over both; a value that is not a boolean stops the run before anything is written.
