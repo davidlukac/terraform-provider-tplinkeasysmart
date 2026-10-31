@@ -159,7 +159,10 @@ func (r *managementIPResource) applyBound(ctx context.Context, m *managementIPMo
 	wantDHCP := m.DHCP.ValueBool()
 	var want escp.IPConfig
 	if !wantDHCP {
-		want, _ = ipConfigOf(*m, func(_ path.Path, summary, detail string) { add(summary, detail) })
+		var ok bool
+		if want, ok = ipConfigOf(*m, func(_ path.Path, summary, detail string) { add(summary, detail) }); !ok {
+			return false // plan-time validation refuses this already; nothing is compared or written with half an address
+		}
 	}
 	if wantDHCP != cur.DHCP || (!wantDHCP && !sameIPConfig(cur, want)) {
 		if !m.AllowDisruptive.ValueBool() {
