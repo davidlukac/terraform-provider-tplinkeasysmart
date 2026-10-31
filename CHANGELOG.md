@@ -2,7 +2,10 @@
 
 ## 0.32.1
 
-- a new 802.1Q VLAN in a full table is refused before anything is written; a bad static management address stops the apply at once; golang.org/x/net v0.62.0
+- **Fix:** `tplinkeasysmart_vlan_8021q_group` refuses to add a VLAN to a full table before it writes anything. The switch holds at most 32 802.1Q VLANs, VLAN 1 included (probed on a TL-SG108E: 31 more were accepted, the next was refused with an unexplained error code 7505); the error now says "the 802.1Q VLAN table is full: the switch holds at most 32 VLANs (VLAN 1 among them) and has 32, so VLAN 20 cannot be added". Changing a VLAN that is already in the table is not an addition and still works.
+- **Fix:** `tplinkeasysmart_management_ip` stops at once when a static address is not a dotted IPv4 address at apply time (plan-time validation refuses it first, so this is the second layer). It used to report it and carry on, and with `allow_disruptive` ended with a misleading "the switch may now be at the old or the new address".
+- **Dependency:** `golang.org/x/net` v0.62.0, which fixes GO-2026-6866 and GO-2026-6860. The provider does not call the affected code; the scan exited clean before, and the module no longer carries them.
+- Internal, no change for users: the coverage policy and the badge are a Go tool, the CI linter and vulnerability scanner are pinned, the CI runs on a fixed Ubuntu image.
 
 ## 0.32.0
 
