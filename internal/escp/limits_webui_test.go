@@ -60,8 +60,9 @@ func TestLibraryLimitsMatchTheWebUI(t *testing.T) {
 	}{
 		"port_based_vlan_id_max_digits": {digits(MaxPortVLANID), "the web UI takes port-based VLAN ids 2 to the port count (page text and pvlan.js); the type allows the wire's 1 to 255, because it does not know the switch, and SetPortBasedVLAN and the provider refuse an id above the number of groups the switch reports (TLV 8450, 8 on a TL-SG108E), as the web UI does. Whether the switch itself would accept a higher id is not probed"},
 	}
-	// Limits the library does not model: it does not write them (user account, CLI only) or does not
-	// need them (the table size and port count are read from the switch).
+	// Limits the library does not model as constants: it does not write them (user account, CLI only; the
+	// switch's own rule for those is not probed) or reads them from the switch (the table size, enforced by
+	// the switch and checked through Dot1Q.CheckRoom; the port count).
 	notModelled := map[string]bool{"user_name_max_length": true, "password_max_length": true, "dot1q_vlan_table_size": true, "port_count": true}
 
 	for name, want := range matches {

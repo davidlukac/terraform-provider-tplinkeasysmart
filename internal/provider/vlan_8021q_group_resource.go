@@ -87,16 +87,22 @@ func (r *vlan8021QGroupResource) Configure(_ context.Context, req resource.Confi
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-// table reads the 802.1Q table; the mode must be active, because the switch ignores or rejects VLAN writes otherwise.
-func (r *vlan8021QGroupResource) table(ctx context.Context) ([]escp.VLAN8021Q, error) {
+// state reads the 802.1Q state; the mode must be active, because the switch ignores or rejects VLAN writes otherwise.
+func (r *vlan8021QGroupResource) state(ctx context.Context) (escp.Dot1Q, error) {
 	q, err := r.client.Dot1Q(ctx)
 	if err != nil {
-		return nil, err
+		return escp.Dot1Q{}, err
 	}
 	if !q.Enabled {
-		return nil, &inactiveModeError{"802.1Q VLAN mode is not active on the switch; refusing to manage 802.1Q VLANs in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the 802.1Q table when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the VLANs depend on it"}
+		return escp.Dot1Q{}, &inactiveModeError{"802.1Q VLAN mode is not active on the switch; refusing to manage 802.1Q VLANs in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the 802.1Q table when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the VLANs depend on it"}
 	}
-	return q.VLANs, nil
+	return q, nil
+}
+
+// table is the 802.1Q table of state.
+func (r *vlan8021QGroupResource) table(ctx context.Context) ([]escp.VLAN8021Q, error) {
+	q, err := r.state(ctx)
+	return q.VLANs, err
 }
 
 // findVLAN returns the VLAN with the id, if the table has it.
@@ -164,11 +170,16 @@ func (r *vlan8021QGroupResource) applyBound(ctx context.Context, m *vlan8021QGro
 		add("Invalid ports", err.Error())
 		return false
 	}
-	table, err := r.table(ctx)
+	q, err := r.state(ctx)
 	if err != nil {
 		add("Reading the 802.1Q VLANs failed", err.Error())
 		return false
 	}
+	if err := q.CheckRoom(want.ID); err != nil {
+		add("The 802.1Q VLAN table is full", err.Error())
+		return false
+	}
+	table := q.VLANs
 	old, _ := findVLAN(table, want.ID)
 	if err := r.guard(ctx, m.AllowDisruptive.ValueBool(), table, want.ID, members(old), members(want)); err != nil {
 		add("Refusing to change the 802.1Q VLAN", err.Error())
