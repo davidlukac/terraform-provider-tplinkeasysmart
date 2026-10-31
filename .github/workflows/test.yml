@@ -24,7 +24,7 @@ permissions:
 jobs:
   build:
     name: Build, lint and docs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,7 +52,7 @@ jobs:
   # releases are not tested because go.mod forbids them.
   unit:
     name: Unit tests (Go ${{ matrix.go }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -97,7 +97,7 @@ jobs:
     name: Publish coverage badge
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: unit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
@@ -136,7 +136,7 @@ jobs:
   # boundaries (import/moved handling, harness behaviour) without testing every minor.
   acceptance:
     name: Terraform ${{ matrix.terraform }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -153,7 +153,7 @@ jobs:
   # merges (continue-on-error). Promote it to required once it has proven stable.
   opentofu:
     name: OpenTofu latest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     continue-on-error: true
     steps:
@@ -179,7 +179,7 @@ jobs:
   # `release --snapshot` (all targets, archives, checksums).
   release-dry-run:
     name: Release build (snapshot)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
