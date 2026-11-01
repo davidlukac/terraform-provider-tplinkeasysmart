@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.32.2
+
+- Internal, no change in behaviour: the provider uses the extracted ESCP library, [github.com/davidlukac/escp-go](https://github.com/davidlukac/escp-go) v0.2.0, instead of its internal copy (the full hardware regression on a real switch passed, and the configuration files of both test switches read byte for byte as before). The one visible difference is in the debug log (`TF_LOG=DEBUG`): the 802.1Q VLAN writes are named `SetDot1QVLAN` and `DeleteDot1QVLAN` (were `SetVLAN8021Q` and `DeleteVLAN8021Q`).
+
 ## 0.32.1
 
 - **Fix:** `tplinkeasysmart_vlan_8021q_group` refuses to add a VLAN to a full table before it writes anything. The switch holds at most 32 802.1Q VLANs, VLAN 1 included (probed on a TL-SG108E: 31 more were accepted, the next was refused with an unexplained error code 7505); the error now says "the 802.1Q VLAN table is full: the switch holds at most 32 VLANs (VLAN 1 among them) and has 32, so VLAN 20 cannot be added". Changing a VLAN that is already in the table is not an addition and still works.
