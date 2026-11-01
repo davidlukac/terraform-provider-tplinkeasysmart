@@ -7,8 +7,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/escptest"
 )
 
 // A port-based VLAN group is checked against what the switch has before anything is written: that

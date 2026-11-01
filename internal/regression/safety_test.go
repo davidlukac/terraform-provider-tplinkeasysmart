@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/escptest"
 )
 
 func TestCheckTestPorts(t *testing.T) {
@@ -29,7 +29,7 @@ func TestCheckTestPorts(t *testing.T) {
 		})
 	}
 	// A free port that has become a LAG member is refused too.
-	if err := s.Client.SetLAG(ctx, 1, escp.MustPortSet(3, 4)); err != nil {
+	if err := s.Client.SetLAG(ctx, escp.LAG{ID: 1, Ports: escp.MustPortSet(3, 4)}); err != nil {
 		t.Fatal(err)
 	}
 	if err := CheckTestPorts(ctx, s.Client, Target{TestPorts: []escp.PortID{3}}); err == nil || !strings.Contains(err.Error(), "member of LAG 1") {
@@ -39,7 +39,7 @@ func TestCheckTestPorts(t *testing.T) {
 
 func TestCheckTestPortsUnreadable(t *testing.T) {
 	s := Open(t, noEnv)
-	s.Fake.Configure(func(f *escptest.Switch) {
+	s.Fake.Configure(func(f *escptest.Faults) {
 		f.GetFn = func([]escptest.TLVType) ([]escptest.Setting, int32, bool) { return nil, 1, false }
 	})
 	if err := CheckTestPorts(context.Background(), s.Client, Target{TestPorts: []escp.PortID{2}}); err == nil || !strings.Contains(err.Error(), "cannot read the ports") {

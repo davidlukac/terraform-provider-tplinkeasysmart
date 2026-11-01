@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // SwitchClient is the union of everything the provider asks of the switch, as
@@ -17,7 +17,7 @@ type SwitchClient interface {
 	SetPort(ctx context.Context, cfg escp.PortConfig) error
 	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
 	LAGs(ctx context.Context) ([]escp.LAG, error)
-	SetLAG(ctx context.Context, group escp.LAGID, ports escp.PortSet) error
+	SetLAG(ctx context.Context, lag escp.LAG) error
 	IGMP(ctx context.Context) (escp.IGMP, error)
 	SetIGMP(ctx context.Context, cfg escp.IGMPConfig) error
 	LoopPrevention(ctx context.Context) (bool, error)
@@ -26,12 +26,12 @@ type SwitchClient interface {
 	SetPortMirror(ctx context.Context, m escp.Mirror) error
 	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
-	SetPortBasedVLAN(ctx context.Context, id escp.PortVLANID, ports escp.PortSet) error
+	SetPortBasedVLAN(ctx context.Context, group escp.PortVLAN) error
 	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
 	VLANMode(ctx context.Context) (escp.VLANModeSetting, error)
 	SetVLANMode(ctx context.Context, s escp.VLANModeSetting) error
-	SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error
-	DeleteVLAN8021Q(ctx context.Context, id escp.VLANID) error
+	SetDot1QVLAN(ctx context.Context, v escp.Dot1QVLAN) error
+	DeleteDot1QVLAN(ctx context.Context, id escp.VLANID) error
 	SetPVIDs(ctx context.Context, pvids map[escp.PortID]escp.VLANID) error
 	QoS(ctx context.Context) (escp.QoS, error)
 	SetQoSMode(ctx context.Context, mode escp.QoSMode) error

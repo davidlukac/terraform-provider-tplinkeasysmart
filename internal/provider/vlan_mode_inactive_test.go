@@ -3,7 +3,7 @@ package provider
 import (
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )

@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 func TestQoSResourceRejectsInvalidConfiguration(t *testing.T) {

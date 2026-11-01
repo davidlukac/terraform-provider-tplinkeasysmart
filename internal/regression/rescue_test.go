@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // leaveDirty does what a scenario that failed halfway leaves behind: the VLAN mode switched and a

@@ -12,8 +12,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/escptest"
+
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/provider"
 )
 
@@ -109,7 +110,7 @@ func TestScenarioMultiSwitchByMAC(t *testing.T) {
 	if target, err := LoadTarget(map[string]string{EnvTarget: os.Getenv(EnvTarget)}); err != nil || target.Real() {
 		t.Skip("the multi-switch scenario runs on the fakes only")
 	}
-	macA, macB := escp.MAC(escptest.DefaultMAC), escp.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x03}
+	macA, macB := escp.MAC(escptest.DefaultMAC()), escp.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x03}
 	a, b := startFake(t), startFake(t)
 	b.SetMAC(macB)
 	fakes := map[string]*escptest.Switch{macA.String(): a, macB.String(): b}
@@ -118,7 +119,7 @@ func TestScenarioMultiSwitchByMAC(t *testing.T) {
 		if !ok || cfg.Host != "" {
 			return nil, fmt.Errorf("%w: %s", escp.ErrNotFound, cfg.MAC)
 		}
-		cfg.Host, cfg.SwitchPort, cfg.BroadcastAddr, cfg.Timeout = loopback, f.Port(), escptest.Loopback, fakeTimeout
+		cfg.Host, cfg.SwitchPort, cfg.BroadcastAddr, cfg.Timeout = loopback, f.Port(), escptest.Loopback(), fakeTimeout
 		cfg.HostPort = escptest.FreeUDPPort(t)
 		return escp.Dial(cfg)
 	}
@@ -144,7 +145,7 @@ resource "tplinkeasysmart_led" "b" {
 	}
 	led := func(f *escptest.Switch, want bool) resource.TestCheckFunc {
 		return func(*terraform.State) error {
-			c, err := escp.Dial(escp.Config{Host: loopback, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback, Timeout: fakeTimeout, Username: escptest.Username, Password: escptest.Password})
+			c, err := escp.Dial(escp.Config{Host: loopback, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback(), Timeout: fakeTimeout, Username: escptest.Username, Password: escptest.Password})
 			if err != nil {
 				return err
 			}

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // errInjected is the error every injected fault returns.
@@ -151,8 +151,8 @@ func (w *faultyClient) LAGs(ctx context.Context) ([]escp.LAG, error) {
 	return w.SwitchClient.LAGs(ctx)
 }
 
-func (w *faultyClient) SetLAG(ctx context.Context, group escp.LAGID, ports escp.PortSet) error {
-	return w.write("SetLAG", func() error { return w.SwitchClient.SetLAG(ctx, group, ports) })
+func (w *faultyClient) SetLAG(ctx context.Context, lag escp.LAG) error {
+	return w.write("SetLAG", func() error { return w.SwitchClient.SetLAG(ctx, lag) })
 }
 
 func (w *faultyClient) IGMP(ctx context.Context) (escp.IGMP, error) {
@@ -202,8 +202,8 @@ func (w *faultyClient) PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, e
 	return w.SwitchClient.PortBasedVLAN(ctx)
 }
 
-func (w *faultyClient) SetPortBasedVLAN(ctx context.Context, id escp.PortVLANID, ports escp.PortSet) error {
-	return w.write("SetPortBasedVLAN", func() error { return w.SwitchClient.SetPortBasedVLAN(ctx, id, ports) })
+func (w *faultyClient) SetPortBasedVLAN(ctx context.Context, group escp.PortVLAN) error {
+	return w.write("SetPortBasedVLAN", func() error { return w.SwitchClient.SetPortBasedVLAN(ctx, group) })
 }
 
 func (w *faultyClient) Dot1Q(ctx context.Context) (escp.Dot1Q, error) {
@@ -261,12 +261,12 @@ func (w *faultyClient) SetVLANMode(ctx context.Context, s escp.VLANModeSetting) 
 	return w.write("SetVLANMode", func() error { return w.SwitchClient.SetVLANMode(ctx, s) })
 }
 
-func (w *faultyClient) SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error {
-	return w.write("SetVLAN8021Q", func() error { return w.SwitchClient.SetVLAN8021Q(ctx, v) })
+func (w *faultyClient) SetDot1QVLAN(ctx context.Context, v escp.Dot1QVLAN) error {
+	return w.write("SetDot1QVLAN", func() error { return w.SwitchClient.SetDot1QVLAN(ctx, v) })
 }
 
-func (w *faultyClient) DeleteVLAN8021Q(ctx context.Context, id escp.VLANID) error {
-	return w.write("DeleteVLAN8021Q", func() error { return w.SwitchClient.DeleteVLAN8021Q(ctx, id) })
+func (w *faultyClient) DeleteDot1QVLAN(ctx context.Context, id escp.VLANID) error {
+	return w.write("DeleteDot1QVLAN", func() error { return w.SwitchClient.DeleteDot1QVLAN(ctx, id) })
 }
 
 func (w *faultyClient) SetPVIDs(ctx context.Context, pvids map[escp.PortID]escp.VLANID) error {

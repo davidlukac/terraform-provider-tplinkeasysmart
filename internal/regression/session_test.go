@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/escptest"
 )
 
 func noEnv(string) string { return "" }
@@ -122,7 +122,7 @@ func TestOpenEnvFileSelectsTarget(t *testing.T) {
 
 func TestFailingReadsStopTheRun(t *testing.T) {
 	failReads := func(f *escptest.Switch) {
-		f.Configure(func(f *escptest.Switch) {
+		f.Configure(func(f *escptest.Faults) {
 			f.GetFn = func([]escptest.TLVType) ([]escptest.Setting, int32, bool) { return nil, 1, false }
 		})
 	}
@@ -191,8 +191,8 @@ func TestOpenStopsWhenATestPortHasALink(t *testing.T) {
 
 func TestAClientWithOnlyAMACFindsTheFakeWhenTheMACIsItsOwn(t *testing.T) {
 	s := Open(t, noEnv)
-	if s.MAC != escp.MAC(escptest.DefaultMAC) {
-		t.Fatalf("the session reports MAC %q, want the fake's %v", s.MAC, escptest.DefaultMAC)
+	if s.MAC != escp.MAC(escptest.DefaultMAC()) {
+		t.Fatalf("the session reports MAC %q, want the fake's %v", s.MAC, escptest.DefaultMAC())
 	}
 	c, err := s.dialClient(escp.Config{MAC: s.MAC, Username: s.Target.Username, Password: s.Target.Password})
 	if err != nil {

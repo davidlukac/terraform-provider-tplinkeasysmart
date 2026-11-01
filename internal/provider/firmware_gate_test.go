@@ -10,8 +10,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/safety"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
 )
 
 const (
@@ -64,11 +64,11 @@ func (g *gatedClient) SetPort(ctx context.Context, cfg escp.PortConfig) error {
 	return g.SwitchClient.SetPort(ctx, cfg)
 }
 
-func (g *gatedClient) SetLAG(ctx context.Context, group escp.LAGID, ports escp.PortSet) error {
+func (g *gatedClient) SetLAG(ctx context.Context, lag escp.LAG) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
-	return g.SwitchClient.SetLAG(ctx, group, ports)
+	return g.SwitchClient.SetLAG(ctx, lag)
 }
 
 func (g *gatedClient) SetIGMP(ctx context.Context, cfg escp.IGMPConfig) error {
@@ -92,11 +92,11 @@ func (g *gatedClient) SetPortMirror(ctx context.Context, m escp.Mirror) error {
 	return g.SwitchClient.SetPortMirror(ctx, m)
 }
 
-func (g *gatedClient) SetPortBasedVLAN(ctx context.Context, id escp.PortVLANID, ports escp.PortSet) error {
+func (g *gatedClient) SetPortBasedVLAN(ctx context.Context, group escp.PortVLAN) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
-	return g.SwitchClient.SetPortBasedVLAN(ctx, id, ports)
+	return g.SwitchClient.SetPortBasedVLAN(ctx, group)
 }
 
 func (g *gatedClient) SetVLANMode(ctx context.Context, s escp.VLANModeSetting) error {
@@ -106,18 +106,18 @@ func (g *gatedClient) SetVLANMode(ctx context.Context, s escp.VLANModeSetting) e
 	return g.SwitchClient.SetVLANMode(ctx, s)
 }
 
-func (g *gatedClient) SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error {
+func (g *gatedClient) SetDot1QVLAN(ctx context.Context, v escp.Dot1QVLAN) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
-	return g.SwitchClient.SetVLAN8021Q(ctx, v)
+	return g.SwitchClient.SetDot1QVLAN(ctx, v)
 }
 
-func (g *gatedClient) DeleteVLAN8021Q(ctx context.Context, id escp.VLANID) error {
+func (g *gatedClient) DeleteDot1QVLAN(ctx context.Context, id escp.VLANID) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
-	return g.SwitchClient.DeleteVLAN8021Q(ctx, id)
+	return g.SwitchClient.DeleteDot1QVLAN(ctx, id)
 }
 
 func (g *gatedClient) SetPVIDs(ctx context.Context, pvids map[escp.PortID]escp.VLANID) error {

@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // Reader reads one setting of the switch into a stable string (nothing volatile: no counters, no

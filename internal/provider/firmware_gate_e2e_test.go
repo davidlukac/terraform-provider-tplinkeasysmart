@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/escptest"
 )
 
 // The other firmware-gate tests put a double (gatedClient) in front of an in-memory
@@ -28,7 +28,7 @@ func realClientFactories(t *testing.T, sw *escptest.Switch) map[string]func() (t
 			newClient: func(cfg escp.Config) (SwitchClient, error) {
 				cfg.SwitchPort = sw.Port()
 				cfg.HostPort = escptest.FreeUDPPort(t) // the client shares its socket, so a free port is enough
-				cfg.BroadcastAddr = escptest.Loopback
+				cfg.BroadcastAddr = escptest.Loopback()
 				c, err := escp.Dial(cfg)
 				if err != nil {
 					return nil, err
@@ -70,8 +70,8 @@ func TestAccRealClientRefusesAWriteOnUnverifiedFirmwareAndSendsNothing(t *testin
 	if sets := sw.AllSets(); len(sets) != 0 {
 		t.Fatalf("the switch received %d write(s) despite the refusal: %v", len(sets), sets)
 	}
-	if led, _, sets := sw.State(); !led || sets != 0 {
-		t.Fatalf("the LED must be untouched: led=%v writes=%d", led, sets)
+	if led, writes := sw.LED(), sw.WriteCount(); !led || writes != 0 {
+		t.Fatalf("the LED must be untouched: led=%v writes=%d", led, writes)
 	}
 }
 
@@ -123,7 +123,7 @@ func assertLEDOffWasSentOnce(t *testing.T, sw *escptest.Switch) {
 	if sets := sw.AllSets(); len(sets) != 1 {
 		t.Fatalf("want exactly one write, the switch received %d: %v", len(sets), sets)
 	}
-	if led, _, _ := sw.State(); led {
+	if sw.LED() {
 		t.Fatal("the LED write did not arrive: the LED is still on")
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // The targets a run can be aimed at.

@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // vlanPorts is a switch where 1 and 2 are the LAG to the router, 4 and 8 carry
@@ -29,7 +29,7 @@ func newVLANFake(mode string) *fakeClient {
 func (f *fakeClient) vlanState() *fakeVLANs { f.mu.Lock(); defer f.mu.Unlock(); return f.vlans }
 
 // withVLAN adds a VLAN to the fake's 802.1Q table behind the provider's back (the web UI, another run).
-func (f *fakeClient) withVLAN(v escp.VLAN8021Q) {
+func (f *fakeClient) withVLAN(v escp.Dot1QVLAN) {
 	f.mutate(func(f *fakeClient) { f.vlans.vlans[v.ID] = v })
 }
 
@@ -232,7 +232,7 @@ func TestAccVLAN8021QGroupLifecycleOnFreePorts(t *testing.T) {
 func TestAccVLAN8021QGroupRefusesANewVLANWhenTheTableIsFull(t *testing.T) {
 	f := newVLANFake("802.1q")
 	f.vlanState().maxVLANs = 2 // VLAN 1 and the one added below
-	f.withVLAN(escp.VLAN8021Q{ID: 30, Name: "taken", Untagged: escp.MustPortSet(6)})
+	f.withVLAN(escp.Dot1QVLAN{ID: 30, Name: "taken", Untagged: escp.MustPortSet(6)})
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{{Config: groupConfig8021Q(20, "  untagged_ports = [7]\n"),
@@ -323,7 +323,7 @@ func TestAccVLAN8021QGroupNeverLeavesAPortInNoVLAN(t *testing.T) {
 	// ports 5, 6 and 7 are members of VLAN 20 only; the default VLAN has the others
 	f := newVLANFake("802.1q")
 	f.mutate(func(f *fakeClient) {
-		f.vlans.vlans[1] = escp.VLAN8021Q{ID: 1, Name: "Default", Untagged: escp.MustPortSet(1, 2, 3, 4, 8), Tagged: 0}
+		f.vlans.vlans[1] = escp.Dot1QVLAN{ID: 1, Name: "Default", Untagged: escp.MustPortSet(1, 2, 3, 4, 8), Tagged: 0}
 	})
 	cfg := groupConfig8021Q(20, "  untagged_ports = [5, 6]\n")
 	resource.UnitTest(t, resource.TestCase{
@@ -346,7 +346,7 @@ func TestAccVLAN8021QGroupNeverLeavesAPortInNoVLAN(t *testing.T) {
 func TestAccVLAN8021QGroupDestroyIsGuarded(t *testing.T) {
 	f := newVLANFake("802.1q")
 	f.mutate(func(f *fakeClient) {
-		f.vlans.vlans[1] = escp.VLAN8021Q{ID: 1, Name: "Default", Untagged: escp.MustPortSet(1, 2, 3, 4, 8), Tagged: 0}
+		f.vlans.vlans[1] = escp.Dot1QVLAN{ID: 1, Name: "Default", Untagged: escp.MustPortSet(1, 2, 3, 4, 8), Tagged: 0}
 	})
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
@@ -397,7 +397,7 @@ func TestAccVLAN8021QGroupDriftIsDetected(t *testing.T) {
 			{Config: cfg},
 			{
 				PreConfig: func() {
-					f.withVLAN(escp.VLAN8021Q{ID: 20, Name: "media", Untagged: escp.MustPortSet(5), Tagged: escp.MustPortSet(6)})
+					f.withVLAN(escp.Dot1QVLAN{ID: 20, Name: "media", Untagged: escp.MustPortSet(5), Tagged: escp.MustPortSet(6)})
 				},
 				Config:             cfg,
 				PlanOnly:           true,
@@ -424,8 +424,8 @@ func TestAccVLAN8021QGroupReportsFailures(t *testing.T) {
 	}{
 		{"table read fails", func(w *faultyClient) { w.failAlways("Dot1Q") }, `Reading the 802.1Q VLANs failed`},
 		{"ports read fails", func(w *faultyClient) { w.failAlways("Ports") }, `cannot check whether the ports are in use|Refusing to change the 802.1Q VLAN`},
-		{"write fails", func(w *faultyClient) { w.failAlways("SetVLAN8021Q") }, `Setting the 802.1Q VLAN failed`},
-		{"write is accepted but ignored", func(w *faultyClient) { w.ignoreOnly("SetVLAN8021Q") }, `did not change as requested`},
+		{"write fails", func(w *faultyClient) { w.failAlways("SetDot1QVLAN") }, `Setting the 802.1Q VLAN failed`},
+		{"write is accepted but ignored", func(w *faultyClient) { w.ignoreOnly("SetDot1QVLAN") }, `did not change as requested`},
 		{"read back fails", func(w *faultyClient) { w.failCalls("Dot1Q", 2, 0) }, `did not change as requested`},
 	}
 	for _, tc := range cases {
@@ -443,7 +443,7 @@ func TestAccVLAN8021QGroupReportsFailures(t *testing.T) {
 
 func TestAccVLAN8021QGroupDeleteFailures(t *testing.T) {
 	cfg := groupConfig8021Q(20, "  untagged_ports = [5]\n")
-	for name, want := range map[string]string{"DeleteVLAN8021Q": `Removing the 802.1Q VLAN failed`} {
+	for name, want := range map[string]string{"DeleteDot1QVLAN": `Removing the 802.1Q VLAN failed`} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			w := newFaulty(newVLANFake("802.1q"))
@@ -464,7 +464,7 @@ func TestAccVLAN8021QGroupDeleteFailures(t *testing.T) {
 			ProtoV6ProviderFactories: factories(w),
 			Steps: []resource.TestStep{
 				{Config: cfg},
-				{PreConfig: func() { w.ignoreOnly("DeleteVLAN8021Q") }, Config: providerBlock, ExpectError: regexp.MustCompile(`The 802.1Q VLAN was not removed`)},
+				{PreConfig: func() { w.ignoreOnly("DeleteDot1QVLAN") }, Config: providerBlock, ExpectError: regexp.MustCompile(`The 802.1Q VLAN was not removed`)},
 				{PreConfig: w.heal, Config: providerBlock},
 			},
 		})
@@ -522,7 +522,7 @@ func TestAccVLAN8021QGroupImportRejectsBadIDs(t *testing.T) {
 }
 
 func TestOrphanedPorts(t *testing.T) {
-	table := []escp.VLAN8021Q{
+	table := []escp.Dot1QVLAN{
 		{ID: 1, Untagged: escp.MustPortSet(1, 2, 3)},
 		{ID: 20, Untagged: escp.MustPortSet(5), Tagged: escp.MustPortSet(6)},
 		{ID: 30, Untagged: escp.MustPortSet(6, 7)},
@@ -551,11 +551,11 @@ func TestOrphanedPorts(t *testing.T) {
 
 // A VLAN is a value: port order cannot matter because a set has none, and every field counts.
 func TestVLANsCompareByIdNameAndPortSets(t *testing.T) {
-	a := escp.VLAN8021Q{ID: 2, Name: "x", Tagged: escp.MustPortSet(6, 5), Untagged: escp.MustPortSet(1)}
-	if a != (escp.VLAN8021Q{ID: 2, Name: "x", Tagged: escp.MustPortSet(5, 6), Untagged: escp.MustPortSet(1)}) {
+	a := escp.Dot1QVLAN{ID: 2, Name: "x", Tagged: escp.MustPortSet(6, 5), Untagged: escp.MustPortSet(1)}
+	if a != (escp.Dot1QVLAN{ID: 2, Name: "x", Tagged: escp.MustPortSet(5, 6), Untagged: escp.MustPortSet(1)}) {
 		t.Fatal("port order must not matter")
 	}
-	for name, b := range map[string]escp.VLAN8021Q{
+	for name, b := range map[string]escp.Dot1QVLAN{
 		"id":       {ID: 3, Name: "x", Tagged: escp.MustPortSet(5, 6), Untagged: escp.MustPortSet(1)},
 		"name":     {ID: 2, Name: "y", Tagged: escp.MustPortSet(5, 6), Untagged: escp.MustPortSet(1)},
 		"tagged":   {ID: 2, Name: "x", Tagged: escp.MustPortSet(5), Untagged: escp.MustPortSet(1)},
@@ -571,7 +571,7 @@ func TestVLANsCompareByIdNameAndPortSets(t *testing.T) {
 
 func newPVIDFake() *fakeClient {
 	f := newVLANFake("802.1q")
-	f.withVLAN(escp.VLAN8021Q{ID: 20, Name: "media", Untagged: escp.MustPortSet(5, 6), Tagged: 0})
+	f.withVLAN(escp.Dot1QVLAN{ID: 20, Name: "media", Untagged: escp.MustPortSet(5, 6), Tagged: 0})
 	return f
 }
 
@@ -801,7 +801,7 @@ func TestAccVLAN8021QPVIDImportRejectsBadIDs(t *testing.T) {
 }
 
 func TestPVIDOfAndFindVLAN(t *testing.T) {
-	q := escp.Dot1Q{VLANs: []escp.VLAN8021Q{{ID: 1}, {ID: 20}}, PVIDs: []escp.PortPVID{{Port: 5, PVID: 20}}}
+	q := escp.Dot1Q{VLANs: []escp.Dot1QVLAN{{ID: 1}, {ID: 20}}, PVIDs: []escp.PortPVID{{Port: 5, PVID: 20}}}
 	if got, ok := pvidOf(q, 5); !ok || got != 20 {
 		t.Fatalf("got %d %t", got, ok)
 	}

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/safety"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
 )
 
 // The wording helper must not turn a refusal it does not know into "the ports are free".

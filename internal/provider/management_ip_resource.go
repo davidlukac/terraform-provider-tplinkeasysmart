@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 const managementIPID = "management_ip"
@@ -139,7 +139,7 @@ func (r *managementIPResource) ValidateConfig(ctx context.Context, req resource.
 	if !ok {
 		return
 	}
-	if err := escp.ValidateIPConfig(cfg); err != nil {
+	if err := cfg.Validate(); err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("ip_address"), "The management address cannot be used", err.Error())
 	}
 }
