@@ -120,7 +120,7 @@ func (g *gatedClient) DeleteDot1QVLAN(ctx context.Context, id escp.VLANID) error
 	return g.SwitchClient.DeleteDot1QVLAN(ctx, id)
 }
 
-func (g *gatedClient) SetPVIDs(ctx context.Context, pvids map[escp.PortID]escp.VLANID) error {
+func (g *gatedClient) SetPVIDs(ctx context.Context, pvids []escp.PortPVID) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func (g *gatedClient) SetQoSMode(ctx context.Context, mode escp.QoSMode) error {
 	return g.SwitchClient.SetQoSMode(ctx, mode)
 }
 
-func (g *gatedClient) SetPortPriorities(ctx context.Context, changes map[escp.PortID]escp.Priority) error {
+func (g *gatedClient) SetPortPriorities(ctx context.Context, changes []escp.PortPriority) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}

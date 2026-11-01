@@ -101,9 +101,9 @@ func (r *portMirrorResource) applyBound(ctx context.Context, m *portMirrorResour
 		add("Invalid port set", fmt.Sprintf("%v %v", err1, err2))
 		return false
 	}
-	want := escp.Mirror{Enabled: m.Enabled.ValueBool(), MirrorPort: escp.PortID(m.MirrorPort.ValueInt64()), IngressPorts: in, EgressPorts: eg}
+	want := escp.Mirror{Enabled: m.Enabled.ValueBool(), Destination: escp.PortID(m.MirrorPort.ValueInt64()), IngressPorts: in, EgressPorts: eg}
 	if want.Enabled {
-		if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), want.MirrorPort); err != nil {
+		if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), want.Destination); err != nil {
 			add("Refusing to use this destination port", err.Error())
 			return false
 		}
@@ -154,7 +154,7 @@ func (r *portMirrorResource) readBound(ctx context.Context, req resource.ReadReq
 		return
 	}
 	state.ID = qualifiedID(r.sw, portMirrorID)
-	state.Enabled, state.MirrorPort = types.BoolValue(got.Enabled), types.Int64Value(int64(got.MirrorPort))
+	state.Enabled, state.MirrorPort = types.BoolValue(got.Enabled), types.Int64Value(int64(got.Destination))
 	state.IngressPorts, state.EgressPorts = portsToSet(got.IngressPorts), portsToSet(got.EgressPorts)
 	if state.AllowDisruptive.IsNull() {
 		state.AllowDisruptive = types.BoolValue(false)

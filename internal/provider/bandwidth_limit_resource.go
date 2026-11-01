@@ -84,7 +84,7 @@ func (r *bandwidthLimitResource) find(ctx context.Context, port escp.PortID) (in
 	}
 	for _, row := range rows {
 		if row.Port == port {
-			return row.IngressKbps, row.EgressKbps, true, nil
+			return row.Ingress, row.Egress, true, nil
 		}
 	}
 	return 0, 0, false, nil
@@ -103,7 +103,7 @@ func (r *bandwidthLimitResource) applyBound(ctx context.Context, m *bandwidthLim
 		add("Refusing to change port", err.Error())
 		return false
 	}
-	if err := r.client.SetBandwidth(ctx, escp.PortBandwidth{Port: port, IngressKbps: in, EgressKbps: eg}); err != nil {
+	if err := r.client.SetBandwidth(ctx, escp.PortBandwidth{Port: port, Ingress: in, Egress: eg}); err != nil {
 		add("Setting bandwidth limit failed", err.Error())
 		return false
 	}

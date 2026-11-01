@@ -17,7 +17,7 @@ func leaveDirty(t *testing.T, s *Session) {
 	if err := s.Client.SetVLANMode(ctx, escp.VLANModeSetting{Mode: escp.VLANModeDot1Q}); err != nil {
 		t.Fatal(err)
 	}
-	mirror := escp.Mirror{Enabled: true, MirrorPort: 3, IngressPorts: escp.MustPortSet(4)}
+	mirror := escp.Mirror{Enabled: true, Destination: 3, IngressPorts: escp.MustPortSet(4)}
 	if err := s.Client.SetPortMirror(ctx, mirror); err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestRescueWritesNothingWhenTheSwitchIsAsItWas(t *testing.T) {
 
 func TestRescueRestoresOnlyWhatDiffers(t *testing.T) {
 	s := Open(t, noEnv)
-	mirror := escp.Mirror{Enabled: true, MirrorPort: 3, IngressPorts: escp.MustPortSet(4)}
+	mirror := escp.Mirror{Enabled: true, Destination: 3, IngressPorts: escp.MustPortSet(4)}
 	if err := s.Client.SetPortMirror(context.Background(), mirror); err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func (c *stubRescue) SetPortMirror(_ context.Context, m escp.Mirror) error {
 
 func TestRescueReportsWhatItCannotDo(t *testing.T) {
 	boom := errors.New("boom")
-	dirtyMirror := escp.Mirror{Enabled: true, MirrorPort: 3, IngressPorts: escp.MustPortSet(4)}
+	dirtyMirror := escp.Mirror{Enabled: true, Destination: 3, IngressPorts: escp.MustPortSet(4)}
 	for _, c := range []struct {
 		name string
 		stub stubRescue

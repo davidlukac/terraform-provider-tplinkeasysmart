@@ -67,7 +67,7 @@ func (v *fakeVLANs) tableSize() int {
 
 // dot1q is the 802.1Q state as the switch reports it, VLANs and PVIDs sorted.
 func (v *fakeVLANs) dot1q() escp.Dot1Q {
-	out := escp.Dot1Q{Enabled: v.enabled, MaxVLAN: v.tableSize(), VLANs: []escp.Dot1QVLAN{}, PVIDs: []escp.PortPVID{}}
+	out := escp.Dot1Q{Enabled: v.enabled, MaxVLANs: v.tableSize(), VLANs: []escp.Dot1QVLAN{}, PVIDs: []escp.PortPVID{}}
 	ids := make([]escp.VLANID, 0, len(v.vlans))
 	for id := range v.vlans {
 		ids = append(ids, id)
@@ -138,10 +138,10 @@ func (f *fakeClient) DeleteDot1QVLAN(_ context.Context, id escp.VLANID) error {
 	})
 }
 
-func (f *fakeClient) SetPVIDs(_ context.Context, pvids map[escp.PortID]escp.VLANID) error {
+func (f *fakeClient) SetPVIDs(_ context.Context, pvids []escp.PortPVID) error {
 	return f.vlanWrite(func(v *fakeVLANs) error {
-		for port, pvid := range pvids {
-			v.pvids[port] = pvid
+		for _, p := range pvids {
+			v.pvids[p.Port] = p.PVID
 		}
 		return nil
 	})

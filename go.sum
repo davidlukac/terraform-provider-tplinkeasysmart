@@ -39,6 +39,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davidlukac/escp-go v0.2.0 h1:F5Aa9SuBVqxdEYz37YD4GP1Ke7YVKXKTIEoAsSs0CCg=
 github.com/davidlukac/escp-go v0.2.0/go.mod h1:dXvNCPRrkF7LKbGMFDpnvJQewZscGA7BSlNIvrVpTGU=
+github.com/davidlukac/escp-go v0.3.0 h1:tVu2afTwkLaxSK+7sxG4V49YRUHAMKqZj14skKIg/dE=
+github.com/davidlukac/escp-go v0.3.0/go.mod h1:dXvNCPRrkF7LKbGMFDpnvJQewZscGA7BSlNIvrVpTGU=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=
 github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=

@@ -133,7 +133,7 @@ func TestScenarioDisruptiveMirrorDestination(t *testing.T) {
 	s.scenario(t, cfg(fmt.Sprintf("  enabled       = true\n  mirror_port   = %d\n  ingress_ports = %s\n", dest, intSet(src))), cfg("  enabled = false\n"),
 		func(*terraform.State) error {
 			got, err := s.Client.PortMirror(context.Background())
-			if err != nil || !got.Enabled || got.MirrorPort != dest || got.IngressPorts != escp.MustPortSet(src) {
+			if err != nil || !got.Enabled || got.Destination != dest || got.IngressPorts != escp.MustPortSet(src) {
 				return fmt.Errorf("mirror on the switch = %+v, err %w, want %d mirrored to %d", got, err, src, dest)
 			}
 			return nil

@@ -109,12 +109,12 @@ func (r *stormLimitResource) applyBound(ctx context.Context, m *stormLimitModel,
 		add("Refusing to change port", err.Error())
 		return false
 	}
-	if err := r.client.SetStormControl(ctx, escp.StormConfig{Port: port, UnknownUnicast: uu, Multicast: mc, Broadcast: bc, RateKbps: rate}); err != nil {
+	if err := r.client.SetStormControl(ctx, escp.StormConfig{Port: port, UnknownUnicast: uu, Multicast: mc, Broadcast: bc, Rate: rate}); err != nil {
 		add("Setting storm control failed", err.Error())
 		return false
 	}
 	got, ok, err := r.find(ctx, port)
-	if err != nil || !ok || got.UnknownUnicast != uu || got.Multicast != mc || got.Broadcast != bc || got.RateKbps != rate {
+	if err != nil || !ok || got.UnknownUnicast != uu || got.Multicast != mc || got.Broadcast != bc || got.Rate != rate {
 		add("Storm control did not change as requested", fmt.Sprintf("requested uu=%t mc=%t bc=%t rate=%d, switch reports %+v (found=%t err=%v)", uu, mc, bc, rate, got, ok, err))
 		return false
 	}
@@ -154,7 +154,7 @@ func (r *stormLimitResource) readBound(ctx context.Context, req resource.ReadReq
 		return
 	}
 	state.UnknownUnicast, state.Multicast, state.Broadcast = types.BoolValue(got.UnknownUnicast), types.BoolValue(got.Multicast), types.BoolValue(got.Broadcast)
-	state.RateKbps = types.Int64Value(int64(got.RateKbps))
+	state.RateKbps = types.Int64Value(int64(got.Rate))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 

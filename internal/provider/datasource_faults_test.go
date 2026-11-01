@@ -16,7 +16,7 @@ func TestDataSourcesReportASwitchThatCannotBeRead(t *testing.T) {
 		{"tplinkeasysmart_system_info", "Info", "Reading switch info failed"},
 		{"tplinkeasysmart_system_info", "System", "Reading switch system settings failed"},
 		{"tplinkeasysmart_ports", "Ports", "Reading ports failed"},
-		{"tplinkeasysmart_port_statistics", "PortStatistics", "Reading port statistics failed"},
+		{"tplinkeasysmart_port_statistics", "PortStats", "Reading port statistics failed"},
 		{"tplinkeasysmart_lags", "LAGs", "Reading LAGs failed"},
 		{"tplinkeasysmart_port_mirror", "PortMirror", "Reading port mirror failed"},
 		{"tplinkeasysmart_vlan_mtu", "MTUVLAN", "Reading MTU VLAN failed"},

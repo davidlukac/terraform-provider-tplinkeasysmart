@@ -358,10 +358,10 @@ func TestAllowDisruptiveReallyAllowsTheWrite(t *testing.T) {
 			func(f *fakeClient) bool { return f.bw[4][0] == 64 }},
 		{"storm on a linked port", stormConfig(4, "  broadcast = true\n  rate_kbps = 64\n  allow_disruptive = true\n"),
 			func() *fakeClient { return &fakeClient{ports: testPorts(), storm: map[escp.PortID]escp.PortStorm{}} },
-			func(f *fakeClient) bool { return f.storm[4].RateKbps == 64 }},
+			func(f *fakeClient) bool { return f.storm[4].Rate == 64 }},
 		{"mirror to a linked port", mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [7]\n  allow_disruptive = true\n"),
 			func() *fakeClient { return &fakeClient{ports: testPorts(), mirror: &escp.Mirror{}} },
-			func(f *fakeClient) bool { return f.mirror.Enabled && f.mirror.MirrorPort == 4 }},
+			func(f *fakeClient) bool { return f.mirror.Enabled && f.mirror.Destination == 4 }},
 		{"LAG over a linked port", lagConfig(1, "  ports = [3, 4]\n  allow_disruptive = true\n"),
 			func() *fakeClient {
 				return &fakeClient{ports: lagPorts(), lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}}

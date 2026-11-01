@@ -84,6 +84,6 @@ func (d *portMirrorDataSource) readBound(ctx context.Context, _ datasource.ReadR
 		return
 	}
 	state := portMirrorModel{ID: qualifiedID(d.sw, "port_mirror"), Enabled: types.BoolValue(m.Enabled),
-		MirrorPort: types.Int64Value(int64(m.MirrorPort)), IngressPorts: portInt64s(m.IngressPorts), EgressPorts: portInt64s(m.EgressPorts)}
+		MirrorPort: types.Int64Value(int64(m.Destination)), IngressPorts: portInt64s(m.IngressPorts), EgressPorts: portInt64s(m.EgressPorts)}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

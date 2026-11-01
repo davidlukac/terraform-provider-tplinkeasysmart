@@ -26,7 +26,7 @@ type portStatisticsDataSource struct {
 
 // portStatisticsReader is the part of the switch API this data source reads.
 type portStatisticsReader interface {
-	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
+	PortStats(ctx context.Context) ([]escp.PortStats, error)
 }
 
 // bound returns a copy of the data source wired to the client of the named switch.
@@ -90,7 +90,7 @@ func (d *portStatisticsDataSource) Read(ctx context.Context, req datasource.Read
 }
 
 func (d *portStatisticsDataSource) readBound(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	rows, err := d.client.PortStatistics(ctx)
+	rows, err := d.client.PortStats(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading port statistics failed", err.Error())
 		return

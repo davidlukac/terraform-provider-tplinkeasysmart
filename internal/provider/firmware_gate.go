@@ -21,7 +21,7 @@ func firmwareWriteGate(allowUnverified bool) escp.WriteGate {
 		return nil
 	}
 	gate := safety.FirmwareGate()
-	return func(ctx context.Context, sw escp.InfoReader, op escp.Operation) error {
+	return func(ctx context.Context, sw escp.Reader, op escp.Operation) error {
 		if err := gate(ctx, sw, op); err != nil {
 			return writeRefusal(err)
 		}
