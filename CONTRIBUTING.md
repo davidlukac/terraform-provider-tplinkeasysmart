@@ -10,6 +10,7 @@ Tags: **[C]** client change (`internal/escp`), **[R]** new or changed resource, 
 - [ ] Work on a branch (`feat/`, `fix/`, `docs/`, `test/`, `chore/`). Nothing goes to `main` directly.
 - [ ] Decide the kind of change, because it drives the version: a new setting or resource is `feat` (minor); a bug fix is `fix` (patch); a change that only touches tests, docs, CI or internals is `test:`/`docs:`/`ci:`/`refactor:`/`chore:` and does not release by itself.
 - [ ] **[R]** Can the change cut management access or break traffic? Then it needs a guard and an `allow_disruptive` argument, and it is designed with the safety notes in the README (*Safety by design*) in mind. Settings that can lock you out of the switch (credentials, reboot, factory reset, config restore, firmware) are deliberately not writable.
+- [ ] **A change that needs a library change** (a new setting, a changed write) is two cycles: first a pull request and a release in the [escp-go](https://github.com/davidlukac/escp-go) repository, then this one, which requires that release in `go.mod` (`go get github.com/davidlukac/escp-go@vX.Y.Z`; never a pseudo-version on `main`). To develop both at once, `make work` links this checkout to `../escp-go` (a local `go.work`, not committed; `make unwork` removes it) and so does the `go build` that produces the binary `scripts/tf.sh` runs. The pre-commit hook ignores the workspace, so a commit is checked against the released version, as CI will.
 
 ## 1. Code
 

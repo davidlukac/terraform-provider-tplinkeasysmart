@@ -3,7 +3,8 @@
 # Development tools (the linter, the vulnerability scanner) are pinned in devtools/go.mod, a module of
 # their own so that their dependencies stay out of this module's go.mod; Dependabot bumps them there.
 # `go tool` builds the pinned version on first use (cached afterwards): nothing to install by hand.
-DEVTOOL := go tool -modfile=devtools/go.mod
+# GOWORK=off: the tools refuse to run in workspace mode (see `make work`).
+DEVTOOL := GOWORK=off go tool -modfile=devtools/go.mod
 
 # Regenerate docs/ from the schema and examples/ (needs the terraform binary on PATH).
 generate:
@@ -38,8 +39,26 @@ hooks:
 	git config core.hooksPath .githooks
 	@echo "git hooks enabled: .githooks/pre-commit"
 
+# Develop against a checkout of the ESCP library (github.com/davidlukac/escp-go, ../escp-go; override
+# with ESCP_DIR) instead of the version go.mod requires: `make work` writes a go.work that uses both
+# modules, `make unwork` removes it. The file is not committed and CI never sees it. A change that
+# needs a library change is committed against a *released* library version: the pre-commit hook
+# builds and tests without the workspace, as CI does.
+ESCP_DIR ?= ../escp-go
+
+work:
+	@test -d "$(ESCP_DIR)" || { echo "$(ESCP_DIR) is not the escp-go checkout (set ESCP_DIR)"; exit 1; }
+	@rm -f go.work go.work.sum
+	go work init . $(ESCP_DIR)
+	@echo "workspace on: go build, go test and scripts/tf.sh now use $(ESCP_DIR); make unwork to stop"
+
+unwork:
+	rm -f go.work go.work.sum
+
 # What the pre-commit hook runs: format, vet, lint, then the whole suite with the
-# race detector and the coverage policy. Same checks CI enforces.
+# race detector and the coverage policy. Same checks CI enforces. Without a local workspace
+# (GOWORK=off), because CI has none: it builds against the library version go.mod requires.
+pre-commit: export GOWORK = off
 pre-commit:
 	@test -z "$$(gofmt -l .)" || { echo "gofmt needed on:"; gofmt -l .; exit 1; }
 	go vet ./...
@@ -67,7 +86,7 @@ regression-live:
 compat-table:
 	go test ./internal/escp/safety -run TestReadmeCompatibilityTable -update-readme
 
-.PHONY: compat-table regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
+.PHONY: work unwork compat-table regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
 
 # --- coverage -------------------------------------------------------------
 # `make cover` runs the whole suite with the race detector, writes cover.out

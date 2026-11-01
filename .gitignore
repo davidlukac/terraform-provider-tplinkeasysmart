@@ -9,3 +9,7 @@ dist/
 cover.out
 cover.html
 .test.env
+
+# a local workspace that links the provider to a checkout of the library (make work); never committed
+go.work
+go.work.sum
