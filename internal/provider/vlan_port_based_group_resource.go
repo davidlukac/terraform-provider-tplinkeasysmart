@@ -10,8 +10,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/safety"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -39,7 +39,7 @@ type portVLANResource struct {
 type portVLANClient interface {
 	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
 	Ports(ctx context.Context) ([]escp.Port, error)
-	SetPortBasedVLAN(ctx context.Context, id escp.PortVLANID, ports escp.PortSet) error
+	SetPortBasedVLAN(ctx context.Context, group escp.PortVLAN) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -153,7 +153,7 @@ func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceMo
 		add("Refusing to change VLAN group", err.Error())
 		return false
 	}
-	if err := r.client.SetPortBasedVLAN(ctx, group, ports); err != nil {
+	if err := r.client.SetPortBasedVLAN(ctx, escp.PortVLAN{ID: group, Ports: ports}); err != nil {
 		// The client refuses, before sending anything, an id the switch does not have (its group
 		// limit or its port count, whichever is larger: no model of the family is held below its own).
 		if errors.Is(err, escp.ErrInvalid) {
@@ -232,7 +232,7 @@ func (r *portVLANResource) deleteBound(ctx context.Context, req resource.DeleteR
 		resp.Diagnostics.AddError("Refusing to remove VLAN group", err.Error())
 		return
 	}
-	if err := r.client.SetPortBasedVLAN(ctx, group, 0); err != nil {
+	if err := r.client.SetPortBasedVLAN(ctx, escp.PortVLAN{ID: group, Ports: 0}); err != nil {
 		resp.Diagnostics.AddError("Removing VLAN group failed", err.Error())
 	}
 }

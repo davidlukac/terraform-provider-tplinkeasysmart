@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // fakeClient is an in-memory switch used instead of the UDP transport.
@@ -87,10 +87,10 @@ func (f *fakeClient) PortStatistics(context.Context) ([]escp.PortStats, error) {
 	return []escp.PortStats{{ID: 1, Enabled: true, Link: "1000Mbps-full", TxGood: 4000000000, RxGood: 7, RxBad: 1}}, nil
 }
 
-func (f *fakeClient) SetLAG(_ context.Context, group escp.LAGID, ports escp.PortSet) error {
+func (f *fakeClient) SetLAG(_ context.Context, lag escp.LAG) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.lags[group] = ports
+	f.lags[lag.ID] = lag.Ports
 	f.sets++
 	return nil
 }
@@ -164,7 +164,8 @@ func (f *fakeClient) MTUVLAN(context.Context) (escp.MTUVLAN, error) {
 	return escp.MTUVLAN{Enabled: true, UplinkPort: 8}, nil
 }
 
-func (f *fakeClient) SetPortBasedVLAN(_ context.Context, id escp.PortVLANID, ports escp.PortSet) error {
+func (f *fakeClient) SetPortBasedVLAN(_ context.Context, group escp.PortVLAN) error {
+	id, ports := group.ID, group.Ports
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	// membership is exclusive: take the ports out of every other group, return them to VLAN 1 on delete
@@ -205,7 +206,7 @@ func (f *fakeClient) Dot1Q(context.Context) (escp.Dot1Q, error) {
 		return f.vlans.dot1q(), nil
 	}
 	return escp.Dot1Q{Enabled: true, MaxVLAN: 32,
-		VLANs: []escp.VLAN8021Q{{ID: 10, Name: "iot", Tagged: escp.MustPortSet(8), Untagged: escp.MustPortSet(1, 2)}},
+		VLANs: []escp.Dot1QVLAN{{ID: 10, Name: "iot", Tagged: escp.MustPortSet(8), Untagged: escp.MustPortSet(1, 2)}},
 		PVIDs: []escp.PortPVID{{Port: 1, PVID: 10}, {Port: 8, PVID: 1}}}, nil
 }
 

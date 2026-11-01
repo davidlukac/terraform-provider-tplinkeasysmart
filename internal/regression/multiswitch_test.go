@@ -11,8 +11,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/escptest"
+
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/provider"
 )
 
@@ -41,7 +42,7 @@ func TestScenarioMultiSwitch(t *testing.T) {
 		if !ok {
 			return nil, fmt.Errorf("no fake for host %q", cfg.Host)
 		}
-		cfg.Host, cfg.SwitchPort, cfg.BroadcastAddr, cfg.Timeout = "127.0.0.1", f.Port(), escptest.Loopback, fakeTimeout
+		cfg.Host, cfg.SwitchPort, cfg.BroadcastAddr, cfg.Timeout = "127.0.0.1", f.Port(), escptest.Loopback(), fakeTimeout
 		cfg.HostPort = escptest.FreeUDPPort(t)
 		return escp.Dial(cfg)
 	}

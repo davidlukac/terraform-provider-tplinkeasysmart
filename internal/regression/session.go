@@ -11,8 +11,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/escptest"
+
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/provider"
 )
 
@@ -130,7 +131,7 @@ func startFake(t testing.TB) *escptest.Switch {
 // fakeConfig aims a client configuration at the fake: its port, a free local port, loopback broadcast.
 func (s *Session) fakeConfig(cfg escp.Config) escp.Config {
 	cfg.SwitchPort = s.Fake.Port()
-	cfg.BroadcastAddr = escptest.Loopback
+	cfg.BroadcastAddr = escptest.Loopback()
 	cfg.Timeout = fakeTimeout
 	return cfg
 }
@@ -143,7 +144,7 @@ func (s *Session) dialClient(cfg escp.Config) (*escp.Client, error) {
 			// A client without an address finds its switch by a discovery on the host's interfaces,
 			// which cannot see a fake on loopback. This stands in for it: the fake is found when the
 			// MAC is its own, and nothing is found otherwise.
-			if cfg.MAC != escp.MAC(escptest.DefaultMAC) {
+			if cfg.MAC != escp.MAC(escptest.DefaultMAC()) {
 				return nil, fmt.Errorf("%w: %s", escp.ErrNotFound, cfg.MAC)
 			}
 			cfg.Host = loopback

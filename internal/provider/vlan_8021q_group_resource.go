@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 var (
@@ -35,8 +35,8 @@ type vlan8021QGroupResource struct {
 // vlan8021QGroupClient is the part of the switch API this resource needs.
 type vlan8021QGroupClient interface {
 	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
-	SetVLAN8021Q(ctx context.Context, v escp.VLAN8021Q) error
-	DeleteVLAN8021Q(ctx context.Context, id escp.VLANID) error
+	SetDot1QVLAN(ctx context.Context, v escp.Dot1QVLAN) error
+	DeleteDot1QVLAN(ctx context.Context, id escp.VLANID) error
 	Ports(ctx context.Context) ([]escp.Port, error)
 }
 
@@ -100,27 +100,27 @@ func (r *vlan8021QGroupResource) state(ctx context.Context) (escp.Dot1Q, error) 
 }
 
 // table is the 802.1Q table of state.
-func (r *vlan8021QGroupResource) table(ctx context.Context) ([]escp.VLAN8021Q, error) {
+func (r *vlan8021QGroupResource) table(ctx context.Context) ([]escp.Dot1QVLAN, error) {
 	q, err := r.state(ctx)
 	return q.VLANs, err
 }
 
 // findVLAN returns the VLAN with the id, if the table has it.
-func findVLAN(table []escp.VLAN8021Q, id escp.VLANID) (escp.VLAN8021Q, bool) {
+func findVLAN(table []escp.Dot1QVLAN, id escp.VLANID) (escp.Dot1QVLAN, bool) {
 	for _, v := range table {
 		if v.ID == id {
 			return v, true
 		}
 	}
-	return escp.VLAN8021Q{}, false
+	return escp.Dot1QVLAN{}, false
 }
 
 // members is every member port of v, tagged and untagged.
-func members(v escp.VLAN8021Q) escp.PortSet { return v.Tagged.Union(v.Untagged) }
+func members(v escp.Dot1QVLAN) escp.PortSet { return v.Tagged.Union(v.Untagged) }
 
 // orphanedPorts returns the ports of affected that would belong to no VLAN
 // once VLAN id has the given member ports (none: it is deleted); the other VLANs of the table stay as they are.
-func orphanedPorts(table []escp.VLAN8021Q, id escp.VLANID, newMembers, affected escp.PortSet) escp.PortSet {
+func orphanedPorts(table []escp.Dot1QVLAN, id escp.VLANID, newMembers, affected escp.PortSet) escp.PortSet {
 	covered := newMembers
 	for _, v := range table {
 		if v.ID != id {
@@ -132,7 +132,7 @@ func orphanedPorts(table []escp.VLAN8021Q, id escp.VLANID, newMembers, affected 
 
 // guard refuses a change of VLAN id from the old to the new members when a port
 // involved carries traffic, or would be left in no VLAN.
-func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []escp.VLAN8021Q, id escp.VLANID, old, new escp.PortSet) error {
+func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []escp.Dot1QVLAN, id escp.VLANID, old, new escp.PortSet) error {
 	affected := old.Union(new)
 	if err := guardPorts(ctx, r.client, allow, affected.Ports()...); err != nil {
 		return err
@@ -146,16 +146,16 @@ func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []
 	return nil
 }
 
-func (m *vlan8021QGroupModel) vlan(ctx context.Context) (escp.VLAN8021Q, error) {
+func (m *vlan8021QGroupModel) vlan(ctx context.Context) (escp.Dot1QVLAN, error) {
 	tagged, err := setToPorts(ctx, m.TaggedPorts)
 	if err != nil {
-		return escp.VLAN8021Q{}, err
+		return escp.Dot1QVLAN{}, err
 	}
 	untagged, err := setToPorts(ctx, m.UntaggedPorts)
 	if err != nil {
-		return escp.VLAN8021Q{}, err
+		return escp.Dot1QVLAN{}, err
 	}
-	return escp.VLAN8021Q{ID: escp.VLANID(m.VLAN.ValueInt64()), Name: escp.VLANName(m.Name.ValueString()), Tagged: tagged, Untagged: untagged}, nil
+	return escp.Dot1QVLAN{ID: escp.VLANID(m.VLAN.ValueInt64()), Name: escp.VLANName(m.Name.ValueString()), Tagged: tagged, Untagged: untagged}, nil
 }
 
 // apply binds the resource to the switch the plan selects, then applies it.
@@ -185,7 +185,7 @@ func (r *vlan8021QGroupResource) applyBound(ctx context.Context, m *vlan8021QGro
 		add("Refusing to change the 802.1Q VLAN", err.Error())
 		return false
 	}
-	if err := r.client.SetVLAN8021Q(ctx, want); err != nil {
+	if err := r.client.SetDot1QVLAN(ctx, want); err != nil {
 		add("Setting the 802.1Q VLAN failed", err.Error())
 		return false
 	}
@@ -260,7 +260,7 @@ func (r *vlan8021QGroupResource) deleteBound(ctx context.Context, req resource.D
 		resp.Diagnostics.AddError("Refusing to remove the 802.1Q VLAN", err.Error())
 		return
 	}
-	if err := r.client.DeleteVLAN8021Q(ctx, id); err != nil {
+	if err := r.client.DeleteDot1QVLAN(ctx, id); err != nil {
 		resp.Diagnostics.AddError("Removing the 802.1Q VLAN failed", err.Error())
 		return
 	}

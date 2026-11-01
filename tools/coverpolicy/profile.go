@@ -9,9 +9,11 @@ import (
 	"strings"
 )
 
-// notMeasured are the path prefixes (relative to the module root) of test-support packages. Their
-// statements are dropped from the profile, so neither the policy nor the badge counts them.
-var notMeasured = []string{"internal/escp/escptest/"}
+// notMeasured are the path prefixes (relative to the module root) that the policy does not measure.
+// Their statements are dropped from the profile, so neither the policy nor the badge counts them.
+// internal/escp is the frozen, unreferenced copy of the ESCP library that the provider used before it
+// switched to github.com/davidlukac/escp-go (its tests still run until the directory is deleted).
+var notMeasured = []string{"internal/escp/"}
 
 // blockLine is one line of a cover profile: file:startLine.col,endLine.col statements count.
 var blockLine = regexp.MustCompile(`^(.+):(\d{1,9})\.(\d{1,9}),(\d{1,9})\.(\d{1,9}) (\d{1,9}) (\d{1,9})$`)

@@ -1,21 +1,11 @@
 package safety
 
 import (
-	"flag"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-)
-
-var updateReadme = flag.Bool("update-readme", false, "rewrite the compatibility table in README.md from compatibility.json")
-
-const (
-	readmeBegin = "<!-- compatibility-table:begin (generated from internal/escp/safety/compatibility.json: make compat-table) -->"
-	readmeEnd   = "<!-- compatibility-table:end -->"
 )
 
 func TestCompatibilityFeedsTheAllowList(t *testing.T) {
@@ -90,30 +80,5 @@ func TestRenderCompatibility(t *testing.T) {
 		"| D | v4 | f4 | Not supported: no key exchange |\n"
 	if got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
-	}
-}
-
-// The README shows the table generated from compatibility.json, so the documentation cannot
-// differ from what the firmware gate enforces. `make compat-table` rewrites it.
-func TestReadmeCompatibilityTable(t *testing.T) {
-	path := filepath.Join("..", "..", "..", "README.md")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := string(data)
-	begin, end := strings.Index(text, readmeBegin), strings.Index(text, readmeEnd)
-	if begin < 0 || end < begin {
-		t.Fatalf("README.md needs the markers\n%s\n...\n%s", readmeBegin, readmeEnd)
-	}
-	want := text[:begin+len(readmeBegin)] + "\n\n" + CompatibilityTable() + "\n" + text[end:]
-	if *updateReadme {
-		if err := os.WriteFile(path, []byte(want), 0o644); err != nil { //nolint:gosec // a documentation file
-			t.Fatal(err)
-		}
-		return
-	}
-	if text != want {
-		t.Fatal("the compatibility table in README.md is out of date: run `make compat-table`")
 	}
 }

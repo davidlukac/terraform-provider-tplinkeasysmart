@@ -10,7 +10,7 @@ The latest released version. The provider is pre-1.0; fixes land on `main` and s
 
 ## Threat model, in one paragraph
 
-The provider speaks the switch's own management protocol (ESCP), which has **no real security on the wire**: the static RC4 key is public, the session-key exchange uses a 64-bit RSA modulus that is trivially breakable, there is no integrity protection, and a SET carries the admin password. This is a property of the device firmware, not something a client can fix. Anyone who can observe or inject UDP on the switch's layer-2 segment can recover credentials and forge replies. See [`internal/escp/PROTOCOL.md`](internal/escp/PROTOCOL.md).
+The provider speaks the switch's own management protocol (ESCP), which has **no real security on the wire**: the static RC4 key is public, the session-key exchange uses a 64-bit RSA modulus that is trivially breakable, there is no integrity protection, and a SET carries the admin password. This is a property of the device firmware, not something a client can fix. Anyone who can observe or inject UDP on the switch's layer-2 segment can recover credentials and forge replies. See [`PROTOCOL.md`](https://github.com/davidlukac/escp-go/blob/main/PROTOCOL.md) of the ESCP library.
 
 ## What that means for you
 

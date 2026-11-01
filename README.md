@@ -25,7 +25,7 @@
   <a href="#safety-by-design">Safety</a> ·
   <a href="#compatibility">Compatibility</a> ·
   <a href="https://registry.terraform.io/providers/davidlukac/tplinkeasysmart/latest/docs">Registry docs</a> ·
-  <a href="internal/escp/PROTOCOL.md">Protocol</a>
+  <a href="https://github.com/davidlukac/escp-go/blob/main/PROTOCOL.md">Protocol</a>
 </p>
 
 ---
@@ -192,18 +192,20 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 
 ## Compatibility
 
-<!-- compatibility-table:begin (generated from internal/escp/safety/compatibility.json: make compat-table) -->
+<!-- compatibility-table:begin (generated from the safety package of github.com/davidlukac/escp-go: make compat-table) -->
 
 | Switch | Hardware | Firmware | Status |
 |---|---|---|---|
-| TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads, writes, import and drift checked on a real device. The VLAN mode, 802.1Q group and PVID resources were not tried on this build (they are verified on 20250710; same protocol generation). |
-| TL-SG108E | v6 | 1.0.0 Build 20250710 | **Verified**: reads, imports and drift; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID resources), the management address and the DHCP lease (the switch found again by its MAC address). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8; see the `lag` page). |
-| TL-SG108E | v6 | builds newer than 20250710 | Untried; reads work, writes are refused unless `allow_unverified_firmware = true`; start with the read-only data sources |
+| TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads and writes checked on a real device, and the settings read back. The VLAN mode, 802.1Q VLAN and PVID writes were not tried on this build (they are verified on 20250710; same protocol generation). |
+| TL-SG108E | v6 | 1.0.0 Build 20250710 | **Verified**: reads; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID), the management address and the DHCP lease (the switch found again by its MAC address). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8). |
+| TL-SG108E | v6 | builds newer than 20250710 | Untried; reads work; `safety.FirmwareGate` refuses writes unless the caller opts in. Start with the reads |
 | TL-SG108E | other hardware versions | any | Untested |
 | Other Easy Smart models (TL-SG105E, TL-SG1016DE, ...) | any | any | Untested; reports wanted |
 | Any | any | firmware **before the 2023 RSA key exchange** | Not supported: the client always performs the key exchange and has never been tried against the older login |
 
 <!-- compatibility-table:end -->
+
+The table is the one of the [ESCP library](https://github.com/davidlukac/escp-go) the provider is built with. On a firmware build that is not listed as verified the provider refuses writes unless `allow_unverified_firmware = true` (or the environment variable `TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE` is set); reads always work. The provider's own resources, imports and drift detection were verified on both builds marked Verified (the VLAN mode, 802.1Q group and PVID resources on 20250710 only).
 
 Other Easy Smart models are expected to speak the same protocol family; that is a hope, not a claim. Reports (even "the read-only data sources work" or "login is rejected") fill in this table, see [Contributing](#contributing).
 
@@ -213,13 +215,13 @@ Other Easy Smart models are expected to speak the same protocol family; that is 
 | OpenTofu | The latest release (informational job) |
 | Go | The version in [`go.mod`](go.mod) and the latest stable, for building from source |
 
-Behaviour of other models and firmware is documented in the [protocol notes](internal/escp/PROTOCOL.md) as it is verified.
+Behaviour of other models and firmware is documented in the [protocol notes](https://github.com/davidlukac/escp-go/blob/main/PROTOCOL.md) as it is verified.
 
 ## Constraints (read these)
 
 - **Same layer-2 network only.** ESCP is UDP broadcast based; run Terraform on a host in the switch's subnet.
 - **One client per switch at a time.** Don't run two clients against the same switch concurrently; an old client that binds the reply port exclusively (for example an old Easy Smart utility) blocks the provider until it is closed. Several *different* switches work at once.
-- **No real security on the wire.** The protocol's encryption keys are public or trivially breakable (see the [protocol notes](internal/escp/PROTOCOL.md)). Keep the switches on a trusted management network.
+- **No real security on the wire.** The protocol's encryption keys are public or trivially breakable (see the [protocol notes](https://github.com/davidlukac/escp-go/blob/main/PROTOCOL.md)). Keep the switches on a trusted management network.
 
 ## Troubleshooting
 
@@ -230,10 +232,9 @@ Set `TF_LOG=DEBUG` (or `INFO`) to see what the client does: every request and re
 The provider talks UDP port 29808/29809 on the switch's own layer-2 segment: discovery, an RSA session-key exchange, RC4-encrypted TLV requests, then reads and writes with read-back. The wire format, every TLV layout and what was verified live are in [`internal/escp/PROTOCOL.md`](internal/escp/PROTOCOL.md).
 
 ```
-internal/escp                 UDP client (discovery, key exchange, get/set, retry, session recovery) and the settings
-internal/escp/internal/wire   packet codec, TLV catalogue, RC4 and RSA
-internal/escp/safety          write policy without Terraform types (verified firmware builds, the write gate)
 internal/provider             provider, resources and data sources, guards, validation
+github.com/davidlukac/escp-go the ESCP client library (its own repository): UDP client, settings, wire codec,
+                              write gates (package safety), fake switch (package escptest)
 templates/                    docs templates      examples/   runnable examples used for the generated docs
 ```
 
@@ -275,7 +276,7 @@ Policy: **every statement is covered**, except inside functions whose doc commen
 
 Failure paths are exercised without hardware:
 
-- `internal/escp`: the fake UDP switch can be scripted per request, stay silent, reject the key exchange, reject the *n*th SET, or replace its discovery reply.
+- [`escp-go`](https://github.com/davidlukac/escp-go) (the library): its fake UDP switch (package `escptest`) can be scripted per request, stay silent, reject the key exchange, reject the *n*th SET, or replace its discovery reply.
 - `internal/provider`: a fault-injecting client wraps the in-memory fake and fails specific calls of any method, or accepts writes without applying them; every resource is driven through the same failure scenarios (write rejected, read-back fails, write ignored, update fails, refresh fails, bad import id, object vanishes).
 
 - `internal/regression`: the same scenarios run against the stateful fake (`make regression`, in CI with the lifecycle tests) or, from a gitignored `.test.env` (see `.test.env.example`), against one designated test switch (`make regression-live CONFIRM=1`; never in CI; switch 01 is refused by name and address). Every scenario changes a setting, checks it by reading the switch directly, restores the original values by configuration and proves the readout of the whole switch is identical. Two scenarios are opt-in on hardware: the move of the management address to a spare address and back (`TPLINK_REGRESSION_ALLOW_MANAGEMENT_MOVE=1`, `TPLINK_REGRESSION_MOVE_IP`) the write to a port that carries a device (`TPLINK_REGRESSION_DISRUPT_DEVICE_PORT`) and the disruptive scenarios (`TPLINK_REGRESSION_DISRUPTIVE_PORTS`: real changes behind `allow_disruptive` on device ports; they always run on the fake).

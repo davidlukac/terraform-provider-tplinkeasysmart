@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/safety"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
 )
 
 // portLister is the part of the switch API the port guard needs.

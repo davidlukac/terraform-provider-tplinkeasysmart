@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // fakePortCount is the number of ports of the fake switch's 802.1Q default VLAN.
@@ -18,7 +18,7 @@ type fakeVLANs struct {
 	mtu       escp.MTUVLAN
 	portBased bool
 	enabled   bool // 802.1Q mode
-	vlans     map[escp.VLANID]escp.VLAN8021Q
+	vlans     map[escp.VLANID]escp.Dot1QVLAN
 	pvids     map[escp.PortID]escp.VLANID
 
 	ignoreModeWrites bool // accept mode writes without applying them
@@ -27,7 +27,7 @@ type fakeVLANs struct {
 
 // newFakeVLANs returns a switch in the given mode ("mtu", "port-based", "802.1q" or "").
 func newFakeVLANs(mode string) *fakeVLANs {
-	v := &fakeVLANs{mtu: escp.MTUVLAN{UplinkPort: 1}, vlans: map[escp.VLANID]escp.VLAN8021Q{}, pvids: map[escp.PortID]escp.VLANID{}}
+	v := &fakeVLANs{mtu: escp.MTUVLAN{UplinkPort: 1}, vlans: map[escp.VLANID]escp.Dot1QVLAN{}, pvids: map[escp.PortID]escp.VLANID{}}
 	switch mode {
 	case "mtu":
 		v.mtu = escp.MTUVLAN{Enabled: true, UplinkPort: 8}
@@ -50,7 +50,7 @@ func allFakePorts() escp.PortSet {
 // enable8021Q turns the mode on and builds the default VLAN 1 with every port untagged.
 func (v *fakeVLANs) enable8021Q() {
 	v.enabled, v.portBased, v.mtu = true, false, escp.MTUVLAN{UplinkPort: 1}
-	v.vlans = map[escp.VLANID]escp.VLAN8021Q{1: {ID: 1, Name: "Default", Untagged: allFakePorts(), Tagged: 0}}
+	v.vlans = map[escp.VLANID]escp.Dot1QVLAN{1: {ID: 1, Name: "Default", Untagged: allFakePorts(), Tagged: 0}}
 	v.pvids = map[escp.PortID]escp.VLANID{}
 	for _, p := range allFakePorts().Ports() {
 		v.pvids[p] = 1
@@ -67,7 +67,7 @@ func (v *fakeVLANs) tableSize() int {
 
 // dot1q is the 802.1Q state as the switch reports it, VLANs and PVIDs sorted.
 func (v *fakeVLANs) dot1q() escp.Dot1Q {
-	out := escp.Dot1Q{Enabled: v.enabled, MaxVLAN: v.tableSize(), VLANs: []escp.VLAN8021Q{}, PVIDs: []escp.PortPVID{}}
+	out := escp.Dot1Q{Enabled: v.enabled, MaxVLAN: v.tableSize(), VLANs: []escp.Dot1QVLAN{}, PVIDs: []escp.PortPVID{}}
 	ids := make([]escp.VLANID, 0, len(v.vlans))
 	for id := range v.vlans {
 		ids = append(ids, id)
@@ -104,7 +104,7 @@ func (f *fakeClient) VLANMode(ctx context.Context) (escp.VLANModeSetting, error)
 }
 
 func (f *fakeClient) SetVLANMode(_ context.Context, s escp.VLANModeSetting) error {
-	if err := escp.ValidateVLANMode(s); err != nil {
+	if err := s.Validate(); err != nil {
 		return err
 	}
 	return f.vlanWrite(func(v *fakeVLANs) error {
@@ -121,7 +121,7 @@ func (f *fakeClient) SetVLANMode(_ context.Context, s escp.VLANModeSetting) erro
 	})
 }
 
-func (f *fakeClient) SetVLAN8021Q(_ context.Context, vlan escp.VLAN8021Q) error {
+func (f *fakeClient) SetDot1QVLAN(_ context.Context, vlan escp.Dot1QVLAN) error {
 	return f.vlanWrite(func(v *fakeVLANs) error {
 		if _, exists := v.vlans[vlan.ID]; !exists && len(v.vlans) >= v.tableSize() {
 			return &escp.RejectedError{Code: 7505} // what switch 03 answered to the 33rd VLAN
@@ -131,7 +131,7 @@ func (f *fakeClient) SetVLAN8021Q(_ context.Context, vlan escp.VLAN8021Q) error 
 	})
 }
 
-func (f *fakeClient) DeleteVLAN8021Q(_ context.Context, id escp.VLANID) error {
+func (f *fakeClient) DeleteDot1QVLAN(_ context.Context, id escp.VLANID) error {
 	return f.vlanWrite(func(v *fakeVLANs) error {
 		delete(v.vlans, id)
 		return nil

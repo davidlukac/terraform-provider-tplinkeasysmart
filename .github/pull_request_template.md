@@ -13,6 +13,6 @@ Full list: [`CONTRIBUTING.md`](../CONTRIBUTING.md) (client, resource and data so
 - [ ] `CHANGELOG.md` updated for user-visible changes
 - [ ] Writes that could cut management access are guarded and covered by tests (zero writes on a refusal)
 - [ ] A regression scenario covers a new or changed setting (`internal/regression`), and the fake enforces the rules measured on hardware
-- [ ] Client documentation and `internal/escp/PROTOCOL.md` are current when the client changed
+- [ ] A client change is made in the [escp-go](https://github.com/davidlukac/escp-go) library first (released, then required in `go.mod`); its documentation and `PROTOCOL.md` are updated there
 - [ ] Hardware and firmware verified on are stated (or "not verified live")
 - [ ] No credentials, MAC addresses or real addresses in code, tests or docs

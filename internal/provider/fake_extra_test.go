@@ -6,7 +6,7 @@ import (
 	"net/netip"
 	"sync"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // extraState holds the fake switch behaviour for the device description and
@@ -97,7 +97,7 @@ func orDefault(v, def string) string {
 
 // SetIPConfig moves the fake switch like the real one: the new triple is what Info reports afterwards.
 func (f *fakeClient) SetIPConfig(_ context.Context, cfg escp.IPConfig) error {
-	if err := escp.ValidateIPConfig(cfg); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return err
 	}
 	e := f.extra()

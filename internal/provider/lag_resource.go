@@ -11,8 +11,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/safety"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -45,7 +45,7 @@ type lagResource struct {
 type lagClient interface {
 	LAGs(ctx context.Context) ([]escp.LAG, error)
 	Ports(ctx context.Context) ([]escp.Port, error)
-	SetLAG(ctx context.Context, group escp.LAGID, ports escp.PortSet) error
+	SetLAG(ctx context.Context, lag escp.LAG) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -147,7 +147,7 @@ func (r *lagResource) applyBound(ctx context.Context, m *lagResourceModel, add f
 		add("Refusing to change LAG", err.Error())
 		return false
 	}
-	if err := r.client.SetLAG(ctx, group, ports); err != nil {
+	if err := r.client.SetLAG(ctx, escp.LAG{ID: group, Ports: ports}); err != nil {
 		add("Setting LAG failed", err.Error())
 		return false
 	}
@@ -212,7 +212,7 @@ func (r *lagResource) deleteBound(ctx context.Context, req resource.DeleteReques
 		resp.Diagnostics.AddError("Refusing to remove LAG", err.Error())
 		return
 	}
-	if err := r.client.SetLAG(ctx, group, 0); err != nil {
+	if err := r.client.SetLAG(ctx, escp.LAG{ID: group, Ports: 0}); err != nil {
 		resp.Diagnostics.AddError("Removing LAG failed", err.Error())
 	}
 }
@@ -244,7 +244,7 @@ func (r *lagResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 	if group.Validate() != nil || ports.Len() < escp.LAGMinPorts || ports.Len() > escp.LAGPortsPerGroup {
 		return
 	}
-	if err := escp.ValidateLAG(group, ports); err != nil {
+	if err := (escp.LAG{ID: group, Ports: ports}).Validate(); err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("ports"), "Ports do not fit the LAG group", strings.TrimPrefix(err.Error(), "escp: "))
 	}
 }

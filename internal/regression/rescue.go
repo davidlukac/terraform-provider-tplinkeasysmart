@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // rescueTimeout bounds the safety net: it runs when a scenario is over, whatever state the
