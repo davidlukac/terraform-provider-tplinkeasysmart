@@ -211,7 +211,7 @@ Other Easy Smart models are expected to speak the same protocol family; that is 
 
 | Tool | Tested |
 |---|---|
-| Terraform | 1.4 and later, tested on 1.4, 1.6, 1.8, 1.10 and latest |
+| Terraform | 1.4 and later, tested on 1.4, 1.6, 1.8, 1.10, 1.12, 1.14, 1.16 and latest (1.17 at the time of writing); the newest pre-release, when there is one newer than the latest stable, in an informational job |
 | OpenTofu | The latest release (informational job) |
 | Go | The version in [`go.mod`](go.mod) and the latest stable, for building from source |
 

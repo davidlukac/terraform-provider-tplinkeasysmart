@@ -130,8 +130,10 @@ jobs:
           git push origin badges
 
   # Terraform plan/apply/import/drift/destroy lifecycles on every supported Terraform
-  # version. 1.4 is the documented lower bound; the others catch regressions at
-  # boundaries (import/moved handling, harness behaviour) without testing every minor.
+  # version. 1.4 is the documented lower bound; then every second minor up to the one
+  # before the newest, and `latest` (the newest stable release) last, so the tested
+  # span has no gap wider than one minor. The newest pre-release is tried in the job
+  # below, informationally.
   acceptance:
     name: Terraform ${{ matrix.terraform }}
     runs-on: ubuntu-24.04
@@ -139,13 +141,45 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        terraform: ["1.4.*", "1.6.*", "1.8.*", "1.10.*", "latest"]
+        terraform: ["1.4.*", "1.6.*", "1.8.*", "1.10.*", "1.12.*", "1.14.*", "1.16.*", "latest"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           terraform: ${{ matrix.terraform }}
       - run: make testacc
+
+  # The newest Terraform pre-release (alpha, beta or release candidate) that is newer than the
+  # latest stable one, so a change in Terraform that breaks the provider shows before its
+  # release. Informational (continue-on-error), like OpenTofu below; when there is no such
+  # pre-release the job says so and ends.
+  terraform-next:
+    name: Terraform pre-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: next
+        name: Find the newest pre-release newer than the latest stable
+        run: |
+          versions="$(curl -fsS https://releases.hashicorp.com/terraform/index.json | jq -r '.versions | keys[]')"
+          stable="$(printf '%s\n' "$versions" | grep -v -e '-' | sort -V | tail -1)"
+          next=""
+          for v in $(printf '%s\n' "$versions" | grep -e '-' | sort -V); do
+            base="${v%%-*}"
+            if [ "$base" != "$stable" ] && [ "$(printf '%s\n%s\n' "$stable" "$base" | sort -V | tail -1)" = "$base" ]; then
+              next="$v"
+            fi
+          done
+          echo "latest stable: $stable; newest newer pre-release: ${next:-none}"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+      - if: steps.next.outputs.version != ''
+        uses: ./.github/actions/setup
+        with:
+          terraform: ${{ steps.next.outputs.version }}
+      - if: steps.next.outputs.version != ''
+        run: make testacc
 
   # Same lifecycles on OpenTofu. Informational: a Tofu-only quirk must not block
   # merges (continue-on-error). Promote it to required once it has proven stable.
