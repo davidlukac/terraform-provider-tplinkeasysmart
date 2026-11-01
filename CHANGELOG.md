@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.32.3
+
+- Internal, no change in behaviour: the provider uses [github.com/davidlukac/escp-go](https://github.com/davidlukac/escp-go) v0.3.0 (the library renamed fields and methods before 1.0, and now refuses an unusable client configuration, a refused read and a bad value earlier and in a fixed order; the full hardware regression on a real switch passed: 67 passed, 0 failed, 7 opt-in skips, the configuration files of both test switches read byte for byte as before, no ping lost to the router or switch 01).
+
 ## 0.32.2
 
 - Internal, no change in behaviour: the provider uses the extracted ESCP library, [github.com/davidlukac/escp-go](https://github.com/davidlukac/escp-go) v0.2.0, instead of its internal copy (the full hardware regression on a real switch passed, and the configuration files of both test switches read byte for byte as before). The one visible difference is in the debug log (`TF_LOG=DEBUG`): the 802.1Q VLAN writes are named `SetDot1QVLAN` and `DeleteDot1QVLAN` (were `SetVLAN8021Q` and `DeleteVLAN8021Q`).
