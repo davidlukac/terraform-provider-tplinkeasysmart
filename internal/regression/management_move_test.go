@@ -38,7 +38,7 @@ func (s *Session) bringBack(t *testing.T, original escp.IPConfig) {
 	t.Logf("the switch is not at %s; moving it back from %s", original.IP, s.Target.MoveIP)
 	c, err := s.dialClient(escp.Config{Host: s.Target.MoveIP, Username: s.Target.Username, Password: s.Target.Password})
 	if err != nil {
-		t.Errorf("CANNOT REACH THE SWITCH: dialling %s: %v. Look for it at %s and at %s (discovery) before doing anything else", s.Target.MoveIP, err, original.IP, s.Target.MoveIP)
+		t.Errorf("CANNOT REACH THE SWITCH: dialing %s: %v. Look for it at %s and at %s (discovery) before doing anything else", s.Target.MoveIP, err, original.IP, s.Target.MoveIP)
 		return
 	}
 	defer func() { _ = c.Close() }() // best effort at the end of the run
@@ -172,7 +172,7 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 }
 
 // A discovery right after the switch changed its address can come back empty or still show the old
-// address (seen on switch 03 twice: the neighbour caches and the switch's own table are catching
+// address (seen on switch 03 twice: the neighbor caches and the switch's own table are catching
 // up), so a look-up that must see a new state asks again for a few seconds. This is the tolerance of
 // the check, not of the product: the provider's own look-up repeats once and its apply read the
 // switch back fine each time.
@@ -191,7 +191,7 @@ func anyAnswer(escp.Info) bool { return true }
 
 // locateSettled asks up to tries times, pause apart, until the switch answers and ok accepts what it
 // says; it returns the last answer and error, so a switch that never settled is described by what
-// it last reported. A cancelled context ends the asking.
+// it last reported. A canceled context ends the asking.
 func locateSettled(ctx context.Context, locate func(context.Context) (escp.Info, error), ok func(escp.Info) bool, tries int, pause time.Duration) (escp.Info, error) {
 	var found escp.Info
 	var err error
@@ -315,9 +315,9 @@ func TestLocateSettledAsksAgainUntilTheStateIsSeen(t *testing.T) {
 	if _, err := locateSettled(ctx, script(miss), notDHCP, 3, 0); !errors.Is(err, escp.ErrNotFound) || calls != 3 {
 		t.Errorf("a switch that never answers: err %v after %d asks, want ErrNotFound after 3", err, calls)
 	}
-	cancelled, cancel := context.WithCancel(ctx)
+	canceled, cancel := context.WithCancel(ctx)
 	cancel()
-	if _, err := locateSettled(cancelled, script(miss), notDHCP, 3, time.Hour); !errors.Is(err, context.Canceled) || calls != 1 {
-		t.Errorf("a cancelled context: err %v after %d asks, want it to stop after 1", err, calls)
+	if _, err := locateSettled(canceled, script(miss), notDHCP, 3, time.Hour); !errors.Is(err, context.Canceled) || calls != 1 {
+		t.Errorf("a canceled context: err %v after %d asks, want it to stop after 1", err, calls)
 	}
 }

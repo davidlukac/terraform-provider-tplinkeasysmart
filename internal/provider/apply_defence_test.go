@@ -10,7 +10,7 @@ import (
 )
 
 // Terraform validates every value before it calls apply, so these checks can
-// not be reached through a real run. They remain as the last line of defence
+// not be reached through a real run. They remain as the last line of defense
 // on paths where the wrong input would be destructive (an empty member list
 // would delete a LAG or VLAN group), and are exercised directly.
 

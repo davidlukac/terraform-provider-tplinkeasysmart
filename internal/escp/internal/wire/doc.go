@@ -1,5 +1,5 @@
 // Package wire is the byte level of the ESCP protocol: the 32-byte packet header, the
-// type-length-value elements, the catalogue of TLV types, and the RC4 and RSA
+// type-length-value elements, the catalog of TLV types, and the RC4 and RSA
 // primitives that protect them. It knows nothing about settings, sockets or
 // switches.
 //

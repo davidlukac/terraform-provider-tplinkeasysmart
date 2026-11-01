@@ -13,7 +13,7 @@ const (
 	// ipMoveWait is how long SetIPConfig waits for the switch to answer at its new address.
 	ipMoveWait = 20 * time.Second
 	// settleBudget bounds the probe after a write whose outcome is unknown when the caller's context
-	// is already done (cancelled or expired): the probe must still run, but not for ever.
+	// is already done (canceled or expired): the probe must still run, but not for ever.
 	settleBudget = 15 * time.Second
 	// ipMovePoll is the pause between discovery probes while waiting.
 	ipMovePoll = 500 * time.Millisecond
@@ -122,8 +122,8 @@ func broadcastOf(n net.IPNet) net.IP {
 // write was not applied (it matches ErrNoReply); or nothing can be established, and the
 // error matches ErrMoveUnconfirmed. In that last case the state is unknown and the caller
 // must look at both addresses before it believes either. The same holds when ctx is
-// cancelled or expires after the write was sent: the probe still runs (for a bounded
-// time), because "cancelled" would not say whether the switch moved; a probe that still
+// canceled or expires after the write was sent: the probe still runs (for a bounded
+// time), because "canceled" would not say whether the switch moved; a probe that still
 // shows the old settings then proves little (the write may be taking effect), so it is
 // reported as ErrMoveUnconfirmed, not as "not applied". A write the switch refuses, or the gate refuses, is not probed:
 // nothing was applied.
@@ -150,7 +150,7 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	defer c.mu.Unlock()
 	var refused *RejectedError
 	if err != nil && sent && !errors.As(err, &refused) {
-		// The write may have been applied: no reply came, or the call was cancelled, or the
+		// The write may have been applied: no reply came, or the call was canceled, or the
 		// request could not be sent in full. Only a refusal by the switch (or by the gate, which
 		// sends nothing) says it was not. alsoFrom is still set, so a probe is answered from
 		// either address; and the probe must run even if ctx is done, because the answer is what
@@ -219,7 +219,7 @@ func (c *Client) settleLostReply(ctx context.Context, mac MAC, before, want IPCo
 		return nil
 	case lostReplyUnchanged:
 		if !errors.Is(lost, ErrNoReply) {
-			// The call ended (cancelled, expired, or a send failed) possibly moments after the
+			// The call ended (canceled, expired, or a send failed) possibly moments after the
 			// write went out, before the switch had to answer it: "unchanged" is only how the
 			// switch looked at the probe, and the write may still take effect.
 			return fmt.Errorf("%w: %w; a probe still shows the switch unchanged at %s, but the write may not have taken effect yet", ErrMoveUnconfirmed, lost, before.IP)
@@ -233,7 +233,7 @@ func (c *Client) settleLostReply(ctx context.Context, mac MAC, before, want IPCo
 }
 
 // awaitAddress probes the new address until the switch reports it, because
-// the first packets can fail while the neighbour caches of the network catch up
+// the first packets can fail while the neighbor caches of the network catch up
 // (for example "host is down" from an earlier unanswered ARP). Callers hold c.mu.
 func (c *Client) awaitAddress(ctx context.Context, want IPConfig) error {
 	wait := c.moveWait

@@ -8,7 +8,7 @@ import (
 )
 
 // deferredTB is a test double whose cleanups, failure state and log the test controls, so the
-// session's end-of-test behaviour can be driven without failing the real test.
+// session's end-of-test behavior can be driven without failing the real test.
 type deferredTB struct {
 	testing.TB
 	failed   bool

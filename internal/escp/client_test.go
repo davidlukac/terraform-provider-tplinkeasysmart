@@ -136,7 +136,7 @@ func TestLocalMAC(t *testing.T) {
 			t.Fatalf("got %x, want zero", got)
 		}
 	})
-	t.Run("destination that cannot be dialled", func(t *testing.T) {
+	t.Run("destination that cannot be dialed", func(t *testing.T) {
 		if got := localMAC(net.ParseIP("::1")); got != [6]byte{} {
 			t.Fatalf("got %x, want zero", got)
 		}

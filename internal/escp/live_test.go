@@ -757,7 +757,7 @@ func TestLiveIPChange(t *testing.T) {
 	// The restore comes first. The switch may be at either address, or have moved while the reply
 	// was lost, so it is found by its MAC address wherever it answers, not at an expected address.
 	// A single probe right after a move can come back empty (seen once on switch 03 while the
-	// neighbour caches were still catching up), so the lookup tries a few times.
+	// neighbor caches were still catching up), so the lookup tries a few times.
 	findSwitch := func() (Info, bool) {
 		for attempt := 1; attempt <= 5; attempt++ {
 			infos, err := Discover(ctx, DiscoverOptions{})

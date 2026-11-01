@@ -42,7 +42,7 @@ const (
 // carries the hostname and the management address.
 type SystemSetBehaviour int
 
-// The behaviours after a system SET. SystemSetReplies is the well-behaved switch.
+// The behaviors after a system SET. SystemSetReplies is the well-behaved switch.
 const (
 	// SystemSetReplies answers the SET and carries on.
 	SystemSetReplies SystemSetBehaviour = iota
@@ -56,7 +56,7 @@ const (
 	SystemSetVanishes
 )
 
-// Switch is the fake. Create it with Start; change its behaviour with Configure.
+// Switch is the fake. Create it with Start; change its behavior with Configure.
 // It can decrypt the session key because the switch's 64-bit RSA modulus factors
 // trivially (p=3443843009, q=3765816959), which is also why ESCP offers no real secrecy.
 type Switch struct {
@@ -91,11 +91,11 @@ type Switch struct {
 	model            bool                            // EnableModel was called: cross-setting rules apply
 	lease            *Lease                          // what the switch is given when its DHCP flag goes on (see Lease)
 	dhcp             bool                            // the switch leases its address
-	acquiring        int                             // packets still swallowed while the modelled switch asks for a lease
+	acquiring        int                             // packets still swallowed while the modeled switch asks for a lease
 	bundles          map[wire.TLVType][]wire.TLVType // requests that the switch answers with more types than asked for
 	rows             map[wire.TLVType][][]byte       // tables with one TLV per row (ports, priorities, rates), keyed by the first byte of a row
 
-	// Programmable misbehaviour. Set these inside Configure, which holds the lock.
+	// Programmable misbehavior. Set these inside Configure, which holds the lock.
 
 	// GetFn scripts the reply to GETs: the settings, the error code, and whether to stay silent.
 	GetFn func(types []wire.TLVType) (settings []Setting, code int32, drop bool)
@@ -240,7 +240,7 @@ func (f *Switch) Mute() { f.mu.Lock(); f.mute = true; f.mu.Unlock() }
 // ClearSession forgets the session key, as after a reboot: the client must exchange keys again.
 func (f *Switch) ClearSession() { f.mu.Lock(); f.session = nil; f.mu.Unlock() }
 
-// Configure changes the fake's behaviour under its lock.
+// Configure changes the fake's behavior under its lock.
 func (f *Switch) Configure(fn func(f *Switch)) { f.mu.Lock(); fn(f); f.mu.Unlock() }
 
 // SetBackupMode chooses how the configuration backup misbehaves (BackupOK, the default, is a
@@ -807,7 +807,7 @@ func rowKeyLen(typ wire.TLVType) int {
 	return 1
 }
 
-// Lease is what the modelled switch gets from its DHCP server when its DHCP flag is switched on.
+// Lease is what the modeled switch gets from its DHCP server when its DHCP flag is switched on.
 // The fake can only answer from 127.0.0.1, so a lease that differs from the static address in
 // the mask or the gateway is what tells the two apart, as in SetIPConfig's tests.
 type Lease struct {

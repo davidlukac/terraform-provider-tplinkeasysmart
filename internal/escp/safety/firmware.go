@@ -15,7 +15,7 @@ import (
 var verifiedFirmwareBuilds = verifiedBuilds(compatibility)
 
 // VerifiedFirmwareBuilds returns the firmware builds (the date in "1.0.0 Build
-// 20230218 Rel.50633") whose protocol behaviour this client was tested
+// 20230218 Rel.50633") whose protocol behavior this client was tested
 // against on real switches: reads, and writes on unused ports. Any other build
 // may have changed layouts or authentication, so writes to it are refused
 // unless the user opts in. The result is a copy: changing it changes nothing.

@@ -117,7 +117,7 @@ func TestContextDeadlineBeatsTheConfiguredTimeout(t *testing.T) {
 	}
 }
 
-func TestCancelledContextStopsRetrying(t *testing.T) {
+func TestCanceledContextStopsRetrying(t *testing.T) {
 	f := escptest.Start(t)
 	f.Mute()
 	c := dialFast(t, f, "secret")
@@ -157,7 +157,7 @@ func TestExpiredReportsCancellationAndPassedDeadlines(t *testing.T) {
 	}
 	cancel()
 	if err := expired(ctx); !errors.Is(err, context.Canceled) {
-		t.Fatalf("a cancelled context must report cancellation, got %v", err)
+		t.Fatalf("a canceled context must report cancellation, got %v", err)
 	}
 }
 
@@ -231,8 +231,8 @@ func TestBindFailureIsReported(t *testing.T) {
 
 // An attempt whose deadline has already passed must give up at once instead of
 // blocking on the socket: no reply, and no waiting.
-// A cancelled call does not wait for the attempt's deadline, even when that is some way off.
-func TestRecvWithACancelledContextReturnsImmediately(t *testing.T) {
+// A canceled call does not wait for the attempt's deadline, even when that is some way off.
+func TestRecvWithACanceledContextReturnsImmediately(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if err := c.open(); err != nil {
@@ -245,7 +245,7 @@ func TestRecvWithACancelledContextReturnsImmediately(t *testing.T) {
 		t.Fatal("nothing was sent, so nothing can have been received")
 	}
 	if took := time.Since(start); took > 2*time.Second { // the deadline is 5 s away
-		t.Fatalf("recv waited %v for a cancelled call", took)
+		t.Fatalf("recv waited %v for a canceled call", took)
 	}
 }
 

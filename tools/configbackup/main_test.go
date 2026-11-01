@@ -151,7 +151,7 @@ func TestAFailedWriteIsReportedAndExitsNonZero(t *testing.T) {
 }
 
 func TestUsageErrors(t *testing.T) {
-	noDial := deps{dial: func(escp.Config) (*escp.Client, error) { t.Fatal("dialled"); return nil, nil }, create: createExclusive}
+	noDial := deps{dial: func(escp.Config) (*escp.Client, error) { t.Fatal("dialed"); return nil, nil }, create: createExclusive}
 	for name, tc := range map[string]struct {
 		args []string
 		env  map[string]string

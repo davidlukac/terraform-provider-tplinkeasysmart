@@ -160,8 +160,8 @@ func TestSettleLostReplyNamesWhatAnswered(t *testing.T) {
 }
 
 // The caller's context ends right after the write was applied: the call must not report
-// "cancelled" as if nothing happened. The probe runs anyway and finds the move.
-func TestSetIPConfigSettlesWhenTheCallIsCancelledAfterTheWrite(t *testing.T) {
+// "canceled" as if nothing happened. The probe runs anyway and finds the move.
+func TestSetIPConfigSettlesWhenTheCallIsCanceledAfterTheWrite(t *testing.T) {
 	f := escptest.Start(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -182,8 +182,8 @@ func TestSetIPConfigSettlesWhenTheCallIsCancelledAfterTheWrite(t *testing.T) {
 	}
 }
 
-// Cancelled while the switch still shows the old settings: that proves nothing yet, and the error says so.
-func TestSetIPConfigDoesNotClaimTheWriteWasNotAppliedWhenCancelled(t *testing.T) {
+// Canceled while the switch still shows the old settings: that proves nothing yet, and the error says so.
+func TestSetIPConfigDoesNotClaimTheWriteWasNotAppliedWhenCanceled(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Switch) { f.DropSets = true })
 	ctx, cancel := context.WithCancel(context.Background())

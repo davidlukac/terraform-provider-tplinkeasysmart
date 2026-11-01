@@ -9,7 +9,7 @@ import (
 	"github.com/davidlukac/escp-go"
 )
 
-// extraState holds the fake switch behaviour for the device description and
+// extraState holds the fake switch behavior for the device description and
 // the configuration backup. It lives beside fakeClient (keyed by pointer) so
 // the main fake stays small.
 type extraState struct {

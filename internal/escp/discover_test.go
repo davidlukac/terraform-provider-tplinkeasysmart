@@ -193,7 +193,7 @@ func TestDiscoverWithNoAnswerIsEmptyNotAnError(t *testing.T) {
 	}
 }
 
-func TestDiscoverStopsWhenTheContextIsCancelled(t *testing.T) {
+func TestDiscoverStopsWhenTheContextIsCanceled(t *testing.T) {
 	hostPort := escptest.FreeUDPPort(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -211,7 +211,7 @@ func TestDiscoverStopsWhenTheContextIsCancelled(t *testing.T) {
 	}
 }
 
-func TestDiscoverWithACancelledContextReturnsAtOnce(t *testing.T) {
+func TestDiscoverWithACanceledContextReturnsAtOnce(t *testing.T) {
 	hostPort := escptest.FreeUDPPort(t)
 	r := startResponder(t, hostPort, nil)
 	ctx, cancel := context.WithCancel(context.Background())

@@ -10,8 +10,8 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
 )
 
-// A call whose context is already cancelled sends nothing: not the key exchange, not the write.
-func TestCancelledContextSendsNothing(t *testing.T) {
+// A call whose context is already canceled sends nothing: not the key exchange, not the write.
+func TestCanceledContextSendsNothing(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx, cancel := context.WithCancel(context.Background())
@@ -20,7 +20,7 @@ func TestCancelledContextSendsNothing(t *testing.T) {
 		t.Fatalf("got %v, want context.Canceled", err)
 	}
 	if n := f.WriteCount(); n != 0 {
-		t.Fatalf("the cancelled call wrote %d time(s)", n)
+		t.Fatalf("the canceled call wrote %d time(s)", n)
 	}
 	if led, _, sets := f.State(); !led || sets != 0 {
 		t.Fatalf("the switch was touched: led=%v sets=%d", led, sets)
@@ -33,11 +33,11 @@ func TestCancelledContextSendsNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	if n := f.Received(); n > 2 {
-		t.Fatalf("the cancelled call sent datagrams: the switch has received %d, want only those of the later probe (at most 2)", n)
+		t.Fatalf("the canceled call sent datagrams: the switch has received %d, want only those of the later probe (at most 2)", n)
 	}
 }
 
-// A method that sends two writes stops between them when the call is cancelled in the gate of the
+// A method that sends two writes stops between them when the call is canceled in the gate of the
 // second: the first was applied, the second is not sent.
 func TestCancellationBetweenTwoWritesStopsTheSecond(t *testing.T) {
 	f := escptest.Start(t)
@@ -63,7 +63,7 @@ func TestCancellationBetweenTwoWritesStopsTheSecond(t *testing.T) {
 	}
 }
 
-// A call that is waiting for a reply returns when it is cancelled, not when the attempt times out.
+// A call that is waiting for a reply returns when it is canceled, not when the attempt times out.
 func TestCancellationInterruptsTheWaitForAReply(t *testing.T) {
 	f := escptest.Start(t)
 	f.Mute()
@@ -80,12 +80,12 @@ func TestCancellationInterruptsTheWaitForAReply(t *testing.T) {
 	}
 	// the attempt would have waited 20 s; anything far below that shows the wait was interrupted
 	if took := time.Since(start); took > 10*time.Second {
-		t.Fatalf("the cancelled call kept waiting for %v", took)
+		t.Fatalf("the canceled call kept waiting for %v", took)
 	}
 }
 
 // The fragment exchange of the backup also sends nothing for a call that is already done.
-func TestExchangeFragmentsSendsNothingForACancelledCall(t *testing.T) {
+func TestExchangeFragmentsSendsNothingForACanceledCall(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	if _, err := c.LED(context.Background()); err != nil { // opens the socket and the session
@@ -104,6 +104,6 @@ func TestExchangeFragmentsSendsNothingForACancelledCall(t *testing.T) {
 		t.Fatal(err)
 	}
 	if n := f.Received() - before; n != 1 {
-		t.Fatalf("the cancelled exchange sent datagrams: %d arrived since, want only the later read's 1", n)
+		t.Fatalf("the canceled exchange sent datagrams: %d arrived since, want only the later read's 1", n)
 	}
 }

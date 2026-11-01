@@ -183,7 +183,7 @@ func mirrorProblem(enabled types.Bool, dest types.Int64, ingress, egress escp.Po
 }
 
 // qosProblem checks that per-port priorities are only given in port-based
-// mode, the only mode in which the switch honours them.
+// mode, the only mode in which the switch honors them.
 func qosProblem(mode types.String, priorities types.Map) string {
 	if mode.IsUnknown() || priorities.IsUnknown() || len(priorities.Elements()) == 0 {
 		return ""

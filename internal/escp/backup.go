@@ -60,7 +60,7 @@ func (f ConfigFile) LogValue() slog.Value { return slog.StringValue(f.String()) 
 // assembleConfig) and a second download, requested separately, is byte for byte the same. Anything
 // else is repeated, up to Config.Retries+1 rounds, and then reported as ErrInvalidConfig. A
 // configuration that changes while it is read fails the same way. A rejection, a missing reply
-// and a cancelled context end the call at once.
+// and a canceled context end the call at once.
 func (c *Client) ConfigBackup(ctx context.Context) (ConfigFile, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -94,7 +94,7 @@ func (c *Client) verifiedConfig(ctx context.Context) ([]byte, error) {
 			return nil, err
 		}
 		c.log.WarnContext(ctx, "configuration download not usable; repeating", "round", round+1, "rounds", c.cfg.Retries+1, "reason", err.Error())
-		last = err // a cancelled context is reported by the next download, which checks it before it sends
+		last = err // a canceled context is reported by the next download, which checks it before it sends
 	}
 	return nil, last
 }
@@ -116,7 +116,7 @@ func (c *Client) downloadConfig(ctx context.Context) ([]byte, error) {
 // assembleConfig joins the packets of one download, in order, and refuses what cannot be the whole
 // file: no magic (the first packet is missing, or this is not a configuration), or packets of
 // unequal length before the last (the switch fills every packet but the last, 1400 bytes in a
-// 2258-byte file; a shorter one in front means a neighbour was lost), or a last packet longer than
+// 2258-byte file; a shorter one in front means a neighbor was lost), or a last packet longer than
 // the others. A lost middle packet of equal length cannot be seen here; the second download of
 // ConfigBackup catches that.
 func assembleConfig(parts [][]byte) ([]byte, error) {

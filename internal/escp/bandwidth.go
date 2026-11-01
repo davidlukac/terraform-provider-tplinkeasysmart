@@ -88,7 +88,7 @@ func bandwidthTLV(typ wire.TLVType, port PortID, kbps Kbps) (wire.TLV, error) {
 // whose storm control is on: the switch would turn storm control off without saying so. Like the vendor utility it sends two requests,
 // ingress first, then egress. A limit on a port that carries traffic throttles
 // it; callers must guard against that. The two requests are not atomic: if the second
-// fails (or its gate refuses, or the call is cancelled) the ingress limit stays applied.
+// fails (or its gate refuses, or the call is canceled) the ingress limit stays applied.
 func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error {
 	if err := limit.Port.Validate(); err != nil {
 		return err

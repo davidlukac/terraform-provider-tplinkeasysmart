@@ -24,7 +24,7 @@ func TestPasswordNeverPrints(t *testing.T) {
 		{"Config %v", fmt.Sprintf("%v", cfg)},
 		{"Config %+v", fmt.Sprintf("%+v", cfg)},
 		{"Config %#v", fmt.Sprintf("%#v", cfg)},
-		{"error", fmt.Errorf("dialling with %+v", cfg).Error()},
+		{"error", fmt.Errorf("dialing with %+v", cfg).Error()},
 	} {
 		if strings.Contains(tc.got, secretText) {
 			t.Errorf("%s leaks the password: %s", tc.name, tc.got)
