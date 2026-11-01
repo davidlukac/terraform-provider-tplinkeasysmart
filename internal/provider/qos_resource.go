@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -40,7 +42,7 @@ type qosResource struct {
 // qosClient is the part of the switch API this resource needs.
 type qosClient interface {
 	QoS(ctx context.Context) (escp.QoS, error)
-	SetPortPriorities(ctx context.Context, changes map[escp.PortID]escp.Priority) error
+	SetPortPriorities(ctx context.Context, changes []escp.PortPriority) error
 	SetQoSMode(ctx context.Context, mode escp.QoSMode) error
 }
 
@@ -127,7 +129,7 @@ func (r *qosResource) applyBound(ctx context.Context, plan *qosResourceModel, ad
 		return false
 	}
 	if len(want) > 0 {
-		if err := r.client.SetPortPriorities(ctx, want); err != nil {
+		if err := r.client.SetPortPriorities(ctx, priorityChanges(want)); err != nil {
 			add("Setting port priorities failed", err.Error())
 			return false
 		}
@@ -210,3 +212,13 @@ func (r *qosResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 }
 
 var _ resource.ResourceWithModifyPlan = &qosResource{}
+
+// priorityChanges lists the wanted priorities lowest port first, so that the first fault the library
+// reports does not depend on the order Terraform hands the map out.
+func priorityChanges(want map[escp.PortID]escp.Priority) []escp.PortPriority {
+	changes := make([]escp.PortPriority, 0, len(want))
+	for _, port := range slices.Sorted(maps.Keys(want)) {
+		changes = append(changes, escp.PortPriority{Port: port, Priority: want[port]})
+	}
+	return changes
+}

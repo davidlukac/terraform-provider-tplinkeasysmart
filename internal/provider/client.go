@@ -15,7 +15,7 @@ type SwitchClient interface {
 	SetLED(ctx context.Context, on bool) error
 	Ports(ctx context.Context) ([]escp.Port, error)
 	SetPort(ctx context.Context, cfg escp.PortConfig) error
-	PortStatistics(ctx context.Context) ([]escp.PortStats, error)
+	PortStats(ctx context.Context) ([]escp.PortStats, error)
 	LAGs(ctx context.Context) ([]escp.LAG, error)
 	SetLAG(ctx context.Context, lag escp.LAG) error
 	IGMP(ctx context.Context) (escp.IGMP, error)
@@ -32,10 +32,10 @@ type SwitchClient interface {
 	SetVLANMode(ctx context.Context, s escp.VLANModeSetting) error
 	SetDot1QVLAN(ctx context.Context, v escp.Dot1QVLAN) error
 	DeleteDot1QVLAN(ctx context.Context, id escp.VLANID) error
-	SetPVIDs(ctx context.Context, pvids map[escp.PortID]escp.VLANID) error
+	SetPVIDs(ctx context.Context, pvids []escp.PortPVID) error
 	QoS(ctx context.Context) (escp.QoS, error)
 	SetQoSMode(ctx context.Context, mode escp.QoSMode) error
-	SetPortPriorities(ctx context.Context, changes map[escp.PortID]escp.Priority) error
+	SetPortPriorities(ctx context.Context, changes []escp.PortPriority) error
 	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
 	SetBandwidth(ctx context.Context, limit escp.PortBandwidth) error
 	StormControl(ctx context.Context) ([]escp.PortStorm, error)

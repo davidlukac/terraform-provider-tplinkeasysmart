@@ -264,13 +264,13 @@ func TestScenarioBandwidthLimit(t *testing.T) {
 	cfg := func(in, out int) string {
 		return fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"this\" {\n  port         = %d\n  ingress_kbps = %d\n  egress_kbps  = %d\n}\n", port, in, out)
 	}
-	s.scenario(t, cfg(10240, 5120), cfg(int(was.IngressKbps), int(was.EgressKbps)), func(*terraform.State) error {
+	s.scenario(t, cfg(10240, 5120), cfg(int(was.Ingress), int(was.Egress)), func(*terraform.State) error {
 		got, err := s.Client.Bandwidth(context.Background())
 		if err != nil {
 			return err
 		}
 		for _, b := range got {
-			if b.Port == port && (b.IngressKbps != 10240 || b.EgressKbps != 5120) {
+			if b.Port == port && (b.Ingress != 10240 || b.Egress != 5120) {
 				return fmt.Errorf("port %d limits = %+v, want 10240 in, 5120 out", port, b)
 			}
 		}
@@ -294,13 +294,13 @@ func TestScenarioStormLimit(t *testing.T) {
 	cfg := func(uu, mc, bc bool, rate int) string {
 		return fmt.Sprintf("resource \"tplinkeasysmart_storm_limit\" \"this\" {\n  port            = %d\n  unknown_unicast = %t\n  multicast       = %t\n  broadcast       = %t\n  rate_kbps       = %d\n}\n", port, uu, mc, bc, rate)
 	}
-	s.scenario(t, cfg(false, true, true, 1024), cfg(was.UnknownUnicast, was.Multicast, was.Broadcast, int(was.RateKbps)), func(*terraform.State) error {
+	s.scenario(t, cfg(false, true, true, 1024), cfg(was.UnknownUnicast, was.Multicast, was.Broadcast, int(was.Rate)), func(*terraform.State) error {
 		got, err := s.Client.StormControl(context.Background())
 		if err != nil {
 			return err
 		}
 		for _, p := range got {
-			if p.Port == port && (!p.Multicast || !p.Broadcast || p.RateKbps != 1024) {
+			if p.Port == port && (!p.Multicast || !p.Broadcast || p.Rate != 1024) {
 				return fmt.Errorf("port %d storm control = %+v, want multicast and broadcast at 1024", port, p)
 			}
 		}
@@ -346,9 +346,9 @@ func TestScenarioIngressLimitAndStormControlExclude(t *testing.T) {
 	ingress := func(kbps int, dependsOn string) string {
 		return fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"this\" {\n  port = %d\n  ingress_kbps = %d\n  egress_kbps = 5120\n%s}\n", port, kbps, dependsOn)
 	}
-	restoreBW := fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"this\" {\n  port = %d\n  ingress_kbps = %d\n  egress_kbps = %d\n}\n", port, wasBW.IngressKbps, wasBW.EgressKbps)
+	restoreBW := fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"this\" {\n  port = %d\n  ingress_kbps = %d\n  egress_kbps = %d\n}\n", port, wasBW.Ingress, wasBW.Egress)
 	restoreStorm := fmt.Sprintf("resource \"tplinkeasysmart_storm_limit\" \"this\" {\n  port = %d\n  unknown_unicast = %t\n  multicast = %t\n  broadcast = %t\n  rate_kbps = %d\n}\n",
-		port, wasStorm.UnknownUnicast, wasStorm.Multicast, wasStorm.Broadcast, wasStorm.RateKbps)
+		port, wasStorm.UnknownUnicast, wasStorm.Multicast, wasStorm.Broadcast, wasStorm.Rate)
 	state := func(wantIngress escp.Kbps, wantStorm bool) resource.TestCheckFunc {
 		return func(*terraform.State) error {
 			bws, err := s.Client.Bandwidth(ctx)
@@ -360,8 +360,8 @@ func TestScenarioIngressLimitAndStormControlExclude(t *testing.T) {
 				return err
 			}
 			for _, b := range bws {
-				if b.Port == port && b.IngressKbps != wantIngress {
-					return fmt.Errorf("port %d ingress limit = %s, want %s", port, b.IngressKbps, wantIngress)
+				if b.Port == port && b.Ingress != wantIngress {
+					return fmt.Errorf("port %d ingress limit = %s, want %s", port, b.Ingress, wantIngress)
 				}
 			}
 			for _, p := range storms {
@@ -444,7 +444,7 @@ func TestScenarioPortMirror(t *testing.T) {
 	s.scenario(t, cfg(fmt.Sprintf("  enabled       = true\n  mirror_port   = %d\n  ingress_ports = %s\n", dest, intSet(src))),
 		cfg("  enabled = false\n"), func(*terraform.State) error {
 			got, err := s.Client.PortMirror(context.Background())
-			if err != nil || !got.Enabled || got.MirrorPort != dest || got.IngressPorts != escp.MustPortSet(src) {
+			if err != nil || !got.Enabled || got.Destination != dest || got.IngressPorts != escp.MustPortSet(src) {
 				return fmt.Errorf("mirror on the switch = %+v, err %w, want %d mirrored to %d", got, err, src, dest)
 			}
 			return nil

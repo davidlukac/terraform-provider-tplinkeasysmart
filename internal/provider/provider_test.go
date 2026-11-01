@@ -83,7 +83,7 @@ func (f *fakeClient) Ports(context.Context) ([]escp.Port, error) {
 	}, nil
 }
 
-func (f *fakeClient) PortStatistics(context.Context) ([]escp.PortStats, error) {
+func (f *fakeClient) PortStats(context.Context) ([]escp.PortStats, error) {
 	return []escp.PortStats{{ID: 1, Enabled: true, Link: "1000Mbps-full", TxGood: 4000000000, RxGood: 7, RxBad: 1}}, nil
 }
 
@@ -152,7 +152,7 @@ func (f *fakeClient) PortMirror(context.Context) (escp.Mirror, error) {
 		m := *f.mirror
 		return m, nil
 	}
-	return escp.Mirror{Enabled: true, MirrorPort: 8, IngressPorts: escp.MustPortSet(1, 2), EgressPorts: 0}, nil
+	return escp.Mirror{Enabled: true, Destination: 8, IngressPorts: escp.MustPortSet(1, 2), EgressPorts: 0}, nil
 }
 
 func (f *fakeClient) MTUVLAN(context.Context) (escp.MTUVLAN, error) {
@@ -185,10 +185,10 @@ func (f *fakeClient) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.vlans != nil {
-		return escp.PortBasedVLAN{Enabled: f.vlans.portBased, MaxVLAN: 8, VLANs: []escp.PortVLAN{}}, nil
+		return escp.PortBasedVLAN{Enabled: f.vlans.portBased, MaxGroups: 8, VLANs: []escp.PortVLAN{}}, nil
 	}
 	if f.pvlans != nil {
-		v := escp.PortBasedVLAN{Enabled: !f.pvlanOff, MaxVLAN: 8}
+		v := escp.PortBasedVLAN{Enabled: !f.pvlanOff, MaxGroups: 8}
 		for id := escp.PortVLANID(1); id <= escp.MaxPortVLANID; id++ {
 			if ps, ok := f.pvlans[id]; ok {
 				v.VLANs = append(v.VLANs, escp.PortVLAN{ID: id, Ports: ps})
@@ -196,7 +196,7 @@ func (f *fakeClient) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) 
 		}
 		return v, nil
 	}
-	return escp.PortBasedVLAN{Enabled: true, MaxVLAN: 8, VLANs: []escp.PortVLAN{{ID: 1, Ports: escp.MustPortSet(1, 2, 3)}}}, nil
+	return escp.PortBasedVLAN{Enabled: true, MaxGroups: 8, VLANs: []escp.PortVLAN{{ID: 1, Ports: escp.MustPortSet(1, 2, 3)}}}, nil
 }
 
 func (f *fakeClient) Dot1Q(context.Context) (escp.Dot1Q, error) {
@@ -205,7 +205,7 @@ func (f *fakeClient) Dot1Q(context.Context) (escp.Dot1Q, error) {
 	if f.vlans != nil {
 		return f.vlans.dot1q(), nil
 	}
-	return escp.Dot1Q{Enabled: true, MaxVLAN: 32,
+	return escp.Dot1Q{Enabled: true, MaxVLANs: 32,
 		VLANs: []escp.Dot1QVLAN{{ID: 10, Name: "iot", Tagged: escp.MustPortSet(8), Untagged: escp.MustPortSet(1, 2)}},
 		PVIDs: []escp.PortPVID{{Port: 1, PVID: 10}, {Port: 8, PVID: 1}}}, nil
 }
@@ -218,15 +218,17 @@ func (f *fakeClient) SetQoSMode(_ context.Context, mode escp.QoSMode) error {
 	return nil
 }
 
-func (f *fakeClient) SetPortPriorities(_ context.Context, ch map[escp.PortID]escp.Priority) error {
+func (f *fakeClient) SetPortPriorities(_ context.Context, ch []escp.PortPriority) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.qos.Mode != 0 {
 		return nil // like the real switch: accepted but ignored outside port-based mode
 	}
-	for i := range f.qos.Priorities {
-		if v, ok := ch[f.qos.Priorities[i].Port]; ok {
-			f.qos.Priorities[i].Priority = v
+	for _, c := range ch {
+		for i := range f.qos.Priorities {
+			if f.qos.Priorities[i].Port == c.Port {
+				f.qos.Priorities[i].Priority = c.Priority
+			}
 		}
 	}
 	return nil
@@ -244,7 +246,7 @@ func (f *fakeClient) QoS(context.Context) (escp.QoS, error) {
 }
 
 func (f *fakeClient) SetBandwidth(_ context.Context, limit escp.PortBandwidth) error {
-	port, in, eg := limit.Port, limit.IngressKbps, limit.EgressKbps
+	port, in, eg := limit.Port, limit.Ingress, limit.Egress
 	if in%64 != 0 || eg%64 != 0 {
 		return fmt.Errorf("invalid rate: use 0 or a multiple of 64")
 	}
@@ -264,15 +266,15 @@ func (f *fakeClient) Bandwidth(context.Context) ([]escp.PortBandwidth, error) {
 	if f.bw != nil {
 		var rows []escp.PortBandwidth
 		for _, p := range f.rows() {
-			rows = append(rows, escp.PortBandwidth{Port: escp.PortID(p), IngressKbps: escp.Kbps(f.bw[escp.PortID(p)][0]), EgressKbps: escp.Kbps(f.bw[escp.PortID(p)][1])})
+			rows = append(rows, escp.PortBandwidth{Port: escp.PortID(p), Ingress: escp.Kbps(f.bw[escp.PortID(p)][0]), Egress: escp.Kbps(f.bw[escp.PortID(p)][1])})
 		}
 		return rows, nil
 	}
-	return []escp.PortBandwidth{{Port: 1}, {Port: 2, IngressKbps: 4096, EgressKbps: 8192}}, nil
+	return []escp.PortBandwidth{{Port: 1}, {Port: 2, Ingress: 4096, Egress: 8192}}, nil
 }
 
 func (f *fakeClient) SetStormControl(_ context.Context, cfg escp.StormConfig) error {
-	port, uu, mc, bc, rate := cfg.Port, cfg.UnknownUnicast, cfg.Multicast, cfg.Broadcast, cfg.RateKbps
+	port, uu, mc, bc, rate := cfg.Port, cfg.UnknownUnicast, cfg.Multicast, cfg.Broadcast, cfg.Rate
 	if (uu || mc || bc) != (rate != 0) || rate%64 != 0 {
 		return fmt.Errorf("invalid storm control request")
 	}
@@ -281,7 +283,7 @@ func (f *fakeClient) SetStormControl(_ context.Context, cfg escp.StormConfig) er
 	if f.storm == nil {
 		f.storm = map[escp.PortID]escp.PortStorm{}
 	}
-	f.storm[port] = escp.PortStorm{Port: port, UnknownUnicast: uu, Multicast: mc, Broadcast: bc, RateKbps: rate, Enabled: rate != 0}
+	f.storm[port] = escp.PortStorm{Port: port, UnknownUnicast: uu, Multicast: mc, Broadcast: bc, Rate: rate, Enabled: rate != 0}
 	f.sets++
 	return nil
 }
@@ -298,7 +300,7 @@ func (f *fakeClient) StormControl(context.Context) ([]escp.PortStorm, error) {
 		}
 		return rows, nil
 	}
-	return []escp.PortStorm{{Port: 1}, {Port: 2, Broadcast: true, RateKbps: 5000, Enabled: true}}, nil
+	return []escp.PortStorm{{Port: 1}, {Port: 2, Broadcast: true, Rate: 5000, Enabled: true}}, nil
 }
 
 func (f *fakeClient) System(context.Context) (escp.System, error) {

@@ -35,7 +35,7 @@ type vlan8021QPVIDResource struct {
 // vlan8021QPVIDClient is the part of the switch API this resource needs.
 type vlan8021QPVIDClient interface {
 	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
-	SetPVIDs(ctx context.Context, pvids map[escp.PortID]escp.VLANID) error
+	SetPVIDs(ctx context.Context, pvids []escp.PortPVID) error
 	Ports(ctx context.Context) ([]escp.Port, error)
 }
 
@@ -124,7 +124,7 @@ func (r *vlan8021QPVIDResource) set(ctx context.Context, port escp.PortID, pvid 
 		add("Refusing to change the PVID", err.Error())
 		return false
 	}
-	if err := r.client.SetPVIDs(ctx, map[escp.PortID]escp.VLANID{port: pvid}); err != nil {
+	if err := r.client.SetPVIDs(ctx, []escp.PortPVID{{Port: port, PVID: pvid}}); err != nil {
 		add("Setting the PVID failed", err.Error())
 		return false
 	}

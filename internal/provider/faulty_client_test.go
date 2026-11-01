@@ -137,11 +137,11 @@ func (w *faultyClient) SetPort(ctx context.Context, cfg escp.PortConfig) error {
 	return w.write("SetPort", func() error { return w.SwitchClient.SetPort(ctx, cfg) })
 }
 
-func (w *faultyClient) PortStatistics(ctx context.Context) ([]escp.PortStats, error) {
-	if err := w.check("PortStatistics"); err != nil {
+func (w *faultyClient) PortStats(ctx context.Context) ([]escp.PortStats, error) {
+	if err := w.check("PortStats"); err != nil {
 		return nil, err
 	}
-	return w.SwitchClient.PortStatistics(ctx)
+	return w.SwitchClient.PortStats(ctx)
 }
 
 func (w *faultyClient) LAGs(ctx context.Context) ([]escp.LAG, error) {
@@ -224,7 +224,7 @@ func (w *faultyClient) SetQoSMode(ctx context.Context, mode escp.QoSMode) error 
 	return w.write("SetQoSMode", func() error { return w.SwitchClient.SetQoSMode(ctx, mode) })
 }
 
-func (w *faultyClient) SetPortPriorities(ctx context.Context, changes map[escp.PortID]escp.Priority) error {
+func (w *faultyClient) SetPortPriorities(ctx context.Context, changes []escp.PortPriority) error {
 	return w.write("SetPortPriorities", func() error { return w.SwitchClient.SetPortPriorities(ctx, changes) })
 }
 
@@ -269,6 +269,6 @@ func (w *faultyClient) DeleteDot1QVLAN(ctx context.Context, id escp.VLANID) erro
 	return w.write("DeleteDot1QVLAN", func() error { return w.SwitchClient.DeleteDot1QVLAN(ctx, id) })
 }
 
-func (w *faultyClient) SetPVIDs(ctx context.Context, pvids map[escp.PortID]escp.VLANID) error {
+func (w *faultyClient) SetPVIDs(ctx context.Context, pvids []escp.PortPVID) error {
 	return w.write("SetPVIDs", func() error { return w.SwitchClient.SetPVIDs(ctx, pvids) })
 }

@@ -87,7 +87,7 @@ func (d *vlanPortBasedDataSource) readBound(ctx context.Context, _ datasource.Re
 		return
 	}
 	state := vlanPortBasedModel{ID: qualifiedID(d.sw, "vlan_port_based"), Enabled: types.BoolValue(v.Enabled),
-		MaxVLANs: types.Int64Value(int64(v.MaxVLAN)), VLANs: make([]portVLANModel, 0, len(v.VLANs))}
+		MaxVLANs: types.Int64Value(int64(v.MaxGroups)), VLANs: make([]portVLANModel, 0, len(v.VLANs))}
 	for _, g := range v.VLANs {
 		state.VLANs = append(state.VLANs, portVLANModel{ID: types.Int64Value(int64(g.ID)), Ports: portInt64s(g.Ports)})
 	}

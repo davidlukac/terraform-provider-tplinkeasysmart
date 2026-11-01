@@ -95,7 +95,7 @@ func (d *stormDataSource) readBound(ctx context.Context, _ datasource.ReadReques
 	for _, r := range rows {
 		state.Ports = append(state.Ports, portStormModel{Port: types.Int64Value(int64(r.Port)), Enabled: types.BoolValue(r.Enabled),
 			UnknownUnicast: types.BoolValue(r.UnknownUnicast), Multicast: types.BoolValue(r.Multicast),
-			Broadcast: types.BoolValue(r.Broadcast), RateKbps: types.Int64Value(int64(r.RateKbps))})
+			Broadcast: types.BoolValue(r.Broadcast), RateKbps: types.Int64Value(int64(r.Rate))})
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

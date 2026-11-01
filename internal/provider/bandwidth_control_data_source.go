@@ -87,7 +87,7 @@ func (d *bandwidthDataSource) readBound(ctx context.Context, _ datasource.ReadRe
 	state := bandwidthModel{ID: qualifiedID(d.sw, "bandwidth_control"), Ports: make([]portBandwidthModel, 0, len(rows))}
 	for _, r := range rows {
 		state.Ports = append(state.Ports, portBandwidthModel{Port: types.Int64Value(int64(r.Port)),
-			IngressKbps: types.Int64Value(int64(r.IngressKbps)), EgressKbps: types.Int64Value(int64(r.EgressKbps))})
+			IngressKbps: types.Int64Value(int64(r.Ingress)), EgressKbps: types.Int64Value(int64(r.Egress))})
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
