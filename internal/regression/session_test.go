@@ -170,7 +170,11 @@ func TestProviderDialAimsAtTheFake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = c.(*escp.Client).Close() }()
+	client, ok := c.(*escp.Client)
+	if !ok {
+		t.Fatalf("the provider's dialer returned %T, want the ESCP client", c)
+	}
+	defer func() { _ = client.Close() }()
 	if on, err := c.LED(context.Background()); err != nil || !on {
 		t.Errorf("LED through the provider's dialer = %t, %v", on, err)
 	}

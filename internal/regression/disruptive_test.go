@@ -159,7 +159,7 @@ func TestScenarioDisruptiveVLANGroup(t *testing.T) {
 			return err
 		}
 		for _, v := range got.VLANs {
-			if v.ID == 2 && v.Ports == escp.MustPortSet(escp.PortID(free), escp.PortID(device)) {
+			if v.ID == 2 && v.Ports == escp.MustPortSet(free, device) {
 				return nil
 			}
 		}

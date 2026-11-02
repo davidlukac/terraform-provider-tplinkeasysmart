@@ -58,7 +58,7 @@ func TestAllowDisruptiveAloneNeverTouchesTheSwitch(t *testing.T) {
 			groupConfig8021Q(20, "  tagged_ports = [4]\n  allow_disruptive = true\n"), groupConfig8021Q(20, "  tagged_ports = [4]\n"),
 			groupConfig8021Q(20, "  tagged_ports = [4, 5]\n"), `port 4 has a link up`},
 		{"vlan_8021q_pvid", "tplinkeasysmart_vlan_8021q_pvid.p",
-			func() *fakeClient { return newPVIDFake() },
+			newPVIDFake,
 			pvidConfig(4, 20, "  allow_disruptive = true\n"), pvidConfig(4, 20, ""),
 			pvidConfig(4, 1, ""), `port 4 has a link up`},
 	}

@@ -66,6 +66,7 @@ func TestQoSApplyRefusesWhatTheSwitchWouldIgnoreOrMisread(t *testing.T) {
 		{"unknown mode name", "turbo", prio("7", 2), "Invalid QoS mode"},
 		{"priority key that is not a port number", "port-based", prio("seven", 2), "Invalid port key"},
 		{"priorities outside port-based mode", "802.1p", prio("7", 2), "Priorities need port-based mode"},
+		{"a priority that is not a number", "port-based", types.MapValueMust(types.StringType, map[string]attr.Value{"7": types.StringValue("high")}), "Invalid priority"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

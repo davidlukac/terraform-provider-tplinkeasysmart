@@ -35,7 +35,7 @@ func TestReadmeCompatibilityTable(t *testing.T) {
 	}
 	want := text[:begin+len(readmeBegin)] + "\n\n" + safety.CompatibilityTable() + "\n" + text[end:]
 	if *updateReadme {
-		if err := os.WriteFile(path, []byte(want), 0o644); err != nil { //nolint:gosec // a documentation file
+		if err := os.WriteFile(path, []byte(want), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		return

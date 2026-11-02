@@ -219,7 +219,7 @@ func TestProviderExplainsHowToResolveAnUnknownAttribute(t *testing.T) {
 	}}
 	schemaResp := &provider.SchemaResponse{}
 	p.Schema(context.Background(), provider.SchemaRequest{}, schemaResp)
-	objType := schemaResp.Schema.Type().TerraformType(context.Background()).(tftypes.Object)
+	objType := mustAs[tftypes.Object](t, schemaResp.Schema.Type().TerraformType(context.Background()))
 	raw := tftypes.NewValue(objType, map[string]tftypes.Value{
 		"host":                      tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
 		"mac":                       tftypes.NewValue(tftypes.String, nil),
@@ -256,16 +256,16 @@ func TestNewBuildsTheProductionProvider(t *testing.T) {
 	if meta.TypeName != "tplinkeasysmart" || meta.Version != "9.9.9" {
 		t.Fatalf("metadata %+v", meta)
 	}
-	tp := p.(*tplinkProvider)
+	tp := mustAs[*tplinkProvider](t, p)
 	c, err := tp.newClient(escp.Config{Host: "127.0.0.1"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	real, ok := c.(*escp.Client)
+	prod, ok := c.(*escp.Client)
 	if !ok {
 		t.Fatalf("production wiring must use the ESCP client, got %T", c)
 	}
-	real.Close()
+	prod.Close()
 	if _, err := tp.newClient(escp.Config{Host: "::1"}); err == nil {
 		t.Fatal("an unresolvable host must be reported when the client is built")
 	}

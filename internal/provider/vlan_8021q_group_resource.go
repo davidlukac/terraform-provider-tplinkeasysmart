@@ -130,17 +130,23 @@ func orphanedPorts(table []escp.Dot1QVLAN, id escp.VLANID, newMembers, affected 
 	return affected.Minus(covered)
 }
 
+// vlanMembers is a change of the members of one VLAN: the old ports and the ports it is to have.
+type vlanMembers struct {
+	id        escp.VLANID
+	old, next escp.PortSet
+}
+
 // guard refuses a change of VLAN id from the old to the new members when a port
 // involved carries traffic, or would be left in no VLAN.
-func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []escp.Dot1QVLAN, id escp.VLANID, old, new escp.PortSet) error {
-	affected := old.Union(new)
+func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []escp.Dot1QVLAN, change vlanMembers) error {
+	affected := change.old.Union(change.next)
 	if err := guardPorts(ctx, r.client, allow, affected.Ports()...); err != nil {
 		return err
 	}
 	if allow {
 		return nil
 	}
-	if orphans := orphanedPorts(table, id, new, affected); !orphans.IsEmpty() {
+	if orphans := orphanedPorts(table, change.id, change.next, affected); !orphans.IsEmpty() {
 		return fmt.Errorf("the change would leave port(s) %s in no VLAN, so they could not carry any traffic; set allow_disruptive = true to proceed anyway", orphans)
 	}
 	return nil
@@ -181,7 +187,7 @@ func (r *vlan8021QGroupResource) applyBound(ctx context.Context, m *vlan8021QGro
 	}
 	table := q.VLANs
 	old, _ := findVLAN(table, want.ID)
-	if err := r.guard(ctx, m.AllowDisruptive.ValueBool(), table, want.ID, members(old), members(want)); err != nil {
+	if err := r.guard(ctx, m.AllowDisruptive.ValueBool(), table, vlanMembers{id: want.ID, old: members(old), next: members(want)}); err != nil {
 		add("Refusing to change the 802.1Q VLAN", err.Error())
 		return false
 	}
@@ -256,7 +262,7 @@ func (r *vlan8021QGroupResource) deleteBound(ctx context.Context, req resource.D
 	if !found {
 		return // already gone
 	}
-	if err := r.guard(ctx, state.AllowDisruptive.ValueBool(), table, id, members(old), 0); err != nil {
+	if err := r.guard(ctx, state.AllowDisruptive.ValueBool(), table, vlanMembers{id: id, old: members(old)}); err != nil {
 		resp.Diagnostics.AddError("Refusing to remove the 802.1Q VLAN", err.Error())
 		return
 	}

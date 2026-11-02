@@ -117,7 +117,12 @@ func (r *qosResource) applyBound(ctx context.Context, plan *qosResourceModel, ad
 			add("Invalid port key", fmt.Sprintf("port_priorities key %q is not a port number", k))
 			return false
 		}
-		want[escp.PortID(port)] = escp.Priority(v.(types.Int64).ValueInt64())
+		level, ok := v.(types.Int64)
+		if !ok {
+			add("Invalid priority", fmt.Sprintf("port_priorities[%q] is not a number", k))
+			return false
+		}
+		want[escp.PortID(port)] = escp.Priority(level.ValueInt64())
 		managed[k] = struct{}{}
 	}
 	if problem := qosProblem(plan.Mode, plan.Priorities); problem != "" {
