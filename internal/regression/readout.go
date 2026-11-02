@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/davidlukac/escp-go"
@@ -26,7 +27,7 @@ func CoreReaders(c *escp.Client) []Reader {
 	return []Reader{
 		{"led", func(ctx context.Context) (string, error) {
 			v, err := c.LED(ctx)
-			return fmt.Sprint(v), err
+			return strconv.FormatBool(v), err
 		}},
 		{"igmp", func(ctx context.Context) (string, error) {
 			v, err := c.IGMP(ctx)
@@ -34,7 +35,7 @@ func CoreReaders(c *escp.Client) []Reader {
 		}},
 		{"loop-prevention", func(ctx context.Context) (string, error) {
 			v, err := c.LoopPrevention(ctx)
-			return fmt.Sprint(v), err
+			return strconv.FormatBool(v), err
 		}},
 		{"mac", func(ctx context.Context) (string, error) {
 			v, err := c.Info(ctx)
@@ -115,7 +116,7 @@ func Diff(before, after Readout) []string {
 	for k := range after {
 		names[k] = true
 	}
-	var keys []string
+	keys := make([]string, 0, len(names))
 	for k := range names {
 		keys = append(keys, k)
 	}

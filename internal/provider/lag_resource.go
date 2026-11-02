@@ -91,7 +91,7 @@ func (r *lagResource) Configure(_ context.Context, req resource.ConfigureRequest
 // guardLAG checks every port of the old and new membership. Members of this very
 // group are tolerated (an edit of the group touches them by definition); a link
 // never is, nor are the members of another group.
-func (r *lagResource) guardLAG(ctx context.Context, group escp.LAGID, allow bool, old, new escp.PortSet) error {
+func (r *lagResource) guardLAG(ctx context.Context, group escp.LAGID, allow bool, old, next escp.PortSet) error {
 	if allow {
 		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped")
 		return nil
@@ -100,7 +100,7 @@ func (r *lagResource) guardLAG(ctx context.Context, group escp.LAGID, allow bool
 	if err != nil {
 		return fmt.Errorf("cannot check whether the ports are in use: %w", err)
 	}
-	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{TolerateLAG: group}, old.Union(new)), func(used *safety.PortUseError) error {
+	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{TolerateLAG: group}, old.Union(next)), func(used *safety.PortUseError) error {
 		switch used.Reason {
 		case safety.PortMissing:
 			return errors.New(used.Error())

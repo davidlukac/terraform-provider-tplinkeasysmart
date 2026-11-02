@@ -2,13 +2,11 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -184,126 +182,6 @@ func timeoutOr(configured types.Int64, fallback time.Duration) time.Duration {
 		return time.Duration(configured.ValueInt64()) * time.Second
 	}
 	return fallback
-}
-
-// Configure builds the registry of switches: the provider's own switch (host,
-// username, password, with environment fallbacks) as the default, and every
-// entry of the `switches` map by name. Clients are created lazily; nothing
-// touches the network here.
-func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var cfg providerModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	// A value that is only known after apply (for example taken from another
-	// resource) cannot be used to build a client during planning. Without a
-	// client every resource and data source would dereference nil, so fail
-	// with an explanation instead.
-	for _, attr := range []struct {
-		name  string
-		value attr.Value
-	}{{"host", cfg.Host}, {"mac", cfg.MAC}, {"username", cfg.Username}, {"password", cfg.Password}, {"switches", cfg.Switches}} {
-		if attr.value.IsUnknown() {
-			resp.Diagnostics.AddAttributeError(pathRoot(attr.name), "Unknown switch "+attr.name,
-				"The provider cannot create the switch client because `"+attr.name+"` is not known yet. Apply the resource that provides it first "+
-					"(`terraform apply -target=...`), set the value statically, or use the TPLINK_EASYSMART_"+strings.ToUpper(attr.name)+" environment variable.")
-		}
-	}
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	var entries map[string]switchModel
-	resp.Diagnostics.Append(cfg.Switches.ElementsAs(ctx, &entries, false)...)
-	for name, e := range entries {
-		for _, f := range []struct {
-			attr  string
-			value attr.Value
-		}{{"host", e.Host}, {"mac", e.MAC}, {"username", e.Username}, {"password", e.Password}} {
-			if f.value.IsUnknown() {
-				resp.Diagnostics.AddAttributeError(pathRoot("switches").AtMapKey(name).AtName(f.attr), "Unknown switch "+f.attr,
-					"The provider cannot create the client for switch "+name+" because `"+f.attr+"` is not known yet; set it statically or apply the resource that provides it first.")
-			}
-		}
-	}
-	host := envOr(cfg.Host, envHost)
-	mac := envOr(cfg.MAC, envMAC)
-	user := envOr(cfg.Username, envUsername)
-	pass := envOr(cfg.Password, envPassword)
-	hasDefault := host != "" || mac != "" || len(entries) == 0
-	if hasDefault && host == "" && mac == "" {
-		resp.Diagnostics.AddAttributeError(pathRoot("host"), "Missing switch host or MAC address",
-			"Set `host` or `mac` (or TPLINK_EASYSMART_HOST / TPLINK_EASYSMART_MAC), or define switches with `switches`.")
-	}
-	if _, err := escp.ParseMAC(mac); mac != "" && err != nil {
-		resp.Diagnostics.AddAttributeError(pathRoot("mac"), "Invalid MAC address", err.Error())
-	}
-	if hasDefault && (user == "" || pass == "") {
-		resp.Diagnostics.AddError("Missing credentials", "Set `username`/`password` or TPLINK_EASYSMART_USERNAME/TPLINK_EASYSMART_PASSWORD.")
-	}
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	providerTimeout := timeoutOr(cfg.TimeoutSeconds, defaultTimeout)
-	reg := &switchRegistry{named: map[string]SwitchClient{}}
-	seen := map[string]string{} // "host x" or "mac x" -> switch, so one device is never configured twice
-	providerAllow, err := envBoolOr(cfg.AllowUnverifiedFirmware, envAllowUnverified)
-	if err != nil {
-		resp.Diagnostics.AddAttributeError(pathRoot("allow_unverified_firmware"), "Invalid allow_unverified_firmware", err.Error())
-		return
-	}
-	build := func(name, h, m, u, pw string, timeout time.Duration, allowUnverified bool) {
-		label := name
-		if label == "" {
-			label = "the provider's own switch"
-		}
-		var hw escp.MAC
-		var err error
-		if m != "" {
-			hw, err = escp.ParseMAC(m)
-		}
-		if err != nil { // the schema validator catches this earlier; the environment is checked here
-			resp.Diagnostics.AddError("Invalid MAC address", fmt.Sprintf("%s: %s", label, err))
-			return
-		}
-		for _, id := range []struct{ kind, value string }{{"host", h}, {"mac", hw.String()}} {
-			if id.value == "" {
-				continue
-			}
-			key := id.kind + " " + id.value
-			if other, dup := seen[key]; dup {
-				resp.Diagnostics.AddError("Same switch configured twice", fmt.Sprintf("%s and %s have the same %s %q; two clients on one switch would compete for it.", other, label, id.kind, id.value))
-				return
-			}
-			seen[key] = label
-		}
-		c, err := p.newClient(escp.Config{Host: h, MAC: hw, Username: u, Password: escp.Password(pw), Timeout: timeout, WriteGate: firmwareWriteGate(allowUnverified), Logger: newTflogLogger()})
-		if err != nil {
-			resp.Diagnostics.AddError("Cannot configure switch client", fmt.Sprintf("%s: %s", label, err))
-			return
-		}
-		if name == "" {
-			reg.def = c
-			return
-		}
-		reg.named[name] = c
-	}
-	if hasDefault {
-		build("", host, mac, user, pass, providerTimeout, providerAllow)
-	}
-	for _, name := range sortedKeys(entries) {
-		e := entries[name]
-		allow := providerAllow
-		if !e.AllowUnverifiedFirmware.IsNull() {
-			allow = e.AllowUnverifiedFirmware.ValueBool()
-		}
-		build(name, e.Host.ValueString(), e.MAC.ValueString(), e.Username.ValueString(), e.Password.ValueString(), timeoutOr(e.TimeoutSeconds, providerTimeout), allow)
-	}
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	resp.ResourceData = reg
-	resp.DataSourceData = reg
 }
 
 // sortedKeys returns the map's keys in a stable order, so diagnostics and

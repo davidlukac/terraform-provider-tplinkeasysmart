@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -81,16 +82,7 @@ func (r *portResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 	}
 }
 
-func joinSpeeds() string {
-	out := ""
-	for i, s := range speedNames() {
-		if i > 0 {
-			out += ", "
-		}
-		out += s
-	}
-	return out
-}
+func joinSpeeds() string { return strings.Join(speedNames(), ", ") }
 
 func (r *portResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)

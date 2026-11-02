@@ -59,7 +59,10 @@ func (h tflogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return tflogHandler{groups: h.groups, fields: fields}
 }
 
-func (h tflogHandler) WithGroup(name string) slog.Handler {
+func (h tflogHandler) WithGroup(name string) slog.Handler { return h.inGroup(name) }
+
+// inGroup is the handler with one more open group; an empty name opens none.
+func (h tflogHandler) inGroup(name string) tflogHandler {
 	if name == "" {
 		return h
 	}
@@ -71,10 +74,7 @@ func (h tflogHandler) WithGroup(name string) slog.Handler {
 func (h tflogHandler) addField(fields map[string]any, a slog.Attr) {
 	a.Value = a.Value.Resolve()
 	if a.Value.Kind() == slog.KindGroup {
-		inner := h
-		if a.Key != "" {
-			inner = h.WithGroup(a.Key).(tflogHandler)
-		}
+		inner := h.inGroup(a.Key)
 		for _, g := range a.Value.Group() {
 			inner.addField(fields, g)
 		}

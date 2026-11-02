@@ -39,8 +39,9 @@ func validPortVLANID() validator.Int64 { return int64validator.Between(1, escp.M
 
 // speedNames are the configurable port speeds as Terraform spells them.
 func speedNames() []string {
-	var out []string
-	for _, s := range escp.ConfigurableSpeeds() {
+	speeds := escp.ConfigurableSpeeds()
+	out := make([]string, 0, len(speeds))
+	for _, s := range speeds {
 		out = append(out, s.String())
 	}
 	return out
@@ -60,8 +61,9 @@ func validHostname() []validator.String {
 
 // qosModeNames lists the QoS mode names in mode-number order.
 func qosModeNames() []string {
-	var names []string
-	for _, m := range escp.QoSModes() {
+	modes := escp.QoSModes()
+	names := make([]string, 0, len(modes))
+	for _, m := range modes {
 		names = append(names, m.String())
 	}
 	return names

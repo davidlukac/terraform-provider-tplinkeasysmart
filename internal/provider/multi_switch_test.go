@@ -433,7 +433,7 @@ func TestImportIdsCarryTheSwitchName(t *testing.T) {
 	cfg := twoSwitches + "resource \"tplinkeasysmart_led\" \"b\" {\n  switch  = \"sw02\"\n  enabled = false\n}\n" +
 		"resource \"tplinkeasysmart_port\" \"p\" {\n  switch = \"sw01\"\n  port = 7\n  allow_disruptive = true\n}\n"
 	b.ports = []escp.Port{{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"}}
-	fakes["10.0.0.1"].(*fakeClient).ports = []escp.Port{{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"}}
+	mustAs[*fakeClient](t, fakes["10.0.0.1"]).ports = []escp.Port{{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: multiFactories(fakes, nil),
 		Steps: []resource.TestStep{

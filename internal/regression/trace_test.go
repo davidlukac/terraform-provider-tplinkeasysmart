@@ -71,7 +71,7 @@ func TestTraceWithoutLinesPrintsNothing(t *testing.T) {
 
 func TestTraceKeepsTheLastLinesAndSaysHowManyWereDropped(t *testing.T) {
 	r := &trace{}
-	for i := 0; i < maxTraceLines+3; i++ {
+	for i := range maxTraceLines + 3 {
 		if _, err := fmt.Fprintf(r, "line %d\n", i); err != nil {
 			t.Fatal(err)
 		}

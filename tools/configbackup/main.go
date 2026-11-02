@@ -81,15 +81,21 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer, d 
 	case user == "" || pass == "":
 		say(stderr, "configbackup: set %s and %s\n", envUsername, envPassword)
 	default:
-		return backup(*out, *host, *macText, user, pass, stdout, stderr, d)
+		return backup(backupRequest{out: *out, host: *host, mac: *macText, username: user, password: pass}, stdout, stderr, d)
 	}
 	return exitUsage
 }
 
-func backup(out, host, macText, user, pass string, stdout, stderr io.Writer, d deps) int {
-	cfg := escp.Config{Host: host, Username: user, Password: escp.Password(pass)}
-	if macText != "" {
-		mac, err := escp.ParseMAC(macText)
+// backupRequest is what the command line and the environment ask for.
+type backupRequest struct {
+	out, host, mac     string // the file to create, the switch's address, its MAC address
+	username, password string
+}
+
+func backup(req backupRequest, stdout, stderr io.Writer, d deps) int {
+	cfg := escp.Config{Host: req.host, Username: req.username, Password: escp.Password(req.password)}
+	if req.mac != "" {
+		mac, err := escp.ParseMAC(req.mac)
 		if err != nil {
 			say(stderr, "configbackup: %v\n", err)
 			return exitUsage
@@ -109,11 +115,11 @@ func backup(out, host, macText, user, pass string, stdout, stderr io.Writer, d d
 		say(stderr, "configbackup: no file written: %v\n", err)
 		return exitFailed
 	}
-	if err := save(d.create, out, file); err != nil {
+	if err := save(d.create, req.out, file); err != nil {
 		say(stderr, "configbackup: %v\n", err)
 		return exitFailed
 	}
-	say(stdout, "%s %d bytes sha256=%s\n", out, file.Size(), file.SHA256())
+	say(stdout, "%s %d bytes sha256=%s\n", req.out, file.Size(), file.SHA256())
 	return exitOK
 }
 
