@@ -130,7 +130,7 @@ func startFake(t testing.TB) *escptest.Switch {
 
 // fakeConfig aims a client configuration at the fake: its port, a free local port, loopback broadcast.
 func (s *Session) fakeConfig(cfg escp.Config) escp.Config {
-	cfg.SwitchPort = s.Fake.Port()
+	cfg.SwitchPort = s.Fake.UDPPort()
 	cfg.BroadcastAddr = escptest.Loopback()
 	cfg.Timeout = fakeTimeout
 	return cfg

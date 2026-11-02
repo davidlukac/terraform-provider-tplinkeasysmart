@@ -80,12 +80,12 @@ func validPriorities() []validator.Map {
 // Limits as the descriptions state them, built from the client's constants so the text cannot
 // drift from what is validated.
 func rateRangeText() string {
-	return fmt.Sprintf("0 (unlimited) or a multiple of %d up to %d", escp.RateStepKbps, escp.MaxBandwidthKbps)
+	return fmt.Sprintf("0 (unlimited) or a multiple of %d up to %d", escp.RateStep, escp.MaxBandwidth)
 }
 
 // stormRateRangeText is the rate a storm control with traffic types needs.
 func stormRateRangeText() string {
-	return fmt.Sprintf("%d..%d kbps, multiple of %d", escp.RateStepKbps, escp.MaxBandwidthKbps, escp.RateStepKbps)
+	return fmt.Sprintf("%d..%d kbps, multiple of %d", escp.RateStep, escp.MaxBandwidth, escp.RateStep)
 }
 
 func vlanIDRangeText() string { return fmt.Sprintf("%d-%d", escp.MinVLANID, escp.MaxVLANID) }
@@ -148,8 +148,8 @@ func stormProblem(unicast, multicast, broadcast types.Bool, rate types.Int64) st
 	}
 	anyType := unicast.ValueBool() || multicast.ValueBool() || broadcast.ValueBool()
 	switch {
-	case anyType && rate.ValueInt64() < escp.RateStepKbps:
-		return fmt.Sprintf("a traffic type is selected, so rate_kbps must be a multiple of %d between %d and %d", escp.RateStepKbps, escp.RateStepKbps, escp.MaxBandwidthKbps)
+	case anyType && rate.ValueInt64() < int64(escp.RateStep):
+		return fmt.Sprintf("a traffic type is selected, so rate_kbps must be a multiple of %d between %d and %d", escp.RateStep, escp.RateStep, escp.MaxBandwidth)
 	case !anyType && rate.ValueInt64() != 0:
 		return "rate_kbps is set but no traffic type (unknown_unicast, multicast, broadcast) is selected"
 	}

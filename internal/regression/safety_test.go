@@ -40,7 +40,7 @@ func TestCheckTestPorts(t *testing.T) {
 func TestCheckTestPortsUnreadable(t *testing.T) {
 	s := Open(t, noEnv)
 	s.Fake.Configure(func(f *escptest.Faults) {
-		f.GetFn = func([]escptest.TLVType) ([]escptest.Setting, int32, bool) { return nil, 1, false }
+		f.OnGet = func([]escptest.TLVType) ([]escptest.Setting, int32, bool) { return nil, 1, false }
 	})
 	if err := CheckTestPorts(context.Background(), s.Client, Target{TestPorts: []escp.PortID{2}}); err == nil || !strings.Contains(err.Error(), "cannot read the ports") {
 		t.Errorf("err = %v", err)

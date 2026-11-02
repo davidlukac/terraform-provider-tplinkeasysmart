@@ -21,7 +21,7 @@ func aimedAt(t *testing.T, f *escptest.Switch) deps {
 	t.Helper()
 	return deps{
 		dial: func(cfg escp.Config) (*escp.Client, error) {
-			cfg.SwitchPort, cfg.HostPort, cfg.BroadcastAddr = f.Port(), escptest.FreeUDPPort(t), escptest.Loopback()
+			cfg.SwitchPort, cfg.HostPort, cfg.BroadcastAddr = f.UDPPort(), escptest.FreeUDPPort(t), escptest.Loopback()
 			cfg.Timeout = 200 * time.Millisecond
 			return escp.Dial(cfg)
 		},
@@ -46,7 +46,7 @@ func TestBackupWritesTheWholeVerifiedFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := escptest.ConfigFile()
+	want := escptest.BackupFile()
 	if !bytes.Equal(got, want) {
 		t.Fatalf("saved %d bytes, want the %d-byte file", len(got), len(want))
 	}
@@ -70,7 +70,7 @@ func TestBackupSurvivesALostPacket(t *testing.T) {
 	if code := run([]string{"-out", path}, envOf(goodEnv()), io.Discard, io.Discard, aimedAt(t, f)); code != exitOK {
 		t.Fatalf("exit %d", code)
 	}
-	if got, _ := os.ReadFile(path); !bytes.Equal(got, escptest.ConfigFile()) {
+	if got, _ := os.ReadFile(path); !bytes.Equal(got, escptest.BackupFile()) {
 		t.Fatalf("saved %d bytes, want the whole file", len(got))
 	}
 }

@@ -123,7 +123,7 @@ func TestOpenEnvFileSelectsTarget(t *testing.T) {
 func TestFailingReadsStopTheRun(t *testing.T) {
 	failReads := func(f *escptest.Switch) {
 		f.Configure(func(f *escptest.Faults) {
-			f.GetFn = func([]escptest.TLVType) ([]escptest.Setting, int32, bool) { return nil, 1, false }
+			f.OnGet = func([]escptest.TLVType) ([]escptest.Setting, int32, bool) { return nil, 1, false }
 		})
 	}
 	// Restored cannot say whether the switch is as it was when it cannot read it.

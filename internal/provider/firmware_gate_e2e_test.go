@@ -26,7 +26,7 @@ func realClientFactories(t *testing.T, sw *escptest.Switch) map[string]func() (t
 		"tplinkeasysmart": providerserver.NewProtocol6WithError(&tplinkProvider{
 			version: "test",
 			newClient: func(cfg escp.Config) (SwitchClient, error) {
-				cfg.SwitchPort = sw.Port()
+				cfg.SwitchPort = sw.UDPPort()
 				cfg.HostPort = escptest.FreeUDPPort(t) // the client shares its socket, so a free port is enough
 				cfg.BroadcastAddr = escptest.Loopback()
 				c, err := escp.Dial(cfg)
