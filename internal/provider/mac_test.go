@@ -253,8 +253,8 @@ func TestConfigureRefusesAMalformedMACThatGotPastTheSchema(t *testing.T) {
 	}}
 	schemaResp := &provider.SchemaResponse{}
 	p.Schema(context.Background(), provider.SchemaRequest{}, schemaResp)
-	objType := schemaResp.Schema.Type().TerraformType(context.Background()).(tftypes.Object)
-	entryType := objType.AttributeTypes["switches"].(tftypes.Map).ElementType.(tftypes.Object)
+	objType := mustAs[tftypes.Object](t, schemaResp.Schema.Type().TerraformType(context.Background()))
+	entryType := mustAs[tftypes.Object](t, mustAs[tftypes.Map](t, objType.AttributeTypes["switches"]).ElementType)
 	entry := tftypes.NewValue(entryType, map[string]tftypes.Value{
 		"host":                      tftypes.NewValue(tftypes.String, nil),
 		"mac":                       tftypes.NewValue(tftypes.String, "bogus"),

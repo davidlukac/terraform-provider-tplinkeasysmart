@@ -19,7 +19,7 @@ func TestPortMirrorReadDefaultsAllowDisruptiveToFalse(t *testing.T) {
 	r := &portMirrorResource{src: &switchRegistry{def: newFaulty(&fakeClient{ports: testPorts(), mirror: &escp.Mirror{}})}}
 	var sch resource.SchemaResponse
 	r.Schema(ctx, resource.SchemaRequest{}, &sch)
-	objType := sch.Schema.Type().TerraformType(ctx).(tftypes.Object)
+	objType := mustAs[tftypes.Object](t, sch.Schema.Type().TerraformType(ctx))
 	raw := tftypes.NewValue(objType, map[string]tftypes.Value{
 		"id":               tftypes.NewValue(tftypes.String, "port_mirror"),
 		"enabled":          tftypes.NewValue(tftypes.Bool, false),

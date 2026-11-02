@@ -183,7 +183,7 @@ func (g *gatedClient) SetIPConfig(ctx context.Context, cfg escp.IPConfig) error 
 func TestGatedTestClientCoversEveryWriteMethod(t *testing.T) {
 	ifaceType := reflect.TypeOf((*SwitchClient)(nil)).Elem()
 	checked := 0
-	for i := 0; i < ifaceType.NumMethod(); i++ {
+	for i := range ifaceType.NumMethod() {
 		m := ifaceType.Method(i)
 		if !strings.HasPrefix(m.Name, "Set") && !strings.HasPrefix(m.Name, "Delete") && !strings.HasPrefix(m.Name, "Enable") {
 			continue
@@ -215,7 +215,7 @@ func TestFirmwareGateAllowsVerifiedBuildsAndReadsTheFirmwareOnce(t *testing.T) {
 	for _, version := range []string{verifiedFirmware, newerFirmware} {
 		inner := newFaulty(firmwareFake(version))
 		client := gated(inner, escp.Config{WriteGate: firmwareWriteGate(false)})
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			if err := client.SetLED(context.Background(), false); err != nil {
 				t.Fatalf("%s: %v", version, err)
 			}
@@ -240,7 +240,7 @@ func TestFirmwareGateRefusesAnUnverifiedBuildButNotReads(t *testing.T) {
 		t.Fatalf("reads must work on any firmware: %v", err)
 	}
 	// the verdict is not cached: a switch that later reports a verified build is accepted
-	inner.SwitchClient.(*fakeClient).setFirmware(verifiedFirmware)
+	mustAs[*fakeClient](t, inner.SwitchClient).setFirmware(verifiedFirmware)
 	if err := client.SetLED(context.Background(), false); err != nil {
 		t.Fatalf("a refusal must not stick: %v", err)
 	}

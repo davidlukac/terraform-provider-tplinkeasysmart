@@ -17,7 +17,44 @@ linters:
     - unused
     - gosec
     - forbidigo
+    # The stricter set of escp-go (readability, naming, misuse of the language, complexity limits).
+    - gocritic
+    - predeclared
+    - errname
+    - nilerr
+    - nolintlint
+    - gocyclo
+    - gocognit
+    - nestif
+    - unparam
+    - prealloc
+    - intrange
+    - copyloopvar
+    - nakedret
+    - unconvert
+    - wastedassign
+    - whitespace
+    - recvcheck
+    - contextcheck
+    - noctx
+    - exhaustive
+    - perfsprint
+    - usestdlibvars
+    - forcetypeassert
+    - dupword
+    - errchkjson
   settings:
+    gocyclo:
+      min-complexity: 15
+    gocognit:
+      min-complexity: 20
+    nestif:
+      min-complexity: 5
+    exhaustive:
+      default-signifies-exhaustive: true
+    nolintlint:
+      require-explanation: true
+      require-specific: true
     misspell:
       # American English, as the Go standard library and godoc spell it.
       locale: US
@@ -37,6 +74,14 @@ linters:
         - name: error-naming
         - name: if-return
         - name: var-naming
+        - name: receiver-naming
+        - name: indent-error-flow
+        - name: superfluous-else
+        - name: unexported-return
+        - name: redefines-builtin-id
+        - name: bare-return
+        - name: argument-limit
+          arguments: [5]
         - name: package-comments
           disabled: true
         - name: unused-parameter
@@ -53,6 +98,15 @@ linters:
           - errcheck
           - revive
           - forbidigo
+          # Tests are long on purpose (tables, scripted switches) and read top to bottom.
+          - gocyclo
+          - gocognit
+          - nestif
+          - unparam
+          - prealloc
+          - contextcheck
+          - noctx
+          - perfsprint
 
 formatters:
   enable:
