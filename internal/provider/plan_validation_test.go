@@ -135,7 +135,7 @@ func TestMirrorSourcesKnownOnlyAtApplyAreAccepted(t *testing.T) {
 
 func TestStormProblem(t *testing.T) {
 	yes, no, unk := types.BoolValue(true), types.BoolValue(false), types.BoolUnknown()
-	rate := func(n int64) types.Int64 { return types.Int64Value(n) }
+	rate := types.Int64Value
 	cases := []struct {
 		name            string
 		uu, mc, bc      types.Bool

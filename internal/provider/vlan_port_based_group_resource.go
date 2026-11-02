@@ -82,7 +82,7 @@ func (r *portVLANResource) Configure(_ context.Context, req resource.ConfigureRe
 // guardVLAN checks every port of the old and new membership: none may have a
 // link up or belong to a LAG, because VLAN membership is exclusive and a
 // change moves the port out of its previous group.
-func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new escp.PortSet) error {
+func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, next escp.PortSet) error {
 	if allow {
 		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped")
 		return nil
@@ -91,7 +91,7 @@ func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, new e
 	if err != nil {
 		return fmt.Errorf("cannot check whether the ports are in use: %w", err)
 	}
-	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{}, old.Union(new)), func(used *safety.PortUseError) error {
+	return wordPortRefusal(safety.CheckPorts(all, safety.PortRule{}, old.Union(next)), func(used *safety.PortUseError) error {
 		switch used.Reason {
 		case safety.PortMissing:
 			return errors.New(used.Error())

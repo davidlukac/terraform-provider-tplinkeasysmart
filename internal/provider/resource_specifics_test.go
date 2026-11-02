@@ -315,7 +315,7 @@ func TestResourcesReportUndecodablePlanAndState(t *testing.T) {
 			t.Parallel()
 			fc := newFaulty(&fakeClient{})
 			r := ctor()
-			r.(resource.ResourceWithConfigure).Configure(ctx, resource.ConfigureRequest{ProviderData: &switchRegistry{def: fc}}, &resource.ConfigureResponse{})
+			mustAs[resource.ResourceWithConfigure](t, r).Configure(ctx, resource.ConfigureRequest{ProviderData: &switchRegistry{def: fc}}, &resource.ConfigureResponse{})
 			var sch resource.SchemaResponse
 			r.Schema(ctx, resource.SchemaRequest{}, &sch)
 			objType := sch.Schema.Type().TerraformType(ctx)

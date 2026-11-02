@@ -95,21 +95,26 @@ func ParseEnvFile(r io.Reader) (map[string]string, error) {
 // (the addresses in TPLINK_REGRESSION_READONLY_HOSTS, comma separated), and a port may not be
 // both a test port and a protected one.
 func LoadTarget(env map[string]string) (Target, error) {
-	name := env[EnvTarget]
-	switch name {
+	switch name := env[EnvTarget]; name {
 	case "", TargetFake:
 		return Target{Name: TargetFake, Host: "127.0.0.1", Username: "admin", Password: "secret",
 			TestPorts: []escp.PortID{2, 3, 4, 5}, ProtectedPorts: []escp.PortID{1, 6, 7, 8}, DisruptivePorts: []escp.PortID{7, 8}}, nil
-	case TargetSW03:
 	case targetSW01:
 		return Target{}, errors.New("switch 01 is read-only for the regression suite and is never a target")
+	case TargetSW03:
+		return hardwareTarget(env, name)
 	default:
 		return Target{}, fmt.Errorf("unknown target %q (use %s or %s)", name, TargetFake, TargetSW03)
 	}
+}
+
+// hardwareTarget reads a real switch's target: where it is, who may write to it, which ports the
+// run may touch and which it never does, and what the run opted in to.
+func hardwareTarget(env map[string]string, name string) (Target, error) {
 	t := Target{Name: name, Host: env[envHost], Username: env[envUsername], Password: escp.Password(env[envPassword])}
-	for key, v := range map[string]string{envHost: t.Host, envUsername: t.Username, envPassword: env[envPassword]} {
-		if v == "" {
-			return Target{}, fmt.Errorf("%s is not set for target %s", key, name)
+	for _, s := range []struct{ key, value string }{{envHost, t.Host}, {envUsername, t.Username}, {envPassword, env[envPassword]}} {
+		if s.value == "" {
+			return Target{}, fmt.Errorf("%s is not set for target %s", s.key, name)
 		}
 	}
 	for _, h := range strings.Split(env[envReadOnlyHosts], ",") {
@@ -117,53 +122,70 @@ func LoadTarget(env map[string]string) (Target, error) {
 			return Target{}, fmt.Errorf("host %s is a read-only switch and is never a target", t.Host)
 		}
 	}
+	if err := loadPorts(&t, env); err != nil {
+		return Target{}, err
+	}
+	if err := loadOptIns(&t, env); err != nil {
+		return Target{}, err
+	}
+	return t, nil
+}
+
+// loadPorts reads the test ports and the protected ports, which may not overlap.
+func loadPorts(t *Target, env map[string]string) error {
 	var err error
 	if t.TestPorts, err = parsePorts(env[envTestPorts]); err != nil {
-		return Target{}, fmt.Errorf("%s: %w", envTestPorts, err)
+		return fmt.Errorf("%s: %w", envTestPorts, err)
 	}
 	if len(t.TestPorts) == 0 {
-		return Target{}, fmt.Errorf("%s names no test port", envTestPorts)
+		return fmt.Errorf("%s names no test port", envTestPorts)
 	}
 	if t.ProtectedPorts, err = parsePorts(env[envProtectedPorts]); err != nil {
-		return Target{}, fmt.Errorf("%s: %w", envProtectedPorts, err)
+		return fmt.Errorf("%s: %w", envProtectedPorts, err)
 	}
 	for _, p := range t.TestPorts {
-		for _, q := range t.ProtectedPorts {
-			if p == q {
-				return Target{}, fmt.Errorf("port %d is both a test port and a protected port", p)
-			}
+		if slices.Contains(t.ProtectedPorts, p) {
+			return fmt.Errorf("port %d is both a test port and a protected port", p)
 		}
 	}
+	return nil
+}
+
+// loadOptIns reads what a run may do beyond the test ports: move the management address, use
+// DHCP, and drive the device ports for real.
+func loadOptIns(t *Target, env map[string]string) error {
 	if env[EnvAllowMove] == "1" {
+		var err error
 		if t.MoveIP, err = moveIP(env[envMoveIP], t.Host, env[envReadOnlyHosts]); err != nil {
-			return Target{}, fmt.Errorf("%s: %w", envMoveIP, err)
+			return fmt.Errorf("%s: %w", envMoveIP, err)
 		}
 	}
 	t.DHCP = env[EnvAllowDHCP] == "1"
+	// the device ports are the protected ports other than the uplink, which is listed first
+	devices := t.ProtectedPorts[min(1, len(t.ProtectedPorts)):]
 	if v := env[envDisruptPort]; v != "" {
 		ports, err := parsePorts(v)
 		if err != nil || len(ports) != 1 {
-			return Target{}, fmt.Errorf("%s: %q is not one port number", envDisruptPort, v)
+			return fmt.Errorf("%s: %q is not one port number", envDisruptPort, v)
 		}
-		if !slices.Contains(t.ProtectedPorts[min(1, len(t.ProtectedPorts)):], ports[0]) {
-			return Target{}, fmt.Errorf("%s: port %d is not a device port (the protected ports other than the uplink, which is listed first, are %v)", envDisruptPort, ports[0], t.ProtectedPorts[min(1, len(t.ProtectedPorts)):])
+		if !slices.Contains(devices, ports[0]) {
+			return fmt.Errorf("%s: port %d is not a device port (the protected ports other than the uplink, which is listed first, are %v)", envDisruptPort, ports[0], devices)
 		}
 		t.DisruptPort = ports[0]
 	}
 	if v := env[envDisruptivePorts]; v != "" {
 		ports, err := parsePorts(v)
 		if err != nil || len(ports) == 0 {
-			return Target{}, fmt.Errorf("%s: %q is not a list of port numbers", envDisruptivePorts, v)
+			return fmt.Errorf("%s: %q is not a list of port numbers", envDisruptivePorts, v)
 		}
-		devices := t.ProtectedPorts[min(1, len(t.ProtectedPorts)):]
 		for _, p := range ports {
 			if !slices.Contains(devices, p) {
-				return Target{}, fmt.Errorf("%s: port %d is not a device port (the protected ports other than the uplink, which is listed first, are %v)", envDisruptivePorts, p, devices)
+				return fmt.Errorf("%s: port %d is not a device port (the protected ports other than the uplink, which is listed first, are %v)", envDisruptivePorts, p, devices)
 			}
 		}
 		t.DisruptivePorts = ports
 	}
-	return t, nil
+	return nil
 }
 
 // moveIP checks the spare address for the management move: an IPv4 address that is neither the

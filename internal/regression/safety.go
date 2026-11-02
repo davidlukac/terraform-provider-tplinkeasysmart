@@ -20,7 +20,7 @@ func CheckTestPorts(ctx context.Context, c *escp.Client, t Target) error {
 		byID[p.ID] = p
 	}
 	for _, id := range t.TestPorts {
-		p, ok := byID[escp.PortID(id)]
+		p, ok := byID[id]
 		switch {
 		case !ok:
 			return fmt.Errorf("test port %d does not exist on the switch", id)

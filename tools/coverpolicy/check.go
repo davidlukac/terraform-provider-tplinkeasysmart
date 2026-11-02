@@ -5,6 +5,7 @@ import (
 	"io"
 	"path/filepath"
 	"sort"
+	"strconv"
 )
 
 // result is the policy applied to a profile.
@@ -75,7 +76,7 @@ func evaluate(blocks map[span]counts, root string) result {
 			continue
 		}
 		r.excluded += c.statements
-		id := [3]string{key.file, fmt.Sprint(ex.start), ex.reason}
+		id := [3]string{key.file, strconv.Itoa(ex.start), ex.reason}
 		if totals[id] == nil {
 			totals[id] = &exclusionTotal{file: key.file, line: ex.start, reason: ex.reason}
 			order = append(order, totals[id])
