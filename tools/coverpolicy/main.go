@@ -6,9 +6,7 @@
 //
 // Policy: every statement of the module is covered, except inside functions whose doc comment
 // contains `coverage: ignore - <reason>`; the reason is mandatory and every exclusion is listed.
-// Test files are not measured, and neither are the path prefixes in notMeasured: today the frozen,
-// unreferenced copy of the ESCP library (internal/escp), which keeps its own tests until it is
-// deleted. The badge counts the excluded statements as not covered.
+// Test files are not measured. The badge counts the excluded statements as not covered.
 //
 // It replaces scripts/covercheck.py and scripts/coverbadge.py and uses only the standard library.
 package main

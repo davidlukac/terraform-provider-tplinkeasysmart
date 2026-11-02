@@ -9,12 +9,6 @@ import (
 	"strings"
 )
 
-// notMeasured are the path prefixes (relative to the module root) that the policy does not measure.
-// Their statements are dropped from the profile, so neither the policy nor the badge counts them.
-// internal/escp is the frozen, unreferenced copy of the ESCP library that the provider used before it
-// switched to github.com/davidlukac/escp-go (its tests still run until the directory is deleted).
-var notMeasured = []string{"internal/escp/"}
-
 // blockLine is one line of a cover profile: file:startLine.col,endLine.col statements count.
 var blockLine = regexp.MustCompile(`^(.+):(\d{1,9})\.(\d{1,9}),(\d{1,9})\.(\d{1,9}) (\d{1,9}) (\d{1,9})$`)
 
@@ -57,9 +51,6 @@ func parseProfile(text, module string) (map[span]counts, error) {
 			return nil, fmt.Errorf("unparseable cover profile line: %q", line)
 		}
 		name := strings.TrimPrefix(m[1], module+"/")
-		if skipped(name) {
-			continue
-		}
 		key := span{file: name, start: atoi(m[2]), startCol: atoi(m[3]), end: atoi(m[4]), endCol: atoi(m[5])}
 		c := blocks[key]
 		c.statements = atoi(m[6])
@@ -67,16 +58,6 @@ func parseProfile(text, module string) (map[span]counts, error) {
 		blocks[key] = c
 	}
 	return blocks, nil
-}
-
-// skipped reports whether the file belongs to a package that is not measured.
-func skipped(name string) bool {
-	for _, prefix := range notMeasured {
-		if strings.HasPrefix(name, prefix) {
-			return true
-		}
-	}
-	return false
 }
 
 // atoi converts the digits the profile pattern has already checked (at most nine, so no overflow).

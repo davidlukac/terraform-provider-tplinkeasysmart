@@ -53,21 +53,6 @@ func TestDuplicateBlocksFromSeveralTestBinariesAreMerged(t *testing.T) {
 	}
 }
 
-func TestTheFrozenLibraryCopyIsNotMeasured(t *testing.T) {
-	blocks := mustParse(t, profileOf([5]any{"internal/escp/switch.go", 1, 2, 9, 0}, [5]any{"internal/provider/client.go", 1, 2, 3, 1}))
-	want := map[span]counts{{"internal/provider/client.go", 1, 2, 1, 2}: {3, 1}}
-	if !reflect.DeepEqual(blocks, want) {
-		t.Fatalf("got %v, want %v", blocks, want)
-	}
-}
-
-func TestAPackageThatOnlyLooksLikeTheFrozenCopyIsMeasured(t *testing.T) {
-	blocks := mustParse(t, profileOf([5]any{"internal/escpx/a.go", 1, 2, 3, 0}))
-	if _, ok := blocks[span{"internal/escpx/a.go", 1, 2, 1, 2}]; len(blocks) != 1 || !ok {
-		t.Fatalf("got %v, want the block of escpx", blocks)
-	}
-}
-
 func TestAMalformedProfileIsAnError(t *testing.T) {
 	if _, err := parseProfile("mode: atomic\ngarbage\n", module); err == nil || !strings.Contains(err.Error(), "garbage") {
 		t.Fatalf("got %v, want an error naming the line", err)

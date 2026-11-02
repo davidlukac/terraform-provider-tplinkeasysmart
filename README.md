@@ -229,7 +229,7 @@ Set `TF_LOG=DEBUG` (or `INFO`) to see what the client does: every request and re
 
 ## How it works
 
-The provider talks UDP port 29808/29809 on the switch's own layer-2 segment: discovery, an RSA session-key exchange, RC4-encrypted TLV requests, then reads and writes with read-back. The wire format, every TLV layout and what was verified live are in [`internal/escp/PROTOCOL.md`](internal/escp/PROTOCOL.md).
+The provider talks UDP port 29808/29809 on the switch's own layer-2 segment: discovery, an RSA session-key exchange, RC4-encrypted TLV requests, then reads and writes with read-back. The wire format, every TLV layout and what was verified live are in the library's [`PROTOCOL.md`](https://github.com/davidlukac/escp-go/blob/main/PROTOCOL.md).
 
 ```
 internal/provider             provider, resources and data sources, guards, validation
@@ -272,7 +272,7 @@ provider_installation {
 
 The coverage badge is the **measured** statement coverage of the module, computed by CI on every push to `main` (exclusions are counted as not covered). The *policy* below is stricter than a number: it fails the build on any uncovered statement.
 
-Policy: **every statement is covered**, except inside functions whose doc comment says `// coverage: ignore - <reason>` (the reason is mandatory; `tools/coverpolicy` (`go run ./tools/coverpolicy check cover.out`) fails the build without it and lists every exclusion). A test must fail when the behavior it names is broken; safety checks are never removed to raise a number. Test files and the fake switch (`internal/escp/escptest`) are not measured: the library's tests exercise the fake, and a branch no test reaches there is a gap in the fake, not in the product.
+Policy: **every statement is covered**, except inside functions whose doc comment says `// coverage: ignore - <reason>` (the reason is mandatory; `tools/coverpolicy` (`go run ./tools/coverpolicy check cover.out`) fails the build without it and lists every exclusion). A test must fail when the behavior it names is broken; safety checks are never removed to raise a number. Test files are not measured, and the library (`escp-go`) has its own tests and its own policy.
 
 Failure paths are exercised without hardware:
 
