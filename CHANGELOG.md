@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.32.4
+
+- **Fix:** the `host` setting (provider or switch) is refused when the provider is configured if it cannot name one switch: the unspecified address, a multicast group, `255.255.255.255`, an IPv6 address, `host:port` or a name with a space ("Cannot configure switch client: … does not name one switch"). Every write carries the admin password, so such an address would have sent it, with the write, to every device on the segment. The check is in the library ([escp-go](https://github.com/davidlukac/escp-go) v0.4.0, which the provider now uses); a `mac` setting, a name or a normal address is unaffected. Internal, no other change in behavior: the provider follows the library's renames (the full hardware regression on a real switch passed on Terraform 1.17.1: 67 passed, 0 failed, 7 opt-in skips, the configuration files of both test switches read byte for byte as before, no ping lost to the router or switch 01), the code and docs use American English, and CI tests Terraform 1.4, 1.6, 1.8, 1.10, 1.12, 1.14, 1.16 and the latest release, and tries the newest pre-release.
+
 ## 0.32.3
 
 - Internal, no change in behaviour: the provider uses [github.com/davidlukac/escp-go](https://github.com/davidlukac/escp-go) v0.3.0 (the library renamed fields and methods before 1.0, and now refuses an unusable client configuration, a refused read and a bad value earlier and in a fixed order; the full hardware regression on a real switch passed: 67 passed, 0 failed, 7 opt-in skips, the configuration files of both test switches read byte for byte as before, no ping lost to the router or switch 01).
