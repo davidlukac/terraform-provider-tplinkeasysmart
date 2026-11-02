@@ -13,6 +13,10 @@ generate:
 lint:
 	$(DEVTOOL) golangci-lint run ./...
 
+# The workflow files (a pinned actionlint, run by hand: a workflow change is not covered by the pre-commit hook).
+actionlint:
+	$(DEVTOOL) actionlint
+
 # Unit tests plus Terraform lifecycle tests against fakes. No hardware is touched.
 test:
 	go test -race -count=1 ./...
@@ -87,7 +91,7 @@ regression-live:
 compat-table:
 	go test ./internal/provider -run TestReadmeCompatibilityTable -update-readme
 
-.PHONY: work unwork compat-table regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
+.PHONY: work unwork actionlint compat-table regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
 
 # --- coverage -------------------------------------------------------------
 # `make cover` runs the whole suite with the race detector, writes cover.out
@@ -102,3 +106,30 @@ cover:
 
 cover-html: cover
 	go tool cover -html=cover.out -o coverage.html
+
+# --- mutation testing -----------------------------------------------------
+# gremlins (pinned in devtools/go.mod) flips the conditionals, boundaries and arithmetic of the code
+# one at a time and the tests of its package must fail for each: coverage says a line ran, a surviving
+# mutant says no test would notice if it were wrong. Left out: the programs under tools/ and main.go
+# (gremlins reports every mutant in a `package main` as surviving whatever the tests do).
+#
+# The tests of internal/provider run Terraform lifecycles and take about two minutes, and gremlins runs
+# the whole package once per mutant, so the module cannot be mutated as a whole (about 400 mutants):
+#   make mutation        the packages with fast tests (internal/regression, about a minute); run weekly in CI.
+#                        EFFICACY=90 fails below that share of caught mutants, WORKERS=n sets the parallelism.
+#   make mutation-diff   only the lines changed since BASE (default origin/main), in any package; what a pull
+#                        request runs when the change is small. Count on about a minute per changed line.
+# The report is build/mutation.json.
+.PHONY: mutation mutation-diff
+
+# gremlins does not create the directory of its report. GOFLAGS=-count=1: gremlins sizes the timeout of a
+# mutant from the time of its first test run, and a cached result takes no time, so without it every
+# mutant of a package whose tests ran before "times out" (seen: 59 of 63).
+mutate = @mkdir -p build && GOFLAGS=-count=1 $(DEVTOOL) gremlins unleash $(1) --workers $(or $(WORKERS),4) --coverpkg $(2) \
+	--output build/mutation.json -E '^tools/' -E '^main\.go$$'
+
+mutation:
+	$(call mutate,./internal/regression,./internal/regression/...) $(if $(EFFICACY),--threshold-efficacy $(EFFICACY))
+
+mutation-diff:
+	$(call mutate,.,./...) --diff $(or $(BASE),origin/main)

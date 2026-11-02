@@ -1,0 +1,108 @@
+# Mutation testing (gremlins, pinned in devtools/go.mod): the code's conditionals, boundaries and
+# arithmetic are flipped one at a time, and the tests of the package must fail for each. Coverage says a
+# line ran; this says a test would notice if it were wrong. `make mutation` and `make mutation-diff`
+# reproduce both jobs locally.
+#
+# The tests of internal/provider take about two minutes and gremlins runs the whole package for every
+# mutant, so the module as a whole is out of reach (about 400 mutants):
+#   * On a pull request: only the lines the change touches, and only when the change is small (at most
+#     LINE_LIMIT lines of non-test Go code). Informational: the mutants that survived are listed in the
+#     job summary; an equivalent mutant is not a reason to bend a test.
+#   * Weekly and on request: the packages with fast tests (internal/regression). Fails below the
+#     efficacy threshold, so a slow slide in test quality is noticed.
+name: Mutation testing
+
+on:
+  pull_request:
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "devtools/go.mod"
+      - ".github/workflows/mutation.yml"
+  schedule:
+    - cron: "47 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      efficacy:
+        description: Fail below this percentage of caught mutants
+        default: "90"
+
+concurrency:
+  group: mutation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Lines of non-test Go code a pull request may change for the job to run: about a minute per line
+  # (two minutes per mutant, four workers, one mutant for every two lines).
+  LINE_LIMIT: "40"
+
+jobs:
+  changed:
+    name: Mutants in the changed lines
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Size of the change
+        id: size
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          lines=$(git diff --numstat "origin/${BASE_REF}...HEAD" -- '*.go' ':(exclude)*_test.go' | awk '$1 != "-" {n += $1} END {print n + 0}')
+          echo "lines=$lines" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/setup
+        if: fromJSON(steps.size.outputs.lines) <= fromJSON(env.LINE_LIMIT)
+        with:
+          go-version: stable
+          terraform: latest
+      - name: Mutate the lines this pull request changes
+        if: fromJSON(steps.size.outputs.lines) <= fromJSON(env.LINE_LIMIT)
+        run: make mutation-diff BASE="origin/${BASE_REF}" WORKERS=4
+        env:
+          BASE_REF: ${{ github.base_ref }}
+      - name: Summary
+        if: always()
+        env:
+          LINES: ${{ steps.size.outputs.lines }}
+        run: |
+          if [ "$LINES" -gt "$LINE_LIMIT" ]; then
+            {
+              echo "### Mutation testing"
+              echo
+              echo "This change touches $LINES lines of non-test Go code, over the limit of $LINE_LIMIT: the tests of \`internal/provider\` take about two minutes for every mutant, so the job does not run. Mutate the part you care about locally with \`make mutation-diff\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            go run ./tools/mutationreport build/mutation.json >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  fast-packages:
+    name: The packages with fast tests
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-version: stable
+      - name: Mutate every covered operator
+        run: make mutation WORKERS=4 EFFICACY="${EFFICACY}"
+        env:
+          EFFICACY: ${{ inputs.efficacy || '90' }}
+      - name: Summary
+        if: always()
+        run: go run ./tools/mutationreport build/mutation.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: mutation-report
+          path: build/mutation.json
+          if-no-files-found: ignore
+          retention-days: 30

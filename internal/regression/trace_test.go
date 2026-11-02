@@ -86,3 +86,18 @@ func TestTraceKeepsTheLastLinesAndSaysHowManyWereDropped(t *testing.T) {
 		t.Errorf("%d lines kept, want %d", n, maxTraceLines)
 	}
 }
+
+// A trace that lost nothing does not say so.
+func TestTraceThatLostNothingDoesNotMentionDroppedLines(t *testing.T) {
+	r := &trace{}
+	for i := range 3 {
+		if _, err := fmt.Fprintf(r, "line %d\n", i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d := &deferredTB{TB: t, failed: true}
+	r.dumpIfFailed(d)
+	if got := d.logs[0]; strings.Contains(got, "dropped") || !strings.Contains(got, "line 0") {
+		t.Errorf("trace = %s", got)
+	}
+}
