@@ -1,10 +1,10 @@
 package wire
 
-// TLVType is the number that says what a TLV holds (the catalogue below). Comparing or passing a
+// TLVType is the number that says what a TLV holds (the catalog below). Comparing or passing a
 // plain number as a type is a compile error.
 type TLVType int16
 
-// TLV types of the ESCP protocol, as used by this client. The catalogue is the one
+// TLV types of the ESCP protocol, as used by this client. The catalog is the one
 // place that maps a number to its meaning; the settings code in the parent package
 // owns the layout of each value.
 //

@@ -120,7 +120,7 @@ func (c *Client) interruptOnDone(ctx context.Context) func() {
 	}
 }
 
-// expired reports why the call must stop: the context was cancelled, or its
+// expired reports why the call must stop: the context was canceled, or its
 // deadline has passed. The socket deadline equals the context deadline and can
 // fire slightly before the context's own timer does, so the deadline is
 // compared directly instead of waiting for ctx.Err() to catch up.
@@ -187,7 +187,7 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 	defer c.interruptOnDone(ctx)()
 	c.wrong = nil
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
-		if err := expired(ctx); err != nil { // a cancelled call sends nothing, not even a retry
+		if err := expired(ctx); err != nil { // a canceled call sends nothing, not even a retry
 			return reply{}, err
 		}
 		if err := c.send(op, tlvs, static, to); err != nil {

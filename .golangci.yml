@@ -18,6 +18,9 @@ linters:
     - gosec
     - forbidigo
   settings:
+    misspell:
+      # American English, as the Go standard library and godoc spell it.
+      locale: US
     forbidigo:
       # The ESCP library writes nowhere on its own: every message goes through the
       # *slog.Logger the caller passes in (Config.Logger, DiscoverOptions.Logger).

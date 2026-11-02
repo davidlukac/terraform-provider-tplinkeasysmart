@@ -124,7 +124,7 @@ func TestPlanWithOnlyTheFlagChanged(t *testing.T) {
 			t.Fatalf("ok=%v got=%v", ok, got)
 		}
 		if _, ok := planWithOnlyTheFlagChanged(prior, mk(4, "1000Mbps-full", false, set(1, 2))); !ok {
-			t.Fatal("adding the flag alone must be recognised too")
+			t.Fatal("adding the flag alone must be recognized too")
 		}
 	})
 	t.Run("a computed attribute the plan cannot decide keeps its prior value", func(t *testing.T) {

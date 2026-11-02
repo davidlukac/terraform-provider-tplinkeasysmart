@@ -52,7 +52,7 @@ The Easy Smart line (TL-SG105E, TL-SG108E, TL-SG1016DE and friends) is cheap, qu
 
 ## Quick start
 
-> **Status:** pre-1.0. Install from the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart) with `terraform init`; releases are signed. Until 1.0 a minor version may change behaviour, so pin it (`~> 0.26`) and read the [changelog](CHANGELOG.md) before upgrading.
+> **Status:** pre-1.0. Install from the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart) with `terraform init`; releases are signed. Until 1.0 a minor version may change behavior, so pin it (`~> 0.26`) and read the [changelog](CHANGELOG.md) before upgrading.
 
 New to it, or trying a different model? Start with **only** the read-only data sources (`system_info`, `ports`): they confirm the login and the protocol on your switch and firmware without a single write.
 
@@ -215,7 +215,7 @@ Other Easy Smart models are expected to speak the same protocol family; that is 
 | OpenTofu | The latest release (informational job) |
 | Go | The version in [`go.mod`](go.mod) and the latest stable, for building from source |
 
-Behaviour of other models and firmware is documented in the [protocol notes](https://github.com/davidlukac/escp-go/blob/main/PROTOCOL.md) as it is verified.
+Behavior of other models and firmware is documented in the [protocol notes](https://github.com/davidlukac/escp-go/blob/main/PROTOCOL.md) as it is verified.
 
 ## Constraints (read these)
 
@@ -272,7 +272,7 @@ provider_installation {
 
 The coverage badge is the **measured** statement coverage of the module, computed by CI on every push to `main` (exclusions are counted as not covered). The *policy* below is stricter than a number: it fails the build on any uncovered statement.
 
-Policy: **every statement is covered**, except inside functions whose doc comment says `// coverage: ignore - <reason>` (the reason is mandatory; `tools/coverpolicy` (`go run ./tools/coverpolicy check cover.out`) fails the build without it and lists every exclusion). A test must fail when the behaviour it names is broken; safety checks are never removed to raise a number. Test files and the fake switch (`internal/escp/escptest`) are not measured: the library's tests exercise the fake, and a branch no test reaches there is a gap in the fake, not in the product.
+Policy: **every statement is covered**, except inside functions whose doc comment says `// coverage: ignore - <reason>` (the reason is mandatory; `tools/coverpolicy` (`go run ./tools/coverpolicy check cover.out`) fails the build without it and lists every exclusion). A test must fail when the behavior it names is broken; safety checks are never removed to raise a number. Test files and the fake switch (`internal/escp/escptest`) are not measured: the library's tests exercise the fake, and a branch no test reaches there is a gap in the fake, not in the product.
 
 Failure paths are exercised without hardware:
 

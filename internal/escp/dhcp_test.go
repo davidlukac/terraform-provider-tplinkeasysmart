@@ -161,7 +161,7 @@ func TestEnableDHCPDoesNotWaitAfterARefusal(t *testing.T) {
 }
 
 // A caller that gives up after the write was sent still gets the answer: the lookup runs on its own budget.
-func TestEnableDHCPSettlesWhenTheCallIsCancelledAfterTheWrite(t *testing.T) {
+func TestEnableDHCPSettlesWhenTheCallIsCanceledAfterTheWrite(t *testing.T) {
 	f := escptest.Start(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	f.Configure(func(f *escptest.Switch) {
@@ -236,7 +236,7 @@ func TestEnableDHCPKeepsWaitingForAUsableLease(t *testing.T) {
 }
 
 // A caller that has already given up sends nothing: not the read before the write, and not the write.
-func TestEnableDHCPWithACancelledContextSendsNothing(t *testing.T) {
+func TestEnableDHCPWithACanceledContextSendsNothing(t *testing.T) {
 	f := escptest.Start(t)
 	c, lookups := dialLeasing(t, f)
 	ctx, cancel := context.WithCancel(context.Background())

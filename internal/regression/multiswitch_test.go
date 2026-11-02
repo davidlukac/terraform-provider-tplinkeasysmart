@@ -66,7 +66,7 @@ func TestScenarioMultiSwitch(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !origA || !origB {
-		t.Fatalf("the modelled switches start with the LED on, got a=%t b=%t", origA, origB)
+		t.Fatalf("the modeled switches start with the LED on, got a=%t b=%t", origA, origB)
 	}
 
 	providerHCL := fmt.Sprintf(`provider "tplinkeasysmart" {

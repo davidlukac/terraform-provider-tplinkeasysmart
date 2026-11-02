@@ -160,7 +160,7 @@ func (s *Session) dial(cfg escp.Config) (provider.SwitchClient, error) {
 	return s.dialClient(cfg)
 }
 
-// Factories returns the real provider for terraform-plugin-testing, dialling the target.
+// Factories returns the real provider for terraform-plugin-testing, dialing the target.
 func (s *Session) Factories() map[string]func() (tfprotov6.ProviderServer, error) {
 	return map[string]func() (tfprotov6.ProviderServer, error){
 		"tplinkeasysmart": providerserver.NewProtocol6WithError(provider.NewWithDialer("regression", s.dial)()),

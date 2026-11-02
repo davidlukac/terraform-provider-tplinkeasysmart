@@ -90,7 +90,7 @@ func TestALookupThatFindsNobodyIsTriedOnceMore(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	c, calls = dialMAC(t, f, "", wantMAC, func(MAC) (Info, error) { cancel(); return Info{}, ErrNotFound })
 	if _, err := c.Info(ctx); err == nil || *calls != 1 {
-		t.Fatalf("a cancelled caller: err %v after %d lookups; want one lookup", err, *calls)
+		t.Fatalf("a canceled caller: err %v after %d lookups; want one lookup", err, *calls)
 	}
 }
 
@@ -205,7 +205,7 @@ func TestLocateReportsASwitchThatDoesNotAnswer(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := locateWith(ctx, macOne, DiscoverOptions{Window: time.Minute}, env); !errors.Is(err, context.Canceled) {
-		t.Fatalf("a cancelled lookup must say so, got %v", err)
+		t.Fatalf("a canceled lookup must say so, got %v", err)
 	}
 }
 
@@ -237,7 +237,7 @@ func TestADeadAddressGetsAShortBudgetBeforeTheLookup(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := c.Info(ctx); !errors.Is(err, context.Canceled) || *calls != 0 {
-		t.Fatalf("a cancelled call must not look the switch up: %v after %d lookups", err, *calls)
+		t.Fatalf("a canceled call must not look the switch up: %v after %d lookups", err, *calls)
 	}
 }
 
