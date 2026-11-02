@@ -73,7 +73,7 @@ func (r *stormLimitResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"multicast":       schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Limit multicast traffic."},
 			"broadcast":       schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Limit broadcast traffic."},
 			"rate_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{rateKbps{}},
-				Description: fmt.Sprintf("Rate in kbps (multiple of %d, %d..%d) when a traffic type is selected, otherwise 0.", escp.RateStepKbps, escp.RateStepKbps, escp.MaxBandwidthKbps)},
+				Description: fmt.Sprintf("Rate in kbps (multiple of %d, %d..%d) when a traffic type is selected, otherwise 0.", escp.RateStep, escp.RateStep, escp.MaxBandwidth)},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing a port that has a link up or is a LAG member. Defaults to false."),
 		},
 	}

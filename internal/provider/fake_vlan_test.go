@@ -100,7 +100,7 @@ func (f *fakeClient) VLANMode(ctx context.Context) (escp.VLANModeSetting, error)
 	mtu, _ := f.MTUVLAN(ctx)
 	pb, _ := f.PortBasedVLAN(ctx)
 	q, _ := f.Dot1Q(ctx)
-	return escp.VLANModeFrom(mtu, pb.Enabled, q.Enabled), nil
+	return escp.VLANModeFrom(mtu, pb, q), nil
 }
 
 func (f *fakeClient) SetVLANMode(_ context.Context, s escp.VLANModeSetting) error {

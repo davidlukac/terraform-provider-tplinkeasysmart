@@ -119,7 +119,7 @@ func TestScenarioMultiSwitchByMAC(t *testing.T) {
 		if !ok || cfg.Host != "" {
 			return nil, fmt.Errorf("%w: %s", escp.ErrNotFound, cfg.MAC)
 		}
-		cfg.Host, cfg.SwitchPort, cfg.BroadcastAddr, cfg.Timeout = loopback, f.Port(), escptest.Loopback(), fakeTimeout
+		cfg.Host, cfg.SwitchPort, cfg.BroadcastAddr, cfg.Timeout = loopback, f.UDPPort(), escptest.Loopback(), fakeTimeout
 		cfg.HostPort = escptest.FreeUDPPort(t)
 		return escp.Dial(cfg)
 	}
@@ -145,7 +145,7 @@ resource "tplinkeasysmart_led" "b" {
 	}
 	led := func(f *escptest.Switch, want bool) resource.TestCheckFunc {
 		return func(*terraform.State) error {
-			c, err := escp.Dial(escp.Config{Host: loopback, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback(), Timeout: fakeTimeout, Username: escptest.Username, Password: escptest.Password})
+			c, err := escp.Dial(escp.Config{Host: loopback, SwitchPort: f.UDPPort(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback(), Timeout: fakeTimeout, Username: escptest.Username, Password: escptest.Password})
 			if err != nil {
 				return err
 			}
