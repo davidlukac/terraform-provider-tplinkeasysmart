@@ -115,7 +115,7 @@ func TestScenarioIGMPSnooping(t *testing.T) {
 }
 
 // Report suppression is the one value the switch keeps while its feature is off (measured on
-// firmware 20250710, internal/escp/PROTOCOL.md): it can be set while snooping is off and is still
+// firmware 20250710, escp-go's PROTOCOL.md): it can be set while snooping is off and is still
 // there when snooping is switched on. Every other value of an inactive feature is dropped.
 func TestScenarioIGMPSuppressionStagedWhileSnoopingIsOff(t *testing.T) {
 	s := openForScenario(t)

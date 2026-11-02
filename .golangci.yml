@@ -41,27 +41,12 @@ linters:
           disabled: true
         - name: unused-parameter
           disabled: true
-    gosec:
-      excludes:
-        # Weak primitives are the device's own protocol (RC4, 64-bit RSA,
-        # math/big) and are documented as such in internal/escp/PROTOCOL.md.
-        - G401
-        - G501
-        - G505
   exclusions:
     rules:
       # forbidigo guards the library only; the provider, the tools and main may print.
       - path: ^(main\.go|tools/|internal/provider/|internal/regression/)
         linters:
           - forbidigo
-      # G115 (integer conversion overflow): the protocol is a fixed-width binary
-      # format. Conversions are either bit-level masking/shifting by design or
-      # operate on values range-checked beforehand (ports 1-32, rates up to
-      # 1,000,000 kbps, TLV lengths bounded by the packet buffer).
-      - path: internal/escp/
-        text: "G115"
-        linters:
-          - gosec
       - path: _test\.go
         linters:
           - gosec
