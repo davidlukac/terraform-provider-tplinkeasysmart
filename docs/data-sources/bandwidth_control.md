@@ -29,7 +29,7 @@ output "limits" {
 ### Read-Only
 
 - `id` (String) Always `bandwidth_control`.
-- `ports` (Attributes List) (see [below for nested schema](#nestedatt--ports))
+- `ports` (Attributes List) Ingress and egress rate limit of every port. (see [below for nested schema](#nestedatt--ports))
 
 <a id="nestedatt--ports"></a>
 ### Nested Schema for `ports`

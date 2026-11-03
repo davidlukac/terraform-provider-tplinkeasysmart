@@ -29,7 +29,7 @@ output "storm_enabled_ports" {
 ### Read-Only
 
 - `id` (String) Always `storm_control`.
-- `ports` (Attributes List) (see [below for nested schema](#nestedatt--ports))
+- `ports` (Attributes List) Storm control of every port: the traffic types limited and the rate. (see [below for nested schema](#nestedatt--ports))
 
 <a id="nestedatt--ports"></a>
 ### Nested Schema for `ports`

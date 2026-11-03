@@ -31,7 +31,7 @@ output "port_vlans" {
 - `enabled` (Boolean) Whether port-based VLAN mode is active.
 - `id` (String) Always `vlan_port_based`.
 - `max_vlans` (Number) Maximum number of VLAN groups.
-- `vlans` (Attributes List) (see [below for nested schema](#nestedatt--vlans))
+- `vlans` (Attributes List) The port-based VLAN groups that exist, with their member ports. (see [below for nested schema](#nestedatt--vlans))
 
 <a id="nestedatt--vlans"></a>
 ### Nested Schema for `vlans`
