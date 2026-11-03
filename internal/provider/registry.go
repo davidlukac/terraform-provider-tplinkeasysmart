@@ -42,6 +42,25 @@ type switchRegistry struct {
 	named map[string]SwitchClient // the `switches` map
 }
 
+// closeAll closes every client of the registry and reports the first failure; the others are
+// still closed.
+func (r *switchRegistry) closeAll() error {
+	var first error
+	clients := make([]SwitchClient, 0, len(r.named)+1)
+	if r.def != nil {
+		clients = append(clients, r.def)
+	}
+	for _, name := range sortedKeys(r.named) {
+		clients = append(clients, r.named[name])
+	}
+	for _, c := range clients {
+		if err := c.Close(); err != nil && first == nil {
+			first = err
+		}
+	}
+	return first
+}
+
 func (r *switchRegistry) names() string {
 	names := make([]string, 0, len(r.named))
 	for n := range r.named {

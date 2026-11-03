@@ -45,4 +45,8 @@ type SwitchClient interface {
 	SetIPConfig(ctx context.Context, cfg escp.IPConfig) error
 	EnableDHCP(ctx context.Context) error
 	ConfigBackup(ctx context.Context) (escp.ConfigFile, error)
+	// Close ends the client's claim on its switch and releases its socket: Terraform configures the
+	// provider more than once in a process, and the library refuses a second client of a switch
+	// that the first has not given up.
+	Close() error
 }
