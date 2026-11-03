@@ -31,8 +31,8 @@ output "pvids" {
 - `enabled` (Boolean) Whether 802.1Q VLAN mode is active.
 - `id` (String) Always `vlan_8021q`.
 - `max_vlans` (Number) Maximum number of VLANs.
-- `pvids` (Attributes List) (see [below for nested schema](#nestedatt--pvids))
-- `vlans` (Attributes List) (see [below for nested schema](#nestedatt--vlans))
+- `pvids` (Attributes List) The default VLAN (PVID) of every port. (see [below for nested schema](#nestedatt--pvids))
+- `vlans` (Attributes List) The 802.1Q VLANs of the switch, with their tagged and untagged member ports. (see [below for nested schema](#nestedatt--vlans))
 
 <a id="nestedatt--pvids"></a>
 ### Nested Schema for `pvids`

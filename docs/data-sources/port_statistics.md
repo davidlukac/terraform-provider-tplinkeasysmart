@@ -29,7 +29,7 @@ output "rx_bad" {
 ### Read-Only
 
 - `id` (String) Always `port_statistics`.
-- `ports` (Attributes List) (see [below for nested schema](#nestedatt--ports))
+- `ports` (Attributes List) Traffic counters of every port. They change on every read, so keep them out of anything compared between plans. (see [below for nested schema](#nestedatt--ports))
 
 <a id="nestedatt--ports"></a>
 ### Nested Schema for `ports`

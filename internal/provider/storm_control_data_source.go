@@ -60,7 +60,7 @@ func (d *stormDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: dataSourceSwitchAttribute(),
 			"id":       schema.StringAttribute{Computed: true, Description: "Always `storm_control`."},
-			"ports": schema.ListNestedAttribute{Computed: true, NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+			"ports": schema.ListNestedAttribute{Computed: true, Description: "Storm control of every port: the traffic types limited and the rate.", NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
 				"port":            schema.Int64Attribute{Computed: true, Description: "Port number."},
 				"enabled":         b("Storm control is active: a rate is set and at least one traffic type selected (as in the web UI)."),
 				"unknown_unicast": b("Limit unknown unicast traffic."),

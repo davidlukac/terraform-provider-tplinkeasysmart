@@ -71,13 +71,13 @@ func (d *vlan8021QDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"id":        schema.StringAttribute{Computed: true, Description: "Always `vlan_8021q`."},
 			"enabled":   schema.BoolAttribute{Computed: true, Description: "Whether 802.1Q VLAN mode is active."},
 			"max_vlans": schema.Int64Attribute{Computed: true, Description: "Maximum number of VLANs."},
-			"vlans": schema.ListNestedAttribute{Computed: true, NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+			"vlans": schema.ListNestedAttribute{Computed: true, Description: "The 802.1Q VLANs of the switch, with their tagged and untagged member ports.", NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
 				"id":             schema.Int64Attribute{Computed: true, Description: "VLAN id."},
 				"name":           schema.StringAttribute{Computed: true, Description: "VLAN name."},
 				"tagged_ports":   ports("Ports carrying the VLAN tagged."),
 				"untagged_ports": ports("Ports carrying the VLAN untagged."),
 			}}},
-			"pvids": schema.ListNestedAttribute{Computed: true, NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+			"pvids": schema.ListNestedAttribute{Computed: true, Description: "The default VLAN (PVID) of every port.", NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
 				"port": schema.Int64Attribute{Computed: true, Description: "Port number."},
 				"pvid": schema.Int64Attribute{Computed: true, Description: "Default VLAN for untagged frames on the port."},
 			}}},

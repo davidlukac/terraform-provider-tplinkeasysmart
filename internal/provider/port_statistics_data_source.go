@@ -63,7 +63,7 @@ func (d *portStatisticsDataSource) Schema(_ context.Context, _ datasource.Schema
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: dataSourceSwitchAttribute(),
 			"id":       schema.StringAttribute{Computed: true, Description: "Always `port_statistics`."},
-			"ports": schema.ListNestedAttribute{Computed: true, NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+			"ports": schema.ListNestedAttribute{Computed: true, Description: "Traffic counters of every port. They change on every read, so keep them out of anything compared between plans.", NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
 				"id":              i("Port number (1-based)."),
 				"enabled":         schema.BoolAttribute{Computed: true, Description: "Administrative state."},
 				"link":            schema.StringAttribute{Computed: true, Description: "link-down or the negotiated speed."},

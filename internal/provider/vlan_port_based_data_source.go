@@ -59,7 +59,7 @@ func (d *vlanPortBasedDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			"id":        schema.StringAttribute{Computed: true, Description: "Always `vlan_port_based`."},
 			"enabled":   schema.BoolAttribute{Computed: true, Description: "Whether port-based VLAN mode is active."},
 			"max_vlans": schema.Int64Attribute{Computed: true, Description: "Maximum number of VLAN groups."},
-			"vlans": schema.ListNestedAttribute{Computed: true, NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+			"vlans": schema.ListNestedAttribute{Computed: true, Description: "The port-based VLAN groups that exist, with their member ports.", NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
 				"id":    schema.Int64Attribute{Computed: true, Description: "VLAN group id."},
 				"ports": schema.ListAttribute{Computed: true, ElementType: types.Int64Type, Description: "Member ports."},
 			}}},

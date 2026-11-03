@@ -56,7 +56,7 @@ func (d *bandwidthDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: dataSourceSwitchAttribute(),
 			"id":       schema.StringAttribute{Computed: true, Description: "Always `bandwidth_control`."},
-			"ports": schema.ListNestedAttribute{Computed: true, NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+			"ports": schema.ListNestedAttribute{Computed: true, Description: "Ingress and egress rate limit of every port.", NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
 				"port":         schema.Int64Attribute{Computed: true, Description: "Port number."},
 				"ingress_kbps": schema.Int64Attribute{Computed: true, Description: "Ingress limit in kbps; 0 = unlimited."},
 				"egress_kbps":  schema.Int64Attribute{Computed: true, Description: "Egress limit in kbps; 0 = unlimited."},
