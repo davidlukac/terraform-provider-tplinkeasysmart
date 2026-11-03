@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.32.6
+
+- Internal, no change in behavior of any setting: the provider uses [github.com/davidlukac/escp-go](https://github.com/davidlukac/escp-go) v0.6.0. Of the library's changes only one reaches code of this repository, and only its regression-suite harness: the port lists of the suite's configuration (test ports, protected ports and the disruptive ones) are read with `ParsePortID`, which now accepts only the canonical decimal spelling, so `"+3"` or `"03"` in such a list is refused. The provider's own settings never went through it. The full hardware regression on a real switch passed on this code (68 passed, 0 failed, 7 opt-in skips; the configuration files of both test switches read byte for byte as before).
+
 ## 0.32.5
 
 - Internal, no change in behavior of any setting: the provider uses [github.com/davidlukac/escp-go](https://github.com/davidlukac/escp-go) v0.5.0 (a socket that fails is reported as that error and not as "no reply" after the retries, and another device answering during a configuration backup is reported as the wrong switch). The frozen copy of the library inside the provider is deleted, the stricter lint set of the library is adopted (the code it found is fixed; among it, a `port_priorities` value of `tplinkeasysmart_qos` that is not a number is reported as "Invalid priority" instead of relying on an unchecked type assertion), and mutation testing runs in CI for the lines a pull request changes. The full hardware regression on a real switch passed on this code (68 passed, 0 failed, 7 opt-in skips; the configuration files of both test switches read byte for byte as before).
