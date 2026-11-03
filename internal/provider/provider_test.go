@@ -675,17 +675,19 @@ func TestAccPortGuardBlocksUsedPorts(t *testing.T) {
 		port int
 		want string
 	}{{1, `port 1 has a link up`}, {4, `port 4 has a link up`}} {
-		f := &fakeClient{ports: testPorts()}
-		resource.UnitTest(t, resource.TestCase{
-			ProtoV6ProviderFactories: factories(f),
-			Steps: []resource.TestStep{{
-				Config:      portConfig(tc.port, "  enabled = false\n"),
-				ExpectError: regexp.MustCompile(tc.want),
-			}},
+		t.Run(tc.want, func(t *testing.T) {
+			f := &fakeClient{ports: testPorts()}
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: factories(f),
+				Steps: []resource.TestStep{{
+					Config:      portConfig(tc.port, "  enabled = false\n"),
+					ExpectError: regexp.MustCompile(tc.want),
+				}},
+			})
+			if f.sets != 0 {
+				t.Fatalf("port %d: guard must prevent any write, got %d", tc.port, f.sets)
+			}
 		})
-		if f.sets != 0 {
-			t.Fatalf("port %d: guard must prevent any write, got %d", tc.port, f.sets)
-		}
 	}
 }
 

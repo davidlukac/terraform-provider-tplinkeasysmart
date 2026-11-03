@@ -41,16 +41,18 @@ func TestRegistryResolvesSwitchesByName(t *testing.T) {
 		{"unknown name lists the configured ones", &switchRegistry{named: map[string]SwitchClient{"sw02": b, "sw01": a}}, "nope", nil, `unknown switch "nope" (configured: sw01, sw02)`},
 	}
 	for _, tc := range cases {
-		got, err := tc.reg.Client(tc.ask)
-		if tc.wantErr != "" {
-			if err == nil || err.Error() != tc.wantErr {
-				t.Errorf("%s: error %v, want %q", tc.name, err, tc.wantErr)
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := tc.reg.Client(tc.ask)
+			if tc.wantErr != "" {
+				if err == nil || err.Error() != tc.wantErr {
+					t.Errorf("%s: error %v, want %q", tc.name, err, tc.wantErr)
+				}
+				return
 			}
-			continue
-		}
-		if err != nil || got != tc.want {
-			t.Errorf("%s: got %v, %v", tc.name, got, err)
-		}
+			if err != nil || got != tc.want {
+				t.Errorf("%s: got %v, %v", tc.name, got, err)
+			}
+		})
 	}
 }
 
@@ -111,14 +113,18 @@ func TestIdsAreQualifiedByTheSwitch(t *testing.T) {
 		sw   types.String
 		want string
 	}{{types.StringNull(), "led"}, {types.StringUnknown(), "led"}, {types.StringValue(""), "led"}, {types.StringValue("sw02"), "sw02:led"}} {
-		if got := qualifiedID(tc.sw, "led").ValueString(); got != tc.want {
-			t.Errorf("qualifiedID(%v) = %q, want %q", tc.sw, got, tc.want)
-		}
+		t.Run(tc.want, func(t *testing.T) {
+			if got := qualifiedID(tc.sw, "led").ValueString(); got != tc.want {
+				t.Errorf("qualifiedID(%v) = %q, want %q", tc.sw, got, tc.want)
+			}
+		})
 	}
 	for _, tc := range []struct{ in, sw, rest string }{{"7", "", "7"}, {"sw02:7", "sw02", "7"}, {"sw02:led", "sw02", "led"}, {":x", "", "x"}} {
-		if sw, rest := splitQualified(tc.in); string(sw) != tc.sw || rest != tc.rest {
-			t.Errorf("splitQualified(%q) = %q,%q want %q,%q", tc.in, sw, rest, tc.sw, tc.rest)
-		}
+		t.Run(tc.in, func(t *testing.T) {
+			if sw, rest := splitQualified(tc.in); string(sw) != tc.sw || rest != tc.rest {
+				t.Errorf("splitQualified(%q) = %q,%q want %q,%q", tc.in, sw, rest, tc.sw, tc.rest)
+			}
+		})
 	}
 }
 

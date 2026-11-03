@@ -561,9 +561,11 @@ func TestVLANsCompareByIdNameAndPortSets(t *testing.T) {
 		"tagged":   {ID: 2, Name: "x", Tagged: escp.MustPortSet(5), Untagged: escp.MustPortSet(1)},
 		"untagged": {ID: 2, Name: "x", Tagged: escp.MustPortSet(5, 6), Untagged: escp.MustPortSet(2)},
 	} {
-		if a == b {
-			t.Fatalf("a different %s must not compare equal", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			if a == b {
+				t.Fatalf("a different %s must not compare equal", name)
+			}
+		})
 	}
 }
 

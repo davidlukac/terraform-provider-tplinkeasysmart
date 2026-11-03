@@ -11,6 +11,8 @@ generate:
 	go generate ./...
 
 lint:
+	GOWORK=off go -C devtools build -o $(CURDIR)/build/subtests ./subtests
+	build/subtests ./...
 	$(DEVTOOL) golangci-lint run ./...
 
 # The workflow files (a pinned actionlint, run by hand: a workflow change is not covered by the pre-commit hook).
@@ -102,6 +104,7 @@ compat-table:
 # The policy checker is Go (tools/coverpolicy) and is tested, and measured, by the same run.
 cover:
 	go test ./... -race -count=1 -coverpkg=./... -coverprofile=cover.out
+	GOWORK=off go -C devtools test -count=1 ./...
 	go run ./tools/coverpolicy check cover.out .
 
 cover-html: cover

@@ -270,9 +270,11 @@ func TestBadgeOfAnEmptyProfileIsZeroNotADivisionError(t *testing.T) {
 
 func TestColorBands(t *testing.T) {
 	for pct, want := range map[float64]string{99: "brightgreen", 95: "brightgreen", 94.9: "green", 90: "green", 80: "yellowgreen", 70: "yellow", 60: "orange", 59.9: "red"} {
-		if got := color(pct); got != want {
-			t.Errorf("color(%v) = %s, want %s", pct, got, want)
-		}
+		t.Run(fmt.Sprint(pct), func(t *testing.T) {
+			if got := color(pct); got != want {
+				t.Errorf("color(%v) = %s, want %s", pct, got, want)
+			}
+		})
 	}
 }
 

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -11,9 +12,11 @@ import (
 
 func TestSwitchNameOfTreatsNullUnknownAndEmptyAsTheDefault(t *testing.T) {
 	for _, v := range []types.String{types.StringNull(), types.StringUnknown(), types.StringValue("")} {
-		if got := switchNameOf(v); got != "" {
-			t.Errorf("switchNameOf(%v) = %q, want the default switch", v, got)
-		}
+		t.Run(fmt.Sprint(v), func(t *testing.T) {
+			if got := switchNameOf(v); got != "" {
+				t.Errorf("switchNameOf(%v) = %q, want the default switch", v, got)
+			}
+		})
 	}
 	if switchNameOf(types.StringValue("sw02")) != "sw02" {
 		t.Error("a name is the name")
@@ -22,14 +25,18 @@ func TestSwitchNameOfTreatsNullUnknownAndEmptyAsTheDefault(t *testing.T) {
 
 func TestSwitchNameValidate(t *testing.T) {
 	for _, ok := range []switchName{"a", "sw01", "Sw_01-b", "0lab", switchName(strings.Repeat("x", maxSwitchNameLen))} {
-		if err := ok.validate(); err != nil {
-			t.Errorf("%q: %v", ok, err)
-		}
+		t.Run(fmt.Sprint(ok), func(t *testing.T) {
+			if err := ok.validate(); err != nil {
+				t.Errorf("%q: %v", ok, err)
+			}
+		})
 	}
 	for _, bad := range []switchName{"", "-sw", "_sw", "sw 01", "sw:01", "sw.01", "sw/01", "é", switchName(strings.Repeat("x", maxSwitchNameLen+1))} {
-		if bad.validate() == nil {
-			t.Errorf("%q must be refused", bad)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if bad.validate() == nil {
+				t.Errorf("%q must be refused", bad)
+			}
+		})
 	}
 }
 
@@ -40,24 +47,28 @@ func TestQualifyAndSplitAreInverse(t *testing.T) {
 		id   string
 		want string
 	}{{"", "led", "led"}, {"sw02", "led", "sw02:led"}, {"sw02", "7", "sw02:7"}} {
-		q := tc.n.qualify(tc.id)
-		if q != tc.want {
-			t.Errorf("%q.qualify(%q) = %q, want %q", tc.n, tc.id, q, tc.want)
-		}
-		if n, id := splitQualified(q); n != tc.n || id != tc.id {
-			t.Errorf("splitQualified(%q) = %q, %q; want %q, %q", q, n, id, tc.n, tc.id)
-		}
+		t.Run(tc.id, func(t *testing.T) {
+			q := tc.n.qualify(tc.id)
+			if q != tc.want {
+				t.Errorf("%q.qualify(%q) = %q, want %q", tc.n, tc.id, q, tc.want)
+			}
+			if n, id := splitQualified(q); n != tc.n || id != tc.id {
+				t.Errorf("splitQualified(%q) = %q, %q; want %q, %q", q, n, id, tc.n, tc.id)
+			}
+		})
 	}
 }
 
 func TestSwitchNameValidatorSkipsWhatIsNotKnownAndNamesTheAttribute(t *testing.T) {
 	v := validSwitchName()[0]
 	for _, val := range []types.String{types.StringNull(), types.StringUnknown(), types.StringValue("sw01")} {
-		var resp validator.StringResponse
-		v.ValidateString(context.Background(), validator.StringRequest{ConfigValue: val}, &resp)
-		if resp.Diagnostics.HasError() {
-			t.Errorf("%v must pass: %v", val, resp.Diagnostics)
-		}
+		t.Run(fmt.Sprint(val), func(t *testing.T) {
+			var resp validator.StringResponse
+			v.ValidateString(context.Background(), validator.StringRequest{ConfigValue: val}, &resp)
+			if resp.Diagnostics.HasError() {
+				t.Errorf("%v must pass: %v", val, resp.Diagnostics)
+			}
+		})
 	}
 	var resp validator.StringResponse
 	v.ValidateString(context.Background(), validator.StringRequest{ConfigValue: types.StringValue("a:b")}, &resp)

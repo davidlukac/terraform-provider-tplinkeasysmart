@@ -80,19 +80,21 @@ func TestEveryTypeHasItsExample(t *testing.T) {
 		kind  exampleKind
 		types []string
 	}{{resourceExamples, resources}, {dataSourceExamples, dataSources}} {
-		for _, name := range c.types {
-			for _, file := range c.kind.required {
-				path := filepath.Join(examplesDir, c.kind.dir, name, file)
-				info, err := os.Stat(path)
-				if err != nil {
-					t.Errorf("%s has no example file %s: add it (the generated documentation is built from it)", name, path)
-					continue
-				}
-				if info.Size() == 0 {
-					t.Errorf("%s is empty", path)
+		t.Run(c.kind.dir, func(t *testing.T) {
+			for _, name := range c.types {
+				for _, file := range c.kind.required {
+					path := filepath.Join(examplesDir, c.kind.dir, name, file)
+					info, err := os.Stat(path)
+					if err != nil {
+						t.Errorf("%s has no example file %s: add it (the generated documentation is built from it)", name, path)
+						continue
+					}
+					if info.Size() == 0 {
+						t.Errorf("%s is empty", path)
+					}
 				}
 			}
-		}
+		})
 	}
 }
 
@@ -102,15 +104,17 @@ func TestNoExampleWithoutAType(t *testing.T) {
 		kind  exampleKind
 		types []string
 	}{{resourceExamples, resources}, {dataSourceExamples, dataSources}} {
-		known := map[string]bool{}
-		for _, n := range c.types {
-			known[n] = true
-		}
-		for _, dir := range exampleDirs(t, c.kind) {
-			if !known[dir] {
-				t.Errorf("examples/%s/%s belongs to no registered type: remove it or register the type", c.kind.dir, dir)
+		t.Run(c.kind.dir, func(t *testing.T) {
+			known := map[string]bool{}
+			for _, n := range c.types {
+				known[n] = true
 			}
-		}
+			for _, dir := range exampleDirs(t, c.kind) {
+				if !known[dir] {
+					t.Errorf("examples/%s/%s belongs to no registered type: remove it or register the type", c.kind.dir, dir)
+				}
+			}
+		})
 	}
 }
 

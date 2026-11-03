@@ -243,7 +243,7 @@ templates/                    docs templates      examples/   runnable examples 
 ```sh
 make hooks              # once per clone: enable the pre-commit hook (gofmt, vet, lint, tests, coverage)
 make test               # unit + Terraform lifecycle tests against fakes (needs `terraform` on PATH)
-make lint               # golangci-lint, the version pinned in devtools/go.mod
+make lint               # golangci-lint (the version pinned in devtools/go.mod) and devtools/subtests (a table of cases must use t.Run)
 make cover              # tests with -race and the coverage policy
 make regression         # end-to-end scenarios (real Terraform, real provider, wire protocol) against the stateful fake switch
 make generate           # regenerate docs/ from the schema and examples/

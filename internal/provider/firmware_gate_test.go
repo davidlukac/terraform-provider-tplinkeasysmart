@@ -213,16 +213,18 @@ func TestGatedTestClientCoversEveryWriteMethod(t *testing.T) {
 
 func TestFirmwareGateAllowsVerifiedBuildsAndReadsTheFirmwareOnce(t *testing.T) {
 	for _, version := range []string{verifiedFirmware, newerFirmware} {
-		inner := newFaulty(firmwareFake(version))
-		client := gated(inner, escp.Config{WriteGate: firmwareWriteGate(false)})
-		for range 3 {
-			if err := client.SetLED(context.Background(), false); err != nil {
-				t.Fatalf("%s: %v", version, err)
+		t.Run(version, func(t *testing.T) {
+			inner := newFaulty(firmwareFake(version))
+			client := gated(inner, escp.Config{WriteGate: firmwareWriteGate(false)})
+			for range 3 {
+				if err := client.SetLED(context.Background(), false); err != nil {
+					t.Fatalf("%s: %v", version, err)
+				}
 			}
-		}
-		if inner.calls["SetLED"] != 3 || inner.calls["Info"] != 1 {
-			t.Fatalf("%s: want 3 writes after one firmware read, got %v", version, inner.calls)
-		}
+			if inner.calls["SetLED"] != 3 || inner.calls["Info"] != 1 {
+				t.Fatalf("%s: want 3 writes after one firmware read, got %v", version, inner.calls)
+			}
+		})
 	}
 }
 

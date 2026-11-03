@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
@@ -359,9 +360,11 @@ func TestSetToPortsRejectsUnknownSetsAndPortsOutsideTheMask(t *testing.T) {
 		t.Fatal("an unknown set cannot be converted and must be reported")
 	}
 	for _, bad := range []int64{0, 33, -1} {
-		if _, err := setToPorts(ctx, types.SetValueMust(types.Int64Type, []attr.Value{types.Int64Value(4), types.Int64Value(bad)})); err == nil {
-			t.Fatalf("port %d is no port and must be reported", bad)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if _, err := setToPorts(ctx, types.SetValueMust(types.Int64Type, []attr.Value{types.Int64Value(4), types.Int64Value(bad)})); err == nil {
+				t.Fatalf("port %d is no port and must be reported", bad)
+			}
+		})
 	}
 	got, err := setToPorts(ctx, portsToSet(escp.MustPortSet(7, 1, 4)))
 	if err != nil || got != escp.MustPortSet(1, 4, 7) || !reflect.DeepEqual(portInt64s(got), []int64{1, 4, 7}) {

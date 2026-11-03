@@ -37,9 +37,11 @@ func TestPortFlowControlProblem(t *testing.T) {
 			}
 			if tc.bad {
 				for _, part := range []string{`"auto"`, `"1000Mbps-full"`, tc.speed.ValueString()} {
-					if !strings.Contains(got, part) {
-						t.Errorf("the message %q does not mention %s", got, part)
-					}
+					t.Run(part, func(t *testing.T) {
+						if !strings.Contains(got, part) {
+							t.Errorf("the message %q does not mention %s", got, part)
+						}
+					})
 				}
 			}
 		})

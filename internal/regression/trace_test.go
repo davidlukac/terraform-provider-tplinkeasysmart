@@ -40,9 +40,11 @@ func TestFailedScenarioPrintsWhatTheLibraryLogged(t *testing.T) {
 	}
 	got := d.logs[0]
 	for _, want := range []string{"ESCP trace of the scenario", "component=escp", "msg=\"request sent\"", "operation=SetLED"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("trace lacks %q:\n%s", want, got)
-		}
+		t.Run(want, func(t *testing.T) {
+			if !strings.Contains(got, want) {
+				t.Errorf("trace lacks %q:\n%s", want, got)
+			}
+		})
 	}
 	if strings.Contains(got, s.Target.Password.Reveal()) || strings.Contains(got, s.Target.Username) {
 		t.Errorf("the trace carries a credential:\n%s", got)
