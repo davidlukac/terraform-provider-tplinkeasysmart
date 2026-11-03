@@ -5,6 +5,7 @@ go 1.27.3
 tool (
 	github.com/go-gremlins/gremlins/cmd/gremlins
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+	github.com/golangci/misspell/cmd/misspell
 	github.com/rhysd/actionlint/cmd/actionlint
 	golang.org/x/vuln/cmd/govulncheck
 )

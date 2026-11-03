@@ -22,7 +22,7 @@ Tags: **[C]** client change (the [escp-go](https://github.com/davidlukac/escp-go
 - [ ] **[R][D]** The method is added to `SwitchClient` (`client.go`); the resource or data source declares the small interface it actually needs.
 - [ ] **[R][D]** The type is registered in `provider.go` (`Resources()` / `DataSources()`), with the file named `<name>_resource.go` or `<name>_data_source.go`.
 - [ ] **[R][D]** Schema: snake_case names, a `Description` on every attribute, the right mode (Required / Optional+Computed / Computed), the `switch` argument for the multi-switch model (resources: `resourceSwitchAttribute()`), no volatile values in resources (counters belong in data sources).
-- [ ] **[R]** Plan-time validation (`ValidateConfig`, validators or `ModifyPlan`) refuses bad values before anything is applied. Apply-time defences stay as a second layer.
+- [ ] **[R]** Plan-time validation (`ValidateConfig`, validators or `ModifyPlan`) refuses bad values before anything is applied. Apply-time defenses stay as a second layer.
 - [ ] **[R]** Writes that can touch a port in use or a LAG member go through the guards (`guard.go`, `safety.CheckPorts`), refuse before any write, and honor `allow_disruptive`. Changing only `allow_disruptive` writes nothing.
 - [ ] **[R]** The apply reads back and fails loudly ("did not change as requested") when the switch kept something else; state holds what the switch reports.
 - [ ] **[R]** Import is supported with a documented id (qualified with the switch name for `switches`); `Read` normalises into the form the configuration uses; drift shows in the plan.

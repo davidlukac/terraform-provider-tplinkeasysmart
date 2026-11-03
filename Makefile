@@ -10,7 +10,14 @@ DEVTOOL := GOWORK=off go tool -modfile=devtools/go.mod
 generate:
 	go generate ./...
 
-lint:
+# American English in every tracked text file, not only the Go comments the misspell linter reads: the
+# Markdown, templates, YAML, shell and the Makefile too. The same word list as the linter (misspell, locale US,
+# pinned in devtools). The changelog quotes the past and is left as it was.
+spell:
+	@git ls-files -z -- '*.go' '*.md' '*.yml' '*.yaml' '*.json' '*.sh' '*.tmpl' '*.tf' Makefile ':!:CHANGELOG.md' ':!:go.sum' \
+		| xargs -0 env $(DEVTOOL) misspell -locale US -error
+
+lint: spell
 	GOWORK=off go -C devtools build -o $(CURDIR)/build/subtests ./subtests
 	build/subtests ./...
 	$(DEVTOOL) golangci-lint run ./...
@@ -93,7 +100,7 @@ regression-live:
 compat-table:
 	go test ./internal/provider -run TestReadmeCompatibilityTable -update-readme
 
-.PHONY: work unwork actionlint compat-table regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
+.PHONY: work unwork spell actionlint compat-table regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
 
 # --- coverage -------------------------------------------------------------
 # `make cover` runs the whole suite with the race detector, writes cover.out
