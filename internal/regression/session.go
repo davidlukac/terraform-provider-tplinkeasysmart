@@ -95,6 +95,7 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 	s.Client, s.net = c, c
 	t.Cleanup(func() { _ = s.Client.Close() }) // best effort: the run is over
 	s.rd = CoreReaders(s.Client)
+	waitUntilReady(t, target.Name, s.Client, wallClock)
 	err = s.capture(context.Background())
 	if err == nil {
 		s.before, err = Take(context.Background(), s.rd)
