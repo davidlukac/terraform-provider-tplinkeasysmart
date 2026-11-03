@@ -240,9 +240,11 @@ func TestProviderExplainsHowToResolveAnUnknownAttribute(t *testing.T) {
 		t.Fatalf("unexpected diagnostic %v", d)
 	}
 	for _, hint := range []string{"terraform apply -target", "TPLINK_EASYSMART_HOST"} {
-		if !strings.Contains(d.Detail(), hint) {
-			t.Errorf("the detail must mention %q: %s", hint, d.Detail())
-		}
+		t.Run(hint, func(t *testing.T) {
+			if !strings.Contains(d.Detail(), hint) {
+				t.Errorf("the detail must mention %q: %s", hint, d.Detail())
+			}
+		})
 	}
 	if resp.ResourceData != nil || resp.DataSourceData != nil {
 		t.Fatal("no client data may be handed out")

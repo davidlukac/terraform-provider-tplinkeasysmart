@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -152,10 +153,12 @@ func TestStormProblem(t *testing.T) {
 		{"unknown rate is skipped", no, no, yes, types.Int64Unknown(), ""},
 	}
 	for _, tc := range cases {
-		got := stormProblem(tc.uu, tc.mc, tc.bc, tc.rate)
-		if (tc.wantProblemPart == "") != (got == "") || !strings.Contains(got, tc.wantProblemPart) {
-			t.Errorf("%s: got %q, want it to contain %q", tc.name, got, tc.wantProblemPart)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			got := stormProblem(tc.uu, tc.mc, tc.bc, tc.rate)
+			if (tc.wantProblemPart == "") != (got == "") || !strings.Contains(got, tc.wantProblemPart) {
+				t.Errorf("%s: got %q, want it to contain %q", tc.name, got, tc.wantProblemPart)
+			}
+		})
 	}
 }
 
@@ -181,10 +184,12 @@ func TestMirrorProblem(t *testing.T) {
 		{"unknown destination is skipped", yes, types.Int64Unknown(), 0, 0, ""},
 	}
 	for _, tc := range cases {
-		got := mirrorProblem(tc.enabled, tc.dest, tc.ingress, tc.egress)
-		if (tc.wantProblemPart == "") != (got == "") || !strings.Contains(got, tc.wantProblemPart) {
-			t.Errorf("%s: got %q, want it to contain %q", tc.name, got, tc.wantProblemPart)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			got := mirrorProblem(tc.enabled, tc.dest, tc.ingress, tc.egress)
+			if (tc.wantProblemPart == "") != (got == "") || !strings.Contains(got, tc.wantProblemPart) {
+				t.Errorf("%s: got %q, want it to contain %q", tc.name, got, tc.wantProblemPart)
+			}
+		})
 	}
 }
 
@@ -205,9 +210,11 @@ func TestQoSProblem(t *testing.T) {
 		{"unknown priorities are skipped", types.StringValue("802.1p"), types.MapUnknown(types.Int64Type), false},
 	}
 	for _, tc := range cases {
-		if got := qosProblem(tc.mode, tc.priorities) != ""; got != tc.want {
-			t.Errorf("%s: problem=%v, want %v", tc.name, got, tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if got := qosProblem(tc.mode, tc.priorities) != ""; got != tc.want {
+				t.Errorf("%s: problem=%v, want %v", tc.name, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -224,11 +231,13 @@ func TestRateValidator(t *testing.T) {
 		{types.Int64Value(100), true}, {types.Int64Value(-64), true}, {types.Int64Value(1000064), true},
 		{types.Int64Null(), false}, {types.Int64Unknown(), false},
 	} {
-		var resp validator.Int64Response
-		v.ValidateInt64(context.Background(), validator.Int64Request{ConfigValue: tc.in}, &resp)
-		if resp.Diagnostics.HasError() != tc.invalid {
-			t.Errorf("%v: invalid=%v, want %v", tc.in, resp.Diagnostics.HasError(), tc.invalid)
-		}
+		t.Run(fmt.Sprint(tc.in), func(t *testing.T) {
+			var resp validator.Int64Response
+			v.ValidateInt64(context.Background(), validator.Int64Request{ConfigValue: tc.in}, &resp)
+			if resp.Diagnostics.HasError() != tc.invalid {
+				t.Errorf("%v: invalid=%v, want %v", tc.in, resp.Diagnostics.HasError(), tc.invalid)
+			}
+		})
 	}
 }
 
@@ -244,11 +253,13 @@ func TestPortKeyValidator(t *testing.T) {
 		{types.StringValue("1"), false}, {types.StringValue("32"), false}, {types.StringValue("0"), true}, {types.StringValue("33"), true},
 		{types.StringValue("seven"), true}, {types.StringValue(""), true}, {types.StringNull(), false}, {types.StringUnknown(), false},
 	} {
-		var resp validator.StringResponse
-		v.ValidateString(context.Background(), validator.StringRequest{ConfigValue: tc.in}, &resp)
-		if resp.Diagnostics.HasError() != tc.invalid {
-			t.Errorf("%v: invalid=%v, want %v", tc.in, resp.Diagnostics.HasError(), tc.invalid)
-		}
+		t.Run(fmt.Sprint(tc.in), func(t *testing.T) {
+			var resp validator.StringResponse
+			v.ValidateString(context.Background(), validator.StringRequest{ConfigValue: tc.in}, &resp)
+			if resp.Diagnostics.HasError() != tc.invalid {
+				t.Errorf("%v: invalid=%v, want %v", tc.in, resp.Diagnostics.HasError(), tc.invalid)
+			}
+		})
 	}
 }
 

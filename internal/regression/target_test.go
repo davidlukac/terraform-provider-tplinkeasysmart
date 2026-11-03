@@ -17,10 +17,12 @@ func sw03Env() map[string]string {
 
 func TestLoadTargetFakeIsTheDefault(t *testing.T) {
 	for _, env := range []map[string]string{{}, {EnvTarget: TargetFake}} {
-		got, err := LoadTarget(env)
-		if err != nil || got.Name != TargetFake || got.Real() || got.Host != "127.0.0.1" {
-			t.Errorf("LoadTarget(%v) = %+v, %v", env, got, err)
-		}
+		t.Run(fmt.Sprint(env), func(t *testing.T) {
+			got, err := LoadTarget(env)
+			if err != nil || got.Name != TargetFake || got.Real() || got.Host != "127.0.0.1" {
+				t.Errorf("LoadTarget(%v) = %+v, %v", env, got, err)
+			}
+		})
 	}
 }
 
@@ -86,9 +88,11 @@ func TestParseEnvFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	for k, want := range map[string]string{"A": "1", "B": "two words", "C": "x", "D": "y"} {
-		if got[k] != want {
-			t.Errorf("%s = %q, want %q", k, got[k], want)
-		}
+		t.Run(k, func(t *testing.T) {
+			if got[k] != want {
+				t.Errorf("%s = %q, want %q", k, got[k], want)
+			}
+		})
 	}
 	if _, err := ParseEnvFile(strings.NewReader("ok=1\nsecret-without-equals\n")); err == nil ||
 		!strings.Contains(err.Error(), "line 2") || strings.Contains(err.Error(), "secret-without") {

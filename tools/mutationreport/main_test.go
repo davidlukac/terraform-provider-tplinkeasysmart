@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,8 +68,10 @@ func TestAMissingOrBrokenReportIsSaidAndNotAnError(t *testing.T) {
 
 func TestWrongArgumentsAreAUsageError(t *testing.T) {
 	for _, args := range [][]string{nil, {"a", "b"}} {
-		if code, _, errOut := runWith(t, args...); code != exitUsage || !strings.Contains(errOut, "usage") {
-			t.Errorf("%v: code %d, %q", args, code, errOut)
-		}
+		t.Run(fmt.Sprint(args), func(t *testing.T) {
+			if code, _, errOut := runWith(t, args...); code != exitUsage || !strings.Contains(errOut, "usage") {
+				t.Errorf("%v: code %d, %q", args, code, errOut)
+			}
+		})
 	}
 }

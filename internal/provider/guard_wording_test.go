@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/davidlukac/escp-go"
@@ -33,9 +34,11 @@ func TestWordPortRefusal(t *testing.T) {
 func TestGuardPortsRefusesAPortNumberNoSwitchHas(t *testing.T) {
 	f := &fakeClient{ports: testPorts()}
 	for _, bad := range []escp.PortID{0, 33, -4} {
-		if err := guardPorts(context.Background(), f, false, 3, bad); err == nil {
-			t.Errorf("port %d must be refused", bad)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if err := guardPorts(context.Background(), f, false, 3, bad); err == nil {
+				t.Errorf("port %d must be refused", bad)
+			}
+		})
 	}
 	if err := guardPorts(context.Background(), f, true, 0); err != nil {
 		t.Errorf("allow_disruptive skips the guard, as before: %v", err)

@@ -11,6 +11,7 @@ generate:
 	go generate ./...
 
 lint:
+	go run ./tools/subtests .
 	$(DEVTOOL) golangci-lint run ./...
 
 # The workflow files (a pinned actionlint, run by hand: a workflow change is not covered by the pre-commit hook).

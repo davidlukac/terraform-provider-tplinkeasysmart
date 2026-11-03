@@ -178,10 +178,13 @@ data "tplinkeasysmart_system_info" "this" {
 		{Host: "192.0.2.12"},
 		{MAC: wantMAC},
 	}
+	names := []string{"both", "by_host", "by_mac"}
 	cfgs := log.firstRound(t, len(want))
 	for i, w := range want {
-		w.Username, w.Password, w.Timeout = "u", "p", 3*time.Second
-		checkClientConfig(t, cfgs[i], w, true)
+		t.Run(names[i], func(t *testing.T) {
+			w.Username, w.Password, w.Timeout = "u", "p", 3*time.Second
+			checkClientConfig(t, cfgs[i], w, true)
+		})
 	}
 }
 

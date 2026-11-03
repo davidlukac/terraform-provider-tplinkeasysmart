@@ -139,9 +139,11 @@ func TestPlanWithOnlyTheFlagChanged(t *testing.T) {
 			"a set":    mk(4, "1000Mbps-full", false, set(1, 2, 3)),
 			"a string": mk(4, "100Mbps-full", false, set(1, 2)),
 		} {
-			if _, ok := planWithOnlyTheFlagChanged(plan, prior); ok {
-				t.Errorf("%s changed together with the flag, yet it was taken for the flag alone", name)
-			}
+			t.Run(name, func(t *testing.T) {
+				if _, ok := planWithOnlyTheFlagChanged(plan, prior); ok {
+					t.Errorf("%s changed together with the flag, yet it was taken for the flag alone", name)
+				}
+			})
 		}
 	})
 	t.Run("no prior state, or a different shape, is not an update of the flag", func(t *testing.T) {

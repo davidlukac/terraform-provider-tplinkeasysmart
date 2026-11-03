@@ -36,9 +36,11 @@ func TestTflogHandlerMapsLevelsMessagesAndAttributes(t *testing.T) {
 		t.Fatalf("%d entries, want %d: %v", len(entries), len(want), entries)
 	}
 	for i, w := range want {
-		if entries[i]["@level"] != w.level || entries[i]["@message"] != w.msg {
-			t.Errorf("entry %d = level %v message %v, want %s %q", i, entries[i]["@level"], entries[i]["@message"], w.level, w.msg)
-		}
+		t.Run(w.level, func(t *testing.T) {
+			if entries[i]["@level"] != w.level || entries[i]["@message"] != w.msg {
+				t.Errorf("entry %d = level %v message %v, want %s %q", i, entries[i]["@level"], entries[i]["@message"], w.level, w.msg)
+			}
+		})
 	}
 	if entries[1]["seq"] != float64(7) {
 		t.Errorf("seq = %v, want 7", entries[1]["seq"])
@@ -63,9 +65,11 @@ func TestTflogHandlerKeepsAttributesAndGroups(t *testing.T) {
 	}
 	e := entries[0]
 	for k, want := range map[string]any{"host": "192.0.2.13", "switch.mac": "aa:bb", "switch.operation": "SetLED", "switch.ports.count": float64(2), "switch.bare": "x"} {
-		if e[k] != want {
-			t.Errorf("field %q = %v, want %v (entry %v)", k, e[k], want, e)
-		}
+		t.Run(k, func(t *testing.T) {
+			if e[k] != want {
+				t.Errorf("field %q = %v, want %v (entry %v)", k, e[k], want, e)
+			}
+		})
 	}
 	if _, ok := e["switch."]; ok {
 		t.Errorf("an empty attribute must not become a field: %v", e)
