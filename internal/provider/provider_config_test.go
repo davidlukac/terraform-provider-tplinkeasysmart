@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -108,10 +109,35 @@ func TestExplicitProviderAttributesOverrideTheEnvironment(t *testing.T) {
 	checkClientConfig(t, got, want, true)
 }
 
-// timeout_seconds below 1 is rejected while planning, before any client exists.
-func TestNonPositiveTimeoutIsRejectedAtPlanTime(t *testing.T) {
+// The two ends of the range are accepted and reach the client as given.
+func TestTheTimeoutBoundsAreAccepted(t *testing.T) {
 	clearProviderEnv(t)
-	for _, v := range []string{"0", "-5"} {
+	for _, v := range []int{1, 30} {
+		t.Run(strconv.Itoa(v), func(t *testing.T) {
+			var got escp.Config
+			var mu sync.Mutex
+			cfg := `provider "tplinkeasysmart" {
+  host            = "192.0.2.120"
+  username        = "admin"
+  password        = "x"
+  timeout_seconds = ` + strconv.Itoa(v) + `
+}
+` + infoDataSource
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: capturingFactories(&got, &mu, nil),
+				Steps:                    []resource.TestStep{{Config: cfg}},
+			})
+			want := escp.Config{Host: "192.0.2.120", Username: "admin", Password: "x", Timeout: time.Duration(v) * time.Second}
+			checkClientConfig(t, got, want, true)
+		})
+	}
+}
+
+// timeout_seconds outside 1 to 30 (the library's MaxTimeout) is rejected while planning, before any
+// client exists.
+func TestATimeoutOutsideOneToThirtyIsRejectedAtPlanTime(t *testing.T) {
+	clearProviderEnv(t)
+	for _, v := range []string{"0", "-5", "31", "3600"} {
 		t.Run(v, func(t *testing.T) {
 			var got escp.Config
 			var mu sync.Mutex
@@ -124,7 +150,7 @@ func TestNonPositiveTimeoutIsRejectedAtPlanTime(t *testing.T) {
 ` + infoDataSource
 			resource.UnitTest(t, resource.TestCase{
 				ProtoV6ProviderFactories: capturingFactories(&got, &mu, nil),
-				Steps:                    []resource.TestStep{{Config: cfg, ExpectError: regexp.MustCompile(`(?s)timeout_seconds.*at least 1`)}},
+				Steps:                    []resource.TestStep{{Config: cfg, ExpectError: regexp.MustCompile(`(?s)timeout_seconds.*between 1 and 30`)}},
 			})
 			if got.Host != "" {
 				t.Fatalf("no client may be built for an invalid configuration, got %+v", got)
