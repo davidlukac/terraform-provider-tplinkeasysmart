@@ -13,6 +13,7 @@ import (
 
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/provider"
 )
@@ -33,12 +34,12 @@ type Session struct {
 	Fake   *escptest.Switch
 	Client *escp.Client
 	// MAC is the MAC address the target reports about itself.
-	MAC    escp.MAC
+	MAC    model.MAC
 	before Readout
 	// mode and mirror are the two settings the safety net puts back (see Rescue), as they were
 	// when the session opened.
-	mode   escp.VLANModeSetting
-	mirror escp.Mirror
+	mode   model.VLANModeSetting
+	mirror model.Mirror
 	// net is the client the safety net uses; the session's own, replaceable in tests.
 	net rescueClient
 	rd  []Reader
@@ -103,7 +104,7 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 	if err != nil {
 		t.Fatalf("first readout of %s: %v", target.Name, err)
 	}
-	s.MAC, _ = escp.ParseMAC(s.before["mac"]) // the readout prints MAC.String(), which always parses
+	s.MAC, _ = model.ParseMAC(s.before["mac"]) // the readout prints MAC.String(), which always parses
 	if err := CheckTestPorts(context.Background(), s.Client, target); err != nil {
 		t.Fatalf("%s: %v", target.Name, err)
 	}
@@ -125,7 +126,7 @@ func (s *Session) capture(ctx context.Context) (err error) {
 // uplink on port 1 and devices on 6, 7 and 8 have a link, the other ports are free.
 func startFake(t testing.TB) *escptest.Switch {
 	f := escptest.Start(t)
-	f.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full, 6: escptest.Link1000Full, 7: escptest.Link100Full, 8: escptest.Link100Full})
+	f.EnableModel(map[model.PortID]escptest.LinkSpeed{1: escptest.Link1000Full, 6: escptest.Link1000Full, 7: escptest.Link100Full, 8: escptest.Link100Full})
 	return f
 }
 
@@ -145,7 +146,7 @@ func (s *Session) dialClient(cfg escp.Config) (*escp.Client, error) {
 			// A client without an address finds its switch by a discovery on the host's interfaces,
 			// which cannot see a fake on loopback. This stands in for it: the fake is found when the
 			// MAC is its own, and nothing is found otherwise.
-			if cfg.MAC != escp.MAC(escptest.DefaultMAC()) {
+			if cfg.MAC != escptest.DefaultMAC() {
 				return nil, fmt.Errorf("%w: %s", escp.ErrNotFound, cfg.MAC)
 			}
 			cfg.Host = loopback
@@ -176,7 +177,7 @@ func (s *Session) ProviderHCL() string {
 
 // ProviderHCLByMAC is the provider block naming the switch by its MAC address only: no address
 // anywhere, so the provider has to find it. host, when not empty, is added as an address to try first.
-func (s *Session) ProviderHCLByMAC(host string, mac escp.MAC) string {
+func (s *Session) ProviderHCLByMAC(host string, mac model.MAC) string {
 	hostLine := ""
 	if host != "" {
 		hostLine = fmt.Sprintf("  host     = %q\n", host)

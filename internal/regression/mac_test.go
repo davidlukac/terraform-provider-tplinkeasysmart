@@ -14,6 +14,7 @@ import (
 
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/provider"
 )
@@ -24,7 +25,7 @@ import (
 // identity pin refuses another device, and that nothing is written when it does.
 
 // notTheTarget is a MAC address (locally administered, so no vendor owns it) that no switch has.
-var notTheTarget = escp.MAC{0x02, 0, 0, 0, 0, 0x01}
+var notTheTarget = model.MAC{0x02, 0, 0, 0, 0, 0x01}
 
 // ledScenarioByMAC flips the LED through a provider block that names the switch as given, and puts
 // it back: the smallest write that proves the whole path works.
@@ -110,7 +111,7 @@ func TestScenarioMultiSwitchByMAC(t *testing.T) {
 	if target, err := LoadTarget(map[string]string{EnvTarget: os.Getenv(EnvTarget)}); err != nil || target.Real() {
 		t.Skip("the multi-switch scenario runs on the fakes only")
 	}
-	macA, macB := escp.MAC(escptest.DefaultMAC()), escp.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x03}
+	macA, macB := escptest.DefaultMAC(), model.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x03}
 	a, b := startFake(t), startFake(t)
 	b.SetMAC(macB)
 	fakes := map[string]*escptest.Switch{macA.String(): a, macB.String(): b}

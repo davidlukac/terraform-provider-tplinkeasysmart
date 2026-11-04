@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 var (
@@ -26,7 +26,7 @@ type configBackupDataSource struct {
 
 // configBackupReader is the part of the switch API this data source reads.
 type configBackupReader interface {
-	ConfigBackup(ctx context.Context) (escp.ConfigFile, error)
+	ConfigBackup(ctx context.Context) (model.ConfigFile, error)
 }
 
 // bound returns a copy of the data source wired to the client of the named switch.

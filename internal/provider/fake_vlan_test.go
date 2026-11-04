@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // fakePortCount is the number of ports of the fake switch's 802.1Q default VLAN.
@@ -15,11 +16,11 @@ const fakePortCount = 8
 // enabling 802.1Q creates VLAN 1 with every port untagged and PVID 1, and a
 // PVID can only point to an existing VLAN.
 type fakeVLANs struct {
-	mtu       escp.MTUVLAN
+	mtu       model.MTUVLAN
 	portBased bool
 	enabled   bool // 802.1Q mode
-	vlans     map[escp.VLANID]escp.Dot1QVLAN
-	pvids     map[escp.PortID]escp.VLANID
+	vlans     map[model.VLANID]model.Dot1QVLAN
+	pvids     map[model.PortID]model.VLANID
 
 	ignoreModeWrites bool // accept mode writes without applying them
 	maxVLANs         int  // the 802.1Q table size, VLAN 1 included (0: the real switch's 32)
@@ -27,10 +28,10 @@ type fakeVLANs struct {
 
 // newFakeVLANs returns a switch in the given mode ("mtu", "port-based", "802.1q" or "").
 func newFakeVLANs(mode string) *fakeVLANs {
-	v := &fakeVLANs{mtu: escp.MTUVLAN{UplinkPort: 1}, vlans: map[escp.VLANID]escp.Dot1QVLAN{}, pvids: map[escp.PortID]escp.VLANID{}}
+	v := &fakeVLANs{mtu: model.MTUVLAN{UplinkPort: 1}, vlans: map[model.VLANID]model.Dot1QVLAN{}, pvids: map[model.PortID]model.VLANID{}}
 	switch mode {
 	case "mtu":
-		v.mtu = escp.MTUVLAN{Enabled: true, UplinkPort: 8}
+		v.mtu = model.MTUVLAN{Enabled: true, UplinkPort: 8}
 	case "port-based":
 		v.portBased = true
 	case "802.1q":
@@ -39,19 +40,19 @@ func newFakeVLANs(mode string) *fakeVLANs {
 	return v
 }
 
-func allFakePorts() escp.PortSet {
-	var ports escp.PortSet
+func allFakePorts() model.PortSet {
+	var ports model.PortSet
 	for p := 1; p <= fakePortCount; p++ {
-		ports = ports.Union(escp.MustPortSet(escp.PortID(p)))
+		ports = ports.Union(model.MustPortSet(model.PortID(p)))
 	}
 	return ports
 }
 
 // enable8021Q turns the mode on and builds the default VLAN 1 with every port untagged.
 func (v *fakeVLANs) enable8021Q() {
-	v.enabled, v.portBased, v.mtu = true, false, escp.MTUVLAN{UplinkPort: 1}
-	v.vlans = map[escp.VLANID]escp.Dot1QVLAN{1: {ID: 1, Name: "Default", Untagged: allFakePorts(), Tagged: 0}}
-	v.pvids = map[escp.PortID]escp.VLANID{}
+	v.enabled, v.portBased, v.mtu = true, false, model.MTUVLAN{UplinkPort: 1}
+	v.vlans = map[model.VLANID]model.Dot1QVLAN{1: {ID: 1, Name: "Default", Untagged: allFakePorts(), Tagged: 0}}
+	v.pvids = map[model.PortID]model.VLANID{}
 	for _, p := range allFakePorts().Ports() {
 		v.pvids[p] = 1
 	}
@@ -66,9 +67,9 @@ func (v *fakeVLANs) tableSize() int {
 }
 
 // dot1q is the 802.1Q state as the switch reports it, VLANs and PVIDs sorted.
-func (v *fakeVLANs) dot1q() escp.Dot1Q {
-	out := escp.Dot1Q{Enabled: v.enabled, MaxVLANs: v.tableSize(), VLANs: []escp.Dot1QVLAN{}, PVIDs: []escp.PortPVID{}}
-	ids := make([]escp.VLANID, 0, len(v.vlans))
+func (v *fakeVLANs) dot1q() model.Dot1Q {
+	out := model.Dot1Q{Enabled: v.enabled, MaxVLANs: v.tableSize(), VLANs: []model.Dot1QVLAN{}, PVIDs: []model.PortPVID{}}
+	ids := make([]model.VLANID, 0, len(v.vlans))
 	for id := range v.vlans {
 		ids = append(ids, id)
 	}
@@ -78,7 +79,7 @@ func (v *fakeVLANs) dot1q() escp.Dot1Q {
 	}
 	for _, p := range allFakePorts().Ports() {
 		if pvid, ok := v.pvids[p]; ok {
-			out.PVIDs = append(out.PVIDs, escp.PortPVID{Port: p, PVID: pvid})
+			out.PVIDs = append(out.PVIDs, model.PortPVID{Port: p, PVID: pvid})
 		}
 	}
 	return out
@@ -96,24 +97,24 @@ func (f *fakeClient) vlanWrite(do func(v *fakeVLANs) error) error {
 }
 
 // VLANMode names the mode the way the library does, from the fake's three flags.
-func (f *fakeClient) VLANMode(ctx context.Context) (escp.VLANModeSetting, error) {
+func (f *fakeClient) VLANMode(ctx context.Context) (model.VLANModeSetting, error) {
 	mtu, _ := f.MTUVLAN(ctx)
 	pb, _ := f.PortBasedVLAN(ctx)
 	q, _ := f.Dot1Q(ctx)
-	return escp.VLANModeFrom(mtu, pb, q), nil
+	return model.VLANModeFrom(mtu, pb, q), nil
 }
 
-func (f *fakeClient) SetVLANMode(_ context.Context, s escp.VLANModeSetting) error {
+func (f *fakeClient) SetVLANMode(_ context.Context, s model.VLANModeSetting) error {
 	if err := s.Validate(); err != nil {
 		return err
 	}
 	return f.vlanWrite(func(v *fakeVLANs) error {
 		switch {
 		case v.ignoreModeWrites:
-		case s.Mode == escp.VLANModeMTU:
-			v.mtu, v.enabled, v.portBased = escp.MTUVLAN{Enabled: true, UplinkPort: s.UplinkPort}, false, false
-		case s.Mode == escp.VLANModePortBased:
-			v.portBased, v.enabled, v.mtu = true, false, escp.MTUVLAN{UplinkPort: 1}
+		case s.Mode == model.VLANModeMTU:
+			v.mtu, v.enabled, v.portBased = model.MTUVLAN{Enabled: true, UplinkPort: s.UplinkPort}, false, false
+		case s.Mode == model.VLANModePortBased:
+			v.portBased, v.enabled, v.mtu = true, false, model.MTUVLAN{UplinkPort: 1}
 		default:
 			v.enable8021Q()
 		}
@@ -121,7 +122,7 @@ func (f *fakeClient) SetVLANMode(_ context.Context, s escp.VLANModeSetting) erro
 	})
 }
 
-func (f *fakeClient) SetDot1QVLAN(_ context.Context, vlan escp.Dot1QVLAN) error {
+func (f *fakeClient) SetDot1QVLAN(_ context.Context, vlan model.Dot1QVLAN) error {
 	return f.vlanWrite(func(v *fakeVLANs) error {
 		if _, exists := v.vlans[vlan.ID]; !exists && len(v.vlans) >= v.tableSize() {
 			return &escp.RejectedError{Code: 7505} // what switch 03 answered to the 33rd VLAN
@@ -131,14 +132,14 @@ func (f *fakeClient) SetDot1QVLAN(_ context.Context, vlan escp.Dot1QVLAN) error 
 	})
 }
 
-func (f *fakeClient) DeleteDot1QVLAN(_ context.Context, id escp.VLANID) error {
+func (f *fakeClient) DeleteDot1QVLAN(_ context.Context, id model.VLANID) error {
 	return f.vlanWrite(func(v *fakeVLANs) error {
 		delete(v.vlans, id)
 		return nil
 	})
 }
 
-func (f *fakeClient) SetPVIDs(_ context.Context, pvids []escp.PortPVID) error {
+func (f *fakeClient) SetPVIDs(_ context.Context, pvids []model.PortPVID) error {
 	return f.vlanWrite(func(v *fakeVLANs) error {
 		for _, p := range pvids {
 			v.pvids[p.Port] = p.PVID

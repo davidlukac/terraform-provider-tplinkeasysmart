@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // leaveDirty does what a scenario that failed halfway leaves behind: the VLAN mode switched and a
@@ -14,10 +14,10 @@ import (
 func leaveDirty(t *testing.T, s *Session) {
 	t.Helper()
 	ctx := context.Background()
-	if err := s.Client.SetVLANMode(ctx, escp.VLANModeSetting{Mode: escp.VLANModeDot1Q}); err != nil {
+	if err := s.Client.SetVLANMode(ctx, model.VLANModeSetting{Mode: model.VLANModeDot1Q}); err != nil {
 		t.Fatal(err)
 	}
-	mirror := escp.Mirror{Enabled: true, Destination: 3, IngressPorts: escp.MustPortSet(4)}
+	mirror := model.Mirror{Enabled: true, Destination: 3, IngressPorts: model.MustPortSet(4)}
 	if err := s.Client.SetPortMirror(ctx, mirror); err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestRescueWritesNothingWhenTheSwitchIsAsItWas(t *testing.T) {
 
 func TestRescueRestoresOnlyWhatDiffers(t *testing.T) {
 	s := Open(t, noEnv)
-	mirror := escp.Mirror{Enabled: true, Destination: 3, IngressPorts: escp.MustPortSet(4)}
+	mirror := model.Mirror{Enabled: true, Destination: 3, IngressPorts: model.MustPortSet(4)}
 	if err := s.Client.SetPortMirror(context.Background(), mirror); err != nil {
 		t.Fatal(err)
 	}
@@ -113,25 +113,25 @@ func (c *cleanupRecorder) runCleanups() {
 // stubRescue is a client whose reads and writes fail on demand, for the paths a fake cannot reach
 // without scripting every reply.
 type stubRescue struct {
-	mode   escp.VLANModeSetting
-	mirror escp.Mirror
+	mode   model.VLANModeSetting
+	mirror model.Mirror
 	// readModeErr, setModeErr, readMirrorErr and setMirrorErr make the matching call fail.
 	readModeErr, setModeErr, readMirrorErr, setMirrorErr error
 }
 
-func (c *stubRescue) VLANMode(context.Context) (escp.VLANModeSetting, error) {
+func (c *stubRescue) VLANMode(context.Context) (model.VLANModeSetting, error) {
 	return c.mode, c.readModeErr
 }
-func (c *stubRescue) SetVLANMode(_ context.Context, m escp.VLANModeSetting) error {
+func (c *stubRescue) SetVLANMode(_ context.Context, m model.VLANModeSetting) error {
 	if c.setModeErr == nil {
 		c.mode = m
 	}
 	return c.setModeErr
 }
-func (c *stubRescue) PortMirror(context.Context) (escp.Mirror, error) {
+func (c *stubRescue) PortMirror(context.Context) (model.Mirror, error) {
 	return c.mirror, c.readMirrorErr
 }
-func (c *stubRescue) SetPortMirror(_ context.Context, m escp.Mirror) error {
+func (c *stubRescue) SetPortMirror(_ context.Context, m model.Mirror) error {
 	if c.setMirrorErr == nil {
 		c.mirror = m
 	}
@@ -140,7 +140,7 @@ func (c *stubRescue) SetPortMirror(_ context.Context, m escp.Mirror) error {
 
 func TestRescueReportsWhatItCannotDo(t *testing.T) {
 	boom := errors.New("boom")
-	dirtyMirror := escp.Mirror{Enabled: true, Destination: 3, IngressPorts: escp.MustPortSet(4)}
+	dirtyMirror := model.Mirror{Enabled: true, Destination: 3, IngressPorts: model.MustPortSet(4)}
 	for _, c := range []struct {
 		name string
 		stub stubRescue
@@ -148,14 +148,14 @@ func TestRescueReportsWhatItCannotDo(t *testing.T) {
 		done int    // settings put back before it failed
 	}{
 		{"the VLAN mode cannot be read", stubRescue{readModeErr: boom}, "reading the VLAN mode", 0},
-		{"the VLAN mode cannot be written", stubRescue{mode: escp.VLANModeSetting{Mode: escp.VLANModeDot1Q}, setModeErr: boom}, "putting the VLAN mode back", 0},
+		{"the VLAN mode cannot be written", stubRescue{mode: model.VLANModeSetting{Mode: model.VLANModeDot1Q}, setModeErr: boom}, "putting the VLAN mode back", 0},
 		{"the mirror cannot be read", stubRescue{readMirrorErr: boom}, "reading the port mirror", 0},
 		{"the mirror cannot be written", stubRescue{mirror: dirtyMirror, setMirrorErr: boom}, "putting the port mirror back", 0},
-		{"the mode went back but the mirror cannot be read", stubRescue{mode: escp.VLANModeSetting{Mode: escp.VLANModeDot1Q}, readMirrorErr: boom}, "reading the port mirror", 1},
+		{"the mode went back but the mirror cannot be read", stubRescue{mode: model.VLANModeSetting{Mode: model.VLANModeDot1Q}, readMirrorErr: boom}, "reading the port mirror", 1},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			opening := escp.VLANModeSetting{Mode: escp.VLANModePortBased}
-			if c.stub.mode == (escp.VLANModeSetting{}) {
+			opening := model.VLANModeSetting{Mode: model.VLANModePortBased}
+			if c.stub.mode == (model.VLANModeSetting{}) {
 				c.stub.mode = opening // a case about something else starts with the mode as it was
 			}
 			s := &Session{net: &c.stub, mode: opening}
@@ -191,7 +191,7 @@ func TestCaptureReportsWhatItCannotRead(t *testing.T) {
 
 func TestRescueCannotWriteAnOpeningModeThatIsNone(t *testing.T) {
 	s := Open(t, noEnv)
-	s.mode = escp.VLANModeSetting{Mode: escp.VLANModeNone} // a switch that began with no single mode
+	s.mode = model.VLANModeSetting{Mode: model.VLANModeNone} // a switch that began with no single mode
 	if _, err := s.Rescue(context.Background()); err == nil || !strings.Contains(err.Error(), "putting the VLAN mode back") {
 		t.Errorf("err = %v, want the unwritable opening mode named", err)
 	}

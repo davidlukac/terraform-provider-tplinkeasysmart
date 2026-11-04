@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 const igmpID = "igmp_snooping"
@@ -34,8 +34,8 @@ type igmpResource struct {
 
 // igmpClient is the part of the switch API this resource needs.
 type igmpClient interface {
-	IGMP(ctx context.Context) (escp.IGMP, error)
-	SetIGMP(ctx context.Context, cfg escp.IGMPConfig) error
+	IGMP(ctx context.Context) (model.IGMP, error)
+	SetIGMP(ctx context.Context, cfg model.IGMPConfig) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -86,7 +86,7 @@ var igmpGroupType = types.ObjectType{AttrTypes: map[string]attr.Type{
 
 // igmpToModel converts the switch state to the Terraform model. The values are
 // built from the group type itself, so they cannot violate it.
-func igmpToModel(sw types.String, s escp.IGMP) igmpModel {
+func igmpToModel(sw types.String, s model.IGMP) igmpModel {
 	groups := make([]attr.Value, 0, len(s.Groups))
 	for _, g := range s.Groups {
 		ports := make([]attr.Value, 0, g.Ports.Len())
@@ -110,8 +110,8 @@ func (r *igmpResource) apply(ctx context.Context, plan *igmpModel, add func(stri
 }
 
 func (r *igmpResource) applyBound(ctx context.Context, plan *igmpModel, add func(string, string)) bool {
-	want := escp.IGMP{Enabled: plan.Enabled.ValueBool(), ReportSuppression: plan.ReportSuppression.ValueBool()}
-	if err := r.client.SetIGMP(ctx, escp.IGMPConfig{Enabled: want.Enabled, ReportSuppression: want.ReportSuppression}); err != nil {
+	want := model.IGMP{Enabled: plan.Enabled.ValueBool(), ReportSuppression: plan.ReportSuppression.ValueBool()}
+	if err := r.client.SetIGMP(ctx, model.IGMPConfig{Enabled: want.Enabled, ReportSuppression: want.ReportSuppression}); err != nil {
 		add("Setting IGMP snooping failed", err.Error())
 		return false
 	}

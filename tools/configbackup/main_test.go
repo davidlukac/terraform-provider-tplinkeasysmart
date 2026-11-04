@@ -14,6 +14,7 @@ import (
 
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // aimedAt returns the dependencies that reach the fake switch instead of the network.
@@ -187,7 +188,7 @@ func TestTheMACIsPassedToTheLibrary(t *testing.T) {
 	env[envMAC] = "aa:bb:cc:dd:ee:ff"
 	// the fake's default MAC differs, so the library refuses the device: the point is only that the MAC arrived
 	_ = run([]string{"-out", filepath.Join(t.TempDir(), "x.bin")}, envOf(env), io.Discard, io.Discard, d)
-	if want, _ := escp.ParseMAC("aa:bb:cc:dd:ee:ff"); got.MAC != want {
+	if want, _ := model.ParseMAC("aa:bb:cc:dd:ee:ff"); got.MAC != want {
 		t.Fatalf("the client was configured with MAC %v, want %v", got.MAC, want)
 	}
 }

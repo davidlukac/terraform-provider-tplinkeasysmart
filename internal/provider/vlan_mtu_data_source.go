@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -26,7 +26,7 @@ type vlanMTUDataSource struct {
 
 // vlanMTUReader is the part of the switch API this data source reads.
 type vlanMTUReader interface {
-	MTUVLAN(ctx context.Context) (escp.MTUVLAN, error)
+	MTUVLAN(ctx context.Context) (model.MTUVLAN, error)
 }
 
 // bound returns a copy of the data source wired to the client of the named switch.

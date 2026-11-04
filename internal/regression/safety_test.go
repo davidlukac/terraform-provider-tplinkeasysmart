@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 )
 
 func TestCheckTestPorts(t *testing.T) {
@@ -14,12 +14,12 @@ func TestCheckTestPorts(t *testing.T) {
 	ctx := context.Background()
 	for _, tc := range []struct {
 		name  string
-		ports []escp.PortID
+		ports []model.PortID
 		want  string
 	}{
-		{"free ports", []escp.PortID{2, 3, 4, 5}, ""},
-		{"a port with a link", []escp.PortID{2, 6}, "port 6 has a link"},
-		{"a port that does not exist", []escp.PortID{2, 9}, "port 9 does not exist"},
+		{"free ports", []model.PortID{2, 3, 4, 5}, ""},
+		{"a port with a link", []model.PortID{2, 6}, "port 6 has a link"},
+		{"a port that does not exist", []model.PortID{2, 9}, "port 9 does not exist"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := CheckTestPorts(ctx, s.Client, Target{TestPorts: tc.ports})
@@ -29,10 +29,10 @@ func TestCheckTestPorts(t *testing.T) {
 		})
 	}
 	// A free port that has become a LAG member is refused too.
-	if err := s.Client.SetLAG(ctx, escp.LAG{ID: 1, Ports: escp.MustPortSet(3, 4)}); err != nil {
+	if err := s.Client.SetLAG(ctx, model.LAG{ID: 1, Ports: model.MustPortSet(3, 4)}); err != nil {
 		t.Fatal(err)
 	}
-	if err := CheckTestPorts(ctx, s.Client, Target{TestPorts: []escp.PortID{3}}); err == nil || !strings.Contains(err.Error(), "member of LAG 1") {
+	if err := CheckTestPorts(ctx, s.Client, Target{TestPorts: []model.PortID{3}}); err == nil || !strings.Contains(err.Error(), "member of LAG 1") {
 		t.Errorf("err = %v, want the LAG named", err)
 	}
 }
@@ -42,7 +42,7 @@ func TestCheckTestPortsUnreadable(t *testing.T) {
 	s.Fake.Configure(func(f *escptest.Faults) {
 		f.OnGet = func([]escptest.TLVType) ([]escptest.Setting, int32, bool) { return nil, 1, false }
 	})
-	if err := CheckTestPorts(context.Background(), s.Client, Target{TestPorts: []escp.PortID{2}}); err == nil || !strings.Contains(err.Error(), "cannot read the ports") {
+	if err := CheckTestPorts(context.Background(), s.Client, Target{TestPorts: []model.PortID{2}}); err == nil || !strings.Contains(err.Error(), "cannot read the ports") {
 		t.Errorf("err = %v", err)
 	}
 }

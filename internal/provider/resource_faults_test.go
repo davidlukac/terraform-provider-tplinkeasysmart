@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 func loopCfg(v string) string {
@@ -56,7 +56,7 @@ func faultScenarios() []faultScenario {
 		},
 		{
 			name: "igmp snooping", addr: "tplinkeasysmart_igmp_snooping.this",
-			fake:   func() *fakeClient { return &fakeClient{igmp: escp.IGMP{Enabled: true}} },
+			fake:   func() *fakeClient { return &fakeClient{igmp: model.IGMP{Enabled: true}} },
 			create: igmpConfig("false"), update: igmpConfig("true"),
 			writeMethod: "SetIGMP", writeErr: "Setting IGMP snooping failed",
 			backMethod: "IGMP", backCall: 1, backErr: "Reading IGMP snooping back failed", noChgEr: "IGMP snooping did not change",
@@ -93,7 +93,7 @@ func faultScenarios() []faultScenario {
 		},
 		{
 			name: "bandwidth limit", addr: "tplinkeasysmart_bandwidth_limit.b",
-			fake:   func() *fakeClient { return &fakeClient{ports: testPorts(), bw: map[escp.PortID][2]int{}} },
+			fake:   func() *fakeClient { return &fakeClient{ports: testPorts(), bw: map[model.PortID][2]int{}} },
 			create: bwConfig(7, "  ingress_kbps = 64\n"), update: bwConfig(7, "  egress_kbps = 64\n"),
 			writeMethod: "SetBandwidth", writeErr: "Setting bandwidth limit failed",
 			backMethod: "Bandwidth", backCall: 1, backErr: "Bandwidth limit did not change", noChgEr: "Bandwidth limit did not change",
@@ -103,7 +103,7 @@ func faultScenarios() []faultScenario {
 		},
 		{
 			name: "storm limit", addr: "tplinkeasysmart_storm_limit.s",
-			fake:   func() *fakeClient { return &fakeClient{ports: testPorts(), storm: map[escp.PortID]escp.PortStorm{}} },
+			fake:   func() *fakeClient { return &fakeClient{ports: testPorts(), storm: map[model.PortID]model.PortStorm{}} },
 			create: stormConfig(7, "  broadcast = true\n  rate_kbps = 64\n"), update: stormConfig(7, "  multicast = true\n  rate_kbps = 128\n"),
 			writeMethod: "SetStormControl", writeErr: "Setting storm control failed",
 			backMethod: "StormControl", backCall: 1, backErr: "Storm control did not change", noChgEr: "Storm control did not change",
@@ -113,7 +113,7 @@ func faultScenarios() []faultScenario {
 		},
 		{
 			name: "port mirror", addr: "tplinkeasysmart_port_mirror.m",
-			fake:        func() *fakeClient { return &fakeClient{ports: testPorts(), mirror: &escp.Mirror{}} },
+			fake:        func() *fakeClient { return &fakeClient{ports: testPorts(), mirror: &model.Mirror{}} },
 			create:      mirrorConfig("  enabled = true\n  mirror_port = 7\n  ingress_ports = [4]\n"),
 			update:      mirrorConfig("  enabled = true\n  mirror_port = 7\n  ingress_ports = [1, 4]\n"),
 			writeMethod: "SetPortMirror", writeErr: "Setting port mirror failed",
@@ -124,7 +124,7 @@ func faultScenarios() []faultScenario {
 		{
 			name: "lag", addr: "tplinkeasysmart_lag.l",
 			fake: func() *fakeClient {
-				return &fakeClient{ports: lagPorts(), lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}}
+				return &fakeClient{ports: lagPorts(), lags: map[model.LAGID]model.PortSet{1: model.MustPortSet(1, 2)}}
 			},
 			create: lagConfig(2, "  ports = [6, 7]\n"), update: lagConfig(2, "  ports = [5, 6, 7]\n"),
 			writeMethod: "SetLAG", writeErr: "Setting LAG failed",
@@ -136,7 +136,7 @@ func faultScenarios() []faultScenario {
 		{
 			name: "port-based vlan group", addr: "tplinkeasysmart_vlan_port_based_group.v",
 			fake: func() *fakeClient {
-				return &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
+				return &fakeClient{ports: lagPorts(), pvlans: map[model.PortVLANID]model.PortSet{1: model.MustPortSet(1, 2, 4, 6, 7)}}
 			},
 			create: vlanGroupConfig(2, "  ports = [6, 7]\n"), update: vlanGroupConfig(2, "  ports = [6]\n"),
 			writeMethod: "SetPortBasedVLAN", writeErr: "Setting VLAN group failed",
@@ -273,9 +273,9 @@ func TestGuardedResourcesRefuseUsedPortsWithoutWriting(t *testing.T) {
 		fake            func() *fakeClient
 	}{
 		{"port on a linked port", portConfig(4, "  enabled = false\n"), `has a link up`, func() *fakeClient { return &fakeClient{ports: testPorts()} }},
-		{"bandwidth on a LAG member with a link", bwConfig(1, "  ingress_kbps = 64\n"), `port 1 has a link up`, func() *fakeClient { return &fakeClient{ports: testPorts(), bw: map[escp.PortID][2]int{}} }},
-		{"storm on a linked port", stormConfig(4, "  broadcast = true\n  rate_kbps = 64\n"), `has a link up`, func() *fakeClient { return &fakeClient{ports: testPorts(), storm: map[escp.PortID]escp.PortStorm{}} }},
-		{"mirror destination on a linked port", mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [7]\n"), `has a link up`, func() *fakeClient { return &fakeClient{ports: testPorts(), mirror: &escp.Mirror{}} }},
+		{"bandwidth on a LAG member with a link", bwConfig(1, "  ingress_kbps = 64\n"), `port 1 has a link up`, func() *fakeClient { return &fakeClient{ports: testPorts(), bw: map[model.PortID][2]int{}} }},
+		{"storm on a linked port", stormConfig(4, "  broadcast = true\n  rate_kbps = 64\n"), `has a link up`, func() *fakeClient { return &fakeClient{ports: testPorts(), storm: map[model.PortID]model.PortStorm{}} }},
+		{"mirror destination on a linked port", mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [7]\n"), `has a link up`, func() *fakeClient { return &fakeClient{ports: testPorts(), mirror: &model.Mirror{}} }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -306,8 +306,8 @@ func TestGuardCannotBeBypassedByAFailingPortLookup(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			inner := &fakeClient{ports: lagPorts(), lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}, pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)},
-				bw: map[escp.PortID][2]int{}, storm: map[escp.PortID]escp.PortStorm{}, mirror: &escp.Mirror{}}
+			inner := &fakeClient{ports: lagPorts(), lags: map[model.LAGID]model.PortSet{1: model.MustPortSet(1, 2)}, pvlans: map[model.PortVLANID]model.PortSet{1: model.MustPortSet(1, 2, 4, 6, 7)},
+				bw: map[model.PortID][2]int{}, storm: map[model.PortID]model.PortStorm{}, mirror: &model.Mirror{}}
 			// testPorts has port 7; lagPorts too
 			fc := newFaulty(inner)
 			fc.failAlways("Ports")
@@ -332,7 +332,7 @@ func TestGuardRejectsPortsThatDoNotExist(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			inner := &fakeClient{ports: testPorts(), bw: map[escp.PortID][2]int{}, storm: map[escp.PortID]escp.PortStorm{}, mirror: &escp.Mirror{}}
+			inner := &fakeClient{ports: testPorts(), bw: map[model.PortID][2]int{}, storm: map[model.PortID]model.PortStorm{}, mirror: &model.Mirror{}}
 			resource.UnitTest(t, resource.TestCase{
 				ProtoV6ProviderFactories: factories(inner),
 				Steps:                    []resource.TestStep{{Config: tc.cfg, ExpectError: regexp.MustCompile(`port 9 does not exist`)}},
@@ -354,24 +354,24 @@ func TestAllowDisruptiveReallyAllowsTheWrite(t *testing.T) {
 			func() *fakeClient { return &fakeClient{ports: testPorts()} },
 			func(f *fakeClient) bool { return f.ports[1].ConfiguredFlowControl }},
 		{"bandwidth on a linked port", bwConfig(4, "  ingress_kbps = 64\n  allow_disruptive = true\n"),
-			func() *fakeClient { return &fakeClient{ports: testPorts(), bw: map[escp.PortID][2]int{}} },
+			func() *fakeClient { return &fakeClient{ports: testPorts(), bw: map[model.PortID][2]int{}} },
 			func(f *fakeClient) bool { return f.bw[4][0] == 64 }},
 		{"storm on a linked port", stormConfig(4, "  broadcast = true\n  rate_kbps = 64\n  allow_disruptive = true\n"),
-			func() *fakeClient { return &fakeClient{ports: testPorts(), storm: map[escp.PortID]escp.PortStorm{}} },
+			func() *fakeClient { return &fakeClient{ports: testPorts(), storm: map[model.PortID]model.PortStorm{}} },
 			func(f *fakeClient) bool { return f.storm[4].Rate == 64 }},
 		{"mirror to a linked port", mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [7]\n  allow_disruptive = true\n"),
-			func() *fakeClient { return &fakeClient{ports: testPorts(), mirror: &escp.Mirror{}} },
+			func() *fakeClient { return &fakeClient{ports: testPorts(), mirror: &model.Mirror{}} },
 			func(f *fakeClient) bool { return f.mirror.Enabled && f.mirror.Destination == 4 }},
 		{"LAG over a linked port", lagConfig(1, "  ports = [3, 4]\n  allow_disruptive = true\n"),
 			func() *fakeClient {
-				return &fakeClient{ports: lagPorts(), lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}}
+				return &fakeClient{ports: lagPorts(), lags: map[model.LAGID]model.PortSet{1: model.MustPortSet(1, 2)}}
 			},
-			func(f *fakeClient) bool { return f.lags[1] == escp.MustPortSet(3, 4) }},
+			func(f *fakeClient) bool { return f.lags[1] == model.MustPortSet(3, 4) }},
 		{"VLAN group over a linked port", vlanGroupConfig(2, "  ports = [4]\n  allow_disruptive = true\n"),
 			func() *fakeClient {
-				return &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
+				return &fakeClient{ports: lagPorts(), pvlans: map[model.PortVLANID]model.PortSet{1: model.MustPortSet(1, 2, 4, 6, 7)}}
 			},
-			func(f *fakeClient) bool { return f.pvlans[2] == escp.MustPortSet(4) }},
+			func(f *fakeClient) bool { return f.pvlans[2] == model.MustPortSet(4) }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

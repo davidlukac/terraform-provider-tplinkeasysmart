@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // The targets a run can be aimed at.
@@ -52,20 +52,20 @@ type Target struct {
 	Name     string
 	Host     string
 	Username string
-	Password escp.Password
+	Password model.Password
 	// TestPorts are the ports a scenario may change: free, link-down, in no LAG.
-	TestPorts []escp.PortID
+	TestPorts []model.PortID
 	// ProtectedPorts (the uplink and the ports with devices) are named only by guard-refusal scenarios.
-	ProtectedPorts []escp.PortID
+	ProtectedPorts []model.PortID
 	// MoveIP is the spare address the management-move scenario may use; empty unless the run opted in.
 	MoveIP string
 	// DHCP is true when the run opted in to the DHCP scenario.
 	DHCP bool
 	// DisruptPort is the device port the allow_disruptive scenario may write to; zero unless the run opted in.
-	DisruptPort escp.PortID
+	DisruptPort model.PortID
 	// DisruptivePorts are the device ports the disruptive scenarios may change for real (a link
 	// drop, a LAG, a VLAN, a mirror destination); empty unless the run opted in. Never the uplink.
-	DisruptivePorts []escp.PortID
+	DisruptivePorts []model.PortID
 }
 
 // Real reports whether the target is hardware.
@@ -98,7 +98,7 @@ func LoadTarget(env map[string]string) (Target, error) {
 	switch name := env[EnvTarget]; name {
 	case "", TargetFake:
 		return Target{Name: TargetFake, Host: "127.0.0.1", Username: "admin", Password: "secret",
-			TestPorts: []escp.PortID{2, 3, 4, 5}, ProtectedPorts: []escp.PortID{1, 6, 7, 8}, DisruptivePorts: []escp.PortID{7, 8}}, nil
+			TestPorts: []model.PortID{2, 3, 4, 5}, ProtectedPorts: []model.PortID{1, 6, 7, 8}, DisruptivePorts: []model.PortID{7, 8}}, nil
 	case targetSW01:
 		return Target{}, errors.New("switch 01 is read-only for the regression suite and is never a target")
 	case TargetSW03:
@@ -111,7 +111,7 @@ func LoadTarget(env map[string]string) (Target, error) {
 // hardwareTarget reads a real switch's target: where it is, who may write to it, which ports the
 // run may touch and which it never does, and what the run opted in to.
 func hardwareTarget(env map[string]string, name string) (Target, error) {
-	t := Target{Name: name, Host: env[envHost], Username: env[envUsername], Password: escp.Password(env[envPassword])}
+	t := Target{Name: name, Host: env[envHost], Username: env[envUsername], Password: model.Password(env[envPassword])}
 	for _, s := range []struct{ key, value string }{{envHost, t.Host}, {envUsername, t.Username}, {envPassword, env[envPassword]}} {
 		if s.value == "" {
 			return Target{}, fmt.Errorf("%s is not set for target %s", s.key, name)
@@ -206,13 +206,13 @@ func moveIP(ip, host, readOnly string) (string, error) {
 	return ip, nil
 }
 
-func parsePorts(s string) ([]escp.PortID, error) {
-	var out []escp.PortID
+func parsePorts(s string) ([]model.PortID, error) {
+	var out []model.PortID
 	for _, f := range strings.Split(s, ",") {
 		if f = strings.TrimSpace(f); f == "" {
 			continue
 		}
-		p, err := escp.ParsePortID(f)
+		p, err := model.ParsePortID(f)
 		if err != nil {
 			return nil, fmt.Errorf("%q is not a port number", f)
 		}

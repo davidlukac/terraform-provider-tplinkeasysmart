@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -26,7 +26,7 @@ type vlan8021QDataSource struct {
 
 // vlan8021QReader is the part of the switch API this data source reads.
 type vlan8021QReader interface {
-	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
+	Dot1Q(ctx context.Context) (model.Dot1Q, error)
 }
 
 // bound returns a copy of the data source wired to the client of the named switch.

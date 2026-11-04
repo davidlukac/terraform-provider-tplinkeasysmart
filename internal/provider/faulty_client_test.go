@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // errInjected is the error every injected fault returns.
@@ -101,16 +101,16 @@ func (w *faultyClient) write(method string, do func() error) error {
 	return do()
 }
 
-func (w *faultyClient) Info(ctx context.Context) (escp.Info, error) {
+func (w *faultyClient) Info(ctx context.Context) (model.Info, error) {
 	if err := w.check("Info"); err != nil {
-		return escp.Info{}, err
+		return model.Info{}, err
 	}
 	return w.SwitchClient.Info(ctx)
 }
 
-func (w *faultyClient) System(ctx context.Context) (escp.System, error) {
+func (w *faultyClient) System(ctx context.Context) (model.System, error) {
 	if err := w.check("System"); err != nil {
-		return escp.System{}, err
+		return model.System{}, err
 	}
 	return w.SwitchClient.System(ctx)
 }
@@ -126,43 +126,43 @@ func (w *faultyClient) SetLED(ctx context.Context, on bool) error {
 	return w.write("SetLED", func() error { return w.SwitchClient.SetLED(ctx, on) })
 }
 
-func (w *faultyClient) Ports(ctx context.Context) ([]escp.Port, error) {
+func (w *faultyClient) Ports(ctx context.Context) ([]model.Port, error) {
 	if err := w.check("Ports"); err != nil {
 		return nil, err
 	}
 	return w.SwitchClient.Ports(ctx)
 }
 
-func (w *faultyClient) SetPort(ctx context.Context, cfg escp.PortConfig) error {
+func (w *faultyClient) SetPort(ctx context.Context, cfg model.PortConfig) error {
 	return w.write("SetPort", func() error { return w.SwitchClient.SetPort(ctx, cfg) })
 }
 
-func (w *faultyClient) PortStats(ctx context.Context) ([]escp.PortStats, error) {
+func (w *faultyClient) PortStats(ctx context.Context) ([]model.PortStats, error) {
 	if err := w.check("PortStats"); err != nil {
 		return nil, err
 	}
 	return w.SwitchClient.PortStats(ctx)
 }
 
-func (w *faultyClient) LAGs(ctx context.Context) ([]escp.LAG, error) {
+func (w *faultyClient) LAGs(ctx context.Context) ([]model.LAG, error) {
 	if err := w.check("LAGs"); err != nil {
 		return nil, err
 	}
 	return w.SwitchClient.LAGs(ctx)
 }
 
-func (w *faultyClient) SetLAG(ctx context.Context, lag escp.LAG) error {
+func (w *faultyClient) SetLAG(ctx context.Context, lag model.LAG) error {
 	return w.write("SetLAG", func() error { return w.SwitchClient.SetLAG(ctx, lag) })
 }
 
-func (w *faultyClient) IGMP(ctx context.Context) (escp.IGMP, error) {
+func (w *faultyClient) IGMP(ctx context.Context) (model.IGMP, error) {
 	if err := w.check("IGMP"); err != nil {
-		return escp.IGMP{}, err
+		return model.IGMP{}, err
 	}
 	return w.SwitchClient.IGMP(ctx)
 }
 
-func (w *faultyClient) SetIGMP(ctx context.Context, cfg escp.IGMPConfig) error {
+func (w *faultyClient) SetIGMP(ctx context.Context, cfg model.IGMPConfig) error {
 	return w.write("SetIGMP", func() error { return w.SwitchClient.SetIGMP(ctx, cfg) })
 }
 
@@ -177,98 +177,98 @@ func (w *faultyClient) SetLoopPrevention(ctx context.Context, on bool) error {
 	return w.write("SetLoopPrevention", func() error { return w.SwitchClient.SetLoopPrevention(ctx, on) })
 }
 
-func (w *faultyClient) PortMirror(ctx context.Context) (escp.Mirror, error) {
+func (w *faultyClient) PortMirror(ctx context.Context) (model.Mirror, error) {
 	if err := w.check("PortMirror"); err != nil {
-		return escp.Mirror{}, err
+		return model.Mirror{}, err
 	}
 	return w.SwitchClient.PortMirror(ctx)
 }
 
-func (w *faultyClient) SetPortMirror(ctx context.Context, m escp.Mirror) error {
+func (w *faultyClient) SetPortMirror(ctx context.Context, m model.Mirror) error {
 	return w.write("SetPortMirror", func() error { return w.SwitchClient.SetPortMirror(ctx, m) })
 }
 
-func (w *faultyClient) MTUVLAN(ctx context.Context) (escp.MTUVLAN, error) {
+func (w *faultyClient) MTUVLAN(ctx context.Context) (model.MTUVLAN, error) {
 	if err := w.check("MTUVLAN"); err != nil {
-		return escp.MTUVLAN{}, err
+		return model.MTUVLAN{}, err
 	}
 	return w.SwitchClient.MTUVLAN(ctx)
 }
 
-func (w *faultyClient) PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error) {
+func (w *faultyClient) PortBasedVLAN(ctx context.Context) (model.PortBasedVLAN, error) {
 	if err := w.check("PortBasedVLAN"); err != nil {
-		return escp.PortBasedVLAN{}, err
+		return model.PortBasedVLAN{}, err
 	}
 	return w.SwitchClient.PortBasedVLAN(ctx)
 }
 
-func (w *faultyClient) SetPortBasedVLAN(ctx context.Context, group escp.PortVLAN) error {
+func (w *faultyClient) SetPortBasedVLAN(ctx context.Context, group model.PortVLAN) error {
 	return w.write("SetPortBasedVLAN", func() error { return w.SwitchClient.SetPortBasedVLAN(ctx, group) })
 }
 
-func (w *faultyClient) Dot1Q(ctx context.Context) (escp.Dot1Q, error) {
+func (w *faultyClient) Dot1Q(ctx context.Context) (model.Dot1Q, error) {
 	if err := w.check("Dot1Q"); err != nil {
-		return escp.Dot1Q{}, err
+		return model.Dot1Q{}, err
 	}
 	return w.SwitchClient.Dot1Q(ctx)
 }
 
-func (w *faultyClient) QoS(ctx context.Context) (escp.QoS, error) {
+func (w *faultyClient) QoS(ctx context.Context) (model.QoS, error) {
 	if err := w.check("QoS"); err != nil {
-		return escp.QoS{}, err
+		return model.QoS{}, err
 	}
 	return w.SwitchClient.QoS(ctx)
 }
 
-func (w *faultyClient) SetQoSMode(ctx context.Context, mode escp.QoSMode) error {
+func (w *faultyClient) SetQoSMode(ctx context.Context, mode model.QoSMode) error {
 	return w.write("SetQoSMode", func() error { return w.SwitchClient.SetQoSMode(ctx, mode) })
 }
 
-func (w *faultyClient) SetPortPriorities(ctx context.Context, changes []escp.PortPriority) error {
+func (w *faultyClient) SetPortPriorities(ctx context.Context, changes []model.PortPriority) error {
 	return w.write("SetPortPriorities", func() error { return w.SwitchClient.SetPortPriorities(ctx, changes) })
 }
 
-func (w *faultyClient) Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error) {
+func (w *faultyClient) Bandwidth(ctx context.Context) ([]model.PortBandwidth, error) {
 	if err := w.check("Bandwidth"); err != nil {
 		return nil, err
 	}
 	return w.SwitchClient.Bandwidth(ctx)
 }
 
-func (w *faultyClient) SetBandwidth(ctx context.Context, limit escp.PortBandwidth) error {
+func (w *faultyClient) SetBandwidth(ctx context.Context, limit model.PortBandwidth) error {
 	return w.write("SetBandwidth", func() error { return w.SwitchClient.SetBandwidth(ctx, limit) })
 }
 
-func (w *faultyClient) StormControl(ctx context.Context) ([]escp.PortStorm, error) {
+func (w *faultyClient) StormControl(ctx context.Context) ([]model.PortStorm, error) {
 	if err := w.check("StormControl"); err != nil {
 		return nil, err
 	}
 	return w.SwitchClient.StormControl(ctx)
 }
 
-func (w *faultyClient) SetStormControl(ctx context.Context, cfg escp.StormConfig) error {
+func (w *faultyClient) SetStormControl(ctx context.Context, cfg model.StormConfig) error {
 	return w.write("SetStormControl", func() error { return w.SwitchClient.SetStormControl(ctx, cfg) })
 }
 
-func (w *faultyClient) VLANMode(ctx context.Context) (escp.VLANModeSetting, error) {
+func (w *faultyClient) VLANMode(ctx context.Context) (model.VLANModeSetting, error) {
 	if err := w.check("VLANMode"); err != nil {
-		return escp.VLANModeSetting{}, err
+		return model.VLANModeSetting{}, err
 	}
 	return w.SwitchClient.VLANMode(ctx)
 }
 
-func (w *faultyClient) SetVLANMode(ctx context.Context, s escp.VLANModeSetting) error {
+func (w *faultyClient) SetVLANMode(ctx context.Context, s model.VLANModeSetting) error {
 	return w.write("SetVLANMode", func() error { return w.SwitchClient.SetVLANMode(ctx, s) })
 }
 
-func (w *faultyClient) SetDot1QVLAN(ctx context.Context, v escp.Dot1QVLAN) error {
+func (w *faultyClient) SetDot1QVLAN(ctx context.Context, v model.Dot1QVLAN) error {
 	return w.write("SetDot1QVLAN", func() error { return w.SwitchClient.SetDot1QVLAN(ctx, v) })
 }
 
-func (w *faultyClient) DeleteDot1QVLAN(ctx context.Context, id escp.VLANID) error {
+func (w *faultyClient) DeleteDot1QVLAN(ctx context.Context, id model.VLANID) error {
 	return w.write("DeleteDot1QVLAN", func() error { return w.SwitchClient.DeleteDot1QVLAN(ctx, id) })
 }
 
-func (w *faultyClient) SetPVIDs(ctx context.Context, pvids []escp.PortPVID) error {
+func (w *faultyClient) SetPVIDs(ctx context.Context, pvids []model.PortPVID) error {
 	return w.write("SetPVIDs", func() error { return w.SwitchClient.SetPVIDs(ctx, pvids) })
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // The scenarios run through a real Terraform binary against the target chosen by the environment
@@ -186,23 +186,23 @@ func TestScenarioQoS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var origPrio escp.Priority
+	var origPrio model.Priority
 	for _, p := range orig.Priorities {
 		if p.Port == port {
 			origPrio = p.Priority
 		}
 	}
-	cfg := func(mode escp.QoSMode, prio escp.Priority) string {
+	cfg := func(mode model.QoSMode, prio model.Priority) string {
 		return fmt.Sprintf("resource \"tplinkeasysmart_qos\" \"this\" {\n  mode            = %q\n  port_priorities = { \"%d\" = %d }\n}\n", mode.String(), port, int(prio))
 	}
 	modeOnly := fmt.Sprintf("resource \"tplinkeasysmart_qos\" \"this\" {\n  mode = %q\n}\n", orig.Mode.String())
-	changed := escp.PriorityHighest
+	changed := model.PriorityHighest
 	if origPrio == changed {
-		changed = escp.PriorityLowest
+		changed = model.PriorityLowest
 	}
-	s.scenarioSteps(t, cfg(escp.QoSPortBased, changed), func(*terraform.State) error {
+	s.scenarioSteps(t, cfg(model.QoSPortBased, changed), func(*terraform.State) error {
 		got, err := s.Client.QoS(context.Background())
-		if err != nil || got.Mode != escp.QoSPortBased {
+		if err != nil || got.Mode != model.QoSPortBased {
 			return fmt.Errorf("QoS on the switch = %+v, err %w, want port-based", got, err)
 		}
 		for _, p := range got.Priorities {
@@ -211,7 +211,7 @@ func TestScenarioQoS(t *testing.T) {
 			}
 		}
 		return nil
-	}, cfg(escp.QoSPortBased, origPrio), modeOnly)
+	}, cfg(model.QoSPortBased, origPrio), modeOnly)
 }
 
 func TestScenarioPort(t *testing.T) {
@@ -221,18 +221,18 @@ func TestScenarioPort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var orig escp.Port
+	var orig model.Port
 	for _, p := range ports {
 		if p.ID == port {
 			orig = p
 		}
 	}
-	cfg := func(speed escp.Speed, flow bool) string {
+	cfg := func(speed model.Speed, flow bool) string {
 		return fmt.Sprintf("resource \"tplinkeasysmart_port\" \"this\" {\n  port         = %d\n  speed        = %q\n  flow_control = %t\n}\n", port, string(speed), flow)
 	}
-	changed := escp.Speed100Full
+	changed := model.Speed100Full
 	if orig.ConfiguredSpeed == changed {
-		changed = escp.SpeedAuto
+		changed = model.SpeedAuto
 	}
 	s.scenario(t, cfg(changed, false), cfg(orig.ConfiguredSpeed, orig.ConfiguredFlowControl), func(*terraform.State) error {
 		got, err := s.Client.Ports(context.Background())
@@ -255,7 +255,7 @@ func TestScenarioBandwidthLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var was escp.PortBandwidth
+	var was model.PortBandwidth
 	for _, b := range orig {
 		if b.Port == port {
 			was = b
@@ -285,7 +285,7 @@ func TestScenarioStormLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var was escp.PortStorm
+	var was model.PortStorm
 	for _, p := range orig {
 		if p.Port == port {
 			was = p
@@ -324,8 +324,8 @@ func TestScenarioIngressLimitAndStormControlExclude(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var wasBW escp.PortBandwidth
-	var wasStorm escp.PortStorm
+	var wasBW model.PortBandwidth
+	var wasStorm model.PortStorm
 	for _, b := range bws {
 		if b.Port == port {
 			wasBW = b
@@ -349,7 +349,7 @@ func TestScenarioIngressLimitAndStormControlExclude(t *testing.T) {
 	restoreBW := fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"this\" {\n  port = %d\n  ingress_kbps = %d\n  egress_kbps = %d\n}\n", port, wasBW.Ingress, wasBW.Egress)
 	restoreStorm := fmt.Sprintf("resource \"tplinkeasysmart_storm_limit\" \"this\" {\n  port = %d\n  unknown_unicast = %t\n  multicast = %t\n  broadcast = %t\n  rate_kbps = %d\n}\n",
 		port, wasStorm.UnknownUnicast, wasStorm.Multicast, wasStorm.Broadcast, wasStorm.Rate)
-	state := func(wantIngress escp.Kbps, wantStorm bool) resource.TestCheckFunc {
+	state := func(wantIngress model.Kbps, wantStorm bool) resource.TestCheckFunc {
 		return func(*terraform.State) error {
 			bws, err := s.Client.Bandwidth(ctx)
 			if err != nil {
@@ -389,7 +389,7 @@ func TestScenarioIngressLimitAndStormControlExclude(t *testing.T) {
 	})
 }
 
-func intSet(ports ...escp.PortID) string {
+func intSet(ports ...model.PortID) string {
 	var s []string
 	for _, p := range ports {
 		s = append(s, p.String())
@@ -407,11 +407,11 @@ func TestScenarioLAG(t *testing.T) {
 			return err
 		}
 		for _, l := range got {
-			if l.ID == 1 && l.Ports == escp.MustPortSet(a, b) {
+			if l.ID == 1 && l.Ports == model.MustPortSet(a, b) {
 				return nil
 			}
 		}
-		return fmt.Errorf("LAG 1 not %v on the switch: %v", escp.MustPortSet(a, b), got)
+		return fmt.Errorf("LAG 1 not %v on the switch: %v", model.MustPortSet(a, b), got)
 	})
 }
 
@@ -421,16 +421,16 @@ func TestScenarioLAG(t *testing.T) {
 func TestScenarioLAGRefusedByTheSwitch(t *testing.T) {
 	s := openForScenario(t)
 	a, b := s.Target.TestPorts[1], s.Target.TestPorts[2]
-	ports := func(speedA escp.Speed) string {
+	ports := func(speedA model.Speed) string {
 		return fmt.Sprintf("resource \"tplinkeasysmart_port\" \"a\" {\n  port  = %d\n  speed = %q\n}\nresource \"tplinkeasysmart_port\" \"b\" {\n  port  = %d\n  speed = \"auto\"\n}\n", a, string(speedA), b)
 	}
 	lag := fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"this\" {\n  group      = 1\n  ports      = %s\n  depends_on = [tplinkeasysmart_port.a, tplinkeasysmart_port.b]\n}\n", intSet(a, b))
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: s.Factories(),
 		Steps: []resource.TestStep{
-			{Config: s.ProviderHCL() + ports(escp.Speed100Full)},
-			{Config: s.ProviderHCL() + ports(escp.Speed100Full) + lag, ExpectError: regexp.MustCompile(`7410`)},
-			{Config: s.ProviderHCL() + ports(escp.SpeedAuto), Check: s.restoredCheck(t)},
+			{Config: s.ProviderHCL() + ports(model.Speed100Full)},
+			{Config: s.ProviderHCL() + ports(model.Speed100Full) + lag, ExpectError: regexp.MustCompile(`7410`)},
+			{Config: s.ProviderHCL() + ports(model.SpeedAuto), Check: s.restoredCheck(t)},
 		},
 	})
 }
@@ -444,7 +444,7 @@ func TestScenarioPortMirror(t *testing.T) {
 	s.scenario(t, cfg(fmt.Sprintf("  enabled       = true\n  mirror_port   = %d\n  ingress_ports = %s\n", dest, intSet(src))),
 		cfg("  enabled = false\n"), func(*terraform.State) error {
 			got, err := s.Client.PortMirror(context.Background())
-			if err != nil || !got.Enabled || got.Destination != dest || got.IngressPorts != escp.MustPortSet(src) {
+			if err != nil || !got.Enabled || got.Destination != dest || got.IngressPorts != model.MustPortSet(src) {
 				return fmt.Errorf("mirror on the switch = %+v, err %w, want %d mirrored to %d", got, err, src, dest)
 			}
 			return nil
@@ -461,11 +461,11 @@ func TestScenarioPortBasedVLANGroup(t *testing.T) {
 			return err
 		}
 		for _, v := range got.VLANs {
-			if v.ID == 2 && v.Ports == escp.MustPortSet(a, b) {
+			if v.ID == 2 && v.Ports == model.MustPortSet(a, b) {
 				return nil
 			}
 		}
-		return fmt.Errorf("VLAN 2 not %v on the switch: %v", escp.MustPortSet(a, b), got.VLANs)
+		return fmt.Errorf("VLAN 2 not %v on the switch: %v", model.MustPortSet(a, b), got.VLANs)
 	})
 }
 
@@ -522,7 +522,7 @@ func TestScenarioAllowDisruptive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var orig escp.Port
+	var orig model.Port
 	for _, p := range ports {
 		if p.ID == port {
 			orig = p
@@ -566,9 +566,9 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 	}
 	var originalMode string
 	switch orig.Mode {
-	case escp.VLANModePortBased, escp.VLANModeDot1Q:
+	case model.VLANModePortBased, model.VLANModeDot1Q:
 		originalMode = fmt.Sprintf("  mode = %q\n", string(orig.Mode))
-	case escp.VLANModeMTU:
+	case model.VLANModeMTU:
 		originalMode = fmt.Sprintf("  mode            = \"mtu\"\n  mtu_uplink_port = %d\n", orig.UplinkPort)
 	default:
 		t.Skipf("the switch is in VLAN mode %q, which cannot be written back", orig.Mode)
@@ -578,7 +578,7 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 		t.Fatal(err)
 	}
 	a, b := s.Target.TestPorts[0], s.Target.TestPorts[1]
-	origPVID := escp.VLANID(1)
+	origPVID := model.VLANID(1)
 	for _, p := range dot1q.PVIDs {
 		if p.Port == a {
 			origPVID = p.PVID
@@ -588,7 +588,7 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 		return fmt.Sprintf("resource \"tplinkeasysmart_vlan_mode\" \"this\" {\n%s  allow_disruptive = true\n}\n", body)
 	}
 	group := fmt.Sprintf("resource \"tplinkeasysmart_vlan_8021q_group\" \"lab\" {\n  vlan           = 20\n  name           = \"regtest\"\n  untagged_ports = %s\n  depends_on     = [tplinkeasysmart_vlan_mode.this]\n}\n", intSet(a, b))
-	pvid := func(id escp.VLANID, after string) string {
+	pvid := func(id model.VLANID, after string) string {
 		return fmt.Sprintf("resource \"tplinkeasysmart_vlan_8021q_pvid\" \"lab\" {\n  port       = %d\n  pvid       = %d\n  depends_on = [%s]\n}\n", a, id, after)
 	}
 	const modeOnly, modeAndGroup = "tplinkeasysmart_vlan_mode.this", "tplinkeasysmart_vlan_mode.this, tplinkeasysmart_vlan_8021q_group.lab"
@@ -599,7 +599,7 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 		}
 		found := false
 		for _, v := range got.VLANs {
-			found = found || v.ID == 20 && v.Name == "regtest" && v.Untagged == escp.MustPortSet(a, b)
+			found = found || v.ID == 20 && v.Name == "regtest" && v.Untagged == model.MustPortSet(a, b)
 		}
 		for _, p := range got.PVIDs {
 			if p.Port == a && p.PVID != 20 {
@@ -642,7 +642,7 @@ func TestScenarioLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var origPort escp.Port
+	var origPort model.Port
 	for _, p := range ports {
 		if p.ID == port {
 			origPort = p

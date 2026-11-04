@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 const portMirrorID = "port_mirror"
@@ -39,9 +39,9 @@ type portMirrorResource struct {
 
 // portMirrorClient is the part of the switch API this resource needs.
 type portMirrorClient interface {
-	PortMirror(ctx context.Context) (escp.Mirror, error)
-	Ports(ctx context.Context) ([]escp.Port, error)
-	SetPortMirror(ctx context.Context, m escp.Mirror) error
+	PortMirror(ctx context.Context) (model.Mirror, error)
+	Ports(ctx context.Context) ([]model.Port, error)
+	SetPortMirror(ctx context.Context, m model.Mirror) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -74,7 +74,7 @@ func (r *portMirrorResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"id": schema.StringAttribute{Computed: true, Description: "Always `port_mirror`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"enabled":     schema.BoolAttribute{Required: true, Description: "Whether mirroring is enabled. When false, no other port setting may be given."},
-			"mirror_port": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{int64validator.Between(0, escp.MaxPort)}, Description: "Destination (monitoring) port; 0 when disabled."},
+			"mirror_port": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{int64validator.Between(0, model.MaxPort)}, Description: "Destination (monitoring) port; 0 when disabled."},
 			"ingress_ports": schema.SetAttribute{Optional: true, Computed: true, ElementType: types.Int64Type, Default: setdefault.StaticValue(emptyPortSet()), Validators: []validator.Set{validPortSet()},
 				Description: "Ports whose received traffic is mirrored."},
 			"egress_ports": schema.SetAttribute{Optional: true, Computed: true, ElementType: types.Int64Type, Default: setdefault.StaticValue(emptyPortSet()), Validators: []validator.Set{validPortSet()},
@@ -101,7 +101,7 @@ func (r *portMirrorResource) applyBound(ctx context.Context, m *portMirrorResour
 		add("Invalid port set", fmt.Sprintf("%v %v", err1, err2))
 		return false
 	}
-	want := escp.Mirror{Enabled: m.Enabled.ValueBool(), Destination: escp.PortID(m.MirrorPort.ValueInt64()), IngressPorts: in, EgressPorts: eg}
+	want := model.Mirror{Enabled: m.Enabled.ValueBool(), Destination: model.PortID(m.MirrorPort.ValueInt64()), IngressPorts: in, EgressPorts: eg}
 	if want.Enabled {
 		if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), want.Destination); err != nil {
 			add("Refusing to use this destination port", err.Error())

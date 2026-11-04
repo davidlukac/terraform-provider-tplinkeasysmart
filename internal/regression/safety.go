@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // CheckTestPorts proves, before any write, that every test port of the target exists, has no
@@ -15,7 +16,7 @@ func CheckTestPorts(ctx context.Context, c *escp.Client, t Target) error {
 	if err != nil {
 		return fmt.Errorf("cannot read the ports to check the test ports: %w", err)
 	}
-	byID := map[escp.PortID]escp.Port{}
+	byID := map[model.PortID]model.Port{}
 	for _, p := range ports {
 		byID[p.ID] = p
 	}
@@ -24,7 +25,7 @@ func CheckTestPorts(ctx context.Context, c *escp.Client, t Target) error {
 		switch {
 		case !ok:
 			return fmt.Errorf("test port %d does not exist on the switch", id)
-		case p.ActualSpeed != escp.SpeedLinkDown:
+		case p.ActualSpeed != model.SpeedLinkDown:
 			return fmt.Errorf("test port %d has a link (%s); free it or choose another test port", id, p.ActualSpeed)
 		case p.LAG != 0:
 			return fmt.Errorf("test port %d is a member of LAG %d", id, p.LAG)

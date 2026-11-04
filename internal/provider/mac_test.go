@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // Switch 03's MAC, written the three ways a person may write it. The first is the canonical form.
@@ -24,7 +25,7 @@ const (
 	macHyphen = "C0-3A-55-6C-81-61"
 )
 
-var wantMAC = escp.MAC{0xc0, 0x3a, 0x55, 0x6c, 0x81, 0x61}
+var wantMAC = model.MAC{0xc0, 0x3a, 0x55, 0x6c, 0x81, 0x61}
 
 // recordingFactories builds a provider whose client constructor records every configuration it is
 // given, in order, and hands back an empty fake. It is what the MAC tests need: switches without a
@@ -174,7 +175,7 @@ data "tplinkeasysmart_system_info" "this" {
 }`, "")
 	// Entries are built in name order: both, by_host, by_mac.
 	want := []escp.Config{
-		{Host: "192.0.2.11", MAC: escp.MAC{0xa8, 0x42, 0xa1, 0x2a, 0xde, 0x4c}},
+		{Host: "192.0.2.11", MAC: model.MAC{0xa8, 0x42, 0xa1, 0x2a, 0xde, 0x4c}},
 		{Host: "192.0.2.12"},
 		{MAC: wantMAC},
 	}

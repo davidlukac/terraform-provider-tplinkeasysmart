@@ -14,14 +14,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 const vlanModeID = "vlan_mode"
 
 // writableVLANModes lists the modes the library can set, as the attribute spells them.
 func writableVLANModes() []string {
-	modes := escp.VLANModes()
+	modes := model.VLANModes()
 	names := make([]string, len(modes))
 	for i, m := range modes {
 		names[i] = string(m)
@@ -38,7 +38,7 @@ func vlanModeChoices() string {
 // vlanModeMTU is the one mode the resource treats differently (it needs an uplink port). The
 // three modes exclude each other: the vendor utility warns that switching discards the settings
 // of the other modes. The spellings are the library's (they are part of the Terraform state).
-const vlanModeMTU = string(escp.VLANModeMTU)
+const vlanModeMTU = string(model.VLANModeMTU)
 
 var (
 	_ resource.Resource                = &vlanModeResource{}
@@ -57,8 +57,8 @@ type vlanModeResource struct {
 
 // vlanModeClient is the part of the switch API this resource needs.
 type vlanModeClient interface {
-	VLANMode(ctx context.Context) (escp.VLANModeSetting, error)
-	SetVLANMode(ctx context.Context, s escp.VLANModeSetting) error
+	VLANMode(ctx context.Context) (model.VLANModeSetting, error)
+	SetVLANMode(ctx context.Context, s model.VLANModeSetting) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -107,7 +107,7 @@ func (r *vlanModeResource) apply(ctx context.Context, m *vlanModeModel, add func
 }
 
 func (r *vlanModeResource) applyBound(ctx context.Context, m *vlanModeModel, add func(string, string)) bool {
-	want := escp.VLANModeSetting{Mode: escp.VLANMode(m.Mode.ValueString()), UplinkPort: escp.PortID(m.MTUUplinkPort.ValueInt64())}
+	want := model.VLANModeSetting{Mode: model.VLANMode(m.Mode.ValueString()), UplinkPort: model.PortID(m.MTUUplinkPort.ValueInt64())}
 	have, err := r.client.VLANMode(ctx)
 	if err != nil {
 		add("Reading the VLAN mode failed", err.Error())
@@ -162,7 +162,7 @@ func (r *vlanModeResource) readBound(ctx context.Context, req resource.ReadReque
 		return
 	}
 	state.ID, state.Mode, state.MTUUplinkPort = qualifiedID(r.sw, vlanModeID), types.StringValue(string(have.Mode)), types.Int64Null()
-	if have.Mode == escp.VLANModeMTU {
+	if have.Mode == model.VLANModeMTU {
 		state.MTUUplinkPort = types.Int64Value(int64(have.UplinkPort))
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)

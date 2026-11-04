@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 var (
@@ -34,10 +34,10 @@ type vlan8021QGroupResource struct {
 
 // vlan8021QGroupClient is the part of the switch API this resource needs.
 type vlan8021QGroupClient interface {
-	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
-	SetDot1QVLAN(ctx context.Context, v escp.Dot1QVLAN) error
-	DeleteDot1QVLAN(ctx context.Context, id escp.VLANID) error
-	Ports(ctx context.Context) ([]escp.Port, error)
+	Dot1Q(ctx context.Context) (model.Dot1Q, error)
+	SetDot1QVLAN(ctx context.Context, v model.Dot1QVLAN) error
+	DeleteDot1QVLAN(ctx context.Context, id model.VLANID) error
+	Ports(ctx context.Context) ([]model.Port, error)
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -88,39 +88,39 @@ func (r *vlan8021QGroupResource) Configure(_ context.Context, req resource.Confi
 }
 
 // state reads the 802.1Q state; the mode must be active, because the switch ignores or rejects VLAN writes otherwise.
-func (r *vlan8021QGroupResource) state(ctx context.Context) (escp.Dot1Q, error) {
+func (r *vlan8021QGroupResource) state(ctx context.Context) (model.Dot1Q, error) {
 	q, err := r.client.Dot1Q(ctx)
 	if err != nil {
-		return escp.Dot1Q{}, err
+		return model.Dot1Q{}, err
 	}
 	if !q.Enabled {
-		return escp.Dot1Q{}, &inactiveModeError{"802.1Q VLAN mode is not active on the switch; refusing to manage 802.1Q VLANs in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the 802.1Q table when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the VLANs depend on it"}
+		return model.Dot1Q{}, &inactiveModeError{"802.1Q VLAN mode is not active on the switch; refusing to manage 802.1Q VLANs in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the 802.1Q table when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the VLANs depend on it"}
 	}
 	return q, nil
 }
 
 // table is the 802.1Q table of state.
-func (r *vlan8021QGroupResource) table(ctx context.Context) ([]escp.Dot1QVLAN, error) {
+func (r *vlan8021QGroupResource) table(ctx context.Context) ([]model.Dot1QVLAN, error) {
 	q, err := r.state(ctx)
 	return q.VLANs, err
 }
 
 // findVLAN returns the VLAN with the id, if the table has it.
-func findVLAN(table []escp.Dot1QVLAN, id escp.VLANID) (escp.Dot1QVLAN, bool) {
+func findVLAN(table []model.Dot1QVLAN, id model.VLANID) (model.Dot1QVLAN, bool) {
 	for _, v := range table {
 		if v.ID == id {
 			return v, true
 		}
 	}
-	return escp.Dot1QVLAN{}, false
+	return model.Dot1QVLAN{}, false
 }
 
 // members is every member port of v, tagged and untagged.
-func members(v escp.Dot1QVLAN) escp.PortSet { return v.Tagged.Union(v.Untagged) }
+func members(v model.Dot1QVLAN) model.PortSet { return v.Tagged.Union(v.Untagged) }
 
 // orphanedPorts returns the ports of affected that would belong to no VLAN
 // once VLAN id has the given member ports (none: it is deleted); the other VLANs of the table stay as they are.
-func orphanedPorts(table []escp.Dot1QVLAN, id escp.VLANID, newMembers, affected escp.PortSet) escp.PortSet {
+func orphanedPorts(table []model.Dot1QVLAN, id model.VLANID, newMembers, affected model.PortSet) model.PortSet {
 	covered := newMembers
 	for _, v := range table {
 		if v.ID != id {
@@ -132,13 +132,13 @@ func orphanedPorts(table []escp.Dot1QVLAN, id escp.VLANID, newMembers, affected 
 
 // vlanMembers is a change of the members of one VLAN: the old ports and the ports it is to have.
 type vlanMembers struct {
-	id        escp.VLANID
-	old, next escp.PortSet
+	id        model.VLANID
+	old, next model.PortSet
 }
 
 // guard refuses a change of VLAN id from the old to the new members when a port
 // involved carries traffic, or would be left in no VLAN.
-func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []escp.Dot1QVLAN, change vlanMembers) error {
+func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []model.Dot1QVLAN, change vlanMembers) error {
 	affected := change.old.Union(change.next)
 	if err := guardPorts(ctx, r.client, allow, affected.Ports()...); err != nil {
 		return err
@@ -152,16 +152,16 @@ func (r *vlan8021QGroupResource) guard(ctx context.Context, allow bool, table []
 	return nil
 }
 
-func (m *vlan8021QGroupModel) vlan(ctx context.Context) (escp.Dot1QVLAN, error) {
+func (m *vlan8021QGroupModel) vlan(ctx context.Context) (model.Dot1QVLAN, error) {
 	tagged, err := setToPorts(ctx, m.TaggedPorts)
 	if err != nil {
-		return escp.Dot1QVLAN{}, err
+		return model.Dot1QVLAN{}, err
 	}
 	untagged, err := setToPorts(ctx, m.UntaggedPorts)
 	if err != nil {
-		return escp.Dot1QVLAN{}, err
+		return model.Dot1QVLAN{}, err
 	}
-	return escp.Dot1QVLAN{ID: escp.VLANID(m.VLAN.ValueInt64()), Name: escp.VLANName(m.Name.ValueString()), Tagged: tagged, Untagged: untagged}, nil
+	return model.Dot1QVLAN{ID: model.VLANID(m.VLAN.ValueInt64()), Name: model.VLANName(m.Name.ValueString()), Tagged: tagged, Untagged: untagged}, nil
 }
 
 // apply binds the resource to the switch the plan selects, then applies it.
@@ -234,7 +234,7 @@ func (r *vlan8021QGroupResource) readBound(ctx context.Context, req resource.Rea
 		}
 		return
 	}
-	got, ok := findVLAN(table, escp.VLANID(state.VLAN.ValueInt64()))
+	got, ok := findVLAN(table, model.VLANID(state.VLAN.ValueInt64()))
 	if !ok {
 		resp.State.RemoveResource(ctx)
 		return
@@ -250,7 +250,7 @@ func (r *vlan8021QGroupResource) deleteBound(ctx context.Context, req resource.D
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	id := escp.VLANID(state.VLAN.ValueInt64())
+	id := model.VLANID(state.VLAN.ValueInt64())
 	table, err := r.table(ctx)
 	if err != nil {
 		if !warnInactiveMode(&resp.Diagnostics, err, "the 802.1Q VLANs", "The VLAN cannot be removed meanwhile, so the resource is only forgotten and the switch is left as it is") {

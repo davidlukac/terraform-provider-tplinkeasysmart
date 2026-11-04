@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 const managementIPID = "management_ip"
@@ -39,8 +39,8 @@ type managementIPResource struct {
 
 // managementIPClient is the part of the switch API this resource needs.
 type managementIPClient interface {
-	Info(ctx context.Context) (escp.Info, error)
-	SetIPConfig(ctx context.Context, cfg escp.IPConfig) error
+	Info(ctx context.Context) (model.Info, error)
+	SetIPConfig(ctx context.Context, cfg model.IPConfig) error
 	EnableDHCP(ctx context.Context) error
 }
 
@@ -92,17 +92,17 @@ func (r *managementIPResource) Configure(_ context.Context, req resource.Configu
 
 // ipConfigOf parses the three address attributes; ok is false (with the
 // problem named on the attribute) when one is not an IPv4 address.
-func ipConfigOf(m managementIPModel, add func(path.Path, string, string)) (escp.IPConfig, bool) {
+func ipConfigOf(m managementIPModel, add func(path.Path, string, string)) (model.IPConfig, bool) {
 	ok := true
 	parse := func(attr string, v types.String) netip.Addr {
-		ip, err := escp.ParseIPv4(v.ValueString())
+		ip, err := model.ParseIPv4(v.ValueString())
 		if err != nil {
 			add(path.Root(attr), "Not an IPv4 address", fmt.Sprintf("%q is not a dotted IPv4 address", v.ValueString()))
 			ok = false
 		}
 		return ip
 	}
-	cfg := escp.IPConfig{IP: parse("ip_address", m.IPAddress), Netmask: parse("netmask", m.Netmask), Gateway: parse("gateway", m.Gateway)}
+	cfg := model.IPConfig{IP: parse("ip_address", m.IPAddress), Netmask: parse("netmask", m.Netmask), Gateway: parse("gateway", m.Gateway)}
 	return cfg, ok
 }
 
@@ -157,7 +157,7 @@ func (r *managementIPResource) applyBound(ctx context.Context, m *managementIPMo
 		return false
 	}
 	wantDHCP := m.DHCP.ValueBool()
-	var want escp.IPConfig
+	var want model.IPConfig
 	if !wantDHCP {
 		var ok bool
 		if want, ok = ipConfigOf(*m, func(_ path.Path, summary, detail string) { add(summary, detail) }); !ok {
@@ -190,7 +190,7 @@ func (r *managementIPResource) applyBound(ctx context.Context, m *managementIPMo
 }
 
 // write sends the change: a static address (which also turns DHCP off) or DHCP on.
-func (r *managementIPResource) write(ctx context.Context, dhcp bool, static escp.IPConfig, add func(string, string)) bool {
+func (r *managementIPResource) write(ctx context.Context, dhcp bool, static model.IPConfig, add func(string, string)) bool {
 	if !dhcp {
 		if err := r.client.SetIPConfig(ctx, static); err != nil {
 			add("Setting the management address failed", fmt.Sprintf("%v. The switch may now be at the old or the new address; look at both before applying again", err))
@@ -200,7 +200,7 @@ func (r *managementIPResource) write(ctx context.Context, dhcp bool, static escp
 	}
 	if err := r.client.EnableDHCP(ctx); err != nil {
 		hint := "The switch may now be at its old address or at a leased one; look for it by its MAC address before applying again."
-		if errors.Is(err, escp.ErrInvalid) {
+		if errors.Is(err, model.ErrInvalid) {
 			hint = "Set `mac` in the provider configuration (or the entry of `switches`) so the switch can be found at the address the DHCP server gives it."
 		}
 		add("Turning DHCP on failed", fmt.Sprintf("%v. %s", err, hint))
@@ -217,7 +217,7 @@ func onOff(on bool) string {
 }
 
 // requested says what a plan asked for, for messages.
-func requested(dhcp bool, static escp.IPConfig) string {
+func requested(dhcp bool, static model.IPConfig) string {
 	if dhcp {
 		return "a DHCP lease"
 	}
@@ -225,7 +225,7 @@ func requested(dhcp bool, static escp.IPConfig) string {
 }
 
 // sameIPConfig compares the address triple of a discovery reply with the wanted one.
-func sameIPConfig(info escp.Info, want escp.IPConfig) bool {
+func sameIPConfig(info model.Info, want model.IPConfig) bool {
 	return info.IP == want.IP && info.Netmask == want.Netmask && info.Gateway == want.Gateway
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 )
 
 func noEnv(string) string { return "" }
@@ -166,6 +167,7 @@ func TestOpenFailsOnAnUnresolvableHost(t *testing.T) {
 
 func TestProviderDialAimsAtTheFake(t *testing.T) {
 	s := Open(t, noEnv)
+	_ = s.Client.Close() // one client per switch in a process: the session's own gives the switch up
 	c, err := s.dial(escp.Config{Host: s.Target.Host, Username: s.Target.Username, Password: s.Target.Password})
 	if err != nil {
 		t.Fatal(err)
@@ -185,7 +187,7 @@ func TestOpenStopsWhenATestPortHasALink(t *testing.T) {
 	func() {
 		defer func() { _ = recover() }()
 		openWith(ft, noEnv, func(f *escptest.Switch) {
-			f.EnableModel(map[int]escptest.LinkSpeed{3: escptest.Link100Full})
+			f.EnableModel(map[model.PortID]escptest.LinkSpeed{3: escptest.Link100Full})
 		})
 	}()
 	if !ft.failed || !strings.Contains(ft.msg, "test port 3 has a link") {
@@ -195,9 +197,10 @@ func TestOpenStopsWhenATestPortHasALink(t *testing.T) {
 
 func TestAClientWithOnlyAMACFindsTheFakeWhenTheMACIsItsOwn(t *testing.T) {
 	s := Open(t, noEnv)
-	if s.MAC != escp.MAC(escptest.DefaultMAC()) {
+	if s.MAC != escptest.DefaultMAC() {
 		t.Fatalf("the session reports MAC %q, want the fake's %v", s.MAC, escptest.DefaultMAC())
 	}
+	_ = s.Client.Close() // one client per switch in a process: the session's own gives the switch up
 	c, err := s.dialClient(escp.Config{MAC: s.MAC, Username: s.Target.Username, Password: s.Target.Password})
 	if err != nil {
 		t.Fatal(err)
@@ -207,7 +210,7 @@ func TestAClientWithOnlyAMACFindsTheFakeWhenTheMACIsItsOwn(t *testing.T) {
 		t.Errorf("LED through a client that only knows the MAC = %t, %v", on, err)
 	}
 	// Nobody else has any other MAC.
-	if _, err := s.dialClient(escp.Config{MAC: escp.MAC{2, 0, 0, 0, 0, 1}}); !errors.Is(err, escp.ErrNotFound) {
+	if _, err := s.dialClient(escp.Config{MAC: model.MAC{2, 0, 0, 0, 0, 1}}); !errors.Is(err, escp.ErrNotFound) {
 		t.Errorf("a MAC the fake does not have: err = %v, want escp.ErrNotFound", err)
 	}
 }

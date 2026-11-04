@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // switchSpec is one switch the provider is asked to talk to, with the environment fallbacks applied.
@@ -140,7 +141,7 @@ func ownSwitch(cfg providerModel, entries int, diags *diag.Diagnostics) (switchS
 		diags.AddAttributeError(pathRoot("host"), "Missing switch host or MAC address",
 			"Set `host` or `mac` (or TPLINK_EASYSMART_HOST / TPLINK_EASYSMART_MAC), or define switches with `switches`.")
 	}
-	if _, err := escp.ParseMAC(own.mac); own.mac != "" && err != nil {
+	if _, err := model.ParseMAC(own.mac); own.mac != "" && err != nil {
 		diags.AddAttributeError(pathRoot("mac"), "Invalid MAC address", err.Error())
 	}
 	if present && (own.username == "" || own.password == "") {
@@ -175,10 +176,10 @@ type registryBuilder struct {
 // add creates the client of one switch.
 func (b *registryBuilder) add(s switchSpec) {
 	label := s.label()
-	var hw escp.MAC
+	var hw model.MAC
 	var err error
 	if s.mac != "" {
-		hw, err = escp.ParseMAC(s.mac)
+		hw, err = model.ParseMAC(s.mac)
 	}
 	if err != nil { // the schema validator catches this earlier; the environment is checked here
 		b.diags.AddError("Invalid MAC address", fmt.Sprintf("%s: %s", label, err))
@@ -187,7 +188,7 @@ func (b *registryBuilder) add(s switchSpec) {
 	if !b.claim(label, hw, s.host) {
 		return
 	}
-	c, err := b.newClient(escp.Config{Host: s.host, MAC: hw, Username: s.username, Password: escp.Password(s.password), Timeout: s.timeout, WriteGate: firmwareWriteGate(s.allowUnverified), Logger: newTflogLogger()})
+	c, err := b.newClient(escp.Config{Host: s.host, MAC: hw, Username: s.username, Password: model.Password(s.password), Timeout: s.timeout, WriteGate: firmwareWriteGate(s.allowUnverified), Logger: newTflogLogger()})
 	if err != nil {
 		b.diags.AddError("Cannot configure switch client", fmt.Sprintf("%s: %s", label, err))
 		return
@@ -200,7 +201,7 @@ func (b *registryBuilder) add(s switchSpec) {
 }
 
 // claim records the host and the MAC address of a switch and refuses one that another switch has.
-func (b *registryBuilder) claim(label string, mac escp.MAC, host string) bool {
+func (b *registryBuilder) claim(label string, mac model.MAC, host string) bool {
 	for _, id := range []struct{ kind, value string }{{"host", host}, {"mac", mac.String()}} {
 		if id.value == "" {
 			continue

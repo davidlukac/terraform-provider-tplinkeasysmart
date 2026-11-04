@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -33,9 +33,9 @@ type bandwidthLimitResource struct {
 
 // bandwidthLimitClient is the part of the switch API this resource needs.
 type bandwidthLimitClient interface {
-	Bandwidth(ctx context.Context) ([]escp.PortBandwidth, error)
-	Ports(ctx context.Context) ([]escp.Port, error)
-	SetBandwidth(ctx context.Context, limit escp.PortBandwidth) error
+	Bandwidth(ctx context.Context) ([]model.PortBandwidth, error)
+	Ports(ctx context.Context) ([]model.Port, error)
+	SetBandwidth(ctx context.Context, limit model.PortBandwidth) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -77,7 +77,7 @@ func (r *bandwidthLimitResource) Configure(_ context.Context, req resource.Confi
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func (r *bandwidthLimitResource) find(ctx context.Context, port escp.PortID) (ingress, egress escp.Kbps, ok bool, err error) {
+func (r *bandwidthLimitResource) find(ctx context.Context, port model.PortID) (ingress, egress model.Kbps, ok bool, err error) {
 	rows, err := r.client.Bandwidth(ctx)
 	if err != nil {
 		return 0, 0, false, err
@@ -97,13 +97,13 @@ func (r *bandwidthLimitResource) apply(ctx context.Context, m *bandwidthLimitMod
 }
 
 func (r *bandwidthLimitResource) applyBound(ctx context.Context, m *bandwidthLimitModel, add func(string, string)) bool {
-	port := escp.PortID(m.Port.ValueInt64())
-	in, eg := escp.Kbps(m.IngressKbps.ValueInt64()), escp.Kbps(m.EgressKbps.ValueInt64())
+	port := model.PortID(m.Port.ValueInt64())
+	in, eg := model.Kbps(m.IngressKbps.ValueInt64()), model.Kbps(m.EgressKbps.ValueInt64())
 	if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), port); err != nil {
 		add("Refusing to change port", err.Error())
 		return false
 	}
-	if err := r.client.SetBandwidth(ctx, escp.PortBandwidth{Port: port, Ingress: in, Egress: eg}); err != nil {
+	if err := r.client.SetBandwidth(ctx, model.PortBandwidth{Port: port, Ingress: in, Egress: eg}); err != nil {
 		add("Setting bandwidth limit failed", err.Error())
 		return false
 	}
@@ -138,7 +138,7 @@ func (r *bandwidthLimitResource) readBound(ctx context.Context, req resource.Rea
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	in, eg, ok, err := r.find(ctx, escp.PortID(state.Port.ValueInt64()))
+	in, eg, ok, err := r.find(ctx, model.PortID(state.Port.ValueInt64()))
 	if err != nil {
 		resp.Diagnostics.AddError("Reading bandwidth limit failed", err.Error())
 		return

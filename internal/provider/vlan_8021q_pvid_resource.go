@@ -11,11 +11,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // defaultPVID is the PVID every port has until it is changed, and the one a destroyed resource restores.
-const defaultPVID escp.VLANID = 1
+const defaultPVID model.VLANID = 1
 
 var (
 	_ resource.Resource                = &vlan8021QPVIDResource{}
@@ -34,9 +34,9 @@ type vlan8021QPVIDResource struct {
 
 // vlan8021QPVIDClient is the part of the switch API this resource needs.
 type vlan8021QPVIDClient interface {
-	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
-	SetPVIDs(ctx context.Context, pvids []escp.PortPVID) error
-	Ports(ctx context.Context) ([]escp.Port, error)
+	Dot1Q(ctx context.Context) (model.Dot1Q, error)
+	SetPVIDs(ctx context.Context, pvids []model.PortPVID) error
+	Ports(ctx context.Context) ([]model.Port, error)
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -77,7 +77,7 @@ func (r *vlan8021QPVIDResource) Configure(_ context.Context, req resource.Config
 }
 
 // state reads the 802.1Q state; the mode must be active, because the switch does not apply PVIDs otherwise.
-func (r *vlan8021QPVIDResource) state(ctx context.Context) (escp.Dot1Q, error) {
+func (r *vlan8021QPVIDResource) state(ctx context.Context) (model.Dot1Q, error) {
 	q, err := r.client.Dot1Q(ctx)
 	if err != nil {
 		return q, err
@@ -89,7 +89,7 @@ func (r *vlan8021QPVIDResource) state(ctx context.Context) (escp.Dot1Q, error) {
 }
 
 // pvidOf returns the PVID of a port, if the switch reports one.
-func pvidOf(q escp.Dot1Q, port escp.PortID) (escp.VLANID, bool) {
+func pvidOf(q model.Dot1Q, port model.PortID) (model.VLANID, bool) {
 	for _, p := range q.PVIDs {
 		if p.Port == port {
 			return p.PVID, true
@@ -105,12 +105,12 @@ func (r *vlan8021QPVIDResource) apply(ctx context.Context, m *vlan8021QPVIDModel
 }
 
 func (r *vlan8021QPVIDResource) applyBound(ctx context.Context, m *vlan8021QPVIDModel, add func(string, string)) bool {
-	port, pvid := escp.PortID(m.Port.ValueInt64()), escp.VLANID(m.PVID.ValueInt64())
+	port, pvid := model.PortID(m.Port.ValueInt64()), model.VLANID(m.PVID.ValueInt64())
 	return r.set(ctx, port, pvid, m.AllowDisruptive.ValueBool(), add)
 }
 
 // set writes the PVID of a port under the guard and checks it by reading it back.
-func (r *vlan8021QPVIDResource) set(ctx context.Context, port escp.PortID, pvid escp.VLANID, allow bool, add func(string, string)) bool {
+func (r *vlan8021QPVIDResource) set(ctx context.Context, port model.PortID, pvid model.VLANID, allow bool, add func(string, string)) bool {
 	q, err := r.state(ctx)
 	if err != nil {
 		add("Reading the 802.1Q state failed", err.Error())
@@ -124,7 +124,7 @@ func (r *vlan8021QPVIDResource) set(ctx context.Context, port escp.PortID, pvid 
 		add("Refusing to change the PVID", err.Error())
 		return false
 	}
-	if err := r.client.SetPVIDs(ctx, []escp.PortPVID{{Port: port, PVID: pvid}}); err != nil {
+	if err := r.client.SetPVIDs(ctx, []model.PortPVID{{Port: port, PVID: pvid}}); err != nil {
 		add("Setting the PVID failed", err.Error())
 		return false
 	}
@@ -166,7 +166,7 @@ func (r *vlan8021QPVIDResource) readBound(ctx context.Context, req resource.Read
 		}
 		return
 	}
-	pvid, ok := pvidOf(q, escp.PortID(state.Port.ValueInt64()))
+	pvid, ok := pvidOf(q, model.PortID(state.Port.ValueInt64()))
 	if !ok {
 		resp.State.RemoveResource(ctx)
 		return
@@ -182,7 +182,7 @@ func (r *vlan8021QPVIDResource) deleteBound(ctx context.Context, req resource.De
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	port := escp.PortID(state.Port.ValueInt64())
+	port := model.PortID(state.Port.ValueInt64())
 	q, err := r.client.Dot1Q(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading the 802.1Q state failed", err.Error())
