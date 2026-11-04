@@ -36,6 +36,16 @@ type fakeClient struct {
 	rowPorts []int
 	// vlans models the VLAN modes and the 802.1Q tables; nil keeps the static replies the data-source tests expect.
 	vlans *fakeVLANs
+	// closed counts the calls of Close.
+	closed int
+}
+
+// Close counts the call; the fake holds nothing.
+func (f *fakeClient) Close() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.closed++
+	return nil
 }
 
 // mutate changes the fake's state under its lock (for PreConfig hooks).

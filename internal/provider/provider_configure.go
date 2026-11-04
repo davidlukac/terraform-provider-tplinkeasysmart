@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/davidlukac/escp-go"
 )
@@ -59,6 +60,11 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 	providerTimeout := timeoutOr(cfg.TimeoutSeconds, defaultTimeout)
+	// Terraform configures the provider again for every walk (plan, apply) in one process; the
+	// library allows one client per switch, so the previous ones go first.
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.closeCurrent(ctx)
 	b := &registryBuilder{newClient: p.newClient, diags: &resp.Diagnostics, reg: &switchRegistry{named: map[string]SwitchClient{}}, seen: map[string]string{}}
 	if hasOwn {
 		own.timeout, own.allowUnverified = providerTimeout, providerAllow
@@ -70,8 +76,21 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	p.current = b.reg
 	resp.ResourceData = b.reg
 	resp.DataSourceData = b.reg
+}
+
+// closeCurrent closes the clients of the previous configuration; callers hold p.mu. A failure to
+// close is logged: the clients are dropped either way.
+func (p *tplinkProvider) closeCurrent(ctx context.Context) {
+	if p.current == nil {
+		return
+	}
+	if err := p.current.closeAll(); err != nil {
+		tflog.Warn(ctx, "closing the clients of the previous configuration failed", map[string]any{"error": err.Error()})
+	}
+	p.current = nil
 }
 
 // reportUnknownProviderValues refuses a provider argument that is only known after apply (for

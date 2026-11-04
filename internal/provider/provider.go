@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
@@ -40,6 +41,9 @@ type tplinkProvider struct {
 	version string
 	// newClient builds the transport; tests replace it with a fake.
 	newClient func(escp.Config) (SwitchClient, error)
+	// mu guards current: the clients of the last Configure, closed by the next one.
+	mu      sync.Mutex
+	current *switchRegistry
 }
 
 // New returns the provider factory used by main.
