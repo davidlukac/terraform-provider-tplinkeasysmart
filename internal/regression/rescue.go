@@ -67,6 +67,7 @@ func (s *Session) GuardRestore(tb testing.TB) {
 
 func (s *Session) rescueAtEnd(tb testing.TB) {
 	tb.Helper()
+	s.own() // the provider may still hold the switch when a scenario stopped in the middle of a step
 	ctx, cancel := context.WithTimeout(context.Background(), rescueTimeout)
 	defer cancel()
 	done, err := s.Rescue(ctx)

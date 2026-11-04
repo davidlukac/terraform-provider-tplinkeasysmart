@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
@@ -46,6 +47,8 @@ type Session struct {
 	tb  testing.TB
 	// trace keeps what the library logs, for a failing scenario (see trace).
 	trace *trace
+	// lender hands the switch back and forth between the provider and the session's own client.
+	lender
 }
 
 // Getenv is os.Getenv, replaceable in tests.
@@ -94,6 +97,7 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 		t.Fatalf("cannot dial %s: %v", target.Name, err)
 	}
 	s.Client, s.net = c, c
+	s.stepAside(c)
 	t.Cleanup(func() { _ = s.Client.Close() }) // best effort: the run is over
 	s.rd = CoreReaders(s.Client)
 	waitUntilReady(t, target.Name, s.Client, wallClock)
@@ -157,9 +161,22 @@ func (s *Session) dialClient(cfg escp.Config) (*escp.Client, error) {
 	return escp.Dial(cfg)
 }
 
-// dial is dialClient for the provider.
+// dial is dialClient for the provider; see lender.dial.
 func (s *Session) dial(cfg escp.Config) (provider.SwitchClient, error) {
-	return s.dialClient(cfg)
+	return s.lender.dial(cfg, s.dialClient)
+}
+
+// own takes the switch back from the provider for the session's own client; see lender.takeBack.
+func (s *Session) own() { s.takeBack() }
+
+// test is resource.Test for the session's provider (or the factories the case names), with the
+// switch handed back and forth; see lender.run.
+func (s *Session) test(t *testing.T, tc resource.TestCase) {
+	t.Helper()
+	if tc.ProtoV6ProviderFactories == nil {
+		tc.ProtoV6ProviderFactories = s.Factories()
+	}
+	s.run(t, tc)
 }
 
 // Factories returns the real provider for terraform-plugin-testing, dialing the target.

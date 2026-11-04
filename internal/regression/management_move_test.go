@@ -97,7 +97,7 @@ func TestScenarioManagementMove(t *testing.T) {
 		}
 		return nil
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
 		{Config: hcl(s.Target.MoveIP, info.Netmask.String(), info.Gateway.String()), Check: func(*terraform.State) error {
 			setHost(s.Target.MoveIP) // the next Terraform commands must dial the new address
 			return reportsIP(s.Target.MoveIP, s.Target.MoveIP)
@@ -161,7 +161,7 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 		}
 		return last
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
 		{Config: hcl(s.Target.MoveIP, info.Netmask.String(), info.Gateway.String()), Check: func(*terraform.State) error { return reportsIP(s.Target.MoveIP) }},
 		{Config: hcl(info.IP.String(), info.Netmask.String(), info.Gateway.String()), Check: func(st *terraform.State) error {
 			if err := reportsIP(info.IP.String()); err != nil {
@@ -273,7 +273,7 @@ func TestScenarioManagementDHCP(t *testing.T) {
 		t.Logf("leased address %s mask %s gateway %s", found.IP.String(), found.Netmask.String(), found.Gateway.String())
 		return nil
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
 		{Config: dhcp, Check: resource.ComposeAggregateTestCheckFunc(leased, resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.this", "dhcp", "true"),
 			resource.TestCheckResourceAttrSet("tplinkeasysmart_management_ip.this", "ip_address"))},
 		{Config: dhcp}, // the second look: nothing to change, the plan after the apply is empty

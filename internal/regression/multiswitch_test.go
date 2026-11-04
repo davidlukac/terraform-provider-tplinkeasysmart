@@ -46,7 +46,8 @@ func TestScenarioMultiSwitch(t *testing.T) {
 		cfg.HostPort = escptest.FreeUDPPort(t)
 		return escp.Dial(cfg)
 	}
-	dial := func(cfg escp.Config) (provider.SwitchClient, error) { return open(cfg) }
+	var l lender
+	dial := func(cfg escp.Config) (provider.SwitchClient, error) { return l.dial(cfg, open) }
 	client := func(host string) *escp.Client {
 		c, err := open(escp.Config{Host: host, Username: escptest.Username, Password: escptest.Password})
 		if err != nil {
@@ -56,6 +57,7 @@ func TestScenarioMultiSwitch(t *testing.T) {
 		return c
 	}
 	ca, cb := client(hostA), client(hostB)
+	l.stepAside(ca, cb)
 	ctx := context.Background()
 	origA, err := ca.LED(ctx)
 	if err != nil {
@@ -112,7 +114,7 @@ resource "tplinkeasysmart_led" "b" {
 	factories := map[string]func() (tfprotov6.ProviderServer, error){
 		"tplinkeasysmart": providerserver.NewProtocol6WithError(provider.NewWithDialer("regression", dial)()),
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: factories, Steps: []resource.TestStep{
+	l.run(t, resource.TestCase{ProtoV6ProviderFactories: factories, Steps: []resource.TestStep{
 		// Each switch gets its own value.
 		{Config: leds(false, true), Check: resource.ComposeTestCheckFunc(led(ca, false), led(cb, true))},
 		// Only a's configuration changes: b is not written.

@@ -48,7 +48,7 @@ func (s *Session) scenarioWithProvider(t *testing.T, providerHCL, change string,
 		}
 		steps = append(steps, step)
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: steps})
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: steps})
 }
 
 // restoredCheck fails with the differing settings named when the switch is not as it was.
@@ -135,7 +135,7 @@ func TestScenarioIGMPSuppressionStagedWhileSnoopingIsOff(t *testing.T) {
 			return nil
 		}
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
 		{Config: s.ProviderHCL() + cfg(false, true), Check: is(false, true)},
 		{Config: s.ProviderHCL() + cfg(true, true), Check: is(true, true)},
 		{Config: s.ProviderHCL() + cfg(orig.Enabled, orig.ReportSuppression), Check: s.restoredCheck(t)},
@@ -373,7 +373,7 @@ func TestScenarioIngressLimitAndStormControlExclude(t *testing.T) {
 		}
 	}
 	p := s.ProviderHCL()
-	resource.Test(t, resource.TestCase{
+	s.test(t, resource.TestCase{
 		ProtoV6ProviderFactories: s.Factories(),
 		Steps: []resource.TestStep{
 			{Config: p + storm(true, ""), Check: state(0, true)},
@@ -425,7 +425,7 @@ func TestScenarioLAGRefusedByTheSwitch(t *testing.T) {
 		return fmt.Sprintf("resource \"tplinkeasysmart_port\" \"a\" {\n  port  = %d\n  speed = %q\n}\nresource \"tplinkeasysmart_port\" \"b\" {\n  port  = %d\n  speed = \"auto\"\n}\n", a, string(speedA), b)
 	}
 	lag := fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"this\" {\n  group      = 1\n  ports      = %s\n  depends_on = [tplinkeasysmart_port.a, tplinkeasysmart_port.b]\n}\n", intSet(a, b))
-	resource.Test(t, resource.TestCase{
+	s.test(t, resource.TestCase{
 		ProtoV6ProviderFactories: s.Factories(),
 		Steps: []resource.TestStep{
 			{Config: s.ProviderHCL() + ports(model.Speed100Full)},
@@ -502,7 +502,7 @@ func TestScenarioGuardRefusals(t *testing.T) {
 		}
 		return s.restoredCheck(t)(nil)
 	}})
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: steps})
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: steps})
 }
 
 // allow_disruptive is the opt-in for a port that carries a device. The step that applies it
@@ -532,7 +532,7 @@ func TestScenarioAllowDisruptive(t *testing.T) {
 		return fmt.Sprintf("resource \"tplinkeasysmart_port\" \"x\" {\n  port         = %d\n  speed        = %q\n  flow_control = %t\n%s}\n", port, string(orig.ConfiguredSpeed), orig.ConfiguredFlowControl, opt)
 	}
 	var afterOptIn int
-	resource.Test(t, resource.TestCase{
+	s.test(t, resource.TestCase{
 		ProtoV6ProviderFactories: s.Factories(),
 		Steps: []resource.TestStep{
 			{Config: s.ProviderHCL() + cfg(""), ExpectError: regexp.MustCompile(`(?i)refus`)},
@@ -651,7 +651,7 @@ func TestScenarioLifecycle(t *testing.T) {
 	// The port is written with the values it has, so creating the resource changes nothing.
 	portCfg := fmt.Sprintf("resource \"tplinkeasysmart_port\" \"this\" {\n  port         = %d\n  enabled      = %t\n  speed        = %q\n  flow_control = %t\n}\n",
 		port, origPort.Enabled, string(origPort.ConfiguredSpeed), origPort.ConfiguredFlowControl)
-	resource.Test(t, resource.TestCase{
+	s.test(t, resource.TestCase{
 		ProtoV6ProviderFactories: s.Factories(),
 		Steps: []resource.TestStep{
 			// Create, then import into a fresh state and compare every attribute.
@@ -684,7 +684,7 @@ func TestScenarioConfigBackupDataSource(t *testing.T) {
 	s := openForScenario(t)
 	data := `data "tplinkeasysmart_config_backup" "this" {}
 `
-	resource.Test(t, resource.TestCase{
+	s.test(t, resource.TestCase{
 		ProtoV6ProviderFactories: s.Factories(),
 		Steps: []resource.TestStep{{
 			Config: s.ProviderHCL() + data,
@@ -729,7 +729,7 @@ func TestScenarioManagementAddressUnchanged(t *testing.T) {
 	if s.Fake != nil {
 		writes = s.Fake.WriteCount()
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
 		{Config: cfg, Check: resource.ComposeTestCheckFunc(
 			resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.this", "ip_address", info.IP.String()),
 			resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.this", "id", "management_ip"),
@@ -756,7 +756,7 @@ func TestScenarioManagementAddressRefusals(t *testing.T) {
 	if s.Fake != nil {
 		writes = s.Fake.WriteCount()
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
 		{Config: s.ProviderHCL() + managementIP(info.IP.String(), other, info.Gateway.String()),
 			ExpectError: regexp.MustCompile(`Refusing to change the management address`)},
 		{Config: s.ProviderHCL() + managementIP(info.IP.String(), "255.0.255.0", info.Gateway.String()),
