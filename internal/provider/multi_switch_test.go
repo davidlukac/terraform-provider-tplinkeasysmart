@@ -403,7 +403,10 @@ func TestSwitchesConfigurationIsValidated(t *testing.T) {
 }`, `username`},
 		{"a timeout below one second", `provider "tplinkeasysmart" {
   switches = { a = { host = "10.0.0.1", username = "u", password = "p", timeout_seconds = 0 } }
-}`, `at least 1`},
+}`, `between 1 and 30`},
+		{"a timeout above the library's limit", `provider "tplinkeasysmart" {
+  switches = { a = { host = "10.0.0.1", username = "u", password = "p", timeout_seconds = 31 } }
+}`, `between 1 and 30`},
 		{"a host that is only known later", `resource "terraform_data" "h" {
   input = "10.0.0.1"
 }

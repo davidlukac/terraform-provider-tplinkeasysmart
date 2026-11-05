@@ -78,7 +78,7 @@ provider "tplinkeasysmart" {
 - `mac` (String) MAC address of the switch (`aa:bb:cc:dd:ee:ff`, colons or hyphens, any case; `system_info` reports it as `mac_address`). It pins the identity: a device with another MAC at `host` is never written to. Without `host`, or when `host` does not answer, the switch is found by a layer-2 discovery on the first request, so its address may change (for example under DHCP). Discovery needs the same layer-2 segment; use `host` as well when Terraform runs elsewhere. Falls back to TPLINK_EASYSMART_MAC.
 - `password` (String, Sensitive) Admin password. Falls back to TPLINK_EASYSMART_PASSWORD.
 - `switches` (Attributes Map) Switches managed by this provider, by name. Select one on a resource or data source with `switch = "<name>"`. May be combined with `host`, which then names the default switch used when `switch` is omitted. (see [below for nested schema](#nestedatt--switches))
-- `timeout_seconds` (Number) Seconds to wait for a reply before retrying a request. Defaults to 3.
+- `timeout_seconds` (Number) Seconds to wait for a reply before retrying a request, 1 to 30 (the longest the library takes). Defaults to 3.
 - `username` (String) Admin user name. Falls back to TPLINK_EASYSMART_USERNAME.
 
 <a id="nestedatt--switches"></a>
@@ -94,4 +94,4 @@ Optional:
 - `allow_unverified_firmware` (Boolean) Overrides the provider-level `allow_unverified_firmware` for this switch.
 - `host` (String) IPv4 address or hostname of the switch. Optional when `mac` is set; at least one of the two is required.
 - `mac` (String) MAC address of the switch (`aa:bb:cc:dd:ee:ff`, colons or hyphens, any case; `system_info` reports it as `mac_address`). It pins the identity: a device with another MAC at `host` is never written to. Without `host`, or when `host` does not answer, the switch is found by a layer-2 discovery on the first request, so its address may change (for example under DHCP). Discovery needs the same layer-2 segment; use `host` as well when Terraform runs elsewhere.
-- `timeout_seconds` (Number) Seconds to wait for a reply before retrying a request. Defaults to the provider-level `timeout_seconds`, then 3.
+- `timeout_seconds` (Number) Seconds to wait for a reply before retrying a request, 1 to 30 (the longest the library takes). Defaults to the provider-level `timeout_seconds`, then 3.

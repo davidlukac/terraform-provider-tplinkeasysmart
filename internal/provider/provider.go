@@ -29,6 +29,10 @@ const (
 	envUsername = "TPLINK_EASYSMART_USERNAME"
 	envPassword = "TPLINK_EASYSMART_PASSWORD" //nolint:gosec // the name of an environment variable, not a credential
 	// envAllowUnverified backs allow_unverified_firmware for the provider's default; a switch entry still overrides it.
+	// maxTimeoutSeconds is the longest per-attempt timeout the library takes: the plan refuses more, and
+	// so does escp.Config.Validate when the client is built.
+	maxTimeoutSeconds = int64(escp.MaxTimeout / time.Second)
+
 	envAllowUnverified = "TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE"
 )
 
@@ -114,8 +118,8 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 			},
 			"timeout_seconds": schema.Int64Attribute{
 				Optional:    true,
-				Validators:  []validator.Int64{int64validator.AtLeast(1)},
-				Description: "Seconds to wait for a reply before retrying a request. Defaults to 3.",
+				Validators:  []validator.Int64{int64validator.Between(1, maxTimeoutSeconds)},
+				Description: "Seconds to wait for a reply before retrying a request, 1 to 30 (the longest the library takes). Defaults to 3.",
 			},
 			"allow_unverified_firmware": schema.BoolAttribute{
 				Optional: true,
@@ -133,8 +137,8 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 					"mac":      schema.StringAttribute{Optional: true, Validators: []validator.String{validMAC()}, Description: macArgDescription},
 					"username": schema.StringAttribute{Required: true, Description: "Admin user name."},
 					"password": schema.StringAttribute{Required: true, Sensitive: true, Description: "Admin password."},
-					"timeout_seconds": schema.Int64Attribute{Optional: true, Validators: []validator.Int64{int64validator.AtLeast(1)},
-						Description: "Seconds to wait for a reply before retrying a request. Defaults to the provider-level `timeout_seconds`, then 3."},
+					"timeout_seconds": schema.Int64Attribute{Optional: true, Validators: []validator.Int64{int64validator.Between(1, maxTimeoutSeconds)},
+						Description: "Seconds to wait for a reply before retrying a request, 1 to 30 (the longest the library takes). Defaults to the provider-level `timeout_seconds`, then 3."},
 					"allow_unverified_firmware": schema.BoolAttribute{Optional: true,
 						Description: "Overrides the provider-level `allow_unverified_firmware` for this switch."},
 				}},
