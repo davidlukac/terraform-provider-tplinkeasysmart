@@ -21,11 +21,11 @@ import (
 
 // Switch 03's MAC, written the three ways a person may write it. The first is the canonical form.
 const (
-	macColon  = "c0:3a:55:6c:81:61"
-	macHyphen = "C0-3A-55-6C-81-61"
+	macColon  = "00:00:5e:00:53:01"
+	macHyphen = "00-00-5E-00-53-01"
 )
 
-var wantMAC = model.MAC{0xc0, 0x3a, 0x55, 0x6c, 0x81, 0x61}
+var wantMAC = model.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x01}
 
 // recordingFactories builds a provider whose client constructor records every configuration it is
 // given, in order, and hands back an empty fake. It is what the MAC tests need: switches without a
@@ -102,11 +102,11 @@ func TestTheMACInTheConfigurationOverridesTheEnvironmentAndIsKeptNextToTheHost(t
 func TestAMalformedMACIsRejectedAtPlanTime(t *testing.T) {
 	clearProviderEnv(t)
 	for name, mac := range map[string]string{
-		"not hex":         "zz:3a:55:6c:81:61",
-		"too short":       "c0:3a:55:6c:81",
-		"too long":        "c0:3a:55:6c:81:61:00:01",
-		"mixed separator": "c0:3a-55:6c:81:61",
-		"no separator":    "c03a556c8161",
+		"not hex":         "zz:00:5e:00:53:01",
+		"too short":       "00:00:5e:00:53",
+		"too long":        "00:00:5e:00:53:01:00:01",
+		"mixed separator": "00:00-5e:00:53:01",
+		"no separator":    "00005e005301",
 		"empty":           "",
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -137,7 +137,7 @@ func TestAMalformedMACInTheEnvironmentIsReportedBeforeAClientIsBuilt(t *testing.
 func TestAMalformedMACInASwitchEntryIsRejectedAtPlanTime(t *testing.T) {
 	clearProviderEnv(t)
 	log := runMACConfig(t, `provider "tplinkeasysmart" {
-  switches = { a = { mac = "c0:3a:55", username = "u", password = "p" } }
+  switches = { a = { mac = "00:00:5e", username = "u", password = "p" } }
 }
 data "tplinkeasysmart_system_info" "this" {
   switch = "a"
@@ -167,7 +167,7 @@ func TestEntriesOfTheSwitchesMapMayUseAMACAHostOrBoth(t *testing.T) {
   switches = {
     by_mac  = { mac = "`+macHyphen+`", username = "u", password = "p" }
     by_host = { host = "192.0.2.12", username = "u", password = "p" }
-    both    = { host = "192.0.2.11", mac = "a8:42:a1:2a:de:4c", username = "u", password = "p" }
+    both    = { host = "192.0.2.11", mac = "00:00:5e:00:53:02", username = "u", password = "p" }
   }
 }
 data "tplinkeasysmart_system_info" "this" {
@@ -175,7 +175,7 @@ data "tplinkeasysmart_system_info" "this" {
 }`, "")
 	// Entries are built in name order: both, by_host, by_mac.
 	want := []escp.Config{
-		{Host: "192.0.2.11", MAC: model.MAC{0xa8, 0x42, 0xa1, 0x2a, 0xde, 0x4c}},
+		{Host: "192.0.2.11", MAC: model.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}},
 		{Host: "192.0.2.12"},
 		{MAC: wantMAC},
 	}
@@ -208,7 +208,7 @@ func TestTheSameMACTwiceIsRefused(t *testing.T) {
 	}
 	for name, hcl := range cases {
 		t.Run(name, func(t *testing.T) {
-			log := runMACConfig(t, hcl+"\n"+infoDataSource, `(?s)Same switch configured twice.*same mac\s+"c0:3a:55:6c:81:61"`)
+			log := runMACConfig(t, hcl+"\n"+infoDataSource, `(?s)Same switch configured twice.*same mac\s+"00:00:5e:00:53:01"`)
 			// The first one is built before the second is found to be a duplicate; the second never is.
 			if len(log.cfgs) > 1 {
 				t.Fatalf("the duplicate must not get a client, got %d clients", len(log.cfgs))
