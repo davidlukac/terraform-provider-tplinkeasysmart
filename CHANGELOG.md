@@ -2,7 +2,17 @@
 
 ## 0.33.0
 
-- on escp-go v0.8.0: timeout_seconds is 1 to 30, one client per switch, the clients of a previous configuration are closed
+- **Behavior changes** (no setting is added or removed; three things that were accepted before are refused or done differently now, so this is a minor version):
+
+  | 0.32.7 | 0.33.0 |
+  |---|---|
+  | `timeout_seconds` (provider level and per entry of `switches`) required at least 1; the library took any value, so `31` or `3600` passed `validate` and plan and held a call for that long when a switch stayed silent (#152) | the attribute takes **1 to 30** (the library's `MaxTimeout`): a larger value is refused at plan time with the attribute named, before any client is built. The description says so. A configuration that set more than 30 lowers it |
+  | The provider never closed the clients it built, and Terraform configures it again for every plan and apply in one process, so each configuration left its sockets open (#151) | the clients of the previous configuration are closed before the new ones are built. This is also what the library's new one-client rule needs (the next row) |
+  | Any number of clients of one switch could exist in a process, and they failed each other with timeouts and rejected writes (escp-go #115, via #154) | a second client of the same switch in one process fails at once ("another client of this process already talks to that switch"): in a provider block that means two `switches` entries that reach one switch. Name each switch once |
+
+- **Fix (library v0.8.0, #154):** the provider uses [github.com/davidlukac/escp-go](https://github.com/davidlukac/escp-go) v0.8.0. A client that knows its switch's MAC (the `mac` setting, or the one of its first contact) refuses a reply that carries no MAC at all, as it refuses one with another MAC ("the device that answered is not the configured switch"), and nothing is written; real switches put their MAC in every reply (captured on both firmware builds). The firmware check (`allow_unverified_firmware`) remembers the verified build per switch, by its MAC, and no longer per gate, so a switch that comes after another one with a different build is checked on its own.
+- **Internal, no other change in behavior:** the values moved from `escp` to `escp/model` in the library, so every `escp.PortID` and friends is `model.PortID` here; `SwitchClient` has `SwitchMAC` (the firmware gate keys by it). The regression suite checks the switch behind the provider's back with clients of its own, which the one-client rule refused (32 of 79 scenarios on the hardware, 20 on the fake in CI): its clients step aside while the provider has the switch and take it back before every check, at the end of a case and in the safety net.
+- **Verified on hardware:** the full regression on a TL-SG108E on Terraform 1.17.1, with its disruptive scenarios (the management address moved and back, DHCP on and off, a speed change, a port taken down, a LAG, a mirror destination and a VLAN group on device ports, an `allow_disruptive` write to a device port): 83 passed, 0 failed, 1 skipped by design (a MAC that nobody has needs a network to search); the configuration files of both test switches read byte for byte as before and every Terraform plan was clean; no ping was lost to the router or the other switch. The first run, before the harness change above, failed 32 scenarios with the one-client error and left the switch as found.
 
 ## 0.32.7
 
