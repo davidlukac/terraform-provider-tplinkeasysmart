@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.33.0
+
+- on escp-go v0.8.0: timeout_seconds is 1 to 30, one client per switch, the clients of a previous configuration are closed
+
 ## 0.32.7
 
 - **Fix:** the provider uses [github.com/davidlukac/escp-go](https://github.com/davidlukac/escp-go) v0.7.0, which closes four gaps in what reaches the switch. A provider block or `switches` entry that names the switch by `host` only now keeps to the switch it first met: if another device takes the address over later (a lease that changed hands) during the run, the request is refused ("the device that answered is not the configured switch") and nothing, the password included, is sent to the stranger; setting `mac` still pins the switch from the start. A `host` that resolves to a broadcast, multicast or unspecified address, written as `4294967295` or `broadcasthost`, for example, is refused when the provider is configured, as the dotted `255.255.255.255` always was. `mac = "00:00:00:00:00:00"`, which pinned nothing, is refused by the argument's validator. An interrupted run (Ctrl-C, a deadline) no longer waits for the calls queued ahead of it on the same switch.
