@@ -142,7 +142,7 @@ An IP address can change (DHCP, a move); the MAC address does not. Put it in the
 
 ```hcl
 provider "tplinkeasysmart" {
-  mac      = "c0:3a:55:6c:81:61" # or TPLINK_EASYSMART_MAC; `system_info` reports it as `mac_address`
+  mac      = "00:00:5e:00:53:01" # or TPLINK_EASYSMART_MAC; `system_info` reports it as `mac_address`
   username = "admin"
   password = var.switch_password
 }

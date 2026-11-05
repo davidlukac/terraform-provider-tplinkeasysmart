@@ -91,7 +91,7 @@ func TestManagementIPApplyStopsOnAnAddressThatIsNotIPv4(t *testing.T) {
 	f := pvFakes()
 	r := &managementIPResource{src: &switchRegistry{def: f}}
 	var got collected
-	m := managementIPModel{IPAddress: types.StringValue("not-an-address"), Netmask: types.StringValue("255.255.255.0"), Gateway: types.StringValue("192.168.77.1"),
+	m := managementIPModel{IPAddress: types.StringValue("not-an-address"), Netmask: types.StringValue("255.255.255.0"), Gateway: types.StringValue("192.0.2.1"),
 		DHCP: types.BoolValue(false), AllowDisruptive: types.BoolValue(true)}
 	if r.apply(context.Background(), &m, got.add) {
 		t.Fatal("an address that is not IPv4 must not be applied")
