@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -26,7 +26,7 @@ type portsDataSource struct {
 
 // portsReader is the part of the switch API this data source reads.
 type portsReader interface {
-	Ports(ctx context.Context) ([]escp.Port, error)
+	Ports(ctx context.Context) ([]model.Port, error)
 }
 
 // bound returns a copy of the data source wired to the client of the named switch.

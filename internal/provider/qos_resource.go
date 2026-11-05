@@ -19,7 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 const qosID = "qos"
@@ -41,9 +41,9 @@ type qosResource struct {
 
 // qosClient is the part of the switch API this resource needs.
 type qosClient interface {
-	QoS(ctx context.Context) (escp.QoS, error)
-	SetPortPriorities(ctx context.Context, changes []escp.PortPriority) error
-	SetQoSMode(ctx context.Context, mode escp.QoSMode) error
+	QoS(ctx context.Context) (model.QoS, error)
+	SetPortPriorities(ctx context.Context, changes []model.PortPriority) error
+	SetQoSMode(ctx context.Context, mode model.QoSMode) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -84,7 +84,7 @@ func (r *qosResource) Configure(_ context.Context, req resource.ConfigureRequest
 }
 
 // qosState builds the model from the switch, keeping only the priority keys we manage.
-func qosState(sw types.String, q escp.QoS, managed map[string]struct{}) qosResourceModel {
+func qosState(sw types.String, q model.QoS, managed map[string]struct{}) qosResourceModel {
 	vals := map[string]attr.Value{}
 	for _, p := range q.Priorities {
 		k := p.Port.String()
@@ -104,12 +104,12 @@ func (r *qosResource) apply(ctx context.Context, plan *qosResourceModel, add fun
 }
 
 func (r *qosResource) applyBound(ctx context.Context, plan *qosResourceModel, add func(string, string)) bool {
-	mode, err := escp.ParseQoSMode(plan.Mode.ValueString())
+	mode, err := model.ParseQoSMode(plan.Mode.ValueString())
 	if err != nil {
 		add("Invalid QoS mode", fmt.Sprintf("%q is not one of %s", plan.Mode.ValueString(), strings.Join(qosModeNames(), ", ")))
 		return false
 	}
-	want := map[escp.PortID]escp.Priority{}
+	want := map[model.PortID]model.Priority{}
 	managed := map[string]struct{}{}
 	for k, v := range plan.Priorities.Elements() {
 		port, err := strconv.Atoi(k)
@@ -122,7 +122,7 @@ func (r *qosResource) applyBound(ctx context.Context, plan *qosResourceModel, ad
 			add("Invalid priority", fmt.Sprintf("port_priorities[%q] is not a number", k))
 			return false
 		}
-		want[escp.PortID(port)] = escp.Priority(level.ValueInt64())
+		want[model.PortID(port)] = model.Priority(level.ValueInt64())
 		managed[k] = struct{}{}
 	}
 	if problem := qosProblem(plan.Mode, plan.Priorities); problem != "" {
@@ -220,10 +220,10 @@ var _ resource.ResourceWithModifyPlan = &qosResource{}
 
 // priorityChanges lists the wanted priorities lowest port first, so that the first fault the library
 // reports does not depend on the order Terraform hands the map out.
-func priorityChanges(want map[escp.PortID]escp.Priority) []escp.PortPriority {
-	changes := make([]escp.PortPriority, 0, len(want))
+func priorityChanges(want map[model.PortID]model.Priority) []model.PortPriority {
+	changes := make([]model.PortPriority, 0, len(want))
 	for _, port := range slices.Sorted(maps.Keys(want)) {
-		changes = append(changes, escp.PortPriority{Port: port, Priority: want[port]})
+		changes = append(changes, model.PortPriority{Port: port, Priority: want[port]})
 	}
 	return changes
 }

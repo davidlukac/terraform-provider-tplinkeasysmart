@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // rescueTimeout bounds the safety net: it runs when a scenario is over, whatever state the
@@ -16,10 +16,10 @@ const rescueTimeout = 60 * time.Second
 // rescueClient is what the safety net needs of a client: the two settings, read and written.
 // *escp.Client satisfies it; the tests of the error paths use a stub.
 type rescueClient interface {
-	VLANMode(ctx context.Context) (escp.VLANModeSetting, error)
-	SetVLANMode(ctx context.Context, s escp.VLANModeSetting) error
-	PortMirror(ctx context.Context) (escp.Mirror, error)
-	SetPortMirror(ctx context.Context, m escp.Mirror) error
+	VLANMode(ctx context.Context) (model.VLANModeSetting, error)
+	SetVLANMode(ctx context.Context, s model.VLANModeSetting) error
+	PortMirror(ctx context.Context) (model.Mirror, error)
+	SetPortMirror(ctx context.Context, m model.Mirror) error
 }
 
 // Rescue puts back the two settings a scenario that failed halfway can leave behind and that
@@ -67,6 +67,7 @@ func (s *Session) GuardRestore(tb testing.TB) {
 
 func (s *Session) rescueAtEnd(tb testing.TB) {
 	tb.Helper()
+	s.own() // the provider may still hold the switch when a scenario stopped in the middle of a step
 	ctx, cancel := context.WithTimeout(context.Background(), rescueTimeout)
 	defer cancel()
 	done, err := s.Rescue(ctx)

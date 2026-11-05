@@ -6,7 +6,7 @@ import (
 	"net/netip"
 	"sync"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // extraState holds the fake switch behavior for the device description and
@@ -39,7 +39,7 @@ type extraState struct {
 }
 
 // fakeMAC is the MAC address every fake client reports.
-var fakeMAC = escp.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x01}
+var fakeMAC = model.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x01}
 
 // defaultFakeFirmware is the build the fakes report unless a test sets another: the verified baseline.
 const defaultFakeFirmware = "1.0.0 Build 20230218 Rel.50633"
@@ -75,16 +75,16 @@ func (f *fakeClient) extra() *extraState {
 	return e
 }
 
-func (e *extraState) info() (escp.Info, bool, error) {
+func (e *extraState) info() (model.Info, bool, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.infoErr != nil {
-		return escp.Info{}, true, e.infoErr
+		return model.Info{}, true, e.infoErr
 	}
 	if !e.active {
-		return escp.Info{Firmware: escp.ParseFirmware(e.firmwareVersion())}, false, nil
+		return model.Info{Firmware: model.ParseFirmware(e.firmwareVersion())}, false, nil
 	}
-	return escp.Info{Model: "TL-SG108E", Hostname: escp.Hostname(e.hostname), MAC: fakeMAC, Firmware: escp.ParseFirmware(e.firmwareVersion()),
+	return model.Info{Model: "TL-SG108E", Hostname: model.Hostname(e.hostname), MAC: fakeMAC, Firmware: model.ParseFirmware(e.firmwareVersion()),
 		IP: netip.MustParseAddr(e.ip), Netmask: netip.MustParseAddr(orDefault(e.netmask, "255.255.255.0")), Gateway: netip.MustParseAddr(orDefault(e.gateway, "192.0.2.1")), DHCP: !e.static}, true, nil
 }
 
@@ -96,7 +96,7 @@ func orDefault(v, def string) string {
 }
 
 // SetIPConfig moves the fake switch like the real one: the new triple is what Info reports afterwards.
-func (f *fakeClient) SetIPConfig(_ context.Context, cfg escp.IPConfig) error {
+func (f *fakeClient) SetIPConfig(_ context.Context, cfg model.IPConfig) error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func newStaticFake(ip, mask, gateway string) *fakeClient {
 	return f
 }
 
-func (f *fakeClient) SetHostname(_ context.Context, name escp.Hostname) error {
+func (f *fakeClient) SetHostname(_ context.Context, name model.Hostname) error {
 	if err := name.Validate(); err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func (f *fakeClient) SetHostname(_ context.Context, name escp.Hostname) error {
 	return nil
 }
 
-func (f *fakeClient) ConfigBackup(context.Context) (escp.ConfigFile, error) {
+func (f *fakeClient) ConfigBackup(context.Context) (model.ConfigFile, error) {
 	e := f.extra()
 	e.mu.Lock()
 	defer e.mu.Unlock()

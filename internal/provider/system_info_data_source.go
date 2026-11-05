@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -26,8 +26,8 @@ type systemInfoDataSource struct {
 
 // systemInfoReader is the part of the switch API this data source reads.
 type systemInfoReader interface {
-	Info(ctx context.Context) (escp.Info, error)
-	System(ctx context.Context) (escp.System, error)
+	Info(ctx context.Context) (model.Info, error)
+	System(ctx context.Context) (model.System, error)
 }
 
 // bound returns a copy of the data source wired to the client of the named switch.

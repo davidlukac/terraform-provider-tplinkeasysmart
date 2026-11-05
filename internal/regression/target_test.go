@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 func sw03Env() map[string]string {
@@ -34,7 +34,7 @@ func TestLoadTargetSW03(t *testing.T) {
 	if !got.Real() || got.Host != "192.0.2.13" || got.Username != "admin" || got.Password != "pw" {
 		t.Errorf("target = %+v", got)
 	}
-	if want := []escp.PortID{2, 3, 4, 5}; len(got.TestPorts) != 4 || got.TestPorts[0] != want[0] || got.TestPorts[3] != want[3] {
+	if want := []model.PortID{2, 3, 4, 5}; len(got.TestPorts) != 4 || got.TestPorts[0] != want[0] || got.TestPorts[3] != want[3] {
 		t.Errorf("test ports = %v, want %v", got.TestPorts, want)
 	}
 	if len(got.ProtectedPorts) != 4 || got.ProtectedPorts[0] != 1 {

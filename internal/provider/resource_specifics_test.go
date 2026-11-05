@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 func TestQoSResourceRejectsInvalidConfiguration(t *testing.T) {
@@ -92,13 +92,13 @@ func TestQoSResourceOnlyManagesTheListedPorts(t *testing.T) {
 // singleLAGClient reports only LAG1, as a switch without a second group would.
 type singleLAGClient struct{ *fakeClient }
 
-func (singleLAGClient) LAGs(context.Context) ([]escp.LAG, error) {
-	return []escp.LAG{{ID: 1, Ports: escp.MustPortSet(1, 2)}}, nil
+func (singleLAGClient) LAGs(context.Context) ([]model.LAG, error) {
+	return []model.LAG{{ID: 1, Ports: model.MustPortSet(1, 2)}}, nil
 }
 
 func TestLAGResourceSpecifics(t *testing.T) {
 	newFake := func() *fakeClient {
-		return &fakeClient{ports: lagPorts(), lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}}
+		return &fakeClient{ports: lagPorts(), lags: map[model.LAGID]model.PortSet{1: model.MustPortSet(1, 2)}}
 	}
 	t.Run("a LAG needs at least two members", func(t *testing.T) {
 		t.Parallel()
@@ -130,7 +130,7 @@ func TestLAGResourceSpecifics(t *testing.T) {
 	})
 	t.Run("a port that already belongs to another LAG", func(t *testing.T) {
 		t.Parallel()
-		inner := &fakeClient{lags: map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}, ports: lagPorts()}
+		inner := &fakeClient{lags: map[model.LAGID]model.PortSet{1: model.MustPortSet(1, 2)}, ports: lagPorts()}
 		inner.ports[4].LAG = 3 // port 5
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),
@@ -196,7 +196,7 @@ func TestLAGResourceSpecifics(t *testing.T) {
 
 func TestVLANGroupResourceSpecifics(t *testing.T) {
 	newFake := func() *fakeClient {
-		return &fakeClient{ports: lagPorts(), pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}}
+		return &fakeClient{ports: lagPorts(), pvlans: map[model.PortVLANID]model.PortSet{1: model.MustPortSet(1, 2, 4, 6, 7)}}
 	}
 	t.Run("a group needs at least one member", func(t *testing.T) {
 		t.Parallel()
@@ -232,8 +232,8 @@ func TestVLANGroupResourceSpecifics(t *testing.T) {
 	})
 	t.Run("a port in a LAG cannot be moved", func(t *testing.T) {
 		t.Parallel()
-		inner := &fakeClient{pvlans: map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 5, 6, 7)},
-			ports: append(lagPorts(), escp.Port{ID: 5, Enabled: true, LAG: 2, ConfiguredSpeed: "auto", ActualSpeed: "link-down"})}
+		inner := &fakeClient{pvlans: map[model.PortVLANID]model.PortSet{1: model.MustPortSet(1, 2, 4, 5, 6, 7)},
+			ports: append(lagPorts(), model.Port{ID: 5, Enabled: true, LAG: 2, ConfiguredSpeed: "auto", ActualSpeed: "link-down"})}
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: factories(inner),
 			Steps:                    []tfresource.TestStep{{Config: vlanGroupConfig(2, "  ports = [5]\n"), ExpectError: regexp.MustCompile(`member of LAG2`)}},
@@ -366,14 +366,14 @@ func TestSetToPortsRejectsUnknownSetsAndPortsOutsideTheMask(t *testing.T) {
 			}
 		})
 	}
-	got, err := setToPorts(ctx, portsToSet(escp.MustPortSet(7, 1, 4)))
-	if err != nil || got != escp.MustPortSet(1, 4, 7) || !reflect.DeepEqual(portInt64s(got), []int64{1, 4, 7}) {
+	got, err := setToPorts(ctx, portsToSet(model.MustPortSet(7, 1, 4)))
+	if err != nil || got != model.MustPortSet(1, 4, 7) || !reflect.DeepEqual(portInt64s(got), []int64{1, 4, 7}) {
 		t.Fatalf("a known set round-trips, got %v, %v", got, err)
 	}
 }
 
 func TestPortMirrorRejectsAnUnknownPortSet(t *testing.T) {
-	fc := newFaulty(&fakeClient{ports: testPorts(), mirror: &escp.Mirror{}})
+	fc := newFaulty(&fakeClient{ports: testPorts(), mirror: &model.Mirror{}})
 	r := &portMirrorResource{src: &switchRegistry{def: fc}}
 	m := portMirrorResourceModel{Enabled: types.BoolValue(true), MirrorPort: types.Int64Value(7),
 		IngressPorts: types.SetUnknown(types.Int64Type), EgressPorts: emptyPortSet(), AllowDisruptive: types.BoolValue(false)}

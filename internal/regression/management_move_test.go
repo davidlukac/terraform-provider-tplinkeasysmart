@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // lookupAfterMove bounds how long a check keeps looking for a switch by MAC after it moved.
@@ -22,14 +23,14 @@ const lookupAfterMove = 30 * time.Second
 const settleTime = 2 * time.Minute
 
 // ipConfigOfInfo is the address triple a discovery reply carries.
-func ipConfigOfInfo(i escp.Info) escp.IPConfig {
-	return escp.IPConfig{IP: i.IP, Netmask: i.Netmask, Gateway: i.Gateway}
+func ipConfigOfInfo(i model.Info) model.IPConfig {
+	return model.IPConfig{IP: i.IP, Netmask: i.Netmask, Gateway: i.Gateway}
 }
 
 // bringBack puts the switch at its original address whatever happened to the run: when a look at
 // the original address shows the switch there, it does nothing; otherwise it talks to the switch
 // at the spare address and moves it back. It runs even when the scenario failed halfway.
-func (s *Session) bringBack(t *testing.T, original escp.IPConfig) {
+func (s *Session) bringBack(t *testing.T, original model.IPConfig) {
 	ctx, cancel := context.WithTimeout(context.Background(), settleTime)
 	defer cancel()
 	if info, err := s.Client.Info(ctx); err == nil && info.IP.String() == original.IP.String() {
@@ -96,7 +97,7 @@ func TestScenarioManagementMove(t *testing.T) {
 		}
 		return nil
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
 		{Config: hcl(s.Target.MoveIP, info.Netmask.String(), info.Gateway.String()), Check: func(*terraform.State) error {
 			setHost(s.Target.MoveIP) // the next Terraform commands must dial the new address
 			return reportsIP(s.Target.MoveIP, s.Target.MoveIP)
@@ -160,7 +161,7 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 		}
 		return last
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
 		{Config: hcl(s.Target.MoveIP, info.Netmask.String(), info.Gateway.String()), Check: func(*terraform.State) error { return reportsIP(s.Target.MoveIP) }},
 		{Config: hcl(info.IP.String(), info.Netmask.String(), info.Gateway.String()), Check: func(st *terraform.State) error {
 			if err := reportsIP(info.IP.String()); err != nil {
@@ -181,19 +182,19 @@ const (
 	locatePause = time.Second
 )
 
-func (s *Session) locateByMAC(mac escp.MAC) func(context.Context) (escp.Info, error) {
-	return func(ctx context.Context) (escp.Info, error) {
+func (s *Session) locateByMAC(mac model.MAC) func(context.Context) (model.Info, error) {
+	return func(ctx context.Context) (model.Info, error) {
 		return escp.Locate(ctx, mac, escp.DiscoverOptions{Logger: s.trace.logger()})
 	}
 }
 
-func anyAnswer(escp.Info) bool { return true }
+func anyAnswer(model.Info) bool { return true }
 
 // locateSettled asks up to tries times, pause apart, until the switch answers and ok accepts what it
 // says; it returns the last answer and error, so a switch that never settled is described by what
 // it last reported. A canceled context ends the asking.
-func locateSettled(ctx context.Context, locate func(context.Context) (escp.Info, error), ok func(escp.Info) bool, tries int, pause time.Duration) (escp.Info, error) {
-	var found escp.Info
+func locateSettled(ctx context.Context, locate func(context.Context) (model.Info, error), ok func(model.Info) bool, tries int, pause time.Duration) (model.Info, error) {
+	var found model.Info
 	var err error
 	for attempt := 1; attempt <= tries; attempt++ {
 		if found, err = locate(ctx); err == nil && ok(found) {
@@ -214,7 +215,7 @@ func locateSettled(ctx context.Context, locate func(context.Context) (escp.Info,
 // the switch is already there with DHCP off it does nothing; otherwise it looks the switch up by its
 // MAC address, wherever the lease put it, and writes the static address back. It runs even when the
 // scenario failed halfway.
-func (s *Session) bringBackFromALease(t *testing.T, mac escp.MAC, original escp.IPConfig) {
+func (s *Session) bringBackFromALease(t *testing.T, mac model.MAC, original model.IPConfig) {
 	ctx, cancel := context.WithTimeout(context.Background(), settleTime)
 	defer cancel()
 	found, err := locateSettled(ctx, s.locateByMAC(mac), anyAnswer, locateTries, locatePause)
@@ -265,19 +266,19 @@ func TestScenarioManagementDHCP(t *testing.T) {
 	dhcp := provider + "resource \"tplinkeasysmart_management_ip\" \"this\" {\n  dhcp             = true\n  allow_disruptive = true\n}\n"
 	static := provider + fmt.Sprintf("resource \"tplinkeasysmart_management_ip\" \"this\" {\n  ip_address       = %q\n  netmask          = %q\n  gateway          = %q\n  allow_disruptive = true\n}\n", info.IP.String(), info.Netmask.String(), info.Gateway.String())
 	leased := func(*terraform.State) error {
-		found, err := locateSettled(ctx, s.locateByMAC(hw), func(in escp.Info) bool { return in.DHCP }, locateTries, locatePause)
+		found, err := locateSettled(ctx, s.locateByMAC(hw), func(in model.Info) bool { return in.DHCP }, locateTries, locatePause)
 		if err != nil || !found.DHCP {
 			return fmt.Errorf("the switch found by MAC reports %+v, err %w, want DHCP on", found, err)
 		}
 		t.Logf("leased address %s mask %s gateway %s", found.IP.String(), found.Netmask.String(), found.Gateway.String())
 		return nil
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{
 		{Config: dhcp, Check: resource.ComposeAggregateTestCheckFunc(leased, resource.TestCheckResourceAttr("tplinkeasysmart_management_ip.this", "dhcp", "true"),
 			resource.TestCheckResourceAttrSet("tplinkeasysmart_management_ip.this", "ip_address"))},
 		{Config: dhcp}, // the second look: nothing to change, the plan after the apply is empty
 		{Config: static, Check: func(st *terraform.State) error {
-			found, err := locateSettled(ctx, s.locateByMAC(hw), func(in escp.Info) bool { return !in.DHCP && in.IP.String() == info.IP.String() }, locateTries, locatePause)
+			found, err := locateSettled(ctx, s.locateByMAC(hw), func(in model.Info) bool { return !in.DHCP && in.IP.String() == info.IP.String() }, locateTries, locatePause)
 			if err != nil || found.DHCP || found.IP.String() != info.IP.String() {
 				return fmt.Errorf("the switch found by MAC reports %+v, err %w, want %s with DHCP off", found, err, info.IP.String())
 			}
@@ -288,20 +289,20 @@ func TestScenarioManagementDHCP(t *testing.T) {
 
 func TestLocateSettledAsksAgainUntilTheStateIsSeen(t *testing.T) {
 	ctx := context.Background()
-	stale, fresh := escp.Info{DHCP: true}, escp.Info{DHCP: false}
+	stale, fresh := model.Info{DHCP: true}, model.Info{DHCP: false}
 	var calls int
-	script := func(answers ...func() (escp.Info, error)) func(context.Context) (escp.Info, error) {
+	script := func(answers ...func() (model.Info, error)) func(context.Context) (model.Info, error) {
 		calls = 0
-		return func(context.Context) (escp.Info, error) {
+		return func(context.Context) (model.Info, error) {
 			a := answers[min(calls, len(answers)-1)]
 			calls++
 			return a()
 		}
 	}
-	miss := func() (escp.Info, error) { return escp.Info{}, escp.ErrNotFound }
-	old := func() (escp.Info, error) { return stale, nil }
-	now := func() (escp.Info, error) { return fresh, nil }
-	notDHCP := func(in escp.Info) bool { return !in.DHCP }
+	miss := func() (model.Info, error) { return model.Info{}, escp.ErrNotFound }
+	old := func() (model.Info, error) { return stale, nil }
+	now := func() (model.Info, error) { return fresh, nil }
+	notDHCP := func(in model.Info) bool { return !in.DHCP }
 
 	if got, err := locateSettled(ctx, script(miss, old, now), notDHCP, 5, 0); err != nil || got != fresh || calls != 3 {
 		t.Errorf("a miss, the old state, then the new: got %+v, err %v after %d asks, want the new state after 3", got, err, calls)

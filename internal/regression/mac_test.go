@@ -14,6 +14,7 @@ import (
 
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/provider"
 )
@@ -24,7 +25,7 @@ import (
 // identity pin refuses another device, and that nothing is written when it does.
 
 // notTheTarget is a MAC address (locally administered, so no vendor owns it) that no switch has.
-var notTheTarget = escp.MAC{0x02, 0, 0, 0, 0, 0x01}
+var notTheTarget = model.MAC{0x02, 0, 0, 0, 0, 0x01}
 
 // ledScenarioByMAC flips the LED through a provider block that names the switch as given, and puts
 // it back: the smallest write that proves the whole path works.
@@ -66,7 +67,7 @@ func TestScenarioAnotherDeviceAtTheHostIsNeverWrittenTo(t *testing.T) {
 	if s.Fake != nil {
 		writes = s.Fake.WriteCount()
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{{
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{{
 		Config: s.ProviderHCLByMAC(s.Target.Host, notTheTarget) + "resource \"tplinkeasysmart_led\" \"this\" {\n  enabled = false\n}\n",
 		// (?s): Terraform wraps the diagnostic at its own line width.
 		ExpectError: regexp.MustCompile(`(?s)not\s+the\s+configured\s+switch.*configuration\s+names\s+` + notTheTarget.String()),
@@ -85,7 +86,7 @@ func TestScenarioAMACNobodyHasIsNotFound(t *testing.T) {
 	if s.Fake == nil {
 		t.Skip("on hardware a lookup that finds nobody takes the whole discovery window; the library test covers it")
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{{
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{{
 		Config:      s.ProviderHCLByMAC("", notTheTarget) + "resource \"tplinkeasysmart_led\" \"this\" {\n  enabled = false\n}\n",
 		ExpectError: regexp.MustCompile(`(?s)no\s+switch\s+with\s+that\s+MAC\s+address\s+answered`),
 	}}})
@@ -110,18 +111,21 @@ func TestScenarioMultiSwitchByMAC(t *testing.T) {
 	if target, err := LoadTarget(map[string]string{EnvTarget: os.Getenv(EnvTarget)}); err != nil || target.Real() {
 		t.Skip("the multi-switch scenario runs on the fakes only")
 	}
-	macA, macB := escp.MAC(escptest.DefaultMAC()), escp.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x03}
+	macA, macB := escptest.DefaultMAC(), model.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x03}
 	a, b := startFake(t), startFake(t)
 	b.SetMAC(macB)
 	fakes := map[string]*escptest.Switch{macA.String(): a, macB.String(): b}
+	var l lender
 	dial := func(cfg escp.Config) (provider.SwitchClient, error) {
-		f, ok := fakes[cfg.MAC.String()]
-		if !ok || cfg.Host != "" {
-			return nil, fmt.Errorf("%w: %s", escp.ErrNotFound, cfg.MAC)
-		}
-		cfg.Host, cfg.SwitchPort, cfg.BroadcastAddr, cfg.Timeout = loopback, f.UDPPort(), escptest.Loopback(), fakeTimeout
-		cfg.HostPort = escptest.FreeUDPPort(t)
-		return escp.Dial(cfg)
+		return l.dial(cfg, func(cfg escp.Config) (*escp.Client, error) {
+			f, ok := fakes[cfg.MAC.String()]
+			if !ok || cfg.Host != "" {
+				return nil, fmt.Errorf("%w: %s", escp.ErrNotFound, cfg.MAC)
+			}
+			cfg.Host, cfg.SwitchPort, cfg.BroadcastAddr, cfg.Timeout = loopback, f.UDPPort(), escptest.Loopback(), fakeTimeout
+			cfg.HostPort = escptest.FreeUDPPort(t)
+			return escp.Dial(cfg)
+		})
 	}
 	factories := map[string]func() (tfprotov6.ProviderServer, error){
 		"tplinkeasysmart": providerserver.NewProtocol6WithError(provider.NewWithDialer("regression", dial)()),
@@ -156,7 +160,7 @@ resource "tplinkeasysmart_led" "b" {
 			return nil
 		}
 	}
-	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: factories, Steps: []resource.TestStep{
+	l.run(t, resource.TestCase{ProtoV6ProviderFactories: factories, Steps: []resource.TestStep{
 		{Config: hcl(false, true), Check: resource.ComposeTestCheckFunc(led(a, false), led(b, true))},
 		{Config: hcl(true, false), Check: resource.ComposeTestCheckFunc(led(a, true), led(b, false))},
 		{Config: hcl(true, true), Check: resource.ComposeTestCheckFunc(led(a, true), led(b, true))},

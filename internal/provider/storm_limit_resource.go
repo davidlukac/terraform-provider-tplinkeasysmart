@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 var (
@@ -35,9 +35,9 @@ type stormLimitResource struct {
 
 // stormLimitClient is the part of the switch API this resource needs.
 type stormLimitClient interface {
-	Ports(ctx context.Context) ([]escp.Port, error)
-	SetStormControl(ctx context.Context, cfg escp.StormConfig) error
-	StormControl(ctx context.Context) ([]escp.PortStorm, error)
+	Ports(ctx context.Context) ([]model.Port, error)
+	SetStormControl(ctx context.Context, cfg model.StormConfig) error
+	StormControl(ctx context.Context) ([]model.PortStorm, error)
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -73,7 +73,7 @@ func (r *stormLimitResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"multicast":       schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Limit multicast traffic."},
 			"broadcast":       schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Limit broadcast traffic."},
 			"rate_kbps": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{rateKbps{}},
-				Description: fmt.Sprintf("Rate in kbps (multiple of %d, %d..%d) when a traffic type is selected, otherwise 0.", escp.RateStep, escp.RateStep, escp.MaxBandwidth)},
+				Description: fmt.Sprintf("Rate in kbps (multiple of %d, %d..%d) when a traffic type is selected, otherwise 0.", model.RateStep, model.RateStep, model.MaxBandwidth)},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing a port that has a link up or is a LAG member. Defaults to false."),
 		},
 	}
@@ -83,17 +83,17 @@ func (r *stormLimitResource) Configure(_ context.Context, req resource.Configure
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func (r *stormLimitResource) find(ctx context.Context, port escp.PortID) (escp.PortStorm, bool, error) {
+func (r *stormLimitResource) find(ctx context.Context, port model.PortID) (model.PortStorm, bool, error) {
 	rows, err := r.client.StormControl(ctx)
 	if err != nil {
-		return escp.PortStorm{}, false, err
+		return model.PortStorm{}, false, err
 	}
 	for _, row := range rows {
 		if row.Port == port {
 			return row, true, nil
 		}
 	}
-	return escp.PortStorm{}, false, nil
+	return model.PortStorm{}, false, nil
 }
 
 // apply binds the resource to the switch the plan selects, then applies it.
@@ -103,13 +103,13 @@ func (r *stormLimitResource) apply(ctx context.Context, m *stormLimitModel, add 
 }
 
 func (r *stormLimitResource) applyBound(ctx context.Context, m *stormLimitModel, add func(string, string)) bool {
-	port := escp.PortID(m.Port.ValueInt64())
-	uu, mc, bc, rate := m.UnknownUnicast.ValueBool(), m.Multicast.ValueBool(), m.Broadcast.ValueBool(), escp.Kbps(m.RateKbps.ValueInt64())
+	port := model.PortID(m.Port.ValueInt64())
+	uu, mc, bc, rate := m.UnknownUnicast.ValueBool(), m.Multicast.ValueBool(), m.Broadcast.ValueBool(), model.Kbps(m.RateKbps.ValueInt64())
 	if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), port); err != nil {
 		add("Refusing to change port", err.Error())
 		return false
 	}
-	if err := r.client.SetStormControl(ctx, escp.StormConfig{Port: port, UnknownUnicast: uu, Multicast: mc, Broadcast: bc, Rate: rate}); err != nil {
+	if err := r.client.SetStormControl(ctx, model.StormConfig{Port: port, UnknownUnicast: uu, Multicast: mc, Broadcast: bc, Rate: rate}); err != nil {
 		add("Setting storm control failed", err.Error())
 		return false
 	}
@@ -144,7 +144,7 @@ func (r *stormLimitResource) readBound(ctx context.Context, req resource.ReadReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	got, ok, err := r.find(ctx, escp.PortID(state.Port.ValueInt64()))
+	got, ok, err := r.find(ctx, model.PortID(state.Port.ValueInt64()))
 	if err != nil {
 		resp.Diagnostics.AddError("Reading storm control failed", err.Error())
 		return

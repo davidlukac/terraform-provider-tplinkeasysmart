@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 	"github.com/davidlukac/escp-go/safety"
 )
 
@@ -16,12 +16,12 @@ import (
 // always pass: they cannot change the switch, and they are how a new firmware is
 // fingerprinted. The refusal is worded here, in Terraform's vocabulary; the
 // check itself and the guarantee that no write bypasses it live in the client.
-func firmwareWriteGate(allowUnverified bool) escp.WriteGate {
+func firmwareWriteGate(allowUnverified bool) model.WriteGate {
 	if allowUnverified {
 		return nil
 	}
 	gate := safety.FirmwareGate()
-	return func(ctx context.Context, sw escp.Reader, op escp.Operation) error {
+	return func(ctx context.Context, sw model.Reader, op model.Operation) error {
 		if err := gate(ctx, sw, op); err != nil {
 			return writeRefusal(err)
 		}

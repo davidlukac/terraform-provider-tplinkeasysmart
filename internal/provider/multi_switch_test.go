@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // ---------------------------------------------------------------- the registry
@@ -361,8 +362,8 @@ data "tplinkeasysmart_system_info" "x" {
 func TestGuardsUseThePortsOfTheSelectedSwitch(t *testing.T) {
 	clearProviderEnv(t)
 	// port 7 is free on sw01 but linked on sw02
-	a := &fakeClient{ports: []escp.Port{{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"}}}
-	b := &fakeClient{ports: []escp.Port{{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"}}}
+	a := &fakeClient{ports: []model.Port{{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"}}}
+	b := &fakeClient{ports: []model.Port{{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"}}}
 	fakes := map[string]SwitchClient{"10.0.0.1": a, "10.0.0.2": b}
 	free := twoSwitches + "resource \"tplinkeasysmart_port\" \"p\" {\n  switch = \"sw01\"\n  port = 7\n  flow_control = true\n}\n"
 	busy := twoSwitches + "resource \"tplinkeasysmart_port\" \"p\" {\n  switch = \"sw02\"\n  port = 7\n  flow_control = true\n}\n"
@@ -438,8 +439,8 @@ func TestImportIdsCarryTheSwitchName(t *testing.T) {
 	_ = a
 	cfg := twoSwitches + "resource \"tplinkeasysmart_led\" \"b\" {\n  switch  = \"sw02\"\n  enabled = false\n}\n" +
 		"resource \"tplinkeasysmart_port\" \"p\" {\n  switch = \"sw01\"\n  port = 7\n  allow_disruptive = true\n}\n"
-	b.ports = []escp.Port{{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"}}
-	mustAs[*fakeClient](t, fakes["10.0.0.1"]).ports = []escp.Port{{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"}}
+	b.ports = []model.Port{{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"}}
+	mustAs[*fakeClient](t, fakes["10.0.0.1"]).ports = []model.Port{{ID: 7, Enabled: true, ConfiguredSpeed: "auto", ActualSpeed: "link-down"}}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: multiFactories(fakes, nil),
 		Steps: []resource.TestStep{

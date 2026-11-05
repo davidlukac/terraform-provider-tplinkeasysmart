@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // pvFakes returns a fresh fake switch for every case: ports 1/2 in LAG1 and
@@ -20,11 +20,11 @@ import (
 func pvFakes() *fakeClient {
 	f := newFakeQoS()
 	f.ports = lagPorts()
-	f.lags = map[escp.LAGID]escp.PortSet{1: escp.MustPortSet(1, 2)}
-	f.pvlans = map[escp.PortVLANID]escp.PortSet{1: escp.MustPortSet(1, 2, 4, 6, 7)}
-	f.mirror = &escp.Mirror{}
-	f.storm = map[escp.PortID]escp.PortStorm{}
-	f.bw = map[escp.PortID][2]int{}
+	f.lags = map[model.LAGID]model.PortSet{1: model.MustPortSet(1, 2)}
+	f.pvlans = map[model.PortVLANID]model.PortSet{1: model.MustPortSet(1, 2, 4, 6, 7)}
+	f.mirror = &model.Mirror{}
+	f.storm = map[model.PortID]model.PortStorm{}
+	f.bw = map[model.PortID][2]int{}
 	return f
 }
 
@@ -168,18 +168,18 @@ func TestMirrorProblem(t *testing.T) {
 		name            string
 		enabled         types.Bool
 		dest            types.Int64
-		ingress, egress escp.PortSet
+		ingress, egress model.PortSet
 		wantProblemPart string
 	}{
 		{"disabled and empty", no, types.Int64Value(0), 0, 0, ""},
-		{"enabled and complete", yes, types.Int64Value(7), escp.MustPortSet(4), 0, ""},
-		{"enabled with egress only", yes, types.Int64Value(7), 0, escp.MustPortSet(1, 2), ""},
+		{"enabled and complete", yes, types.Int64Value(7), model.MustPortSet(4), 0, ""},
+		{"enabled with egress only", yes, types.Int64Value(7), 0, model.MustPortSet(1, 2), ""},
 		{"disabled with a destination", no, types.Int64Value(7), 0, 0, "must be empty"},
-		{"disabled with sources", no, types.Int64Value(0), escp.MustPortSet(4), 0, "must be empty"},
-		{"enabled without destination", yes, types.Int64Value(0), escp.MustPortSet(4), 0, "mirror_port must be set"},
+		{"disabled with sources", no, types.Int64Value(0), model.MustPortSet(4), 0, "must be empty"},
+		{"enabled without destination", yes, types.Int64Value(0), model.MustPortSet(4), 0, "mirror_port must be set"},
 		{"enabled without sources", yes, types.Int64Value(7), 0, 0, "at least one"},
-		{"destination mirrors itself via ingress", yes, types.Int64Value(7), escp.MustPortSet(7), 0, "cannot mirror itself"},
-		{"destination mirrors itself via egress", yes, types.Int64Value(7), escp.MustPortSet(4), escp.MustPortSet(7), "cannot mirror itself"},
+		{"destination mirrors itself via ingress", yes, types.Int64Value(7), model.MustPortSet(7), 0, "cannot mirror itself"},
+		{"destination mirrors itself via egress", yes, types.Int64Value(7), model.MustPortSet(4), model.MustPortSet(7), "cannot mirror itself"},
 		{"unknown enabled is skipped", types.BoolUnknown(), types.Int64Value(0), 0, 0, ""},
 		{"unknown destination is skipped", yes, types.Int64Unknown(), 0, 0, ""},
 	}
@@ -289,9 +289,9 @@ func TestPortsOfDistinguishesOmittedFromUnknown(t *testing.T) {
 		t.Fatal("an omitted set means no ports")
 	}
 	set := types.SetValueMust(types.Int64Type, []attr.Value{types.Int64Value(6), types.Int64Value(4)})
-	if p, ok := portsOf(ctx, set); !ok || p != escp.MustPortSet(4, 6) {
+	if p, ok := portsOf(ctx, set); !ok || p != model.MustPortSet(4, 6) {
 		t.Fatalf("a known set yields its ports, got %v %v", p, ok)
 	}
 }
 
-var _ = escp.MaxPort
+var _ = model.MaxPort

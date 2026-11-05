@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // Environment variables, the provider's own names.
@@ -93,9 +94,9 @@ type backupRequest struct {
 }
 
 func backup(req backupRequest, stdout, stderr io.Writer, d deps) int {
-	cfg := escp.Config{Host: req.host, Username: req.username, Password: escp.Password(req.password)}
+	cfg := escp.Config{Host: req.host, Username: req.username, Password: model.Password(req.password)}
 	if req.mac != "" {
-		mac, err := escp.ParseMAC(req.mac)
+		mac, err := model.ParseMAC(req.mac)
 		if err != nil {
 			say(stderr, "configbackup: %v\n", err)
 			return exitUsage
@@ -124,7 +125,7 @@ func backup(req backupRequest, stdout, stderr io.Writer, d deps) int {
 }
 
 // save writes the whole file to a new path, or removes what it created and says why.
-func save(create func(string) (io.WriteCloser, error), path string, file escp.ConfigFile) error {
+func save(create func(string) (io.WriteCloser, error), path string, file model.ConfigFile) error {
 	f, err := create(path)
 	if err != nil {
 		return fmt.Errorf("not saved: %w", err)

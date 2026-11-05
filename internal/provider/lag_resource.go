@@ -11,7 +11,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 	"github.com/davidlukac/escp-go/safety"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -43,9 +43,9 @@ type lagResource struct {
 
 // lagClient is the part of the switch API this resource needs.
 type lagClient interface {
-	LAGs(ctx context.Context) ([]escp.LAG, error)
-	Ports(ctx context.Context) ([]escp.Port, error)
-	SetLAG(ctx context.Context, lag escp.LAG) error
+	LAGs(ctx context.Context) ([]model.LAG, error)
+	Ports(ctx context.Context) ([]model.Port, error)
+	SetLAG(ctx context.Context, lag model.LAG) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -76,9 +76,9 @@ func (r *lagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: resourceSwitchAttribute(),
 			"group": schema.Int64Attribute{Required: true, Description: "Group number: 1 (ports 1-4) or 2 (ports 5-8).",
-				Validators:    []validator.Int64{int64validator.Between(1, escp.LAGGroupCount)},
+				Validators:    []validator.Int64{int64validator.Between(1, model.LAGGroupCount)},
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}},
-			"ports":             schema.SetAttribute{Required: true, ElementType: types.Int64Type, Validators: []validator.Set{validPortSet(), setvalidator.SizeBetween(escp.LAGMinPorts, escp.LAGPortsPerGroup)}, Description: "Member ports: 2 to 4, all within the range of the group (group 1: ports 1-4, group 2: ports 5-8)."},
+			"ports":             schema.SetAttribute{Required: true, ElementType: types.Int64Type, Validators: []validator.Set{validPortSet(), setvalidator.SizeBetween(model.LAGMinPorts, model.LAGPortsPerGroup)}, Description: "Member ports: 2 to 4, all within the range of the group (group 1: ports 1-4, group 2: ports 5-8)."},
 			attrAllowDisruptive: allowDisruptiveAttribute("Allow touching ports that have a link up or belong to a LAG. Defaults to false."),
 		},
 	}
@@ -91,7 +91,7 @@ func (r *lagResource) Configure(_ context.Context, req resource.ConfigureRequest
 // guardLAG checks every port of the old and new membership. Members of this very
 // group are tolerated (an edit of the group touches them by definition); a link
 // never is, nor are the members of another group.
-func (r *lagResource) guardLAG(ctx context.Context, group escp.LAGID, allow bool, old, next escp.PortSet) error {
+func (r *lagResource) guardLAG(ctx context.Context, group model.LAGID, allow bool, old, next model.PortSet) error {
 	if allow {
 		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped")
 		return nil
@@ -112,7 +112,7 @@ func (r *lagResource) guardLAG(ctx context.Context, group escp.LAGID, allow bool
 	})
 }
 
-func (r *lagResource) current(ctx context.Context, group escp.LAGID) (escp.PortSet, error) {
+func (r *lagResource) current(ctx context.Context, group model.LAGID) (model.PortSet, error) {
 	lags, err := r.client.LAGs(ctx)
 	if err != nil {
 		return 0, err
@@ -132,7 +132,7 @@ func (r *lagResource) apply(ctx context.Context, m *lagResourceModel, add func(s
 }
 
 func (r *lagResource) applyBound(ctx context.Context, m *lagResourceModel, add func(string, string)) bool {
-	group := escp.LAGID(m.Group.ValueInt64())
+	group := model.LAGID(m.Group.ValueInt64())
 	ports, err := setToPorts(ctx, m.Ports)
 	if err != nil || ports.IsEmpty() {
 		add("Invalid ports", "a LAG needs at least one member port")
@@ -147,7 +147,7 @@ func (r *lagResource) applyBound(ctx context.Context, m *lagResourceModel, add f
 		add("Refusing to change LAG", err.Error())
 		return false
 	}
-	if err := r.client.SetLAG(ctx, escp.LAG{ID: group, Ports: ports}); err != nil {
+	if err := r.client.SetLAG(ctx, model.LAG{ID: group, Ports: ports}); err != nil {
 		add("Setting LAG failed", err.Error())
 		return false
 	}
@@ -182,7 +182,7 @@ func (r *lagResource) readBound(ctx context.Context, req resource.ReadRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	got, err := r.current(ctx, escp.LAGID(state.Group.ValueInt64()))
+	got, err := r.current(ctx, model.LAGID(state.Group.ValueInt64()))
 	if err != nil {
 		resp.Diagnostics.AddError("Reading LAG failed", err.Error())
 		return
@@ -202,7 +202,7 @@ func (r *lagResource) deleteBound(ctx context.Context, req resource.DeleteReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	group := escp.LAGID(state.Group.ValueInt64())
+	group := model.LAGID(state.Group.ValueInt64())
 	old, err := r.current(ctx, group)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading LAG failed", err.Error())
@@ -212,7 +212,7 @@ func (r *lagResource) deleteBound(ctx context.Context, req resource.DeleteReques
 		resp.Diagnostics.AddError("Refusing to remove LAG", err.Error())
 		return
 	}
-	if err := r.client.SetLAG(ctx, escp.LAG{ID: group, Ports: 0}); err != nil {
+	if err := r.client.SetLAG(ctx, model.LAG{ID: group, Ports: 0}); err != nil {
 		resp.Diagnostics.AddError("Removing LAG failed", err.Error())
 	}
 }
@@ -240,11 +240,11 @@ func (r *lagResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 	if m.Group.IsNull() || m.Group.IsUnknown() || !ok {
 		return
 	}
-	group := escp.LAGID(m.Group.ValueInt64())
-	if group.Validate() != nil || ports.Len() < escp.LAGMinPorts || ports.Len() > escp.LAGPortsPerGroup {
+	group := model.LAGID(m.Group.ValueInt64())
+	if group.Validate() != nil || ports.Len() < model.LAGMinPorts || ports.Len() > model.LAGPortsPerGroup {
 		return
 	}
-	if err := (escp.LAG{ID: group, Ports: ports}).Validate(); err != nil {
+	if err := (model.LAG{ID: group, Ports: ports}).Validate(); err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("ports"), "Ports do not fit the LAG group", strings.TrimPrefix(err.Error(), "escp: "))
 	}
 }

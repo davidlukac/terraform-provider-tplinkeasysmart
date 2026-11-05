@@ -16,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 var (
@@ -37,8 +37,8 @@ type portResource struct {
 
 // portClient is the part of the switch API this resource needs.
 type portClient interface {
-	Ports(ctx context.Context) ([]escp.Port, error)
-	SetPort(ctx context.Context, cfg escp.PortConfig) error
+	Ports(ctx context.Context) ([]model.Port, error)
+	SetPort(ctx context.Context, cfg model.PortConfig) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -88,17 +88,17 @@ func (r *portResource) Configure(_ context.Context, req resource.ConfigureReques
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-func (r *portResource) find(ctx context.Context, id escp.PortID) (escp.Port, bool, error) {
+func (r *portResource) find(ctx context.Context, id model.PortID) (model.Port, bool, error) {
 	ports, err := r.client.Ports(ctx)
 	if err != nil {
-		return escp.Port{}, false, err
+		return model.Port{}, false, err
 	}
 	for _, p := range ports {
 		if p.ID == id {
 			return p, true, nil
 		}
 	}
-	return escp.Port{}, false, nil
+	return model.Port{}, false, nil
 }
 
 // apply binds the resource to the switch the plan selects, then applies it.
@@ -108,12 +108,12 @@ func (r *portResource) apply(ctx context.Context, m *portResourceModel, add func
 }
 
 func (r *portResource) applyBound(ctx context.Context, m *portResourceModel, add func(string, string)) bool {
-	id := escp.PortID(m.Port.ValueInt64())
+	id := model.PortID(m.Port.ValueInt64())
 	if err := guardPorts(ctx, r.client, m.AllowDisruptive.ValueBool(), id); err != nil {
 		add("Refusing to change port", err.Error())
 		return false
 	}
-	if err := r.client.SetPort(ctx, escp.PortConfig{ID: id, Enabled: m.Enabled.ValueBool(), Speed: escp.Speed(m.Speed.ValueString()), FlowControl: m.FlowControl.ValueBool()}); err != nil {
+	if err := r.client.SetPort(ctx, model.PortConfig{ID: id, Enabled: m.Enabled.ValueBool(), Speed: model.Speed(m.Speed.ValueString()), FlowControl: m.FlowControl.ValueBool()}); err != nil {
 		add("Setting port failed", err.Error())
 		return false
 	}
@@ -153,7 +153,7 @@ func (r *portResource) readBound(ctx context.Context, req resource.ReadRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	got, ok, err := r.find(ctx, escp.PortID(state.Port.ValueInt64()))
+	got, ok, err := r.find(ctx, model.PortID(state.Port.ValueInt64()))
 	if err != nil {
 		resp.Diagnostics.AddError("Reading port failed", err.Error())
 		return
@@ -183,9 +183,9 @@ func portFlowControlProblem(speed types.String, flow types.Bool) string {
 	if speed.IsUnknown() || flow.IsUnknown() || !flow.ValueBool() {
 		return ""
 	}
-	s := escp.SpeedAuto
+	s := model.SpeedAuto
 	if !speed.IsNull() {
-		parsed, err := escp.ParseSpeed(speed.ValueString())
+		parsed, err := model.ParseSpeed(speed.ValueString())
 		if err != nil {
 			return ""
 		}
@@ -194,7 +194,7 @@ func portFlowControlProblem(speed types.String, flow types.Bool) string {
 	if s.AllowsFlowControl() {
 		return ""
 	}
-	return fmt.Sprintf("flow_control = true needs speed = %q or %q, not %q. The switch accepts the setting but keeps flow control off at a fixed 10 or 100 Mbps speed, so the port would be left changed and the apply would then fail; the vendor utility refuses the same combination.", escp.SpeedAuto, escp.Speed1000Full, s)
+	return fmt.Sprintf("flow_control = true needs speed = %q or %q, not %q. The switch accepts the setting but keeps flow control off at a fixed 10 or 100 Mbps speed, so the port would be left changed and the apply would then fail; the vendor utility refuses the same combination.", model.SpeedAuto, model.Speed1000Full, s)
 }
 
 // ValidateConfig rejects, at plan time, flow control together with a fixed 10 or 100 Mbps speed.

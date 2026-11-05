@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
-func igmpConfig(enabled, suppression bool) escp.IGMPConfig {
-	return escp.IGMPConfig{Enabled: enabled, ReportSuppression: suppression}
+func igmpConfig(enabled, suppression bool) model.IGMPConfig {
+	return model.IGMPConfig{Enabled: enabled, ReportSuppression: suppression}
 }
 
 // fatalRecorder records Fatalf instead of ending the test, then stops the calling goroutine's

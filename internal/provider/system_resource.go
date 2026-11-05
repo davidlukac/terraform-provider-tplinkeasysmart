@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -34,8 +34,8 @@ type systemResource struct {
 
 // systemClient is the part of the switch API this resource needs.
 type systemClient interface {
-	Info(ctx context.Context) (escp.Info, error)
-	SetHostname(ctx context.Context, name escp.Hostname) error
+	Info(ctx context.Context) (model.Info, error)
+	SetHostname(ctx context.Context, name model.Hostname) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -63,7 +63,7 @@ func (r *systemResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"id": schema.StringAttribute{Computed: true, Description: "Always `system`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"hostname": schema.StringAttribute{Required: true, Validators: validHostname(),
-				Description: "Device description: 1-" + strconv.Itoa(escp.MaxHostnameLen) + " letters, digits and hyphens, not starting or ending with a hyphen (dots and underscores are rejected by the switch)."},
+				Description: "Device description: 1-" + strconv.Itoa(model.MaxHostnameLen) + " letters, digits and hyphens, not starting or ending with a hyphen (dots and underscores are rejected by the switch)."},
 		},
 	}
 }
@@ -79,7 +79,7 @@ func (r *systemResource) apply(ctx context.Context, m *systemResourceModel, add 
 }
 
 func (r *systemResource) applyBound(ctx context.Context, m *systemResourceModel, add func(string, string)) bool {
-	want := escp.Hostname(m.Hostname.ValueString())
+	want := model.Hostname(m.Hostname.ValueString())
 	cur, err := r.client.Info(ctx)
 	if err != nil {
 		add("Reading the switch failed", err.Error())

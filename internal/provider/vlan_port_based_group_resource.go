@@ -10,7 +10,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 	"github.com/davidlukac/escp-go/safety"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -37,9 +37,9 @@ type portVLANResource struct {
 
 // portVLANClient is the part of the switch API this resource needs.
 type portVLANClient interface {
-	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
-	Ports(ctx context.Context) ([]escp.Port, error)
-	SetPortBasedVLAN(ctx context.Context, group escp.PortVLAN) error
+	PortBasedVLAN(ctx context.Context) (model.PortBasedVLAN, error)
+	Ports(ctx context.Context) ([]model.Port, error)
+	SetPortBasedVLAN(ctx context.Context, group model.PortVLAN) error
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -82,7 +82,7 @@ func (r *portVLANResource) Configure(_ context.Context, req resource.ConfigureRe
 // guardVLAN checks every port of the old and new membership: none may have a
 // link up or belong to a LAG, because VLAN membership is exclusive and a
 // change moves the port out of its previous group.
-func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, next escp.PortSet) error {
+func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, next model.PortSet) error {
 	if allow {
 		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped")
 		return nil
@@ -104,19 +104,19 @@ func (r *portVLANResource) guardVLAN(ctx context.Context, allow bool, old, next 
 }
 
 // state reads the port-based VLAN groups, refusing when the port-based mode is not the active one.
-func (r *portVLANResource) state(ctx context.Context) (escp.PortBasedVLAN, error) {
+func (r *portVLANResource) state(ctx context.Context) (model.PortBasedVLAN, error) {
 	v, err := r.client.PortBasedVLAN(ctx)
 	if err != nil {
-		return escp.PortBasedVLAN{}, err
+		return model.PortBasedVLAN{}, err
 	}
 	if !v.Enabled {
-		return escp.PortBasedVLAN{}, &inactiveModeError{"port-based VLAN mode is not active on the switch; refusing to manage groups in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the groups when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the groups depend on it"}
+		return model.PortBasedVLAN{}, &inactiveModeError{"port-based VLAN mode is not active on the switch; refusing to manage groups in another VLAN mode. The switch accepts such a write but does not keep it, and it resets the groups when the mode is switched on, so set the mode first (tplinkeasysmart_vlan_mode) and make the groups depend on it"}
 	}
 	return v, nil
 }
 
 // current is the member set of a group; empty when the group does not exist.
-func (r *portVLANResource) current(ctx context.Context, group escp.PortVLANID) (escp.PortSet, error) {
+func (r *portVLANResource) current(ctx context.Context, group model.PortVLANID) (model.PortSet, error) {
 	v, err := r.state(ctx)
 	if err != nil {
 		return 0, err
@@ -133,7 +133,7 @@ func (r *portVLANResource) apply(ctx context.Context, m *portVLANResourceModel, 
 }
 
 func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceModel, add func(string, string), create bool) bool {
-	group := escp.PortVLANID(m.VLAN.ValueInt64())
+	group := model.PortVLANID(m.VLAN.ValueInt64())
 	ports, err := setToPorts(ctx, m.Ports)
 	if err != nil || ports.IsEmpty() {
 		add("Invalid ports", "a VLAN group needs at least one member port")
@@ -153,10 +153,10 @@ func (r *portVLANResource) applyBound(ctx context.Context, m *portVLANResourceMo
 		add("Refusing to change VLAN group", err.Error())
 		return false
 	}
-	if err := r.client.SetPortBasedVLAN(ctx, escp.PortVLAN{ID: group, Ports: ports}); err != nil {
+	if err := r.client.SetPortBasedVLAN(ctx, model.PortVLAN{ID: group, Ports: ports}); err != nil {
 		// The client refuses, before sending anything, an id the switch does not have (its group
 		// limit or its port count, whichever is larger: no model of the family is held below its own).
-		if errors.Is(err, escp.ErrInvalid) {
+		if errors.Is(err, model.ErrInvalid) {
 			add("Invalid VLAN group", err.Error())
 			return false
 		}
@@ -198,7 +198,7 @@ func (r *portVLANResource) readBound(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	got, err := r.current(ctx, escp.PortVLANID(state.VLAN.ValueInt64()))
+	got, err := r.current(ctx, model.PortVLANID(state.VLAN.ValueInt64()))
 	if err != nil {
 		if !warnInactiveMode(&resp.Diagnostics, err, "the port-based VLAN groups", "The state of this resource is kept as it is and cannot be checked until the mode is switched back; changes are refused meanwhile") {
 			resp.Diagnostics.AddError("Reading VLAN group failed", err.Error())
@@ -220,7 +220,7 @@ func (r *portVLANResource) deleteBound(ctx context.Context, req resource.DeleteR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	group := escp.PortVLANID(state.VLAN.ValueInt64())
+	group := model.PortVLANID(state.VLAN.ValueInt64())
 	old, err := r.current(ctx, group)
 	if err != nil {
 		if !warnInactiveMode(&resp.Diagnostics, err, "the port-based VLAN groups", "The group cannot be removed meanwhile, so the resource is only forgotten and the switch is left as it is") {
@@ -232,7 +232,7 @@ func (r *portVLANResource) deleteBound(ctx context.Context, req resource.DeleteR
 		resp.Diagnostics.AddError("Refusing to remove VLAN group", err.Error())
 		return
 	}
-	if err := r.client.SetPortBasedVLAN(ctx, escp.PortVLAN{ID: group, Ports: 0}); err != nil {
+	if err := r.client.SetPortBasedVLAN(ctx, model.PortVLAN{ID: group, Ports: 0}); err != nil {
 		resp.Diagnostics.AddError("Removing VLAN group failed", err.Error())
 	}
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 func managementIPConfig(ip, mask, gw string, allow bool) string {
@@ -285,7 +285,7 @@ func TestAccManagementIPDHCPErrors(t *testing.T) {
 		setup func(*extraState)
 		want  string
 	}{
-		{"the client needs a MAC", func(e *extraState) { e.dhcpErr = fmt.Errorf("%w: EnableDHCP needs Config.MAC", escp.ErrInvalid) }, `(?s)Set\s+.mac.\s+in\s+the\s+provider\s+configuration`},
+		{"the client needs a MAC", func(e *extraState) { e.dhcpErr = fmt.Errorf("%w: EnableDHCP needs Config.MAC", model.ErrInvalid) }, `(?s)Set\s+.mac.\s+in\s+the\s+provider\s+configuration`},
 		{"the write fails", func(e *extraState) { e.dhcpErr = errBoom }, `(?s)look\s+for\s+it\s+by\s+its\s+MAC`},
 		{"the switch stays static", func(e *extraState) { e.dhcpIgnore = true }, `did not change as requested`},
 	}

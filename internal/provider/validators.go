@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // Plan-time validation. The rules live in the escp package (the same checks
@@ -27,19 +27,19 @@ const (
 )
 
 // validPortNumber accepts a single port number.
-func validPortNumber() validator.Int64 { return int64validator.Between(1, escp.MaxPort) }
+func validPortNumber() validator.Int64 { return int64validator.Between(1, model.MaxPort) }
 
 // validPortSet accepts a set of port numbers.
 func validPortSet() validator.Set {
-	return setvalidator.ValueInt64sAre(int64validator.Between(1, escp.MaxPort))
+	return setvalidator.ValueInt64sAre(int64validator.Between(1, model.MaxPort))
 }
 
 // validPortVLANID accepts the id of a port-based VLAN group.
-func validPortVLANID() validator.Int64 { return int64validator.Between(1, escp.MaxPortVLANID) }
+func validPortVLANID() validator.Int64 { return int64validator.Between(1, model.MaxPortVLANID) }
 
 // speedNames are the configurable port speeds as Terraform spells them.
 func speedNames() []string {
-	speeds := escp.ConfigurableSpeeds()
+	speeds := model.ConfigurableSpeeds()
 	out := make([]string, 0, len(speeds))
 	for _, s := range speeds {
 		out = append(out, s.String())
@@ -55,13 +55,13 @@ func validHostname() []validator.String {
 	return []validator.String{stringRule{
 		description: "must be a device description: 1 to 32 letters, digits and hyphens, not starting or ending with a hyphen",
 		summary:     "Invalid device description",
-		check:       func(s string) error { return escp.Hostname(s).Validate() },
+		check:       func(s string) error { return model.Hostname(s).Validate() },
 	}}
 }
 
 // qosModeNames lists the QoS mode names in mode-number order.
 func qosModeNames() []string {
-	modes := escp.QoSModes()
+	modes := model.QoSModes()
 	names := make([]string, 0, len(modes))
 	for _, m := range modes {
 		names = append(names, m.String())
@@ -82,15 +82,15 @@ func validPriorities() []validator.Map {
 // Limits as the descriptions state them, built from the client's constants so the text cannot
 // drift from what is validated.
 func rateRangeText() string {
-	return fmt.Sprintf("0 (unlimited) or a multiple of %d up to %d", escp.RateStep, escp.MaxBandwidth)
+	return fmt.Sprintf("0 (unlimited) or a multiple of %d up to %d", model.RateStep, model.MaxBandwidth)
 }
 
 // stormRateRangeText is the rate a storm control with traffic types needs.
 func stormRateRangeText() string {
-	return fmt.Sprintf("%d..%d kbps, multiple of %d", escp.RateStep, escp.MaxBandwidth, escp.RateStep)
+	return fmt.Sprintf("%d..%d kbps, multiple of %d", model.RateStep, model.MaxBandwidth, model.RateStep)
 }
 
-func vlanIDRangeText() string { return fmt.Sprintf("%d-%d", escp.MinVLANID, escp.MaxVLANID) }
+func vlanIDRangeText() string { return fmt.Sprintf("%d-%d", model.MinVLANID, model.MaxVLANID) }
 
 // rateKbps accepts 0 (unlimited) or a multiple of 64 up to the maximum.
 type rateKbps struct{}
@@ -105,7 +105,7 @@ func (rateKbps) ValidateInt64(_ context.Context, req validator.Int64Request, res
 	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
 		return
 	}
-	if err := escp.Kbps(req.ConfigValue.ValueInt64()).Validate(); err != nil {
+	if err := model.Kbps(req.ConfigValue.ValueInt64()).Validate(); err != nil {
 		resp.Diagnostics.AddAttributeError(req.Path, "Invalid rate", err.Error())
 	}
 }
@@ -114,7 +114,7 @@ func (rateKbps) ValidateInt64(_ context.Context, req validator.Int64Request, res
 type portKey struct{}
 
 func (portKey) Description(context.Context) string {
-	return fmt.Sprintf("a port number between 1 and %d", escp.MaxPort)
+	return fmt.Sprintf("a port number between 1 and %d", model.MaxPort)
 }
 
 func (v portKey) MarkdownDescription(ctx context.Context) string { return v.Description(ctx) }
@@ -125,11 +125,11 @@ func (portKey) ValidateString(_ context.Context, req validator.StringRequest, re
 	}
 	n, err := strconv.Atoi(req.ConfigValue.ValueString())
 	if err == nil {
-		err = escp.PortID(n).Validate()
+		err = model.PortID(n).Validate()
 	}
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(req.Path, "Invalid port key",
-			fmt.Sprintf("%q is not a port number between 1 and %d", req.ConfigValue.ValueString(), escp.MaxPort))
+			fmt.Sprintf("%q is not a port number between 1 and %d", req.ConfigValue.ValueString(), model.MaxPort))
 	}
 }
 
@@ -150,8 +150,8 @@ func stormProblem(unicast, multicast, broadcast types.Bool, rate types.Int64) st
 	}
 	anyType := unicast.ValueBool() || multicast.ValueBool() || broadcast.ValueBool()
 	switch {
-	case anyType && rate.ValueInt64() < int64(escp.RateStep):
-		return fmt.Sprintf("a traffic type is selected, so rate_kbps must be a multiple of %d between %d and %d", escp.RateStep, escp.RateStep, escp.MaxBandwidth)
+	case anyType && rate.ValueInt64() < int64(model.RateStep):
+		return fmt.Sprintf("a traffic type is selected, so rate_kbps must be a multiple of %d between %d and %d", model.RateStep, model.RateStep, model.MaxBandwidth)
 	case !anyType && rate.ValueInt64() != 0:
 		return "rate_kbps is set but no traffic type (unknown_unicast, multicast, broadcast) is selected"
 	}
@@ -161,7 +161,7 @@ func stormProblem(unicast, multicast, broadcast types.Bool, rate types.Int64) st
 // mirrorProblem checks port mirroring: enabled needs a destination and at
 // least one source and the destination cannot be a source; disabled must have
 // no ports.
-func mirrorProblem(enabled types.Bool, dest types.Int64, ingress, egress escp.PortSet) string {
+func mirrorProblem(enabled types.Bool, dest types.Int64, ingress, egress model.PortSet) string {
 	if enabled.IsUnknown() || dest.IsUnknown() {
 		return ""
 	}
@@ -178,7 +178,7 @@ func mirrorProblem(enabled types.Bool, dest types.Int64, ingress, egress escp.Po
 	if sources.IsEmpty() {
 		return "mirroring is enabled, so at least one ingress or egress source port is needed"
 	}
-	if sources.Has(escp.PortID(dest.ValueInt64())) {
+	if sources.Has(model.PortID(dest.ValueInt64())) {
 		return fmt.Sprintf("port %d cannot mirror itself", dest.ValueInt64())
 	}
 	return ""
@@ -190,7 +190,7 @@ func qosProblem(mode types.String, priorities types.Map) string {
 	if mode.IsUnknown() || priorities.IsUnknown() || len(priorities.Elements()) == 0 {
 		return ""
 	}
-	if mode.ValueString() != escp.QoSPortBased.String() {
+	if mode.ValueString() != model.QoSPortBased.String() {
 		return "per-port priorities only take effect when mode is port-based (the switch accepts them in the other modes but does not keep them); remove port_priorities or set mode = \"port-based\""
 	}
 	return ""
@@ -198,7 +198,7 @@ func qosProblem(mode types.String, priorities types.Map) string {
 
 // validVLANID accepts an 802.1Q VLAN id or PVID.
 func validVLANID() validator.Int64 {
-	return int64validator.Between(int64(escp.MinVLANID), int64(escp.MaxVLANID))
+	return int64validator.Between(int64(model.MinVLANID), int64(model.MaxVLANID))
 }
 
 // validVLANName accepts what the switch accepts as an 802.1Q VLAN name.
@@ -206,7 +206,7 @@ func validVLANName() []validator.String {
 	return []validator.String{stringRule{
 		description: "must be a VLAN name: up to 10 letters, digits, hyphens and underscores",
 		summary:     "Invalid VLAN name",
-		check:       func(s string) error { return escp.VLANName(s).Validate() },
+		check:       func(s string) error { return model.VLANName(s).Validate() },
 	}}
 }
 
@@ -238,6 +238,6 @@ func validMAC() validator.String {
 	return stringRule{
 		description: "must be a MAC address such as aa:bb:cc:dd:ee:ff",
 		summary:     "Invalid MAC address",
-		check:       func(s string) error { _, err := escp.ParseMAC(s); return err },
+		check:       func(s string) error { _, err := model.ParseMAC(s); return err },
 	}
 }

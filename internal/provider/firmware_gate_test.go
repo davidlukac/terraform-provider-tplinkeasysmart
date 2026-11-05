@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 	"github.com/davidlukac/escp-go/safety"
 )
 
@@ -21,7 +22,7 @@ const (
 )
 
 func firmwareFake(version string) *fakeClient {
-	f := &fakeClient{led: true}
+	f := &fakeClient{led: true, mac: model.MAC{0, 0, 0x5e, 0, 0x53, 1}} // known, so the gate remembers its verdict
 	f.setFirmware(version)
 	return f
 }
@@ -34,7 +35,7 @@ func firmwareFake(version string) *fakeClient {
 // Terraform lifecycle tests exercise the provider's wiring and wording of it.
 type gatedClient struct {
 	SwitchClient
-	gate escp.WriteGate
+	gate model.WriteGate
 }
 
 // gated returns c behind the gate of cfg, or c itself when cfg has no gate.
@@ -47,7 +48,7 @@ func gated(c SwitchClient, cfg escp.Config) SwitchClient {
 
 // allow consults the gate with no operation: the provider's firmware gate does not look at it.
 func (g *gatedClient) allow(ctx context.Context) error {
-	return g.gate(ctx, g.SwitchClient, escp.Operation{})
+	return g.gate(ctx, g.SwitchClient, model.Operation{})
 }
 
 func (g *gatedClient) SetLED(ctx context.Context, on bool) error {
@@ -57,21 +58,21 @@ func (g *gatedClient) SetLED(ctx context.Context, on bool) error {
 	return g.SwitchClient.SetLED(ctx, on)
 }
 
-func (g *gatedClient) SetPort(ctx context.Context, cfg escp.PortConfig) error {
+func (g *gatedClient) SetPort(ctx context.Context, cfg model.PortConfig) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetPort(ctx, cfg)
 }
 
-func (g *gatedClient) SetLAG(ctx context.Context, lag escp.LAG) error {
+func (g *gatedClient) SetLAG(ctx context.Context, lag model.LAG) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetLAG(ctx, lag)
 }
 
-func (g *gatedClient) SetIGMP(ctx context.Context, cfg escp.IGMPConfig) error {
+func (g *gatedClient) SetIGMP(ctx context.Context, cfg model.IGMPConfig) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
@@ -85,77 +86,77 @@ func (g *gatedClient) SetLoopPrevention(ctx context.Context, on bool) error {
 	return g.SwitchClient.SetLoopPrevention(ctx, on)
 }
 
-func (g *gatedClient) SetPortMirror(ctx context.Context, m escp.Mirror) error {
+func (g *gatedClient) SetPortMirror(ctx context.Context, m model.Mirror) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetPortMirror(ctx, m)
 }
 
-func (g *gatedClient) SetPortBasedVLAN(ctx context.Context, group escp.PortVLAN) error {
+func (g *gatedClient) SetPortBasedVLAN(ctx context.Context, group model.PortVLAN) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetPortBasedVLAN(ctx, group)
 }
 
-func (g *gatedClient) SetVLANMode(ctx context.Context, s escp.VLANModeSetting) error {
+func (g *gatedClient) SetVLANMode(ctx context.Context, s model.VLANModeSetting) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetVLANMode(ctx, s)
 }
 
-func (g *gatedClient) SetDot1QVLAN(ctx context.Context, v escp.Dot1QVLAN) error {
+func (g *gatedClient) SetDot1QVLAN(ctx context.Context, v model.Dot1QVLAN) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetDot1QVLAN(ctx, v)
 }
 
-func (g *gatedClient) DeleteDot1QVLAN(ctx context.Context, id escp.VLANID) error {
+func (g *gatedClient) DeleteDot1QVLAN(ctx context.Context, id model.VLANID) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.DeleteDot1QVLAN(ctx, id)
 }
 
-func (g *gatedClient) SetPVIDs(ctx context.Context, pvids []escp.PortPVID) error {
+func (g *gatedClient) SetPVIDs(ctx context.Context, pvids []model.PortPVID) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetPVIDs(ctx, pvids)
 }
 
-func (g *gatedClient) SetQoSMode(ctx context.Context, mode escp.QoSMode) error {
+func (g *gatedClient) SetQoSMode(ctx context.Context, mode model.QoSMode) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetQoSMode(ctx, mode)
 }
 
-func (g *gatedClient) SetPortPriorities(ctx context.Context, changes []escp.PortPriority) error {
+func (g *gatedClient) SetPortPriorities(ctx context.Context, changes []model.PortPriority) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetPortPriorities(ctx, changes)
 }
 
-func (g *gatedClient) SetBandwidth(ctx context.Context, limit escp.PortBandwidth) error {
+func (g *gatedClient) SetBandwidth(ctx context.Context, limit model.PortBandwidth) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetBandwidth(ctx, limit)
 }
 
-func (g *gatedClient) SetStormControl(ctx context.Context, cfg escp.StormConfig) error {
+func (g *gatedClient) SetStormControl(ctx context.Context, cfg model.StormConfig) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
 	return g.SwitchClient.SetStormControl(ctx, cfg)
 }
 
-func (g *gatedClient) SetHostname(ctx context.Context, name escp.Hostname) error {
+func (g *gatedClient) SetHostname(ctx context.Context, name model.Hostname) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}
@@ -169,7 +170,7 @@ func (g *gatedClient) EnableDHCP(ctx context.Context) error {
 	return g.SwitchClient.EnableDHCP(ctx)
 }
 
-func (g *gatedClient) SetIPConfig(ctx context.Context, cfg escp.IPConfig) error {
+func (g *gatedClient) SetIPConfig(ctx context.Context, cfg model.IPConfig) error {
 	if err := g.allow(ctx); err != nil {
 		return err
 	}

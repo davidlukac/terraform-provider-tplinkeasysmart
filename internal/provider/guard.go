@@ -9,24 +9,24 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 	"github.com/davidlukac/escp-go/safety"
 )
 
 // portLister is the part of the switch API the port guard needs.
 type portLister interface {
-	Ports(ctx context.Context) ([]escp.Port, error)
+	Ports(ctx context.Context) ([]model.Port, error)
 }
 
 // guardPorts refuses to touch ports that carry a link or belong to a LAG unless
 // the caller explicitly opted in. Writes to such ports can cut the management
 // path or the uplink, and the switch has no console to recover from that.
-func guardPorts(ctx context.Context, c portLister, allowDisruptive bool, named ...escp.PortID) error {
+func guardPorts(ctx context.Context, c portLister, allowDisruptive bool, named ...model.PortID) error {
 	if allowDisruptive {
 		tflog.Warn(ctx, "allow_disruptive is set: the port-in-use guard is skipped", map[string]any{"ports": named})
 		return nil
 	}
-	ports, err := escp.NewPortSet(named...)
+	ports, err := model.NewPortSet(named...)
 	if err != nil { // a port number no switch has is not "free": refuse, as for a port the switch does not list
 		return err
 	}

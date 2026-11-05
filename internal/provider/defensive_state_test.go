@@ -10,13 +10,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // State written by an older provider version has no allow_disruptive; Read must
 // supply the safe default instead of leaving it null.
 func TestPortMirrorReadDefaultsAllowDisruptiveToFalse(t *testing.T) {
 	ctx := context.Background()
-	r := &portMirrorResource{src: &switchRegistry{def: newFaulty(&fakeClient{ports: testPorts(), mirror: &escp.Mirror{}})}}
+	r := &portMirrorResource{src: &switchRegistry{def: newFaulty(&fakeClient{ports: testPorts(), mirror: &model.Mirror{}})}}
 	var sch resource.SchemaResponse
 	r.Schema(ctx, resource.SchemaRequest{}, &sch)
 	objType := mustAs[tftypes.Object](t, sch.Schema.Type().TerraformType(ctx))

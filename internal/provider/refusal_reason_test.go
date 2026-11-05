@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // refusingClient answers a LAG or port write the way the client does when the switch refuses it
@@ -17,8 +18,8 @@ type refusingClient struct {
 	lag, port error
 }
 
-func (r *refusingClient) SetLAG(context.Context, escp.LAG) error { return r.lag }
-func (r *refusingClient) SetPort(context.Context, escp.PortConfig) error {
+func (r *refusingClient) SetLAG(context.Context, model.LAG) error { return r.lag }
+func (r *refusingClient) SetPort(context.Context, model.PortConfig) error {
 	return r.port
 }
 

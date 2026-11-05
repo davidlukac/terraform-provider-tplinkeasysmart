@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 	"github.com/davidlukac/escp-go/safety"
 )
 
@@ -33,7 +33,7 @@ func TestWordPortRefusal(t *testing.T) {
 // even though a port set cannot hold it.
 func TestGuardPortsRefusesAPortNumberNoSwitchHas(t *testing.T) {
 	f := &fakeClient{ports: testPorts()}
-	for _, bad := range []escp.PortID{0, 33, -4} {
+	for _, bad := range []model.PortID{0, 33, -4} {
 		t.Run(fmt.Sprint(bad), func(t *testing.T) {
 			if err := guardPorts(context.Background(), f, false, 3, bad); err == nil {
 				t.Errorf("port %d must be refused", bad)
