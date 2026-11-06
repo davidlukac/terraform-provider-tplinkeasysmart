@@ -56,4 +56,4 @@ Coverage must stay at 100% of reachable statements (`make cover`, exclusions onl
 
 - [ ] Commit messages and the PR title follow Conventional Commits (lower-case imperative subject, no trailing period). The squash commit takes the PR title.
 - [ ] The PR description says what changed, what was verified (and on what), what was not, and the remaining risks.
-- [ ] After the squash merge, a release follows [`RELEASING.md`](RELEASING.md): `scripts/release.sh`-style bump of `main.go` and `CHANGELOG.md` on a branch, tag on `main`, push the tag, dispatch `release.yml`, then check the version on the Registry (listing, `terraform init`, the rendered pages).
+- [ ] After the squash merge, a release follows [`RELEASING.md`](RELEASING.md): `scripts/release.sh`-style bump of `main.go` and `CHANGELOG.md` on a branch, tag on `main`, push the tag, dispatch `release.yml`, then check the version on the Registry (listing, `terraform init` and `tofu init` printing the release key ID, the rendered pages; `registry-check.yml` runs the two installs).
