@@ -1,0 +1,122 @@
+# Installs a release the way a user does, with Terraform and with OpenTofu, in an empty directory,
+# and checks that both registries serve the release signing key (`terraform init` and `tofu init`
+# print the key ID of a signed install). It runs after the Release workflow, by hand for any
+# version, and weekly for the latest release, which also warns when the signing key is close to its
+# expiry. It reports and never blocks a release: the registries ingest at their own pace (the
+# Terraform Registry in minutes, the OpenTofu registry by a scheduled sync that took hours to
+# publish the key), so a run right after a release waits and retries for an hour.
+#
+#   gh workflow run registry-check.yml -f version=0.34.0      (empty: the latest release)
+name: Registry check
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to check, for example 0.34.0 (empty: the latest release)"
+        required: false
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  schedule:
+    - cron: "23 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: registry-check-${{ github.event_name }}
+  cancel-in-progress: false
+
+env:
+  NAMESPACE: davidlukac
+  PROVIDER: tplinkeasysmart
+  # The ID of the release signing key (RELEASING.md). A rotation changes it here and in both registries.
+  KEY_ID: 41A5C36234739359
+
+jobs:
+  check:
+    name: ${{ matrix.tool }} install
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: [terraform, tofu]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TOOL: ${{ matrix.tool }}
+      # After a release: up to 12 looks, five minutes apart. The weekly run looks once.
+      ATTEMPTS: ${{ github.event_name == 'schedule' && 1 || 12 }}
+    steps:
+      - if: matrix.tool == 'terraform'
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: latest
+          terraform_wrapper: false
+      - if: matrix.tool == 'tofu'
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_wrapper: false
+      - name: The version to check
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          version="${INPUT_VERSION:-}"
+          if [ -z "$version" ]; then
+            version="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
+          fi
+          echo "version=${version#v}" >> "$GITHUB_OUTPUT"
+      - name: The registry serves the signing key
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          case "$TOOL" in
+            terraform) host=registry.terraform.io ;;
+            tofu) host=registry.opentofu.org ;;
+          esac
+          url="https://$host/v1/providers/$NAMESPACE/$PROVIDER/$VERSION/download/linux/amd64"
+          ids=""
+          for i in $(seq 1 "$ATTEMPTS"); do
+            curl -fsS "$url" -o download.json || echo '{}' > download.json
+            ids="$(jq -r '[.signing_keys.gpg_public_keys // [] | .[].key_id] | join(" ")' download.json)"
+            case " $ids " in *" $KEY_ID "*) break ;; esac
+            echo "look $i of $ATTEMPTS: $host lists key(s) '$ids' for $VERSION, not $KEY_ID"
+            if [ "$i" -lt "$ATTEMPTS" ]; then sleep 300; fi
+          done
+          case " $ids " in
+            *" $KEY_ID "*) echo "$host serves key $KEY_ID for $VERSION" ;;
+            *) echo "::error::$host does not serve the signing key $KEY_ID for $VERSION"; exit 1 ;;
+          esac
+          jq -r '.signing_keys.gpg_public_keys[0].ascii_armor' download.json > key.asc
+          expiry="$(gpg --with-colons --show-keys key.asc | awk -F: '$1 == "pub" { print $7; exit }')"
+          if [ -n "$expiry" ]; then
+            days=$(( (expiry - $(date +%s)) / 86400 ))
+            echo "the signing key expires in $days days"
+            if [ "$days" -lt 90 ]; then
+              echo "::warning::the release signing key expires in $days days: rotate it (RELEASING.md)"
+            fi
+          fi
+      - name: A clean init installs the release, signed
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dir="$(mktemp -d)"
+          cd "$dir"
+          printf 'terraform {\n  required_providers {\n    %s = {\n      source  = "%s/%s"\n      version = "%s"\n    }\n  }\n}\n' \
+            "$PROVIDER" "$NAMESPACE" "$PROVIDER" "$VERSION" > main.tf
+          for i in $(seq 1 "$ATTEMPTS"); do
+            if out="$("$TOOL" init -no-color 2>&1)"; then
+              echo "$out"
+              case "$out" in *"key ID $KEY_ID"*) echo "installed $VERSION, signed with $KEY_ID"; exit 0 ;; esac
+              echo "::error::$TOOL init succeeded but the install line does not name key $KEY_ID"
+              exit 1
+            fi
+            echo "init $i of $ATTEMPTS failed:"
+            echo "$out"
+            if [ "$i" -lt "$ATTEMPTS" ]; then sleep 300; fi
+          done
+          echo "::error::$TOOL init of $VERSION did not succeed"
+          exit 1

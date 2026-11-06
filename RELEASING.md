@@ -23,8 +23,8 @@ The release workflow (`.github/workflows/release.yml`) is manual only (`workflow
 
 1. Cut the version as above (the PR bumps `main.go` and moves the `CHANGELOG.md` entries under the new version; the GitHub release notes are that CHANGELOG section).
 2. Push the tag, then dispatch the workflow: `gh workflow run release.yml -f tag=vX.Y.Z`. It builds every OS/arch, signs the checksums with the release key (`GPG_PRIVATE_KEY`, `GPG_PASSPHRASE` secrets; the public key is registered in the Registry) and uploads the assets.
-3. Check the new version on the Registry page and with `terraform init` in an empty directory.
+3. Check the new version on the Registry page and in an empty directory with `terraform init` and `tofu init` (OpenTofu: `required_providers` with `source = "davidlukac/tplinkeasysmart"` and the version pinned): both print `Installed davidlukac/tplinkeasysmart vX.Y.Z (... key ID 41A5C36234739359)`. The workflow `registry-check.yml` does the same for both tools after the Release workflow, weekly, and on demand (`gh workflow run registry-check.yml -f version=X.Y.Z`), retrying for an hour because the registries ingest at their own pace; it reports and never blocks a release, and warns when the signing key has less than 90 days to its expiry (2028-10-11, rotate it before).
 
-Optional: submit to the OpenTofu registry with a PR to `opentofu/registry`.
+The provider is also on the OpenTofu registry (`registry.opentofu.org`), which builds from the same GitHub releases; the signing key is registered there (`opentofu/registry#6347`, merged in PR #6348), and a new version appears with the registry's own sync, not through a step of ours.
 
 Registry versions cannot be deleted by the maintainer, only deprecated, so verify a build (`make snapshot`) before releasing. CI runs a snapshot build on every PR as a dry run.
