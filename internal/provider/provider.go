@@ -130,8 +130,8 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 			"switches": schema.MapNestedAttribute{
 				Optional: true,
 				Description: "Switches managed by this provider, by name. Select one on a resource or data source with `switch = \"<name>\"`. " +
-					"May be combined with `host`, which then names the default switch used when `switch` is omitted.",
-				Validators: []validator.Map{mapvalidator.KeysAre(validSwitchName()...)},
+					"With a `switches` map every resource and data source must set `switch`. It may be combined with `host` (the provider's own switch), which is then selected with `switch = \"default\"`; `default` cannot be a key of this map.",
+				Validators: []validator.Map{mapvalidator.KeysAre(validSwitchKey()...)},
 				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
 					"host":     schema.StringAttribute{Optional: true, Description: "IPv4 address or hostname of the switch. Optional when `mac` is set; at least one of the two is required."},
 					"mac":      schema.StringAttribute{Optional: true, Validators: []validator.String{validMAC()}, Description: macArgDescription},

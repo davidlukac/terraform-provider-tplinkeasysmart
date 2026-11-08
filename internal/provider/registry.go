@@ -70,10 +70,17 @@ func (r *switchRegistry) names() string {
 	return strings.Join(names, ", ")
 }
 
-// Client implements switchSource. Without a name the default switch is used;
-// if there is none, the only configured switch; otherwise the choice is
-// ambiguous and refused.
+// Client implements switchSource. The name `default` selects the provider's own switch. Without
+// a name, the provider's own switch is the answer only when it is the only switch: as soon as the
+// provider has a `switches` map, an object that names no switch is refused, because "the default
+// one" or "the only one" would silently change for every such object when another entry is added.
 func (r *switchRegistry) Client(name switchName) (SwitchClient, error) {
+	if name == defaultSwitchName {
+		if r.def == nil {
+			return nil, fmt.Errorf("the provider has no switch of its own (`host`), so there is no switch named %q (configured: %s)", defaultSwitchName, r.names())
+		}
+		return r.def, nil
+	}
 	if name != "" {
 		c, ok := r.named[string(name)]
 		if !ok {
@@ -81,15 +88,22 @@ func (r *switchRegistry) Client(name switchName) (SwitchClient, error) {
 		}
 		return c, nil
 	}
-	if r.def != nil {
+	if len(r.named) == 0 && r.def != nil {
 		return r.def, nil
 	}
-	if len(r.named) == 1 {
-		for _, c := range r.named {
-			return c, nil
-		}
+	if len(r.named) == 0 {
+		return nil, errors.New("no switch is configured")
 	}
-	return nil, fmt.Errorf("several switches are configured and none is the default: set `switch` to one of %s", r.names())
+	return nil, fmt.Errorf("the provider has a `switches` map, so every object and data source must say which switch it is for: set `switch` to one of %s", r.choices())
+}
+
+// choices lists what `switch` may name: the keys of the `switches` map and, when the provider has a
+// switch of its own, `default`.
+func (r *switchRegistry) choices() string {
+	if r.def != nil {
+		return r.names() + ", or " + defaultSwitchName + " (the provider's own switch)"
+	}
+	return r.names()
 }
 
 // sourceFrom extracts the switch source from provider data (nil before the
@@ -156,7 +170,7 @@ func qualifiedID(sw types.String, id string) types.String {
 }
 
 const switchArgDescription = "Name of the switch (a key of the provider's `switches` map) this object lives on. " +
-	"Omit it to use the provider's own switch (`host`), or the only configured switch."
+	"Required when the provider has a `switches` map; `default` is the provider's own switch (`host`) beside it. Omit it when the provider has only its own switch."
 
 // resourceSwitchAttribute is the `switch` argument of every resource. A
 // different switch is a different device, so changing it replaces the resource.

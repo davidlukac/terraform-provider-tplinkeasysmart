@@ -40,7 +40,7 @@ resource "tplinkeasysmart_storm_limit" "unused" {
 - `broadcast` (Boolean) Limit broadcast traffic.
 - `multicast` (Boolean) Limit multicast traffic.
 - `rate_kbps` (Number) Rate in kbps (multiple of 64, 64..1000000) when a traffic type is selected, otherwise 0.
-- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Required when the provider has a `switches` map; `default` is the provider's own switch (`host`) beside it. Omit it when the provider has only its own switch. Changing it replaces the resource.
 - `unknown_unicast` (Boolean) Limit unknown unicast traffic.
 
 ## Import

@@ -34,7 +34,7 @@ resource "tplinkeasysmart_qos" "this" {
 ### Optional
 
 - `port_priorities` (Map of Number) Priority queue per port, keyed by port number ("7" = 2), 1 (lowest) to 4 (highest). Only the listed ports are managed. Priorities take effect only when mode is port-based; setting them in another mode is rejected.
-- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Required when the provider has a `switches` map; `default` is the provider's own switch (`host`) beside it. Omit it when the provider has only its own switch. Changing it replaces the resource.
 
 ### Read-Only
 

@@ -186,8 +186,8 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 }
 ```
 
-- `switch` is optional everywhere. Omitted, it means the provider's own switch (`host`) or the only configured one; with several switches and no default, planning fails and lists the names.
-- Ids and import ids of a named switch are prefixed with its name (`sw02:led`, `sw02:7`). The provider's own switch keeps plain ids.
+- `switch` is optional only when the provider has just its own switch (`host`). As soon as there is a `switches` map, every resource and data source must say which switch it is for, and planning fails with the list of names if one does not: an omitted `switch` that meant "the default" or "the only one" would silently change meaning for every such object the day another entry is added. `default` names the provider's own switch next to a `switches` map (and cannot be a key of it).
+- Ids and import ids of a named switch are prefixed with its name (`sw02:led`, `sw02:7`). The provider's own switch keeps plain ids, however it is selected. This id format is frozen: it is part of the identity of every object in your state. Renaming a key of `switches` is a destroy and a create of everything on that switch (the objects are replaced); use `moved` blocks or `terraform state mv` to rename it without touching the switch.
 - Changing `switch` replaces the object, because it is a different device.
 - The same host or MAC cannot appear twice. A complete example is in [`examples/multi-switch`](examples/multi-switch).
 
