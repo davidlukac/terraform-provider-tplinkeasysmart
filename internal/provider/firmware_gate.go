@@ -49,7 +49,7 @@ func refusal(err error, action string) error {
 	case safety.FirmwareNoBuildDate:
 		// the library's wording already says what is missing
 	case safety.FirmwareUnverified:
-		detail = fmt.Sprintf("firmware build %s has not been verified with this provider version (verified: %v)", fe.Firmware.Build, fe.Verified)
+		detail = fmt.Sprintf("firmware build %s has not been verified with this provider version (verified: %v)", fe.Firmware.BuildDate(), fe.Verified)
 	}
 	return fmt.Errorf("refusing to %s: %s. Reads work on any firmware (the configuration file, which is read with a request the switch could take for a write on an unknown build, is the one exception); set allow_unverified_firmware = true (provider or switch) to %s anyway, at your own risk", action, detail, action)
 }

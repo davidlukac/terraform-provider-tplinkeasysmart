@@ -160,7 +160,7 @@ provider "tplinkeasysmart" {
 ```
 
 - **It pins the identity.** Every reply names the device that sent it. A device with another MAC at `host` is refused before anything is written to it (credentials ride on every write, so an address reused by another device would otherwise receive them).
-- **It finds the switch.** Without `host`, or when `host` does not answer, the switch is looked up by a layer-2 discovery on the first request: about half a second, once per switch and run. A dead `host` gets 1.5 s before the lookup.
+- **It finds the switch.** Without `host` the switch is looked up by a layer-2 discovery on the first request: about half a second, once per switch and run. With both `host` and `mac` the client keeps to `host`, and a switch that is not there is an error; set `relocate_by_mac = true` (at the provider, or per entry of `switches`) to let it look the switch up by its MAC when `host` does not answer (a DHCP lease that changed), after 1.5 s at the dead `host`. The default is off so that a typo in `host` or a different device at the address is never papered over.
 - **Both together** is the sturdiest setup for a switch with a fixed address: `host` is tried first and `mac` guards it.
 - The MAC is a claim, not a credential: anyone on the segment can claim any MAC, so it protects against accidents, not against an attacker (which this protocol cannot do anyway).
 - Discovery stays on the layer-2 segment; a Terraform run in another subnet needs `host`. Resource ids and imports do not carry the address, so switching a configuration from `host` to `mac` changes no state.
@@ -217,7 +217,7 @@ The provider follows [semantic versioning](https://semver.org). Until 1.0.0 a mi
 
 | Switch | Hardware | Firmware | Status |
 |---|---|---|---|
-| TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads and writes checked on a real device, and the settings read back. The VLAN mode, 802.1Q VLAN and PVID writes were not tried on this build (they are verified on 20250710; same protocol generation). |
+| TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads; the writes on unused ports (port settings, bandwidth control, storm control for multicast and broadcast, QoS, ingress mirroring, LAG, port-based VLAN groups), the LED, IGMP snooping, loop prevention and the device description, each read back. Not tried on this build: the management address and DHCP, mirror egress, unknown-unicast storm control, IGMP report suppression, the VLAN mode, 802.1Q VLAN and PVID (all verified on 20250710; same protocol generation). |
 | TL-SG108E | v6 | 1.0.0 Build 20250710 | **Verified**: reads; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID), the management address and the DHCP lease (the switch found again by its MAC address). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8). |
 | TL-SG108E | v6 | builds newer than 20250710 | Untried; reads work; `safety.FirmwareGate` refuses writes unless the caller opts in. Start with the reads |
 | TL-SG108E | other hardware versions | any | Untested |

@@ -100,7 +100,20 @@ func TestScenarioAStaleHostIsReplacedByTheLookup(t *testing.T) {
 		t.Skip("needs a network to search; the library tests cover the fallback on the fake")
 	}
 	// 192.0.2.0/24 is reserved for documentation: nothing answers there.
-	s.ledScenarioByMAC(t, s.ProviderHCLByMAC("192.0.2.1", s.MAC))
+	s.ledScenarioByMAC(t, s.ProviderHCLByMACRelocating("192.0.2.1", s.MAC))
+}
+
+// Without relocate_by_mac the client keeps to the configured address: a stale host is an error, not
+// a reason to look for the switch (the library's default since 0.9.0). Hardware only, like the one above.
+func TestScenarioAStaleHostIsKeptWithoutRelocateByMAC(t *testing.T) {
+	s := openForScenario(t)
+	if s.Fake != nil {
+		t.Skip("needs a network to search; the library tests cover the default on the fake")
+	}
+	s.test(t, resource.TestCase{ProtoV6ProviderFactories: s.Factories(), Steps: []resource.TestStep{{
+		Config:      s.ProviderHCLByMAC("192.0.2.1", s.MAC) + "resource \"tplinkeasysmart_led\" \"this\" {\n  enabled = false\n}\n",
+		ExpectError: regexp.MustCompile(`(?s)no\s+reply\s+from\s+switch`),
+	}}})
 }
 
 // Two switches named by MAC alone: each resource lands on its own switch. Fakes only.
