@@ -33,16 +33,6 @@ resource "tplinkeasysmart_igmp_snooping" "this" {
 ### Read-Only
 
 - `id` (String) Always `igmp_snooping`.
-- `multicast_groups` (Attributes List) Multicast groups currently learned (read-only, changes at runtime). (see [below for nested schema](#nestedatt--multicast_groups))
-
-<a id="nestedatt--multicast_groups"></a>
-### Nested Schema for `multicast_groups`
-
-Read-Only:
-
-- `ip` (String) Multicast group address.
-- `ports` (List of Number) Ports with subscribers.
-- `vlan` (Number) VLAN the group was learned in.
 
 ## Import
 

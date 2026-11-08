@@ -512,8 +512,7 @@ func TestAccIGMPSnoopingLifecycle(t *testing.T) {
 				resource.TestCheckResourceAttr("tplinkeasysmart_igmp_snooping.this", "id", "igmp_snooping"),
 				resource.TestCheckResourceAttr("tplinkeasysmart_igmp_snooping.this", "enabled", "true"),
 				resource.TestCheckResourceAttr("tplinkeasysmart_igmp_snooping.this", "report_message_suppression", "false"),
-				resource.TestCheckResourceAttr("tplinkeasysmart_igmp_snooping.this", "multicast_groups.0.ip", "239.255.255.250"),
-				resource.TestCheckResourceAttr("tplinkeasysmart_igmp_snooping.this", "multicast_groups.0.ports.1", "4"),
+				resource.TestCheckNoResourceAttr("tplinkeasysmart_igmp_snooping.this", "multicast_groups.#"),
 			)},
 			{Config: igmpConfig("false"), Check: func(*terraformState) error {
 				f.mu.Lock()
@@ -1021,6 +1020,25 @@ data "tplinkeasysmart_vlan_mtu" "this" {}`,
 				resource.TestCheckNoResourceAttr("data.tplinkeasysmart_port_mirror.this", "mirror_port"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_mtu.this", "enabled", "false"),
 				resource.TestCheckNoResourceAttr("data.tplinkeasysmart_vlan_mtu.this", "uplink_port"),
+			),
+		}},
+	})
+}
+
+// The learned multicast groups are read from a data source, not from the resource: they change at
+// runtime, and a resource must plan clean.
+func TestAccIGMPSnoopingDataSource(t *testing.T) {
+	f := &fakeClient{igmp: model.IGMP{Enabled: true, ReportSuppression: true}}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{{
+			Config: providerBlock + `data "tplinkeasysmart_igmp_snooping" "this" {}`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_igmp_snooping.this", "id", "igmp_snooping"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_igmp_snooping.this", "enabled", "true"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_igmp_snooping.this", "report_message_suppression", "true"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_igmp_snooping.this", "multicast_groups.0.ip", "239.255.255.250"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_igmp_snooping.this", "multicast_groups.0.ports.1", "4"),
 			),
 		}},
 	})

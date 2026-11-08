@@ -117,7 +117,7 @@ Write support exists only where it cannot cut management access. Per-port and pe
 | `tplinkeasysmart_vlan_8021q_group` | VLAN > 802.1Q VLAN | old and new member ports, no port left in no VLAN |
 | `tplinkeasysmart_vlan_8021q_pvid` | VLAN > 802.1Q PVID Setting | port in use / LAG member |
 
-**Data sources** (read-only): `system_info`, `ports`, `port_statistics`, `lags`, `port_mirror`, `qos`, `bandwidth_control`, `storm_control`, `vlan_mtu`, `vlan_port_based`, `vlan_8021q`, and `config_backup` (the configuration file, optional and sensitive).
+**Data sources** (read-only): `system_info`, `ports`, `port_statistics`, `lags`, `port_mirror`, `qos`, `igmp_snooping` (with the learned multicast groups), `bandwidth_control`, `storm_control`, `vlan_mtu`, `vlan_port_based`, `vlan_8021q`, and `config_backup` (the configuration file, optional and sensitive).
 
 Deliberately **not** writable: user account, config restore, reboot, factory reset and firmware upgrade. These are the changes that can lock you out of a device that has no console. The full reference for every resource and data source is in [`docs/`](docs/index.md) and on the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart/latest/docs).
 
