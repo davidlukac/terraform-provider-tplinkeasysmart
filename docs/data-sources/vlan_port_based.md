@@ -2,12 +2,12 @@
 page_title: "tplinkeasysmart_vlan_port_based Data Source - tplinkeasysmart"
 subcategory: "VLAN"
 description: |-
-  Port-based VLAN mode and groups (VLAN > Port Based VLAN). Read-only: VLAN changes can cut management access.
+  Port-based VLAN mode and groups (VLAN > Port Based VLAN). Read-only. Set the groups with the tplinkeasysmart_vlan_port_based_group resource and the mode with tplinkeasysmart_vlan_mode.
 ---
 
 # tplinkeasysmart_vlan_port_based (Data Source)
 
-Port-based VLAN mode and groups (VLAN > Port Based VLAN). Read-only: VLAN changes can cut management access.
+Port-based VLAN mode and groups (VLAN > Port Based VLAN). Read-only. Set the groups with the `tplinkeasysmart_vlan_port_based_group` resource and the mode with `tplinkeasysmart_vlan_mode`.
 
 ## Example Usage
 

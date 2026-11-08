@@ -52,7 +52,7 @@ func (d *portMirrorDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 		return schema.ListAttribute{Computed: true, ElementType: types.Int64Type, Description: desc}
 	}
 	resp.Schema = schema.Schema{
-		Description: "Port mirroring (Monitoring > Port Mirror). Read-only: enabling mirroring turns the destination port into a monitor port and can cut its normal traffic.",
+		Description: "Port mirroring (Monitoring > Port Mirror). Read-only. Set it with the `tplinkeasysmart_port_mirror` resource.",
 		Attributes: map[string]schema.Attribute{
 			attrSwitch:      dataSourceSwitchAttribute(),
 			"id":            schema.StringAttribute{Computed: true, Description: "Always `port_mirror`."},

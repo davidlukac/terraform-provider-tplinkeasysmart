@@ -53,7 +53,7 @@ func (d *vlanPortBasedDataSource) Metadata(_ context.Context, req datasource.Met
 
 func (d *vlanPortBasedDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Port-based VLAN mode and groups (VLAN > Port Based VLAN). Read-only: VLAN changes can cut management access.",
+		Description: "Port-based VLAN mode and groups (VLAN > Port Based VLAN). Read-only. Set the groups with the `tplinkeasysmart_vlan_port_based_group` resource and the mode with `tplinkeasysmart_vlan_mode`.",
 		Attributes: map[string]schema.Attribute{
 			attrSwitch:  dataSourceSwitchAttribute(),
 			"id":        schema.StringAttribute{Computed: true, Description: "Always `vlan_port_based`."},

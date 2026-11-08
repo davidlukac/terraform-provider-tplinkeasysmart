@@ -117,6 +117,16 @@ Write support exists only where it cannot cut management access. Per-port and pe
 | `tplinkeasysmart_vlan_8021q_group` | VLAN > 802.1Q VLAN | old and new member ports, no port left in no VLAN |
 | `tplinkeasysmart_vlan_8021q_pvid` | VLAN > 802.1Q PVID Setting | port in use / LAG member |
 
+**What `terraform destroy` (or removing the block) does.** There is no "absent" state for most settings, so most resources only **forget** the setting and leave the switch as it is. A resource that removes or resets something says so here and in its page; none of them ever resets a whole switch.
+
+| Resource | On destroy |
+|---|---|
+| `led`, `system`, `management_ip`, `igmp_snooping`, `loop_prevention`, `qos`, `vlan_mode` | Forgotten: the switch keeps the setting. |
+| `port`, `bandwidth_limit`, `storm_limit`, `port_mirror` | Forgotten: **the setting stays active on the switch** (a rate limit, a storm limit and a mirror keep working until you change them; set the value you want back first, or remove the limit with a final apply). |
+| `lag`, `vlan_port_based_group` | The group is removed under the same guard as a change (its ports go back to the default group). |
+| `vlan_8021q_group` | The VLAN is deleted, under the guard (VLAN 1 holds every port including the uplink, so deleting it needs `allow_disruptive`). |
+| `vlan_8021q_pvid` | The port's PVID is set back to 1 (a PVID without its resource would be a dangling default). |
+
 **Data sources** (read-only): `system_info`, `ports`, `port_statistics`, `lags`, `port_mirror`, `qos`, `igmp_snooping` (with the learned multicast groups), `bandwidth_control`, `storm_control`, `vlan_mtu`, `vlan_port_based`, `vlan_8021q`, and `config_backup` (the configuration file, optional and sensitive).
 
 Deliberately **not** writable: user account, config restore, reboot, factory reset and firmware upgrade. These are the changes that can lock you out of a device that has no console. The full reference for every resource and data source is in [`docs/`](docs/index.md) and on the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart/latest/docs).
@@ -131,7 +141,7 @@ A managed switch is the one device you cannot reach when you misconfigure it. Th
 - **VLAN mode.** Switching between MTU, port-based and 802.1Q VLAN discards the other modes' settings and can cut every connection, so `vlan_mode` refuses unless `allow_disruptive = true`; applying the mode the switch already has writes nothing.
 - **Firmware guard.** Writes are refused while the switch runs a firmware build this provider was not verified against (reads and imports always work, except the `config_backup` data source: the file is read with a request that is a write on the wire). `allow_unverified_firmware = true` opts in, or set `TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE=true` in the environment (the argument wins; a switch entry overrides both).
 - **Import the uplink, protect it.** Bring the LAG that carries your router uplink under management and add `lifecycle { prevent_destroy = true }`.
-- **Plan-time validation.** Port numbers (1-32), VLAN ids (1-255), LAG groups (1 takes ports 1-4, 2 takes ports 5-8, two to four members), speeds, QoS modes and priorities (1-4), rate limits (0 or a multiple of 64 up to 1,000,000 kbps), device description (letters, digits, hyphens, up to 32) and cross-field rules (a storm limit needs a rate if a traffic type is selected, a mirror needs a destination that is not one of its sources) are checked before apply. The client repeats every check before it writes.
+- **Plan-time validation.** Port numbers (1-32), VLAN ids (1-4094 for 802.1Q; the port-based groups the switch has), LAG groups (1 takes ports 1-4, 2 takes ports 5-8, two to four members), speeds, QoS modes and priorities (1-4), rate limits (0 or a multiple of 64 up to 1,000,000 kbps), device description (letters, digits, hyphens, up to 32) and cross-field rules (a storm limit needs a rate if a traffic type is selected, a mirror needs a destination that is not one of its sources) are checked before apply. The client repeats every check before it writes.
 - **Read-back.** Each write is verified against the switch afterwards; a write the switch ignored is an error.
 - **Back up first.** The `config_backup` data source returns the device configuration so you can keep a copy before a change.
 - **No hardware needed for tests.** Everything above is exercised against a fake switch, including the failure paths.
@@ -189,6 +199,16 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 - Ids and import ids of a named switch are prefixed with its name (`sw02:led`, `sw02:7`). The provider's own switch keeps plain ids.
 - Changing `switch` replaces the object, because it is a different device.
 - The same host or MAC cannot appear twice. A complete example is in [`examples/multi-switch`](examples/multi-switch).
+
+## Stability
+
+The provider follows [semantic versioning](https://semver.org). Until 1.0.0 a minor version may change the schema or the behavior of a setting; every such change has a migration table in the [CHANGELOG](CHANGELOG.md). From 1.0.0 on:
+
+- **A breaking change needs a major version.** That is: removing or renaming a resource, a data source or an attribute, changing a type or the meaning of a value, changing the format of an `id` or an import id, a new refusal for a configuration that applied before (a guard that did not exist), or a different destroy behavior.
+- **Deprecation comes first.** An attribute or resource is marked deprecated (`DeprecationMessage`, shown by Terraform on every plan) for at least one minor version before a major version removes it.
+- **State upgrades.** A schema change that needs it ships a state upgrade; an old state file is never a reason to import again.
+- **Not covered:** the wording of messages and documentation, the order of list attributes of data sources whose order the switch decides, and anything that belongs to the library (`escp-go`, which has its own 0.x versions; the provider pins one).
+- **Support.** The newest minor of the newest major gets fixes; security fixes see [SECURITY.md](SECURITY.md).
 
 ## Compatibility
 

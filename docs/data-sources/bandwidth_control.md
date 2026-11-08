@@ -2,12 +2,12 @@
 page_title: "tplinkeasysmart_bandwidth_control Data Source - tplinkeasysmart"
 subcategory: "QoS"
 description: |-
-  Per-port rate limits (QoS > Bandwidth Control). Read-only: a wrong limit on an uplink slows or cuts management access.
+  Per-port rate limits (QoS > Bandwidth Control). Read-only. Set the limits with the tplinkeasysmart_bandwidth_limit resource.
 ---
 
 # tplinkeasysmart_bandwidth_control (Data Source)
 
-Per-port rate limits (QoS > Bandwidth Control). Read-only: a wrong limit on an uplink slows or cuts management access.
+Per-port rate limits (QoS > Bandwidth Control). Read-only. Set the limits with the `tplinkeasysmart_bandwidth_limit` resource.
 
 ## Example Usage
 

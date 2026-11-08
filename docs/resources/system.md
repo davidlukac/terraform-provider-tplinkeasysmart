@@ -43,4 +43,4 @@ Import is supported using the following syntax:
 terraform import tplinkeasysmart_system.this system
 ```
 
-For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`).
+For a switch defined in the provider's `switches` map, put the switch name in front of the id, separated by a colon (for example `sw02:7` or `sw02:led`). Without a prefix the id belongs to the provider's own switch (`host`); when the provider has a `switches` map, always give a prefix, `default:` for the provider's own switch (for example `default:7`).

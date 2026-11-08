@@ -2,12 +2,12 @@
 page_title: "tplinkeasysmart_vlan_8021q Data Source - tplinkeasysmart"
 subcategory: "VLAN"
 description: |-
-  802.1Q VLAN mode, VLAN table and per-port PVIDs (VLAN > 802.1Q VLAN / 802.1Q PVID Setting). Read-only: VLAN and PVID changes can cut management access. The VLAN table is only populated while the mode is enabled; the VLAN entry layout comes from the vendor utility and is untested on live data.
+  802.1Q VLAN mode, VLAN table and per-port PVIDs (VLAN > 802.1Q VLAN / 802.1Q PVID Setting). Read-only. The VLAN table is only populated while the 802.1Q mode is enabled. Verified on a real switch on firmware 20250710.
 ---
 
 # tplinkeasysmart_vlan_8021q (Data Source)
 
-802.1Q VLAN mode, VLAN table and per-port PVIDs (VLAN > 802.1Q VLAN / 802.1Q PVID Setting). Read-only: VLAN and PVID changes can cut management access. The VLAN table is only populated while the mode is enabled; the VLAN entry layout comes from the vendor utility and is untested on live data.
+802.1Q VLAN mode, VLAN table and per-port PVIDs (VLAN > 802.1Q VLAN / 802.1Q PVID Setting). Read-only. The VLAN table is only populated while the 802.1Q mode is enabled. Verified on a real switch on firmware 20250710.
 
 ## Example Usage
 
