@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -48,7 +47,6 @@ type igmpModel struct {
 	ID                types.String `tfsdk:"id"`
 	Enabled           types.Bool   `tfsdk:"enabled"`
 	ReportSuppression types.Bool   `tfsdk:"report_message_suppression"`
-	Groups            types.List   `tfsdk:"multicast_groups"`
 }
 
 func (r *igmpResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -66,12 +64,6 @@ func (r *igmpResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"enabled": schema.BoolAttribute{Required: true, Description: "Whether IGMP snooping is enabled."},
 			"report_message_suppression": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false),
 				Description: "Whether IGMP report message suppression is enabled. Defaults to false."},
-			"multicast_groups": schema.ListNestedAttribute{Computed: true, Description: "Multicast groups currently learned (read-only, changes at runtime).",
-				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
-					"ip":    schema.StringAttribute{Computed: true, Description: "Multicast group address."},
-					"vlan":  schema.Int64Attribute{Computed: true, Description: "VLAN the group was learned in."},
-					"ports": schema.ListAttribute{Computed: true, ElementType: types.Int64Type, Description: "Ports with subscribers."},
-				}}},
 		},
 	}
 }
@@ -80,27 +72,10 @@ func (r *igmpResource) Configure(_ context.Context, req resource.ConfigureReques
 	r.src = sourceFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-var igmpGroupType = types.ObjectType{AttrTypes: map[string]attr.Type{
-	"ip": types.StringType, "vlan": types.Int64Type, "ports": types.ListType{ElemType: types.Int64Type},
-}}
-
-// igmpToModel converts the switch state to the Terraform model. The values are
-// built from the group type itself, so they cannot violate it.
+// igmpToModel converts the switch state to the Terraform model. The learned multicast groups are
+// not part of the resource: they change at runtime (see the igmp_snooping data source).
 func igmpToModel(sw types.String, s model.IGMP) igmpModel {
-	groups := make([]attr.Value, 0, len(s.Groups))
-	for _, g := range s.Groups {
-		ports := make([]attr.Value, 0, g.Ports.Len())
-		for _, p := range g.Ports.Ports() {
-			ports = append(ports, types.Int64Value(int64(p)))
-		}
-		groups = append(groups, types.ObjectValueMust(igmpGroupType.AttrTypes, map[string]attr.Value{
-			"ip":    types.StringValue(g.IP.String()),
-			"vlan":  types.Int64Value(int64(g.VLAN)),
-			"ports": types.ListValueMust(types.Int64Type, ports),
-		}))
-	}
-	return igmpModel{ID: qualifiedID(sw, igmpID), Enabled: types.BoolValue(s.Enabled),
-		ReportSuppression: types.BoolValue(s.ReportSuppression), Groups: types.ListValueMust(igmpGroupType, groups)}
+	return igmpModel{ID: qualifiedID(sw, igmpID), Enabled: types.BoolValue(s.Enabled), ReportSuppression: types.BoolValue(s.ReportSuppression)}
 }
 
 // apply binds the resource to the switch the plan selects, then applies it.

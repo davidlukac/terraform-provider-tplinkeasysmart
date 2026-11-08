@@ -210,5 +210,5 @@ func (p *tplinkProvider) Resources(context.Context) []func() resource.Resource {
 
 // DataSources lists the read-only data sources the provider offers.
 func (p *tplinkProvider) DataSources(context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{NewSystemInfoDataSource, NewPortsDataSource, NewPortStatisticsDataSource, NewLAGsDataSource, NewPortMirrorDataSource, NewVLANMTUDataSource, NewVLANPortBasedDataSource, NewVLAN8021QDataSource, NewQoSDataSource, NewBandwidthControlDataSource, NewStormControlDataSource, NewConfigBackupDataSource}
+	return []func() datasource.DataSource{NewSystemInfoDataSource, NewPortsDataSource, NewPortStatisticsDataSource, NewLAGsDataSource, NewPortMirrorDataSource, NewVLANMTUDataSource, NewVLANPortBasedDataSource, NewVLAN8021QDataSource, NewQoSDataSource, NewIGMPSnoopingDataSource, NewBandwidthControlDataSource, NewStormControlDataSource, NewConfigBackupDataSource}
 }
