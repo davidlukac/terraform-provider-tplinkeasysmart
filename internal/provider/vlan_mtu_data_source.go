@@ -52,7 +52,7 @@ func (d *vlanMTUDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 			attrSwitch:    dataSourceSwitchAttribute(),
 			"id":          schema.StringAttribute{Computed: true, Description: "Always `vlan_mtu`."},
 			"enabled":     schema.BoolAttribute{Computed: true, Description: "Whether MTU VLAN mode is active."},
-			"uplink_port": schema.Int64Attribute{Computed: true, Description: "Uplink port (1 when the mode is disabled)."},
+			"uplink_port": schema.Int64Attribute{Computed: true, Description: "Uplink port; null when the MTU VLAN is disabled."},
 		},
 	}
 }
@@ -76,6 +76,15 @@ func (d *vlanMTUDataSource) readBound(ctx context.Context, _ datasource.ReadRequ
 		resp.Diagnostics.AddError("Reading MTU VLAN failed", err.Error())
 		return
 	}
-	state := vlanMTUModel{ID: qualifiedID(d.sw, "vlan_mtu"), Enabled: types.BoolValue(m.Enabled), UplinkPort: types.Int64Value(int64(m.UplinkPort))}
+	state := vlanMTUModel{ID: qualifiedID(d.sw, "vlan_mtu"), Enabled: types.BoolValue(m.Enabled), UplinkPort: mtuUplinkOrNull(m)}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+// mtuUplinkOrNull is the uplink port of an enabled MTU VLAN; the switch reports port 1 when it is
+// disabled, which is not an uplink.
+func mtuUplinkOrNull(m model.MTUVLAN) types.Int64 {
+	if !m.Enabled {
+		return types.Int64Null()
+	}
+	return types.Int64Value(int64(m.UplinkPort))
 }

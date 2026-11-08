@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -74,7 +73,7 @@ func (r *portMirrorResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"id": schema.StringAttribute{Computed: true, Description: "Always `port_mirror`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"enabled":     schema.BoolAttribute{Required: true, Description: "Whether mirroring is enabled. When false, no other port setting may be given."},
-			"mirror_port": schema.Int64Attribute{Optional: true, Computed: true, Default: int64default.StaticInt64(0), Validators: []validator.Int64{int64validator.Between(0, model.MaxPort)}, Description: "Destination (monitoring) port; 0 when disabled."},
+			"mirror_port": schema.Int64Attribute{Optional: true, Validators: []validator.Int64{int64validator.Between(1, model.MaxPort)}, Description: "Destination (monitoring) port. Required when mirroring is enabled; leave it out (null) when it is disabled."},
 			"ingress_ports": schema.SetAttribute{Optional: true, Computed: true, ElementType: types.Int64Type, Default: setdefault.StaticValue(emptyPortSet()), Validators: []validator.Set{validPortSet()},
 				Description: "Ports whose received traffic is mirrored."},
 			"egress_ports": schema.SetAttribute{Optional: true, Computed: true, ElementType: types.Int64Type, Default: setdefault.StaticValue(emptyPortSet()), Validators: []validator.Set{validPortSet()},
@@ -154,7 +153,7 @@ func (r *portMirrorResource) readBound(ctx context.Context, req resource.ReadReq
 		return
 	}
 	state.ID = qualifiedID(r.sw, portMirrorID)
-	state.Enabled, state.MirrorPort = types.BoolValue(got.Enabled), types.Int64Value(int64(got.Destination))
+	state.Enabled, state.MirrorPort = types.BoolValue(got.Enabled), portOrNull(got.Destination)
 	state.IngressPorts, state.EgressPorts = portsToSet(got.IngressPorts), portsToSet(got.EgressPorts)
 	if state.AllowDisruptive.IsNull() {
 		state.AllowDisruptive = types.BoolValue(false)

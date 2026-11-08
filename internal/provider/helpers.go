@@ -230,3 +230,12 @@ func addrString(a netip.Addr) string {
 	}
 	return a.String()
 }
+
+// portOrNull is a port number for a state or a data source, null for no port (the switch reports 0
+// when there is none).
+func portOrNull(p model.PortID) types.Int64 {
+	if p == 0 {
+		return types.Int64Null()
+	}
+	return types.Int64Value(int64(p))
+}

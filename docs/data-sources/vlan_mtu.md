@@ -30,4 +30,4 @@ output "mtu_vlan" {
 
 - `enabled` (Boolean) Whether MTU VLAN mode is active.
 - `id` (String) Always `vlan_mtu`.
-- `uplink_port` (Number) Uplink port (1 when the mode is disabled).
+- `uplink_port` (Number) Uplink port; null when the MTU VLAN is disabled.
