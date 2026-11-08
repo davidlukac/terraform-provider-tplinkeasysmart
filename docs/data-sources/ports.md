@@ -15,7 +15,7 @@ Port settings and link state (Switching > Port Setting in the web UI). Read-only
 data "tplinkeasysmart_ports" "this" {}
 
 output "linked_ports" {
-  value = [for p in data.tplinkeasysmart_ports.this.ports : p.id if p.actual_speed != "link-down"]
+  value = [for p in data.tplinkeasysmart_ports.this.ports : p.port if p.actual_speed != "link-down"]
 }
 ```
 
@@ -41,5 +41,5 @@ Read-Only:
 - `configured_flow_control` (Boolean) Configured flow control.
 - `configured_speed` (String) auto, 10Mbps-half, 10Mbps-full, 100Mbps-half, 100Mbps-full or 1000Mbps-full.
 - `enabled` (Boolean) Administrative state.
-- `id` (Number) Port number (1-based).
 - `lag` (Number) LAG group the port belongs to, 0 if none.
+- `port` (Number) Port number (1-based).

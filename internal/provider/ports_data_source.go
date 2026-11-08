@@ -35,7 +35,7 @@ func (d *portsDataSource) bound(add func(string, string), name types.String) *po
 }
 
 type portModel struct {
-	ID                    types.Int64  `tfsdk:"id"`
+	Port                  types.Int64  `tfsdk:"port"`
 	Enabled               types.Bool   `tfsdk:"enabled"`
 	LAG                   types.Int64  `tfsdk:"lag"`
 	ConfiguredSpeed       types.String `tfsdk:"configured_speed"`
@@ -64,7 +64,7 @@ func (d *portsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 				Computed:    true,
 				Description: "One entry per physical port.",
 				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
-					"id":                      schema.Int64Attribute{Computed: true, Description: "Port number (1-based)."},
+					"port":                    schema.Int64Attribute{Computed: true, Description: "Port number (1-based)."},
 					"enabled":                 schema.BoolAttribute{Computed: true, Description: "Administrative state."},
 					"lag":                     schema.Int64Attribute{Computed: true, Description: "LAG group the port belongs to, 0 if none."},
 					"configured_speed":        schema.StringAttribute{Computed: true, Description: "auto, 10Mbps-half, 10Mbps-full, 100Mbps-half, 100Mbps-full or 1000Mbps-full."},
@@ -99,7 +99,7 @@ func (d *portsDataSource) readBound(ctx context.Context, _ datasource.ReadReques
 	state := portsModel{ID: qualifiedID(d.sw, "ports"), Ports: make([]portModel, 0, len(ports))}
 	for _, p := range ports {
 		state.Ports = append(state.Ports, portModel{
-			ID: types.Int64Value(int64(p.ID)), Enabled: types.BoolValue(p.Enabled), LAG: types.Int64Value(int64(p.LAG)),
+			Port: types.Int64Value(int64(p.ID)), Enabled: types.BoolValue(p.Enabled), LAG: types.Int64Value(int64(p.LAG)),
 			ConfiguredSpeed: types.StringValue(p.ConfiguredSpeed.String()), ActualSpeed: types.StringValue(p.ActualSpeed.String()),
 			ConfiguredFlowControl: types.BoolValue(p.ConfiguredFlowControl), ActualFlowControl: types.BoolValue(p.ActualFlowControl),
 		})

@@ -35,13 +35,13 @@ func (d *portStatisticsDataSource) bound(add func(string, string), name types.St
 }
 
 type portStatsModel struct {
-	ID      types.Int64  `tfsdk:"id"`
-	Enabled types.Bool   `tfsdk:"enabled"`
-	Link    types.String `tfsdk:"link"`
-	TxGood  types.Int64  `tfsdk:"tx_good_packets"`
-	TxBad   types.Int64  `tfsdk:"tx_bad_packets"`
-	RxGood  types.Int64  `tfsdk:"rx_good_packets"`
-	RxBad   types.Int64  `tfsdk:"rx_bad_packets"`
+	Port        types.Int64  `tfsdk:"port"`
+	Enabled     types.Bool   `tfsdk:"enabled"`
+	ActualSpeed types.String `tfsdk:"actual_speed"`
+	TxGood      types.Int64  `tfsdk:"tx_good_packets"`
+	TxBad       types.Int64  `tfsdk:"tx_bad_packets"`
+	RxGood      types.Int64  `tfsdk:"rx_good_packets"`
+	RxBad       types.Int64  `tfsdk:"rx_bad_packets"`
 }
 
 type portStatisticsModel struct {
@@ -64,9 +64,9 @@ func (d *portStatisticsDataSource) Schema(_ context.Context, _ datasource.Schema
 			attrSwitch: dataSourceSwitchAttribute(),
 			"id":       schema.StringAttribute{Computed: true, Description: "Always `port_statistics`."},
 			"ports": schema.ListNestedAttribute{Computed: true, Description: "Traffic counters of every port. They change on every read, so keep them out of anything compared between plans.", NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
-				"id":              i("Port number (1-based)."),
+				"port":            i("Port number (1-based)."),
 				"enabled":         schema.BoolAttribute{Computed: true, Description: "Administrative state."},
-				"link":            schema.StringAttribute{Computed: true, Description: "link-down or the negotiated speed."},
+				"actual_speed":    schema.StringAttribute{Computed: true, Description: "link-down or the negotiated speed."},
 				"tx_good_packets": i("Good packets transmitted."),
 				"tx_bad_packets":  i("Bad packets transmitted."),
 				"rx_good_packets": i("Good packets received."),
@@ -98,7 +98,7 @@ func (d *portStatisticsDataSource) readBound(ctx context.Context, _ datasource.R
 	state := portStatisticsModel{ID: qualifiedID(d.sw, "port_statistics"), Ports: make([]portStatsModel, 0, len(rows))}
 	for _, r := range rows {
 		state.Ports = append(state.Ports, portStatsModel{
-			ID: types.Int64Value(int64(r.ID)), Enabled: types.BoolValue(r.Enabled), Link: types.StringValue(r.Link.String()),
+			Port: types.Int64Value(int64(r.ID)), Enabled: types.BoolValue(r.Enabled), ActualSpeed: types.StringValue(r.Link.String()),
 			TxGood: types.Int64Value(int64(r.TxGood)), TxBad: types.Int64Value(int64(r.TxBad)),
 			RxGood: types.Int64Value(int64(r.RxGood)), RxBad: types.Int64Value(int64(r.RxBad)),
 		})

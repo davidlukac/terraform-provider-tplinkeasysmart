@@ -15,7 +15,7 @@ Per-port traffic counters (Monitoring > Port Statistics). Read-only; values chan
 data "tplinkeasysmart_port_statistics" "this" {}
 
 output "rx_bad" {
-  value = { for p in data.tplinkeasysmart_port_statistics.this.ports : p.id => p.rx_bad_packets }
+  value = { for p in data.tplinkeasysmart_port_statistics.this.ports : p.port => p.rx_bad_packets }
 }
 ```
 
@@ -36,9 +36,9 @@ output "rx_bad" {
 
 Read-Only:
 
+- `actual_speed` (String) link-down or the negotiated speed.
 - `enabled` (Boolean) Administrative state.
-- `id` (Number) Port number (1-based).
-- `link` (String) link-down or the negotiated speed.
+- `port` (Number) Port number (1-based).
 - `rx_bad_packets` (Number) Bad packets received.
 - `rx_good_packets` (Number) Good packets received.
 - `tx_bad_packets` (Number) Bad packets transmitted.
