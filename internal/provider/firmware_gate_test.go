@@ -284,11 +284,11 @@ func TestFirmwareGateOptInHasNoGate(t *testing.T) {
 // not describe is passed on with the same prefix rather than lost.
 func TestWriteRefusalKeepsAnUnknownErrorAndItsCause(t *testing.T) {
 	cause := errors.New("boom")
-	if err := writeRefusal(cause); !errors.Is(err, cause) || !strings.HasPrefix(err.Error(), "refusing to write: ") {
+	if err := refusal(cause, "write"); !errors.Is(err, cause) || !strings.HasPrefix(err.Error(), "refusing to write: ") {
 		t.Fatalf("got %v", err)
 	}
 	unreadable := &safety.FirmwareError{Reason: safety.FirmwareUnreadable, Err: cause}
-	if err := writeRefusal(unreadable); !errors.Is(err, cause) || strings.Contains(err.Error(), "allow_unverified_firmware") {
+	if err := refusal(unreadable, "write"); !errors.Is(err, cause) || strings.Contains(err.Error(), "allow_unverified_firmware") {
 		t.Fatalf("an unreadable firmware is reported as it is, with its cause: %v", err)
 	}
 }
