@@ -57,7 +57,7 @@ func (d *portMirrorDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 			attrSwitch:      dataSourceSwitchAttribute(),
 			"id":            schema.StringAttribute{Computed: true, Description: "Always `port_mirror`."},
 			"enabled":       schema.BoolAttribute{Computed: true, Description: "Whether mirroring is enabled."},
-			"mirror_port":   schema.Int64Attribute{Computed: true, Description: "Destination (monitoring) port; 0 when disabled."},
+			"mirror_port":   schema.Int64Attribute{Computed: true, Description: "Destination (monitoring) port; null when mirroring is disabled."},
 			"ingress_ports": list("Ports whose received traffic is mirrored."),
 			"egress_ports":  list("Ports whose transmitted traffic is mirrored."),
 		},
@@ -84,6 +84,6 @@ func (d *portMirrorDataSource) readBound(ctx context.Context, _ datasource.ReadR
 		return
 	}
 	state := portMirrorModel{ID: qualifiedID(d.sw, "port_mirror"), Enabled: types.BoolValue(m.Enabled),
-		MirrorPort: types.Int64Value(int64(m.Destination)), IngressPorts: portInt64s(m.IngressPorts), EgressPorts: portInt64s(m.EgressPorts)}
+		MirrorPort: portOrNull(m.Destination), IngressPorts: portInt64s(m.IngressPorts), EgressPorts: portInt64s(m.EgressPorts)}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

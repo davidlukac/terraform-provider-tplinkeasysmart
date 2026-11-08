@@ -852,7 +852,7 @@ func TestAccPortMirrorLifecycle(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
 		Steps: []resource.TestStep{
-			{Config: mirrorConfig("  enabled = false\n"), Check: resource.TestCheckResourceAttr("tplinkeasysmart_port_mirror.m", "mirror_port", "0")},
+			{Config: mirrorConfig("  enabled = false\n"), Check: resource.TestCheckNoResourceAttr("tplinkeasysmart_port_mirror.m", "mirror_port")},
 			{Config: mirrorConfig("  enabled = true\n  mirror_port = 7\n  ingress_ports = [4]\n  egress_ports = [1, 2]\n"), Check: resource.ComposeAggregateTestCheckFunc(
 				resource.TestCheckResourceAttr("tplinkeasysmart_port_mirror.m", "mirror_port", "7"),
 				resource.TestCheckResourceAttr("tplinkeasysmart_port_mirror.m", "ingress_ports.#", "1"),
@@ -997,4 +997,23 @@ func TestAccPortGuardNamesAnIdleLAGMember(t *testing.T) {
 	if f.sets != 0 {
 		t.Fatalf("nothing may be written, got %d writes", f.sets)
 	}
+}
+
+// With no mirror and no MTU VLAN the data sources say so with null, not with port 0 or port 1: a
+// consumer cannot mistake "none" for a port (the switch itself reports 0 and 1).
+func TestAccDataSourcesReportNoPortAsNull(t *testing.T) {
+	f := newVLANFake("802.1q") // the MTU VLAN is off, and the switch reports uplink port 1 for it
+	f.mirror = &model.Mirror{}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{{
+			Config: providerBlock + `data "tplinkeasysmart_port_mirror" "this" {}
+data "tplinkeasysmart_vlan_mtu" "this" {}`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckNoResourceAttr("data.tplinkeasysmart_port_mirror.this", "mirror_port"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_vlan_mtu.this", "enabled", "false"),
+				resource.TestCheckNoResourceAttr("data.tplinkeasysmart_vlan_mtu.this", "uplink_port"),
+			),
+		}},
+	})
 }

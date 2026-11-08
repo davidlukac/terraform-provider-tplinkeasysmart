@@ -32,4 +32,4 @@ output "mirroring_enabled" {
 - `enabled` (Boolean) Whether mirroring is enabled.
 - `id` (String) Always `port_mirror`.
 - `ingress_ports` (List of Number) Ports whose received traffic is mirrored.
-- `mirror_port` (Number) Destination (monitoring) port; 0 when disabled.
+- `mirror_port` (Number) Destination (monitoring) port; null when mirroring is disabled.
