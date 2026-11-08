@@ -52,7 +52,7 @@ func (d *bandwidthDataSource) Metadata(_ context.Context, req datasource.Metadat
 
 func (d *bandwidthDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Per-port rate limits (QoS > Bandwidth Control). Read-only: a wrong limit on an uplink slows or cuts management access.",
+		Description: "Per-port rate limits (QoS > Bandwidth Control). Read-only. Set the limits with the `tplinkeasysmart_bandwidth_limit` resource.",
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: dataSourceSwitchAttribute(),
 			"id":       schema.StringAttribute{Computed: true, Description: "Always `bandwidth_control`."},

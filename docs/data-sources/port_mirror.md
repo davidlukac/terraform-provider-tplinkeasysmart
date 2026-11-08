@@ -2,12 +2,12 @@
 page_title: "tplinkeasysmart_port_mirror Data Source - tplinkeasysmart"
 subcategory: "Monitoring"
 description: |-
-  Port mirroring (Monitoring > Port Mirror). Read-only: enabling mirroring turns the destination port into a monitor port and can cut its normal traffic.
+  Port mirroring (Monitoring > Port Mirror). Read-only. Set it with the tplinkeasysmart_port_mirror resource.
 ---
 
 # tplinkeasysmart_port_mirror (Data Source)
 
-Port mirroring (Monitoring > Port Mirror). Read-only: enabling mirroring turns the destination port into a monitor port and can cut its normal traffic.
+Port mirroring (Monitoring > Port Mirror). Read-only. Set it with the `tplinkeasysmart_port_mirror` resource.
 
 ## Example Usage
 
