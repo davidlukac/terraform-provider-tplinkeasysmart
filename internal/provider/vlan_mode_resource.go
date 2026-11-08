@@ -59,6 +59,7 @@ type vlanModeResource struct {
 type vlanModeClient interface {
 	VLANMode(ctx context.Context) (model.VLANModeSetting, error)
 	SetVLANMode(ctx context.Context, s model.VLANModeSetting) error
+	Ports(ctx context.Context) ([]model.Port, error)
 }
 
 // bound returns a copy of the resource wired to the client of the named switch.
@@ -82,7 +83,7 @@ func (r *vlanModeResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		Description: "The VLAN mode of the switch (VLAN > MTU VLAN, Port Based VLAN, 802.1Q VLAN): exactly one of the three is active. Singleton; import with id `vlan_mode`. " +
 			"**Safety:** switching the mode discards the VLAN settings of the other modes and can cut every connection, including the management path, so the provider " +
-			"refuses to change the mode unless `allow_disruptive = true`. Applying the mode the switch already has writes nothing. Destroying only removes it from state.",
+			"refuses to change the mode unless `allow_disruptive = true`. The MTU VLAN uplink must be a port that has a link and is in no LAG: anything else is refused even with `allow_disruptive`, because it would cut the management path. Applying the mode the switch already has writes nothing. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: resourceSwitchAttribute(),
 			"id": schema.StringAttribute{Computed: true, Description: "Always `vlan_mode`.",
@@ -113,24 +114,62 @@ func (r *vlanModeResource) applyBound(ctx context.Context, m *vlanModeModel, add
 		add("Reading the VLAN mode failed", err.Error())
 		return false
 	}
-	if have != want {
-		if !m.AllowDisruptive.ValueBool() {
-			add("Refusing to change the VLAN mode", fmt.Sprintf("the switch is in VLAN mode %q and %q was requested. Switching the mode discards the other "+
-				"modes' VLAN settings and can cut every connection, including the management path; set allow_disruptive = true to proceed", have.Mode, want.Mode))
-			return false
-		}
-		if err := r.client.SetVLANMode(ctx, want); err != nil {
-			add("Setting the VLAN mode failed", err.Error())
-			return false
-		}
-		got, err := r.client.VLANMode(ctx)
-		if err != nil || got != want {
-			add("The VLAN mode did not change as requested", fmt.Sprintf("requested %+v, the switch reports %+v (err=%v)", want, got, err))
-			return false
-		}
+	if have != want && !r.change(ctx, have, want, m.AllowDisruptive.ValueBool(), add) {
+		return false
 	}
 	m.ID = qualifiedID(r.sw, vlanModeID)
 	return true
+}
+
+// change moves the switch from the mode it has to the wanted one: refused without the opt-in, an
+// MTU VLAN uplink that would cut the switch off is refused with it, then written and read back.
+func (r *vlanModeResource) change(ctx context.Context, have, want model.VLANModeSetting, allowDisruptive bool, add func(string, string)) bool {
+	if !allowDisruptive {
+		add("Refusing to change the VLAN mode", fmt.Sprintf("the switch is in VLAN mode %q and %q was requested. Switching the mode discards the other "+
+			"modes' VLAN settings and can cut every connection, including the management path; set allow_disruptive = true to proceed", have.Mode, want.Mode))
+		return false
+	}
+	if want.Mode == model.VLANModeMTU {
+		if err := r.checkMTUUplink(ctx, want.UplinkPort); err != nil {
+			add("Refusing to use this MTU VLAN uplink port", err.Error())
+			return false
+		}
+	}
+	if err := r.client.SetVLANMode(ctx, want); err != nil {
+		add("Setting the VLAN mode failed", err.Error())
+		return false
+	}
+	got, err := r.client.VLANMode(ctx)
+	if err != nil || got != want {
+		add("The VLAN mode did not change as requested", fmt.Sprintf("requested %+v, the switch reports %+v (err=%v)", want, got, err))
+		return false
+	}
+	return true
+}
+
+// checkMTUUplink refuses an MTU VLAN whose uplink is not a port that has a link and is in no LAG,
+// whatever allow_disruptive says: in the MTU VLAN every other port can only talk to the uplink
+// port, so an uplink that is not the port toward the rest of the network (and the management
+// host) cuts the switch off, and the flag is only the user's consent to the mode change, not to
+// that.
+func (r *vlanModeResource) checkMTUUplink(ctx context.Context, uplink model.PortID) error {
+	ports, err := r.client.Ports(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot check the uplink port: %w", err)
+	}
+	for _, p := range ports {
+		if p.ID != uplink {
+			continue
+		}
+		switch {
+		case p.ActualSpeed == model.SpeedLinkDown:
+			return fmt.Errorf("port %d has no link: in the MTU VLAN every other port can only talk to the uplink port, so it must be the port that leads to the rest of the network and to the management host (a port with a link up)", uplink)
+		case p.LAG != 0:
+			return fmt.Errorf("port %d is a member of LAG%d: the MTU VLAN uplink must be a port outside a link aggregation group", uplink, p.LAG)
+		}
+		return nil
+	}
+	return fmt.Errorf("port %d does not exist on the switch", uplink)
 }
 
 func (r *vlanModeResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

@@ -918,3 +918,42 @@ func TestAccVLAN8021QGroupRefusesToOverwriteAnExistingVLAN(t *testing.T) {
 		t.Fatalf("an existing VLAN was touched: %d writes, %+v", f.sets, f.vlanState().vlans[20])
 	}
 }
+
+// allow_disruptive is the consent to change the VLAN mode, not to isolate the switch: an MTU VLAN
+// whose uplink is not a port that has a link and is in no LAG is refused with the flag set, and
+// nothing is written.
+func TestAccVLANModeRefusesAnMTUUplinkThatIsNotTheLinkedPort(t *testing.T) {
+	for _, tt := range []struct {
+		name, uplink, want string
+	}{
+		{"a port without a link", "3", `port 3 has no link`},
+		{"a member of a LAG", "1", `port 1 is a member of LAG1`},
+		{"a port the switch does not have", "9", `port 9 does not exist`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newVLANFake("port-based")
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: factories(f),
+				Steps: []resource.TestStep{{
+					Config:      modeConfig("  mode = \"mtu\"\n  mtu_uplink_port = " + tt.uplink + "\n  allow_disruptive = true\n"),
+					ExpectError: regexp.MustCompile(tt.want),
+				}},
+			})
+			if f.sets != 0 || !f.vlanState().portBased {
+				t.Fatalf("a refused uplink must not write: sets=%d state=%+v", f.sets, f.vlanState())
+			}
+		})
+	}
+}
+
+func TestAccVLANModeReportsPortsThatCannotBeReadBeforeAnMTUChange(t *testing.T) {
+	fc := newFaulty(newVLANFake("port-based"))
+	fc.failAlways("Ports")
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(fc),
+		Steps: []resource.TestStep{{
+			Config:      modeConfig("  mode = \"mtu\"\n  mtu_uplink_port = 8\n  allow_disruptive = true\n"),
+			ExpectError: regexp.MustCompile(`cannot check the uplink port`),
+		}},
+	})
+}
