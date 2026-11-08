@@ -42,8 +42,7 @@ type portPriorityModel struct {
 type qosModel struct {
 	Switch     types.String        `tfsdk:"switch"`
 	ID         types.String        `tfsdk:"id"`
-	Mode       types.Int64         `tfsdk:"mode"`
-	ModeName   types.String        `tfsdk:"mode_name"`
+	Mode       types.String        `tfsdk:"mode"`
 	Priorities []portPriorityModel `tfsdk:"port_priorities"`
 }
 
@@ -55,10 +54,9 @@ func (d *qosDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 	resp.Schema = schema.Schema{
 		Description: "QoS basic settings (QoS > QoS Basic). Read-only.",
 		Attributes: map[string]schema.Attribute{
-			attrSwitch:  dataSourceSwitchAttribute(),
-			"id":        schema.StringAttribute{Computed: true, Description: "Always `qos`."},
-			"mode":      schema.Int64Attribute{Computed: true, Description: "0 port-based, 1 802.1p, 2 DSCP/802.1p."},
-			"mode_name": schema.StringAttribute{Computed: true, Description: "port-based, 802.1p or dscp-802.1p."},
+			attrSwitch: dataSourceSwitchAttribute(),
+			"id":       schema.StringAttribute{Computed: true, Description: "Always `qos`."},
+			"mode":     schema.StringAttribute{Computed: true, Description: "`port-based`, `802.1p` or `dscp-802.1p`, as the `tplinkeasysmart_qos` resource spells it."},
 			"port_priorities": schema.ListNestedAttribute{Computed: true,
 				Description: "Priority queue per port, 1 (lowest) to 4 (highest) as in the web UI. Only effective in port-based mode.",
 				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
@@ -88,7 +86,7 @@ func (d *qosDataSource) readBound(ctx context.Context, _ datasource.ReadRequest,
 		resp.Diagnostics.AddError("Reading QoS failed", err.Error())
 		return
 	}
-	state := qosModel{ID: qualifiedID(d.sw, "qos"), Mode: types.Int64Value(int64(q.Mode)), ModeName: types.StringValue(q.Mode.String()),
+	state := qosModel{ID: qualifiedID(d.sw, "qos"), Mode: types.StringValue(q.Mode.String()),
 		Priorities: make([]portPriorityModel, 0, len(q.Priorities))}
 	for _, p := range q.Priorities {
 		state.Priorities = append(state.Priorities, portPriorityModel{Port: types.Int64Value(int64(p.Port)), Priority: types.Int64Value(int64(p.Priority))})

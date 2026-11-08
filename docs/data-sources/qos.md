@@ -15,7 +15,7 @@ QoS basic settings (QoS > QoS Basic). Read-only.
 data "tplinkeasysmart_qos" "this" {}
 
 output "qos_mode" {
-  value = data.tplinkeasysmart_qos.this.mode_name
+  value = data.tplinkeasysmart_qos.this.mode
 }
 ```
 
@@ -29,8 +29,7 @@ output "qos_mode" {
 ### Read-Only
 
 - `id` (String) Always `qos`.
-- `mode` (Number) 0 port-based, 1 802.1p, 2 DSCP/802.1p.
-- `mode_name` (String) port-based, 802.1p or dscp-802.1p.
+- `mode` (String) `port-based`, `802.1p` or `dscp-802.1p`, as the `tplinkeasysmart_qos` resource spells it.
 - `port_priorities` (Attributes List) Priority queue per port, 1 (lowest) to 4 (highest) as in the web UI. Only effective in port-based mode. (see [below for nested schema](#nestedatt--port_priorities))
 
 <a id="nestedatt--port_priorities"></a>
