@@ -35,7 +35,7 @@ resource "tplinkeasysmart_vlan_port_based_group" "lab" {
 ### Optional
 
 - `allow_disruptive` (Boolean) Allow touching ports that have a link up or belong to a LAG. Defaults to false.
-- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Required when the provider has a `switches` map; `default` is the provider's own switch (`host`) beside it. Omit it when the provider has only its own switch. Changing it replaces the resource.
 
 ## Import
 

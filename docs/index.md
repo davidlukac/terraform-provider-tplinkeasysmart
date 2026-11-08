@@ -77,7 +77,7 @@ provider "tplinkeasysmart" {
 - `host` (String) IPv4 address or hostname of the switch. Falls back to TPLINK_EASYSMART_HOST. Optional when `mac` is set.
 - `mac` (String) MAC address of the switch (`aa:bb:cc:dd:ee:ff`, colons or hyphens, any case; `system_info` reports it as `mac_address`). It pins the identity: a device with another MAC at `host` is never written to. Without `host`, or when `host` does not answer, the switch is found by a layer-2 discovery on the first request, so its address may change (for example under DHCP). Discovery needs the same layer-2 segment; use `host` as well when Terraform runs elsewhere. Falls back to TPLINK_EASYSMART_MAC.
 - `password` (String, Sensitive) Admin password. Falls back to TPLINK_EASYSMART_PASSWORD.
-- `switches` (Attributes Map) Switches managed by this provider, by name. Select one on a resource or data source with `switch = "<name>"`. May be combined with `host`, which then names the default switch used when `switch` is omitted. (see [below for nested schema](#nestedatt--switches))
+- `switches` (Attributes Map) Switches managed by this provider, by name. Select one on a resource or data source with `switch = "<name>"`. With a `switches` map every resource and data source must set `switch`. It may be combined with `host` (the provider's own switch), which is then selected with `switch = "default"`; `default` cannot be a key of this map. (see [below for nested schema](#nestedatt--switches))
 - `timeout_seconds` (Number) Seconds to wait for a reply before retrying a request, 1 to 30 (the longest the library takes). Defaults to 3.
 - `username` (String) Admin user name. Falls back to TPLINK_EASYSMART_USERNAME.
 

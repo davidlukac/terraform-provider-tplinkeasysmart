@@ -39,7 +39,7 @@ resource "tplinkeasysmart_port_mirror" "this" {
 - `egress_ports` (Set of Number) Ports whose transmitted traffic is mirrored.
 - `ingress_ports` (Set of Number) Ports whose received traffic is mirrored.
 - `mirror_port` (Number) Destination (monitoring) port. Required when mirroring is enabled; leave it out (null) when it is disabled.
-- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Required when the provider has a `switches` map; `default` is the provider's own switch (`host`) beside it. Omit it when the provider has only its own switch. Changing it replaces the resource.
 
 ### Read-Only
 

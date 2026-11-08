@@ -35,10 +35,17 @@ func TestRegistryResolvesSwitchesByName(t *testing.T) {
 		wantErr string
 	}{
 		{"named switch", &switchRegistry{def: def, named: map[string]SwitchClient{"sw01": a, "sw02": b}}, "sw02", b, ""},
-		{"omitted name uses the default", &switchRegistry{def: def, named: map[string]SwitchClient{"sw01": a}}, "", def, ""},
-		{"omitted name uses the only switch when there is no default", &switchRegistry{named: map[string]SwitchClient{"sw01": a}}, "", a, ""},
-		{"omitted name is ambiguous with several switches and no default", &switchRegistry{named: map[string]SwitchClient{"sw01": a, "sw02": b}}, "", nil,
-			"several switches are configured and none is the default: set `switch` to one of sw01, sw02"},
+		{"omitted name uses the provider's own switch when it is the only one", &switchRegistry{def: def}, "", def, ""},
+		{"`default` names the provider's own switch beside named ones", &switchRegistry{def: def, named: map[string]SwitchClient{"sw01": a}}, "default", def, ""},
+		{"omitted name is refused beside a named switch, and the message lists every choice", &switchRegistry{def: def, named: map[string]SwitchClient{"sw01": a}}, "", nil,
+			"the provider has a `switches` map, so every object and data source must say which switch it is for: set `switch` to one of sw01, or default (the provider's own switch)"},
+		{"omitted name is refused for the only named switch: adding a second one must not change what it means", &switchRegistry{named: map[string]SwitchClient{"sw01": a}}, "", nil,
+			"the provider has a `switches` map, so every object and data source must say which switch it is for: set `switch` to one of sw01"},
+		{"omitted name is refused with several switches", &switchRegistry{named: map[string]SwitchClient{"sw01": a, "sw02": b}}, "", nil,
+			"the provider has a `switches` map, so every object and data source must say which switch it is for: set `switch` to one of sw01, sw02"},
+		{"`default` without a switch of the provider's own", &switchRegistry{named: map[string]SwitchClient{"sw01": a}}, "default", nil,
+			"the provider has no switch of its own (`host`), so there is no switch named \"default\" (configured: sw01)"},
+		{"no switch at all", &switchRegistry{}, "", nil, "no switch is configured"},
 		{"unknown name lists the configured ones", &switchRegistry{named: map[string]SwitchClient{"sw02": b, "sw01": a}}, "nope", nil, `unknown switch "nope" (configured: sw01, sw02)`},
 	}
 	for _, tc := range cases {
@@ -259,6 +266,7 @@ provider "tplinkeasysmart" {
   }
 }
 resource "tplinkeasysmart_led" "default" {
+  switch  = "default"
   enabled = false
 }
 resource "tplinkeasysmart_led" "named" {
@@ -398,6 +406,9 @@ func TestSwitchesConfigurationIsValidated(t *testing.T) {
 		{"a switch name with a separator", `provider "tplinkeasysmart" {
   switches = { "a:b" = { host = "10.0.0.1", username = "u", password = "p" } }
 }`, `(?s)letters,\s+digits,\s+hyphens`},
+		{"the reserved name of the provider's own switch as a key", `provider "tplinkeasysmart" {
+  switches = { default = { host = "10.0.0.1", username = "u", password = "p" } }
+}`, `(?s)reserved\s+for\s+the\s+provider's\s+own\s+switch`},
 		{"an entry without credentials", `provider "tplinkeasysmart" {
   switches = { a = { host = "10.0.0.1" } }
 }`, `username`},
@@ -475,5 +486,22 @@ resource "tplinkeasysmart_led" "x" {
 	})
 	if b.sets != 1 || a.sets != 0 {
 		t.Fatalf("the switch resolved at apply time must be the one written: sw01 sets=%d sw02 sets=%d", a.sets, b.sets)
+	}
+}
+
+// The ids are part of the identity of every object and are frozen: the provider's own switch keeps
+// plain ids however it is selected (no `switch`, or `default`), a named switch prefixes its name.
+func TestTheIdFormatOfEverySelectionIsFrozen(t *testing.T) {
+	for _, tc := range []struct {
+		sw   types.String
+		want string
+	}{
+		{types.StringNull(), "led"}, {types.StringValue("default"), "led"}, {types.StringValue("sw02"), "sw02:led"},
+	} {
+		t.Run(tc.sw.String(), func(t *testing.T) {
+			if got := qualifiedID(tc.sw, "led").ValueString(); got != tc.want {
+				t.Errorf("qualifiedID(%v) = %q, want %q", tc.sw, got, tc.want)
+			}
+		})
 	}
 }

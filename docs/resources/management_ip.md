@@ -48,7 +48,7 @@ resource "tplinkeasysmart_management_ip" "this" {
 - `gateway` (String) Default gateway: another host address of the subnet, or `0.0.0.0` for none. A wrong gateway only cuts the switch's route out of its subnet. Required with `dhcp = false`; reports the leased gateway with `dhcp = true`.
 - `ip_address` (String) IPv4 address of the switch. Required with `dhcp = false`; must be a host address of the subnet and outside the DHCP pool of the router. Must not be set with `dhcp = true`, where it reports the leased address.
 - `netmask` (String) Subnet mask, a contiguous prefix between /8 (`255.0.0.0`) and /30 (`255.255.255.252`). Required with `dhcp = false`; reports the leased mask with `dhcp = true`.
-- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Required when the provider has a `switches` map; `default` is the provider's own switch (`host`) beside it. Omit it when the provider has only its own switch. Changing it replaces the resource.
 
 ### Read-Only
 

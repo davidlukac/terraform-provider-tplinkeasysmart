@@ -32,7 +32,7 @@ output "config_sha256" {
 ### Optional
 
 - `include_content` (Boolean) Also return the file as base64 in `content_base64`. Defaults to false.
-- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch.
+- `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Required when the provider has a `switches` map; `default` is the provider's own switch (`host`) beside it. Omit it when the provider has only its own switch.
 
 ### Read-Only
 
