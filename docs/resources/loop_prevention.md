@@ -2,12 +2,12 @@
 page_title: "tplinkeasysmart_loop_prevention Resource - tplinkeasysmart"
 subcategory: "Monitoring"
 description: |-
-  Loop prevention (Monitoring > Loop Prevention). Singleton; import with id loop_prevention. Keep it enabled on a production network. Destroying only removes it from state.
+  Loop prevention (Monitoring > Loop Prevention). Singleton; import with id loop_prevention. Keep it enabled on a production network. Safety: turning it off removes the protection against a loop that would take the network down, and turning it on can make the switch block a port of a redundant topology, so the provider refuses to change the setting unless allow_disruptive = true; applying the value the switch already has writes nothing. Destroying only removes it from state.
 ---
 
 # tplinkeasysmart_loop_prevention (Resource)
 
-Loop prevention (Monitoring > Loop Prevention). Singleton; import with id `loop_prevention`. Keep it enabled on a production network. Destroying only removes it from state.
+Loop prevention (Monitoring > Loop Prevention). Singleton; import with id `loop_prevention`. Keep it enabled on a production network. **Safety:** turning it off removes the protection against a loop that would take the network down, and turning it on can make the switch block a port of a redundant topology, so the provider refuses to change the setting unless `allow_disruptive = true`; applying the value the switch already has writes nothing. Destroying only removes it from state.
 
 ## Example Usage
 
@@ -27,6 +27,7 @@ resource "tplinkeasysmart_loop_prevention" "this" {
 
 ### Optional
 
+- `allow_disruptive` (Boolean) Allow changing loop prevention. Defaults to false.
 - `switch` (String) Name of the switch (a key of the provider's `switches` map) this object lives on. Omit it to use the provider's own switch (`host`), or the only configured switch. Changing it replaces the resource.
 
 ### Read-Only

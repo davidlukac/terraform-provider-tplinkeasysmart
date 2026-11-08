@@ -40,9 +40,10 @@ func (r *loopPreventionResource) bound(add func(string, string), name types.Stri
 }
 
 type loopPreventionModel struct {
-	Switch  types.String `tfsdk:"switch"`
-	ID      types.String `tfsdk:"id"`
-	Enabled types.Bool   `tfsdk:"enabled"`
+	Switch          types.String `tfsdk:"switch"`
+	ID              types.String `tfsdk:"id"`
+	Enabled         types.Bool   `tfsdk:"enabled"`
+	AllowDisruptive types.Bool   `tfsdk:"allow_disruptive"`
 }
 
 func (r *loopPreventionResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -52,12 +53,14 @@ func (r *loopPreventionResource) Metadata(_ context.Context, req resource.Metada
 func (r *loopPreventionResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Loop prevention (Monitoring > Loop Prevention). Singleton; import with id `loop_prevention`. " +
-			"Keep it enabled on a production network. Destroying only removes it from state.",
+			"Keep it enabled on a production network. **Safety:** turning it off removes the protection against a loop that would take the network down, and turning it on can make the switch block a port of a redundant topology, " +
+			"so the provider refuses to change the setting unless `allow_disruptive = true`; applying the value the switch already has writes nothing. Destroying only removes it from state.",
 		Attributes: map[string]schema.Attribute{
 			attrSwitch: resourceSwitchAttribute(),
 			"id": schema.StringAttribute{Computed: true, Description: "Always `loop_prevention`.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"enabled": schema.BoolAttribute{Required: true, Description: "Whether loop prevention is enabled."},
+			"enabled":           schema.BoolAttribute{Required: true, Description: "Whether loop prevention is enabled."},
+			attrAllowDisruptive: allowDisruptiveAttribute("Allow changing loop prevention. Defaults to false."),
 		},
 	}
 }
@@ -74,20 +77,32 @@ func (r *loopPreventionResource) apply(ctx context.Context, plan *loopPrevention
 
 func (r *loopPreventionResource) applyBound(ctx context.Context, plan *loopPreventionModel, add func(string, string)) bool {
 	want := plan.Enabled.ValueBool()
-	if err := r.client.SetLoopPrevention(ctx, want); err != nil {
-		add("Setting loop prevention failed", err.Error())
-		return false
-	}
-	got, err := r.client.LoopPrevention(ctx)
+	have, err := r.client.LoopPrevention(ctx)
 	if err != nil {
-		add("Reading loop prevention back failed", err.Error())
+		add("Reading loop prevention failed", err.Error())
 		return false
 	}
-	if got != want {
-		add("Loop prevention did not change", fmt.Sprintf("requested enabled=%t but the switch reports enabled=%t", want, got))
-		return false
+	if have != want {
+		if !plan.AllowDisruptive.ValueBool() {
+			add("Refusing to change loop prevention", fmt.Sprintf("loop prevention is %s on the switch and %s was requested. Turning it off removes the protection against a loop; "+
+				"turning it on can make the switch block a port of a redundant topology. Set allow_disruptive = true to proceed", onOff(have), onOff(want)))
+			return false
+		}
+		if err := r.client.SetLoopPrevention(ctx, want); err != nil {
+			add("Setting loop prevention failed", err.Error())
+			return false
+		}
+		got, err := r.client.LoopPrevention(ctx)
+		if err != nil {
+			add("Reading loop prevention back failed", err.Error())
+			return false
+		}
+		if got != want {
+			add("Loop prevention did not change", fmt.Sprintf("requested enabled=%t but the switch reports enabled=%t", want, got))
+			return false
+		}
 	}
-	plan.ID, plan.Enabled = qualifiedID(r.sw, loopPreventionID), types.BoolValue(got)
+	plan.ID = qualifiedID(r.sw, loopPreventionID)
 	return true
 }
 
@@ -96,7 +111,7 @@ func (r *loopPreventionResource) Create(ctx context.Context, req resource.Create
 }
 
 func (r *loopPreventionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
+	applyUpdate(ctx, req, resp, r.apply)
 }
 
 // Read binds the resource to the switch recorded in state, then reads it.
@@ -108,13 +123,21 @@ func (r *loopPreventionResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 }
 
-func (r *loopPreventionResource) readBound(ctx context.Context, _ resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *loopPreventionResource) readBound(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var m loopPreventionModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	on, err := r.client.LoopPrevention(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Reading loop prevention failed", err.Error())
 		return
 	}
-	m := loopPreventionModel{ID: qualifiedID(r.sw, loopPreventionID), Enabled: types.BoolValue(on)}
+	m.ID, m.Enabled = qualifiedID(r.sw, loopPreventionID), types.BoolValue(on)
+	if m.AllowDisruptive.IsNull() {
+		m.AllowDisruptive = types.BoolValue(false)
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
 
@@ -122,7 +145,9 @@ func (r *loopPreventionResource) Delete(context.Context, resource.DeleteRequest,
 }
 
 func (r *loopPreventionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	importSingletonID(ctx, req, resp, loopPreventionID)
+	if importSingletonID(ctx, req, resp, loopPreventionID) {
+		resetAllowDisruptive(ctx, resp)
+	}
 }
 
 // ModifyPlan refuses, while planning, a switch that cannot be resolved.

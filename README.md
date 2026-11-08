@@ -105,7 +105,7 @@ Write support exists only where it cannot cut management access. Per-port and pe
 | `tplinkeasysmart_system` | System > System Info (device description) | IP config re-sent unchanged and verified; skipped if unchanged |
 | `tplinkeasysmart_management_ip` | System > IP Setting (static address, mask, gateway) | `allow_disruptive` for every change, between a static address and a DHCP lease included (`dhcp = true` needs the switch's `mac`) |
 | `tplinkeasysmart_igmp_snooping` | Switching > IGMP Snooping | none |
-| `tplinkeasysmart_loop_prevention` | Monitoring > Loop Prevention | none |
+| `tplinkeasysmart_loop_prevention` | Monitoring > Loop Prevention | `allow_disruptive` for any change |
 | `tplinkeasysmart_qos` | QoS > QoS Basic | priorities only in port-based mode |
 | `tplinkeasysmart_port` | Switching > Port Setting | port in use / LAG member |
 | `tplinkeasysmart_bandwidth_limit` | QoS > Bandwidth Control | port in use / LAG member |

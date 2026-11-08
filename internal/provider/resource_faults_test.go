@@ -11,7 +11,7 @@ import (
 )
 
 func loopCfg(v string) string {
-	return providerBlock + "resource \"tplinkeasysmart_loop_prevention\" \"this\" {\n  enabled = " + v + "\n}\n"
+	return providerBlock + "resource \"tplinkeasysmart_loop_prevention\" \"this\" {\n  enabled = " + v + "\n  allow_disruptive = true\n}\n"
 }
 
 func qosCfg(body string) string {
@@ -68,7 +68,7 @@ func faultScenarios() []faultScenario {
 			fake:   func() *fakeClient { return &fakeClient{loop: true} },
 			create: loopCfg("false"), update: loopCfg("true"),
 			writeMethod: "SetLoopPrevention", writeErr: "Setting loop prevention failed",
-			backMethod: "LoopPrevention", backCall: 1, backErr: "Reading loop prevention back failed", noChgEr: "Loop prevention did not change",
+			backMethod: "LoopPrevention", backCall: 2, backErr: "Reading loop prevention back failed", noChgEr: "Loop prevention did not change",
 			readMethod: "LoopPrevention", readErr: "Reading loop prevention failed",
 			importBad: "nope", importErr: "only valid id",
 		},
