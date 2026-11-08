@@ -43,10 +43,12 @@ func TestAllowDisruptiveAloneNeverTouchesTheSwitch(t *testing.T) {
 			mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [6, 7]\n"), `port 4 has a link up`},
 		{"lag", "tplinkeasysmart_lag.l",
 			func() *fakeClient {
-				return &fakeClient{ports: lagPorts(), lags: map[model.LAGID]model.PortSet{1: model.MustPortSet(1, 2)}}
+				ports := lagPorts()
+				ports[6].ActualSpeed = "1000Mbps-full" // port 7 carries a link
+				return &fakeClient{ports: ports, lags: map[model.LAGID]model.PortSet{1: model.MustPortSet(1, 2)}}
 			},
-			lagConfig(1, "  ports = [3, 4]\n  allow_disruptive = true\n"), lagConfig(1, "  ports = [3, 4]\n"),
-			lagConfig(1, "  ports = [2, 3, 4]\n"), `link up`},
+			lagConfig(2, "  ports = [6, 7]\n  allow_disruptive = true\n"), lagConfig(2, "  ports = [6, 7]\n"),
+			lagConfig(2, "  ports = [5, 6, 7]\n"), `link up`},
 		{"vlan_port_based_group", "tplinkeasysmart_vlan_port_based_group.v",
 			func() *fakeClient {
 				return &fakeClient{ports: lagPorts(), pvlans: map[model.PortVLANID]model.PortSet{1: model.MustPortSet(1, 2, 4, 6, 7)}}

@@ -66,7 +66,7 @@ func (r *lagResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 
 func (r *lagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "A link aggregation group (Switching > Port Trunk). Import with the group number. **Safety:** the provider refuses to create, change or " +
+		Description: "A link aggregation group (Switching > Port Trunk). Import with the group number; creating a group that already exists is refused (import it instead). **Safety:** the provider refuses to create, change or " +
 			"destroy a group when any port involved (old or new members) has a link up or belongs to another LAG, because that can cut the uplink; set " +
 			"`allow_disruptive = true` to override. The existing router uplink (usually LAG1) should be imported and protected with `lifecycle { prevent_destroy = true }`. " +
 			"The group number decides the ports: " + lagRangeNote + ". The switch itself rejects ports that conflict with the port mirror (source or destination), a port-based VLAN other than the default, " +
@@ -126,12 +126,14 @@ func (r *lagResource) current(ctx context.Context, group model.LAGID) (model.Por
 }
 
 // apply binds the resource to the switch the plan selects, then applies it.
-func (r *lagResource) apply(ctx context.Context, m *lagResourceModel, add func(string, string)) bool {
+func (r *lagResource) apply(ctx context.Context, m *lagResourceModel, add func(string, string), create bool) bool {
 	b := r.bound(add, m.Switch)
-	return b != nil && b.applyBound(ctx, m, add)
+	return b != nil && b.applyBound(ctx, m, add, create)
 }
 
-func (r *lagResource) applyBound(ctx context.Context, m *lagResourceModel, add func(string, string)) bool {
+// applyBound applies the plan. A creation (create) refuses a group that already has members: it
+// would overwrite it, and two resources with the same `group` would overwrite each other.
+func (r *lagResource) applyBound(ctx context.Context, m *lagResourceModel, add func(string, string), create bool) bool {
 	group := model.LAGID(m.Group.ValueInt64())
 	ports, err := setToPorts(ctx, m.Ports)
 	if err != nil || ports.IsEmpty() {
@@ -141,6 +143,10 @@ func (r *lagResource) applyBound(ctx context.Context, m *lagResourceModel, add f
 	old, err := r.current(ctx, group)
 	if err != nil {
 		add("Reading LAG failed", err.Error())
+		return false
+	}
+	if create && !old.IsEmpty() {
+		add("LAG already exists", fmt.Sprintf("LAG %d is already on the switch (ports %s). Creating it again would overwrite it, and two resources with the same `group` would overwrite each other. Import it to manage it (terraform import <address> %d), or use another group.", group, old, group))
 		return false
 	}
 	if err := r.guardLAG(ctx, group, m.AllowDisruptive.ValueBool(), old, ports); err != nil {
@@ -160,11 +166,15 @@ func (r *lagResource) applyBound(ctx context.Context, m *lagResourceModel, add f
 }
 
 func (r *lagResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, func(ctx context.Context, m *lagResourceModel, add func(string, string)) bool {
+		return r.apply(ctx, m, add, true)
+	})
 }
 
 func (r *lagResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	applyUpdate(ctx, req, resp, r.apply)
+	applyUpdate(ctx, req, resp, func(ctx context.Context, m *lagResourceModel, add func(string, string)) bool {
+		return r.apply(ctx, m, add, false)
+	})
 }
 
 // Read binds the resource to the switch recorded in state, then reads it.
