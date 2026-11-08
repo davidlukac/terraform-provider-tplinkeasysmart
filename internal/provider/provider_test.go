@@ -530,7 +530,10 @@ func TestAccIGMPSnoopingLifecycle(t *testing.T) {
 func TestAccLoopPreventionLifecycle(t *testing.T) {
 	f := &fakeClient{loop: true}
 	cfg := func(v string) string {
-		return providerBlock + `resource "tplinkeasysmart_loop_prevention" "this" { enabled = ` + v + ` }`
+		return providerBlock + `resource "tplinkeasysmart_loop_prevention" "this" {
+  enabled          = ` + v + `
+  allow_disruptive = true
+}`
 	}
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: factories(f),
@@ -544,7 +547,45 @@ func TestAccLoopPreventionLifecycle(t *testing.T) {
 				}
 				return nil
 			}},
-			{ResourceName: "tplinkeasysmart_loop_prevention.this", ImportState: true, ImportStateId: "loop_prevention", ImportStateVerify: true},
+			{ResourceName: "tplinkeasysmart_loop_prevention.this", ImportState: true, ImportStateId: "loop_prevention", ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{"allow_disruptive"}},
+		},
+	})
+}
+
+// A change of loop prevention needs allow_disruptive; the value the switch already has is applied
+// without it and writes nothing.
+func TestAccLoopPreventionIsGuarded(t *testing.T) {
+	f := &fakeClient{loop: true}
+	cfg := func(v, flag string) string {
+		return providerBlock + `resource "tplinkeasysmart_loop_prevention" "this" {
+  enabled = ` + v + `
+` + flag + `}`
+	}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{
+			{Config: cfg("true", ""), Check: func(*terraformState) error {
+				if f.sets != 0 {
+					return fmt.Errorf("the value the switch already has was written: %d writes", f.sets)
+				}
+				return nil
+			}},
+			{Config: cfg("false", ""), ExpectError: regexp.MustCompile(`Refusing to change loop prevention`)},
+			{Config: cfg("true", "  allow_disruptive = true\n"), Check: func(*terraformState) error {
+				if f.sets != 0 {
+					return fmt.Errorf("the opt-in alone wrote: %d writes", f.sets)
+				}
+				return nil
+			}},
+			{Config: cfg("false", "  allow_disruptive = true\n"), Check: func(*terraformState) error {
+				f.mu.Lock()
+				defer f.mu.Unlock()
+				if f.loop || f.sets != 1 {
+					return fmt.Errorf("the allowed change did not reach the switch: loop=%t writes=%d", f.loop, f.sets)
+				}
+				return nil
+			}},
 		},
 	})
 }
@@ -1040,6 +1081,23 @@ func TestAccIGMPSnoopingDataSource(t *testing.T) {
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_igmp_snooping.this", "multicast_groups.0.ip", "239.255.255.250"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_igmp_snooping.this", "multicast_groups.0.ports.1", "4"),
 			),
+		}},
+	})
+}
+
+// The current value is read before anything is decided: a switch that cannot be read is reported and
+// nothing is written.
+func TestAccLoopPreventionReportsASwitchThatCannotBeReadBeforeTheChange(t *testing.T) {
+	fc := newFaulty(&fakeClient{loop: true})
+	fc.failCalls("LoopPrevention", 1, 1)
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(fc),
+		Steps: []resource.TestStep{{
+			Config: providerBlock + `resource "tplinkeasysmart_loop_prevention" "this" {
+  enabled          = false
+  allow_disruptive = true
+}`,
+			ExpectError: regexp.MustCompile(`Reading loop prevention failed`),
 		}},
 	})
 }

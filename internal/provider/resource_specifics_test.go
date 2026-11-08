@@ -307,7 +307,7 @@ func TestResourcesReportUndecodablePlanAndState(t *testing.T) {
 	}
 	// resources whose Read/Delete decode the prior state (the singletons that only
 	// re-read the switch ignore it)
-	readsState := map[string]bool{"led": true, "port": true, "qos": true, "bandwidth limit": true, "storm limit": true,
+	readsState := map[string]bool{"led": true, "loop prevention": true, "port": true, "qos": true, "bandwidth limit": true, "storm limit": true,
 		"port mirror": true, "lag": true, "vlan group": true, "vlan mode": true, "802.1Q vlan": true, "802.1Q pvid": true}
 	deletesState := map[string]bool{"lag": true, "vlan group": true, "802.1Q vlan": true, "802.1Q pvid": true}
 	ctx := context.Background()

@@ -149,7 +149,8 @@ func TestScenarioLoopPrevention(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := func(on bool) string {
-		return fmt.Sprintf("resource \"tplinkeasysmart_loop_prevention\" \"this\" {\n  enabled = %t\n}\n", on)
+		// a change of loop prevention needs allow_disruptive, the restore too
+		return fmt.Sprintf("resource \"tplinkeasysmart_loop_prevention\" \"this\" {\n  enabled = %t\n  allow_disruptive = true\n}\n", on)
 	}
 	s.scenario(t, cfg(!orig), cfg(orig), func(*terraform.State) error {
 		got, err := s.Client.LoopPrevention(context.Background())

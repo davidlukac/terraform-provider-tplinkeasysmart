@@ -42,6 +42,30 @@ func TestPortMirrorReadDefaultsAllowDisruptiveToFalse(t *testing.T) {
 	}
 }
 
+func TestLoopPreventionReadDefaultsAllowDisruptiveToFalse(t *testing.T) {
+	ctx := context.Background()
+	r := &loopPreventionResource{src: &switchRegistry{def: newFaulty(&fakeClient{loop: true})}}
+	var sch resource.SchemaResponse
+	r.Schema(ctx, resource.SchemaRequest{}, &sch)
+	objType := mustAs[tftypes.Object](t, sch.Schema.Type().TerraformType(ctx))
+	raw := tftypes.NewValue(objType, map[string]tftypes.Value{
+		"id":               tftypes.NewValue(tftypes.String, "loop_prevention"),
+		"enabled":          tftypes.NewValue(tftypes.Bool, true),
+		"allow_disruptive": tftypes.NewValue(tftypes.Bool, nil),
+		"switch":           tftypes.NewValue(tftypes.String, nil),
+	})
+	resp := resource.ReadResponse{State: tfsdk.State{Schema: sch.Schema, Raw: raw}}
+	r.Read(ctx, resource.ReadRequest{State: tfsdk.State{Schema: sch.Schema, Raw: raw}}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatal(resp.Diagnostics)
+	}
+	var got loopPreventionModel
+	resp.Diagnostics.Append(resp.State.Get(ctx, &got)...)
+	if got.AllowDisruptive.IsNull() || got.AllowDisruptive.ValueBool() {
+		t.Fatalf("allow_disruptive must default to false, got %v", got.AllowDisruptive)
+	}
+}
+
 func TestProviderConfigureReportsUndecodableConfiguration(t *testing.T) {
 	p := &tplinkProvider{newClient: func(escp.Config) (SwitchClient, error) {
 		t.Fatal("no client may be built")
