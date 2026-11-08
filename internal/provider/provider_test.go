@@ -612,8 +612,8 @@ func TestAccQoSDataSource(t *testing.T) {
 		Steps: []resource.TestStep{{
 			Config: providerBlock + `data "tplinkeasysmart_qos" "this" {}`,
 			Check: resource.ComposeAggregateTestCheckFunc(
-				resource.TestCheckResourceAttr("data.tplinkeasysmart_qos.this", "mode", "2"),
-				resource.TestCheckResourceAttr("data.tplinkeasysmart_qos.this", "mode_name", "dscp-802.1p"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_qos.this", "mode", "dscp-802.1p"),
+				resource.TestCheckNoResourceAttr("data.tplinkeasysmart_qos.this", "mode_name"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_qos.this", "port_priorities.1.priority", "4"),
 			),
 		}},
