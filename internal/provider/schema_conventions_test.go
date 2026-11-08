@@ -104,3 +104,28 @@ func TestEverySchemaAttributeHasADescriptionAndASnakeCaseName(t *testing.T) {
 		})
 	}
 }
+
+// A port number is `port` and the link state of a port is `actual_speed` everywhere; `id` inside a
+// list is the id of the element (a LAG group, a VLAN), never a port. The names freeze at 1.0.
+func TestAPortIsNamedPortAndItsLinkStateActualSpeedInEveryDataSource(t *testing.T) {
+	ctx := context.Background()
+	for _, newSource := range (&tplinkProvider{}).DataSources(ctx) {
+		d := newSource()
+		var meta datasource.MetadataResponse
+		d.Metadata(ctx, datasource.MetadataRequest{ProviderTypeName: "tplinkeasysmart"}, &meta)
+		var s datasource.SchemaResponse
+		d.Schema(ctx, datasource.SchemaRequest{}, &s)
+		t.Run(meta.TypeName, func(t *testing.T) {
+			for name, a := range s.Schema.Attributes {
+				for child, ca := range childrenOf(a) {
+					if child == "id" && regexp.MustCompile(`(?i)^port number`).MatchString(ca.GetDescription()) {
+						t.Errorf("%s.%s.id is a port number: name it `port`", meta.TypeName, name)
+					}
+					if child == "link" {
+						t.Errorf("%s.%s.link: the link state of a port is `actual_speed`", meta.TypeName, name)
+					}
+				}
+			}
+		})
+	}
+}

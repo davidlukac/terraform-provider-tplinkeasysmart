@@ -457,7 +457,7 @@ func TestAccPortsDataSource(t *testing.T) {
 			Config: providerBlock + `data "tplinkeasysmart_ports" "this" {}`,
 			Check: resource.ComposeAggregateTestCheckFunc(
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_ports.this", "ports.#", "2"),
-				resource.TestCheckResourceAttr("data.tplinkeasysmart_ports.this", "ports.0.id", "1"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_ports.this", "ports.0.port", "1"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_ports.this", "ports.0.lag", "1"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_ports.this", "ports.0.actual_speed", "1000Mbps-full"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_ports.this", "ports.1.actual_speed", "link-down"),
@@ -472,7 +472,7 @@ func TestAccPortStatisticsDataSource(t *testing.T) {
 		Steps: []resource.TestStep{{
 			Config: providerBlock + `data "tplinkeasysmart_port_statistics" "this" {}`,
 			Check: resource.ComposeAggregateTestCheckFunc(
-				resource.TestCheckResourceAttr("data.tplinkeasysmart_port_statistics.this", "ports.0.link", "1000Mbps-full"),
+				resource.TestCheckResourceAttr("data.tplinkeasysmart_port_statistics.this", "ports.0.actual_speed", "1000Mbps-full"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_port_statistics.this", "ports.0.tx_good_packets", "4000000000"),
 				resource.TestCheckResourceAttr("data.tplinkeasysmart_port_statistics.this", "ports.0.rx_bad_packets", "1"),
 			),
