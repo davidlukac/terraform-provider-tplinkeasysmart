@@ -13,6 +13,7 @@ import (
 
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/provider"
 )
@@ -36,6 +37,8 @@ func TestScenarioMultiSwitch(t *testing.T) {
 		t.Skip("the multi-switch scenario runs on the fakes only")
 	}
 	a, b := startFake(t), startFake(t)
+	// Two switches have two MAC addresses: the library tells the clients of two switches apart by them.
+	b.SetMAC(model.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x03})
 	fakes := map[string]*escptest.Switch{hostA: a, hostB: b}
 	open := func(cfg escp.Config) (*escp.Client, error) {
 		f, ok := fakes[cfg.Host]
@@ -48,22 +51,22 @@ func TestScenarioMultiSwitch(t *testing.T) {
 	}
 	var l lender
 	dial := func(cfg escp.Config) (provider.SwitchClient, error) { return l.dial(cfg, open) }
-	client := func(host string) *escp.Client {
-		c, err := open(escp.Config{Host: host, Username: escptest.Username, Password: escptest.Password})
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _ = c.Close() })
-		return c
+	// The suite's clients are handles: each steps aside while the provider has its switch and is dialed again afterwards.
+	client := func(host string) *suiteClient {
+		h := &suiteClient{dial: func() (*escp.Client, error) {
+			return open(escp.Config{Host: host, Username: escptest.Username, Password: escptest.Password})
+		}}
+		t.Cleanup(h.release)
+		return h
 	}
 	ca, cb := client(hostA), client(hostB)
 	l.stepAside(ca, cb)
 	ctx := context.Background()
-	origA, err := ca.LED(ctx)
+	origA, err := ledOf(ctx, ca)
 	if err != nil {
 		t.Fatal(err)
 	}
-	origB, err := cb.LED(ctx)
+	origB, err := ledOf(ctx, cb)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,9 +93,9 @@ resource "tplinkeasysmart_led" "b" {
 }
 `, aOn, bOn)
 	}
-	led := func(c *escp.Client, want bool) resource.TestCheckFunc {
+	led := func(c *suiteClient, want bool) resource.TestCheckFunc {
 		return func(*terraform.State) error {
-			if got, err := c.LED(ctx); err != nil || got != want {
+			if got, err := ledOf(ctx, c); err != nil || got != want {
 				return fmt.Errorf("LED = %t, err %w, want %t", got, err, want)
 			}
 			return nil
@@ -125,11 +128,24 @@ resource "tplinkeasysmart_led" "b" {
 			Check: resource.ComposeTestCheckFunc(led(ca, true), led(cb, false), only(false, true))},
 		// A change behind Terraform's back to b is a plan difference; a stays clean.
 		{PreConfig: func() {
-			if err := cb.SetLED(ctx, true); err != nil {
+			c, err := cb.get()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := c.SetLED(ctx, true); err != nil {
 				t.Fatal(err)
 			}
 		}, Config: leds(true, false), PlanOnly: true, ExpectNonEmptyPlan: true},
 		// Restore both explicitly (destroy only forgets).
 		{Config: leds(origA, origB), Check: resource.ComposeTestCheckFunc(led(ca, origA), led(cb, origB))},
 	}})
+}
+
+// ledOf reads the LED through the current client of a handle.
+func ledOf(ctx context.Context, h *suiteClient) (bool, error) {
+	c, err := h.get()
+	if err != nil {
+		return false, err
+	}
+	return c.LED(ctx)
 }

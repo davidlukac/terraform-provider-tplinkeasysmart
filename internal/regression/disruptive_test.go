@@ -29,7 +29,7 @@ func (s *Session) disruptivePorts(t *testing.T) []model.PortID {
 // portOf reads one port from the switch.
 func (s *Session) portOf(t *testing.T, id model.PortID) model.Port {
 	t.Helper()
-	ports, err := s.Client.Ports(context.Background())
+	ports, err := s.Client().Ports(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestScenarioDisruptiveLAG(t *testing.T) {
 	}
 	cfg := fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"this\" {\n  group            = %d\n  ports            = %s\n  allow_disruptive = true\n}\n", group, intSet(a, b))
 	s.scenario(t, cfg, "", func(*terraform.State) error {
-		got, err := s.Client.LAGs(context.Background())
+		got, err := s.Client().LAGs(context.Background())
 		if err != nil {
 			return err
 		}
@@ -132,7 +132,7 @@ func TestScenarioDisruptiveMirrorDestination(t *testing.T) {
 	}
 	s.scenario(t, cfg(fmt.Sprintf("  enabled       = true\n  mirror_port   = %d\n  ingress_ports = %s\n", dest, intSet(src))), cfg("  enabled = false\n"),
 		func(*terraform.State) error {
-			got, err := s.Client.PortMirror(context.Background())
+			got, err := s.Client().PortMirror(context.Background())
 			if err != nil || !got.Enabled || got.Destination != dest || got.IngressPorts != model.MustPortSet(src) {
 				return fmt.Errorf("mirror on the switch = %+v, err %w, want %d mirrored to %d", got, err, src, dest)
 			}
@@ -144,7 +144,7 @@ func TestScenarioDisruptiveMirrorDestination(t *testing.T) {
 // uplink until the group is removed, which puts the port back (membership is exclusive).
 func TestScenarioDisruptiveVLANGroup(t *testing.T) {
 	s := openForScenario(t)
-	vlan, err := s.Client.PortBasedVLAN(context.Background())
+	vlan, err := s.Client().PortBasedVLAN(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestScenarioDisruptiveVLANGroup(t *testing.T) {
 	device, free := s.disruptivePorts(t)[0], s.Target.TestPorts[0]
 	cfg := fmt.Sprintf("resource \"tplinkeasysmart_vlan_port_based_group\" \"this\" {\n  vlan             = 2\n  ports            = %s\n  allow_disruptive = true\n}\n", intSet(free, device))
 	s.scenario(t, cfg, "", func(*terraform.State) error {
-		got, err := s.Client.PortBasedVLAN(context.Background())
+		got, err := s.Client().PortBasedVLAN(context.Background())
 		if err != nil {
 			return err
 		}

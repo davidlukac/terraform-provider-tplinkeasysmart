@@ -31,7 +31,7 @@ var notTheTarget = model.MAC{0x02, 0, 0, 0, 0, 0x01}
 // it back: the smallest write that proves the whole path works.
 func (s *Session) ledScenarioByMAC(t *testing.T, providerHCL string) {
 	t.Helper()
-	orig, err := s.Client.LED(context.Background())
+	orig, err := s.Client().LED(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func (s *Session) ledScenarioByMAC(t *testing.T, providerHCL string) {
 		return fmt.Sprintf("resource \"tplinkeasysmart_led\" \"this\" {\n  enabled = %t\n}\n", on)
 	}
 	s.scenarioWithProvider(t, providerHCL, cfg(!orig), func(*terraform.State) error {
-		got, err := s.Client.LED(context.Background())
+		got, err := s.Client().LED(context.Background())
 		if err != nil || got != !orig {
 			return fmt.Errorf("LED on the switch = %t, err %w, want %t", got, err, !orig)
 		}

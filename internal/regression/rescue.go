@@ -33,22 +33,26 @@ type rescueClient interface {
 // independent of them.
 func (s *Session) Rescue(ctx context.Context) ([]string, error) {
 	var done []string
-	mode, err := s.net.VLANMode(ctx)
+	net, err := s.rescuer()
+	if err != nil {
+		return done, err
+	}
+	mode, err := net.VLANMode(ctx)
 	if err != nil {
 		return done, fmt.Errorf("reading the VLAN mode: %w", err)
 	}
 	if mode != s.mode {
-		if err := s.net.SetVLANMode(ctx, s.mode); err != nil {
+		if err := net.SetVLANMode(ctx, s.mode); err != nil {
 			return done, fmt.Errorf("putting the VLAN mode back to %+v: %w", s.mode, err)
 		}
 		done = append(done, fmt.Sprintf("VLAN mode %+v, was left at %+v", s.mode, mode))
 	}
-	mirror, err := s.net.PortMirror(ctx)
+	mirror, err := net.PortMirror(ctx)
 	if err != nil {
 		return done, fmt.Errorf("reading the port mirror: %w", err)
 	}
 	if mirror != s.mirror {
-		if err := s.net.SetPortMirror(ctx, s.mirror); err != nil {
+		if err := net.SetPortMirror(ctx, s.mirror); err != nil {
 			return done, fmt.Errorf("putting the port mirror back to %+v: %w", s.mirror, err)
 		}
 		done = append(done, fmt.Sprintf("port mirror %+v, was left at %+v", s.mirror, mirror))

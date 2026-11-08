@@ -30,7 +30,7 @@ func (d *deferredTB) finish() {
 func TestFailedScenarioPrintsWhatTheLibraryLogged(t *testing.T) {
 	d := &deferredTB{TB: t}
 	s := Open(d, noEnv)
-	if err := s.Client.SetLED(context.Background(), false); err != nil {
+	if err := s.Client().SetLED(context.Background(), false); err != nil {
 		t.Fatal(err)
 	}
 	d.failed = true
@@ -54,7 +54,7 @@ func TestFailedScenarioPrintsWhatTheLibraryLogged(t *testing.T) {
 func TestPassingScenarioStaysQuiet(t *testing.T) {
 	d := &deferredTB{TB: t}
 	s := Open(d, noEnv)
-	if _, err := s.Client.LED(context.Background()); err != nil {
+	if _, err := s.Client().LED(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	d.finish()
