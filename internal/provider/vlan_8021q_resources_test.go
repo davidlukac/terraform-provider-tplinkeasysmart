@@ -288,13 +288,20 @@ func TestAccVLAN8021QGroupGuardBlocksUsedPorts(t *testing.T) {
 			{Config: groupConfig8021Q(20, "  untagged_ports = [4]\n"), ExpectError: regexp.MustCompile(`port 4 has a link up`)},
 			{Config: groupConfig8021Q(20, "  tagged_ports = [1]\n"), ExpectError: regexp.MustCompile(`port 1 has a link up`)},
 			{Config: groupConfig8021Q(20, "  untagged_ports = [6, 8]\n"), ExpectError: regexp.MustCompile(`port 8 has a link up`)},
-			// VLAN 1 holds every port, linked ones included
+			// VLAN 1 exists: creating it again is refused before the guard is asked
+			{Config: groupConfig8021Q(1, "  name = \"Default\"\n  untagged_ports = [3, 5]\n"), ExpectError: regexp.MustCompile(`802.1Q VLAN already exists`)},
+			// once imported, VLAN 1 holds every port, linked ones included
+			{Config: groupConfig8021Q(1, "  name = \"Default\"\n  untagged_ports = [1, 2, 3, 4, 5, 6, 7, 8]\n"), ResourceName: "tplinkeasysmart_vlan_8021q_group.v", ImportState: true, ImportStateId: "1", ImportStatePersist: true},
 			{Config: groupConfig8021Q(1, "  name = \"Default\"\n  untagged_ports = [3, 5]\n"), ExpectError: regexp.MustCompile(`has a link up|member of LAG`)},
+			// the opt-in alone writes nothing and lets the destroy at the end of the test through
+			{Config: groupConfig8021Q(1, "  name = \"Default\"\n  untagged_ports = [1, 2, 3, 4, 5, 6, 7, 8]\n  allow_disruptive = true\n"), Check: func(*terraformState) error {
+				if f.sets != 0 {
+					return fmt.Errorf("the guard must prevent any write, got %d", f.sets)
+				}
+				return nil
+			}},
 		},
 	})
-	if f.sets != 0 {
-		t.Fatalf("the guard must prevent any write, got %d", f.sets)
-	}
 }
 
 func TestAccVLAN8021QGroupGuardOverride(t *testing.T) {
@@ -885,12 +892,29 @@ func TestVLANGroupApplyRefusesPortSetsThatAreNotKnown(t *testing.T) {
 			f := newVLANFake("802.1q")
 			r := &vlan8021QGroupResource{src: &switchRegistry{def: f}}
 			var got collected
-			if r.apply(context.Background(), &m, got.add) {
+			if r.apply(context.Background(), &m, got.add, true) {
 				t.Fatal("an unknown port set must not be applied")
 			}
 			if len(got.summaries) != 1 || got.summaries[0] != "Invalid ports" || f.sets != 0 {
 				t.Fatalf("diagnostics %+v, writes %d", got, f.sets)
 			}
 		})
+	}
+}
+
+// Creating a VLAN the switch already has is refused, as for a port-based group: it would overwrite
+// the VLAN (and two resources with the same `vlan` would overwrite each other). Nothing is written.
+func TestAccVLAN8021QGroupRefusesToOverwriteAnExistingVLAN(t *testing.T) {
+	f := newVLANFake("802.1q")
+	f.withVLAN(model.Dot1QVLAN{ID: 20, Name: "other", Untagged: model.MustPortSet(6)})
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(f),
+		Steps: []resource.TestStep{{
+			Config:      groupConfig8021Q(20, "  untagged_ports = [7]\n"),
+			ExpectError: regexp.MustCompile(`802.1Q VLAN already exists`),
+		}},
+	})
+	if f.sets != 0 || f.vlanState().vlans[20].Name != "other" {
+		t.Fatalf("an existing VLAN was touched: %d writes, %+v", f.sets, f.vlanState().vlans[20])
 	}
 }

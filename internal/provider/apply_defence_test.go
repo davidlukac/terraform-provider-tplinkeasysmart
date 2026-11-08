@@ -26,7 +26,7 @@ func TestLAGApplyRefusesAnEmptyMemberList(t *testing.T) {
 	r := &lagResource{src: &switchRegistry{def: f}}
 	var got collected
 	m := lagResourceModel{Group: types.Int64Value(2), Ports: types.SetValueMust(types.Int64Type, []attr.Value{}), AllowDisruptive: types.BoolValue(true)}
-	if r.apply(context.Background(), &m, got.add) {
+	if r.apply(context.Background(), &m, got.add, true) {
 		t.Fatal("an empty member list must not be applied: it would delete the group")
 	}
 	if len(got.summaries) != 1 || got.summaries[0] != "Invalid ports" {

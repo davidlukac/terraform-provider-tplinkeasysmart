@@ -64,7 +64,7 @@ func (r *vlan8021QGroupResource) Schema(_ context.Context, _ resource.SchemaRequ
 			Validators: []validator.Set{validPortSet()}, Description: description}
 	}
 	resp.Schema = schema.Schema{
-		Description: "An 802.1Q VLAN (VLAN > 802.1Q VLAN): its name and its tagged and untagged member ports. Import with the VLAN id. " +
+		Description: "An 802.1Q VLAN (VLAN > 802.1Q VLAN): its name and its tagged and untagged member ports. Import with the VLAN id; creating a VLAN that already exists (VLAN 1 always does) is refused, import it instead. " +
 			"The 802.1Q mode must already be active (see `tplinkeasysmart_vlan_mode`); the provider refuses to manage VLANs in another mode. " +
 			"Unlike port-based groups, a port can be a member of several 802.1Q VLANs. **Safety:** the provider refuses to create, change or destroy a VLAN " +
 			"when any port involved (old or new members) has a link up or belongs to a LAG, and when the change would leave a port in no VLAN at all, because " +
@@ -165,12 +165,15 @@ func (m *vlan8021QGroupModel) vlan(ctx context.Context) (model.Dot1QVLAN, error)
 }
 
 // apply binds the resource to the switch the plan selects, then applies it.
-func (r *vlan8021QGroupResource) apply(ctx context.Context, m *vlan8021QGroupModel, add func(string, string)) bool {
+func (r *vlan8021QGroupResource) apply(ctx context.Context, m *vlan8021QGroupModel, add func(string, string), create bool) bool {
 	b := r.bound(add, m.Switch)
-	return b != nil && b.applyBound(ctx, m, add)
+	return b != nil && b.applyBound(ctx, m, add, create)
 }
 
-func (r *vlan8021QGroupResource) applyBound(ctx context.Context, m *vlan8021QGroupModel, add func(string, string)) bool {
+// applyBound applies the plan. A creation (create) refuses a VLAN the switch already has (VLAN 1
+// always exists): it would overwrite it, and two resources with the same `vlan` would overwrite
+// each other.
+func (r *vlan8021QGroupResource) applyBound(ctx context.Context, m *vlan8021QGroupModel, add func(string, string), create bool) bool {
 	want, err := m.vlan(ctx)
 	if err != nil {
 		add("Invalid ports", err.Error())
@@ -186,7 +189,11 @@ func (r *vlan8021QGroupResource) applyBound(ctx context.Context, m *vlan8021QGro
 		return false
 	}
 	table := q.VLANs
-	old, _ := findVLAN(table, want.ID)
+	old, exists := findVLAN(table, want.ID)
+	if create && exists {
+		add("802.1Q VLAN already exists", fmt.Sprintf("VLAN %d is already on the switch (tagged ports %s, untagged ports %s). Creating it again would overwrite it, and two resources with the same `vlan` would overwrite each other. Import it to manage it (terraform import <address> %d), or use another id.", want.ID, old.Tagged, old.Untagged, want.ID))
+		return false
+	}
 	if err := r.guard(ctx, m.AllowDisruptive.ValueBool(), table, vlanMembers{id: want.ID, old: members(old), next: members(want)}); err != nil {
 		add("Refusing to change the 802.1Q VLAN", err.Error())
 		return false
@@ -205,11 +212,15 @@ func (r *vlan8021QGroupResource) applyBound(ctx context.Context, m *vlan8021QGro
 }
 
 func (r *vlan8021QGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, r.apply)
+	applyPlan(ctx, req.Plan, &resp.State, &resp.Diagnostics, func(ctx context.Context, m *vlan8021QGroupModel, add func(string, string)) bool {
+		return r.apply(ctx, m, add, true)
+	})
 }
 
 func (r *vlan8021QGroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	applyUpdate(ctx, req, resp, r.apply)
+	applyUpdate(ctx, req, resp, func(ctx context.Context, m *vlan8021QGroupModel, add func(string, string)) bool {
+		return r.apply(ctx, m, add, false)
+	})
 }
 
 // Read binds the resource to the switch recorded in state, then reads it.

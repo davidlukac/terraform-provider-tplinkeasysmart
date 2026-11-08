@@ -362,11 +362,13 @@ func TestAllowDisruptiveReallyAllowsTheWrite(t *testing.T) {
 		{"mirror to a linked port", mirrorConfig("  enabled = true\n  mirror_port = 4\n  ingress_ports = [7]\n  allow_disruptive = true\n"),
 			func() *fakeClient { return &fakeClient{ports: testPorts(), mirror: &model.Mirror{}} },
 			func(f *fakeClient) bool { return f.mirror.Enabled && f.mirror.Destination == 4 }},
-		{"LAG over a linked port", lagConfig(1, "  ports = [3, 4]\n  allow_disruptive = true\n"),
+		{"LAG over a linked port", lagConfig(2, "  ports = [6, 7]\n  allow_disruptive = true\n"),
 			func() *fakeClient {
-				return &fakeClient{ports: lagPorts(), lags: map[model.LAGID]model.PortSet{1: model.MustPortSet(1, 2)}}
+				ports := lagPorts()
+				ports[6].ActualSpeed = "1000Mbps-full" // port 7 carries a link
+				return &fakeClient{ports: ports, lags: map[model.LAGID]model.PortSet{1: model.MustPortSet(1, 2)}}
 			},
-			func(f *fakeClient) bool { return f.lags[1] == model.MustPortSet(3, 4) }},
+			func(f *fakeClient) bool { return f.lags[2] == model.MustPortSet(6, 7) }},
 		{"VLAN group over a linked port", vlanGroupConfig(2, "  ports = [4]\n  allow_disruptive = true\n"),
 			func() *fakeClient {
 				return &fakeClient{ports: lagPorts(), pvlans: map[model.PortVLANID]model.PortSet{1: model.MustPortSet(1, 2, 4, 6, 7)}}
