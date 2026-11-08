@@ -1101,3 +1101,42 @@ func TestAccLoopPreventionReportsASwitchThatCannotBeReadBeforeTheChange(t *testi
 		}},
 	})
 }
+
+// A port that belongs to a LAG is refused by every guarded per-port resource, whichever LAG it is in
+// and even when it has no link: the rule tolerates no LAG (the LAG resource tolerates its own
+// members, and only it does).
+func TestAccEveryPortGuardRefusesAnIdleMemberOfAnyLAG(t *testing.T) {
+	cases := []struct {
+		name, config string
+		fake         func(ports []model.Port) *fakeClient
+	}{
+		{"port", portConfig(2, "  enabled = false\n"),
+			func(p []model.Port) *fakeClient { return &fakeClient{ports: p} }},
+		{"bandwidth_limit", bwConfig(2, "  ingress_kbps = 64\n"),
+			func(p []model.Port) *fakeClient { return &fakeClient{ports: p, bw: map[model.PortID][2]int{}} }},
+		{"storm_limit", stormConfig(2, "  broadcast = true\n  rate_kbps = 64\n"),
+			func(p []model.Port) *fakeClient {
+				return &fakeClient{ports: p, storm: map[model.PortID]model.PortStorm{}}
+			}},
+		{"port_mirror", mirrorConfig("  enabled = true\n  mirror_port = 2\n  ingress_ports = [7]\n"),
+			func(p []model.Port) *fakeClient { return &fakeClient{ports: p, mirror: &model.Mirror{}} }},
+	}
+	for _, lag := range []model.LAGID{1, 2} {
+		for _, tt := range cases {
+			t.Run(fmt.Sprintf("%s in LAG%d", tt.name, lag), func(t *testing.T) {
+				ports := append(testPorts(), model.Port{ID: 2, Enabled: true, LAG: lag, ConfiguredSpeed: "auto", ActualSpeed: "link-down"})
+				f := tt.fake(ports)
+				resource.UnitTest(t, resource.TestCase{
+					ProtoV6ProviderFactories: factories(f),
+					Steps: []resource.TestStep{{
+						Config:      tt.config,
+						ExpectError: regexp.MustCompile(fmt.Sprintf(`port 2 is a member of LAG%d`, lag)),
+					}},
+				})
+				if f.sets != 0 {
+					t.Fatalf("nothing may be written, got %d writes", f.sets)
+				}
+			})
+		}
+	}
+}
