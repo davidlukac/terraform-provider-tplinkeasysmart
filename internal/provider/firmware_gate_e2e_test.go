@@ -127,3 +127,44 @@ func assertLEDOffWasSentOnce(t *testing.T, sw *escptest.Switch) {
 		t.Fatal("the LED write did not arrive: the LED is still on")
 	}
 }
+
+const realClientBackup = `
+data "tplinkeasysmart_config_backup" "this" {}
+`
+
+// The configuration file is read with a SET on the wire, which is not a write for the client, so
+// the provider puts the firmware gate in front of it: on a build the provider was not verified
+// against, the data source is refused before the request is sent.
+func TestAccRealClientRefusesTheConfigBackupOnUnverifiedFirmware(t *testing.T) {
+	sw := escptest.Start(t)
+	sw.SetFirmware(unverifiedFirmware)
+	sw.SetBackupMode(escptest.BackupSilent) // a request that did go out would end in "no reply", not in this refusal
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: realClientFactories(t, sw),
+		Steps: []resource.TestStep{{
+			Config:      realClientProvider("") + realClientBackup,
+			ExpectError: regexp.MustCompile(`(?s)refusing to read the configuration file: firmware build 20990101 has not\s+been\s+verified.*allow_unverified_firmware`),
+		}},
+	})
+}
+
+func TestAccRealClientReadsTheConfigBackupOnVerifiedFirmwareAndWithTheOptIn(t *testing.T) {
+	for _, tt := range []struct {
+		name, firmware, extra string
+	}{
+		{"verified firmware", newerFirmware, ""},
+		{"unverified firmware with the opt-in", unverifiedFirmware, "  allow_unverified_firmware = true\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			sw := escptest.Start(t)
+			sw.SetFirmware(tt.firmware)
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: realClientFactories(t, sw),
+				Steps: []resource.TestStep{{
+					Config: realClientProvider(tt.extra) + realClientBackup,
+					Check:  resource.TestCheckResourceAttrSet("data.tplinkeasysmart_config_backup.this", "sha256"),
+				}},
+			})
+		})
+	}
+}

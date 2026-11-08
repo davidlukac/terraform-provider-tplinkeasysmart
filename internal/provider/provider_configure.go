@@ -188,11 +188,13 @@ func (b *registryBuilder) add(s switchSpec) {
 	if !b.claim(label, hw, s.host) {
 		return
 	}
-	c, err := b.newClient(escp.Config{Host: s.host, MAC: hw, Username: s.username, Password: model.Password(s.password), Timeout: s.timeout, WriteGate: firmwareWriteGate(s.allowUnverified), Logger: newTflogLogger()})
+	gate := firmwareWriteGate(s.allowUnverified)
+	c, err := b.newClient(escp.Config{Host: s.host, MAC: hw, Username: s.username, Password: model.Password(s.password), Timeout: s.timeout, WriteGate: gate, Logger: newTflogLogger()})
 	if err != nil {
 		b.diags.AddError("Cannot configure switch client", fmt.Sprintf("%s: %s", label, err))
 		return
 	}
+	c = withBackupGate(c, firmwareGate(s.allowUnverified, "read the configuration file"))
 	if s.name == "" {
 		b.reg.def = c
 		return

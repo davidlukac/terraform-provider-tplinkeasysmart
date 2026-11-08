@@ -2,12 +2,12 @@
 page_title: "tplinkeasysmart_config_backup Data Source - tplinkeasysmart"
 subcategory: "System"
 description: |-
-  The switch's binary configuration file (System > System Tools > Backup Config), read over the management protocol. Read-only: nothing on the switch changes. By default only size and SHA-256 are returned, which is enough to detect configuration changes made outside Terraform. The file contains an obfuscated credential block; set include_content only if you need the bytes, and treat the state as secret.
+  The switch's binary configuration file (System > System Tools > Backup Config), read over the management protocol. Read-only: nothing on the switch changes. The file is read with a request that is a write on the wire, so on a firmware build the provider was not verified against it is refused unless allow_unverified_firmware is set. By default only size and SHA-256 are returned, which is enough to detect configuration changes made outside Terraform. The file contains an obfuscated credential block; set include_content only if you need the bytes, and treat the state as secret.
 ---
 
 # tplinkeasysmart_config_backup (Data Source)
 
-The switch's binary configuration file (System > System Tools > Backup Config), read over the management protocol. Read-only: nothing on the switch changes. By default only size and SHA-256 are returned, which is enough to detect configuration changes made outside Terraform. The file contains an obfuscated credential block; set `include_content` only if you need the bytes, and treat the state as secret.
+The switch's binary configuration file (System > System Tools > Backup Config), read over the management protocol. Read-only: nothing on the switch changes. The file is read with a request that is a write on the wire, so on a firmware build the provider was not verified against it is refused unless `allow_unverified_firmware` is set. By default only size and SHA-256 are returned, which is enough to detect configuration changes made outside Terraform. The file contains an obfuscated credential block; set `include_content` only if you need the bytes, and treat the state as secret.
 
 ## Example Usage
 
