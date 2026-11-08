@@ -14,11 +14,11 @@ import (
 func leaveDirty(t *testing.T, s *Session) {
 	t.Helper()
 	ctx := context.Background()
-	if err := s.Client.SetVLANMode(ctx, model.VLANModeSetting{Mode: model.VLANModeDot1Q}); err != nil {
+	if err := s.Client().SetVLANMode(ctx, model.VLANModeSetting{Mode: model.VLANModeDot1Q}); err != nil {
 		t.Fatal(err)
 	}
 	mirror := model.Mirror{Enabled: true, Destination: 3, IngressPorts: model.MustPortSet(4)}
-	if err := s.Client.SetPortMirror(ctx, mirror); err != nil {
+	if err := s.Client().SetPortMirror(ctx, mirror); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -57,7 +57,7 @@ func TestRescueWritesNothingWhenTheSwitchIsAsItWas(t *testing.T) {
 func TestRescueRestoresOnlyWhatDiffers(t *testing.T) {
 	s := Open(t, noEnv)
 	mirror := model.Mirror{Enabled: true, Destination: 3, IngressPorts: model.MustPortSet(4)}
-	if err := s.Client.SetPortMirror(context.Background(), mirror); err != nil {
+	if err := s.Client().SetPortMirror(context.Background(), mirror); err != nil {
 		t.Fatal(err)
 	}
 	done, err := s.Rescue(context.Background())

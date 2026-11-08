@@ -30,7 +30,7 @@ func TestOpenFakeReadsAndDetectsChange(t *testing.T) {
 	if diff, err := s.Restored(ctx); err != nil || len(diff) != 0 {
 		t.Fatalf("untouched switch: diff %q, err %v", diff, err)
 	}
-	if err := s.Client.SetLED(ctx, false); err != nil {
+	if err := s.Client().SetLED(ctx, false); err != nil {
 		t.Fatal(err)
 	}
 	diff, err := s.Restored(ctx)
@@ -42,7 +42,7 @@ func TestOpenFakeReadsAndDetectsChange(t *testing.T) {
 func TestOpenReadsWritesBack(t *testing.T) {
 	s := Open(t, noEnv)
 	ctx := context.Background()
-	if err := s.Client.SetIGMP(ctx, igmpConfig(false, true)); err != nil {
+	if err := s.Client().SetIGMP(ctx, igmpConfig(false, true)); err != nil {
 		t.Fatal(err)
 	}
 	diff, err := s.Restored(ctx)
@@ -167,7 +167,7 @@ func TestOpenFailsOnAnUnresolvableHost(t *testing.T) {
 
 func TestProviderDialAimsAtTheFake(t *testing.T) {
 	s := Open(t, noEnv)
-	_ = s.Client.Close() // one client per switch in a process: the session's own gives the switch up
+	s.suite.release() // one client per switch in a process: the session's own gives the switch up
 	c, err := s.dial(escp.Config{Host: s.Target.Host, Username: s.Target.Username, Password: s.Target.Password})
 	if err != nil {
 		t.Fatal(err)
@@ -200,7 +200,7 @@ func TestAClientWithOnlyAMACFindsTheFakeWhenTheMACIsItsOwn(t *testing.T) {
 	if s.MAC != escptest.DefaultMAC() {
 		t.Fatalf("the session reports MAC %q, want the fake's %v", s.MAC, escptest.DefaultMAC())
 	}
-	_ = s.Client.Close() // one client per switch in a process: the session's own gives the switch up
+	s.suite.release() // one client per switch in a process: the session's own gives the switch up
 	c, err := s.dialClient(escp.Config{MAC: s.MAC, Username: s.Target.Username, Password: s.Target.Password})
 	if err != nil {
 		t.Fatal(err)

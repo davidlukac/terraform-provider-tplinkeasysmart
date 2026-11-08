@@ -32,8 +32,7 @@ const fakeTimeout = 500 * time.Millisecond
 type Session struct {
 	Target Target
 	// Fake is the in-process switch, nil on hardware.
-	Fake   *escptest.Switch
-	Client *escp.Client
+	Fake *escptest.Switch
 	// MAC is the MAC address the target reports about itself.
 	MAC    model.MAC
 	before Readout
@@ -41,7 +40,10 @@ type Session struct {
 	// when the session opened.
 	mode   model.VLANModeSetting
 	mirror model.Mirror
-	// net is the client the safety net uses; the session's own, replaceable in tests.
+	// suite is the session's own client: it steps aside while the provider has the switch and is
+	// dialed again at its next use (see suiteClient), so nothing keeps a *escp.Client of it; ask Client.
+	suite *suiteClient
+	// net is the client the safety net uses instead of the session's own, set by tests of its error paths.
 	net rescueClient
 	rd  []Reader
 	tb  testing.TB
@@ -92,15 +94,15 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 		}
 		cfg = s.fakeConfig(cfg)
 	}
-	c, err := s.dialClient(cfg)
+	s.suite = &suiteClient{dial: func() (*escp.Client, error) { return s.dialClient(cfg) }}
+	c, err := s.suite.get()
 	if err != nil {
 		t.Fatalf("cannot dial %s: %v", target.Name, err)
 	}
-	s.Client, s.net = c, c
-	s.stepAside(c)
-	t.Cleanup(func() { _ = s.Client.Close() }) // best effort: the run is over
-	s.rd = CoreReaders(s.Client)
-	waitUntilReady(t, target.Name, s.Client, wallClock)
+	s.stepAside(s.suite)
+	t.Cleanup(s.suite.release) // the run is over
+	s.rd = CoreReaders(s.suite.get)
+	waitUntilReady(t, target.Name, c, wallClock)
 	err = s.capture(context.Background())
 	if err == nil {
 		s.before, err = Take(context.Background(), s.rd)
@@ -109,18 +111,47 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 		t.Fatalf("first readout of %s: %v", target.Name, err)
 	}
 	s.MAC, _ = model.ParseMAC(s.before["mac"]) // the readout prints MAC.String(), which always parses
-	if err := CheckTestPorts(context.Background(), s.Client, target); err != nil {
+	if err := CheckTestPorts(context.Background(), c, target); err != nil {
 		t.Fatalf("%s: %v", target.Name, err)
 	}
 	return s
 }
 
+// Client is the session's own client, for checks that must not go through the provider. It is the
+// client of the moment: the switch goes to the provider and back during a scenario, and each time
+// the session's client steps aside a new one is dialed at the next use, so call Client at the point
+// of use and do not keep the result across a step. It fails the test when no client can be dialed.
+func (s *Session) Client() *escp.Client {
+	s.tb.Helper()
+	c, err := s.suite.get()
+	if err != nil {
+		s.tb.Fatalf("cannot dial a client of the suite's own for %s: %v", s.Target.Name, err)
+	}
+	return c
+}
+
+// rescuer is the client the safety net and the capture use: the session's own, or the stub of a test.
+func (s *Session) rescuer() (rescueClient, error) {
+	if s.net != nil {
+		return s.net, nil
+	}
+	c, err := s.suite.get()
+	if err != nil {
+		return nil, fmt.Errorf("reaching the switch: %w", err)
+	}
+	return c, nil
+}
+
 // capture records the VLAN mode and the port mirror, as typed values the safety net can write back.
-func (s *Session) capture(ctx context.Context) (err error) {
-	if s.mode, err = s.net.VLANMode(ctx); err != nil {
+func (s *Session) capture(ctx context.Context) error {
+	net, err := s.rescuer()
+	if err != nil {
+		return err
+	}
+	if s.mode, err = net.VLANMode(ctx); err != nil {
 		return fmt.Errorf("reading the VLAN mode: %w", err)
 	}
-	if s.mirror, err = s.net.PortMirror(ctx); err != nil {
+	if s.mirror, err = net.PortMirror(ctx); err != nil {
 		return fmt.Errorf("reading the port mirror: %w", err)
 	}
 	return nil

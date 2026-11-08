@@ -78,7 +78,7 @@ func openForScenario(t *testing.T) *Session {
 
 func TestScenarioLED(t *testing.T) {
 	s := openForScenario(t)
-	orig, err := s.Client.LED(context.Background())
+	orig, err := s.Client().LED(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestScenarioLED(t *testing.T) {
 		return fmt.Sprintf("resource \"tplinkeasysmart_led\" \"this\" {\n  enabled = %t\n}\n", on)
 	}
 	s.scenario(t, cfg(flipped), cfg(orig), func(*terraform.State) error {
-		got, err := s.Client.LED(context.Background())
+		got, err := s.Client().LED(context.Background())
 		if err != nil || got != flipped {
 			return fmt.Errorf("LED on the switch = %t, err %w, want %t", got, err, flipped)
 		}
@@ -97,7 +97,7 @@ func TestScenarioLED(t *testing.T) {
 
 func TestScenarioIGMPSnooping(t *testing.T) {
 	s := openForScenario(t)
-	orig, err := s.Client.IGMP(context.Background())
+	orig, err := s.Client().IGMP(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestScenarioIGMPSnooping(t *testing.T) {
 		return fmt.Sprintf("resource \"tplinkeasysmart_igmp_snooping\" \"this\" {\n  enabled                    = %t\n  report_message_suppression = %t\n}\n", e, r)
 	}
 	s.scenario(t, cfg(!enabled, !suppression), cfg(enabled, suppression), func(*terraform.State) error {
-		got, err := s.Client.IGMP(context.Background())
+		got, err := s.Client().IGMP(context.Background())
 		if err != nil || got.Enabled != !enabled || got.ReportSuppression != !suppression {
 			return fmt.Errorf("IGMP on the switch = %+v, err %w, want enabled=%t suppression=%t", got, err, !enabled, !suppression)
 		}
@@ -119,7 +119,7 @@ func TestScenarioIGMPSnooping(t *testing.T) {
 // there when snooping is switched on. Every other value of an inactive feature is dropped.
 func TestScenarioIGMPSuppressionStagedWhileSnoopingIsOff(t *testing.T) {
 	s := openForScenario(t)
-	orig, err := s.Client.IGMP(context.Background())
+	orig, err := s.Client().IGMP(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestScenarioIGMPSuppressionStagedWhileSnoopingIsOff(t *testing.T) {
 	}
 	is := func(e, r bool) resource.TestCheckFunc {
 		return func(*terraform.State) error {
-			got, err := s.Client.IGMP(context.Background())
+			got, err := s.Client().IGMP(context.Background())
 			if err != nil || got.Enabled != e || got.ReportSuppression != r {
 				return fmt.Errorf("IGMP on the switch = %+v, err %w, want enabled=%t suppression=%t", got, err, e, r)
 			}
@@ -144,7 +144,7 @@ func TestScenarioIGMPSuppressionStagedWhileSnoopingIsOff(t *testing.T) {
 
 func TestScenarioLoopPrevention(t *testing.T) {
 	s := openForScenario(t)
-	orig, err := s.Client.LoopPrevention(context.Background())
+	orig, err := s.Client().LoopPrevention(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestScenarioLoopPrevention(t *testing.T) {
 		return fmt.Sprintf("resource \"tplinkeasysmart_loop_prevention\" \"this\" {\n  enabled = %t\n  allow_disruptive = true\n}\n", on)
 	}
 	s.scenario(t, cfg(!orig), cfg(orig), func(*terraform.State) error {
-		got, err := s.Client.LoopPrevention(context.Background())
+		got, err := s.Client().LoopPrevention(context.Background())
 		if err != nil || got != !orig {
 			return fmt.Errorf("loop prevention on the switch = %t, err %w, want %t", got, err, !orig)
 		}
@@ -163,7 +163,7 @@ func TestScenarioLoopPrevention(t *testing.T) {
 
 func TestScenarioHostname(t *testing.T) {
 	s := openForScenario(t)
-	info, err := s.Client.Info(context.Background())
+	info, err := s.Client().Info(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestScenarioHostname(t *testing.T) {
 	}
 	const renamed = "regression-test"
 	s.scenario(t, cfg(renamed), cfg(info.Hostname.String()), func(*terraform.State) error {
-		got, err := s.Client.Info(context.Background())
+		got, err := s.Client().Info(context.Background())
 		if err != nil || got.Hostname.String() != renamed {
 			return fmt.Errorf("hostname on the switch = %q, err %w, want %q", got.Hostname, err, renamed)
 		}
@@ -183,7 +183,7 @@ func TestScenarioHostname(t *testing.T) {
 func TestScenarioQoS(t *testing.T) {
 	s := openForScenario(t)
 	port := s.Target.TestPorts[0]
-	orig, err := s.Client.QoS(context.Background())
+	orig, err := s.Client().QoS(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestScenarioQoS(t *testing.T) {
 		changed = model.PriorityLowest
 	}
 	s.scenarioSteps(t, cfg(model.QoSPortBased, changed), func(*terraform.State) error {
-		got, err := s.Client.QoS(context.Background())
+		got, err := s.Client().QoS(context.Background())
 		if err != nil || got.Mode != model.QoSPortBased {
 			return fmt.Errorf("QoS on the switch = %+v, err %w, want port-based", got, err)
 		}
@@ -218,7 +218,7 @@ func TestScenarioQoS(t *testing.T) {
 func TestScenarioPort(t *testing.T) {
 	s := openForScenario(t)
 	port := s.Target.TestPorts[0]
-	ports, err := s.Client.Ports(context.Background())
+	ports, err := s.Client().Ports(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +236,7 @@ func TestScenarioPort(t *testing.T) {
 		changed = model.SpeedAuto
 	}
 	s.scenario(t, cfg(changed, false), cfg(orig.ConfiguredSpeed, orig.ConfiguredFlowControl), func(*terraform.State) error {
-		got, err := s.Client.Ports(context.Background())
+		got, err := s.Client().Ports(context.Background())
 		if err != nil {
 			return err
 		}
@@ -252,7 +252,7 @@ func TestScenarioPort(t *testing.T) {
 func TestScenarioBandwidthLimit(t *testing.T) {
 	s := openForScenario(t)
 	port := s.Target.TestPorts[0]
-	orig, err := s.Client.Bandwidth(context.Background())
+	orig, err := s.Client().Bandwidth(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +266,7 @@ func TestScenarioBandwidthLimit(t *testing.T) {
 		return fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"this\" {\n  port         = %d\n  ingress_kbps = %d\n  egress_kbps  = %d\n}\n", port, in, out)
 	}
 	s.scenario(t, cfg(10240, 5120), cfg(int(was.Ingress), int(was.Egress)), func(*terraform.State) error {
-		got, err := s.Client.Bandwidth(context.Background())
+		got, err := s.Client().Bandwidth(context.Background())
 		if err != nil {
 			return err
 		}
@@ -282,7 +282,7 @@ func TestScenarioBandwidthLimit(t *testing.T) {
 func TestScenarioStormLimit(t *testing.T) {
 	s := openForScenario(t)
 	port := s.Target.TestPorts[0]
-	orig, err := s.Client.StormControl(context.Background())
+	orig, err := s.Client().StormControl(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +296,7 @@ func TestScenarioStormLimit(t *testing.T) {
 		return fmt.Sprintf("resource \"tplinkeasysmart_storm_limit\" \"this\" {\n  port            = %d\n  unknown_unicast = %t\n  multicast       = %t\n  broadcast       = %t\n  rate_kbps       = %d\n}\n", port, uu, mc, bc, rate)
 	}
 	s.scenario(t, cfg(false, true, true, 1024), cfg(was.UnknownUnicast, was.Multicast, was.Broadcast, int(was.Rate)), func(*terraform.State) error {
-		got, err := s.Client.StormControl(context.Background())
+		got, err := s.Client().StormControl(context.Background())
 		if err != nil {
 			return err
 		}
@@ -317,11 +317,11 @@ func TestScenarioIngressLimitAndStormControlExclude(t *testing.T) {
 	s := openForScenario(t)
 	ctx := context.Background()
 	port := s.Target.TestPorts[0]
-	bws, err := s.Client.Bandwidth(ctx)
+	bws, err := s.Client().Bandwidth(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	storms, err := s.Client.StormControl(ctx)
+	storms, err := s.Client().StormControl(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,11 +352,11 @@ func TestScenarioIngressLimitAndStormControlExclude(t *testing.T) {
 		port, wasStorm.UnknownUnicast, wasStorm.Multicast, wasStorm.Broadcast, wasStorm.Rate)
 	state := func(wantIngress model.Kbps, wantStorm bool) resource.TestCheckFunc {
 		return func(*terraform.State) error {
-			bws, err := s.Client.Bandwidth(ctx)
+			bws, err := s.Client().Bandwidth(ctx)
 			if err != nil {
 				return err
 			}
-			storms, err := s.Client.StormControl(ctx)
+			storms, err := s.Client().StormControl(ctx)
 			if err != nil {
 				return err
 			}
@@ -403,7 +403,7 @@ func TestScenarioLAG(t *testing.T) {
 	a, b := s.Target.TestPorts[1], s.Target.TestPorts[2] // two ports of LAG 1 (ports 1-4)
 	cfg := fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"this\" {\n  group = 1\n  ports = %s\n}\n", intSet(a, b))
 	s.scenario(t, cfg, "", func(*terraform.State) error {
-		got, err := s.Client.LAGs(context.Background())
+		got, err := s.Client().LAGs(context.Background())
 		if err != nil {
 			return err
 		}
@@ -444,7 +444,7 @@ func TestScenarioPortMirror(t *testing.T) {
 	}
 	s.scenario(t, cfg(fmt.Sprintf("  enabled       = true\n  mirror_port   = %d\n  ingress_ports = %s\n", dest, intSet(src))),
 		cfg("  enabled = false\n"), func(*terraform.State) error {
-			got, err := s.Client.PortMirror(context.Background())
+			got, err := s.Client().PortMirror(context.Background())
 			if err != nil || !got.Enabled || got.Destination != dest || got.IngressPorts != model.MustPortSet(src) {
 				return fmt.Errorf("mirror on the switch = %+v, err %w, want %d mirrored to %d", got, err, src, dest)
 			}
@@ -457,7 +457,7 @@ func TestScenarioPortBasedVLANGroup(t *testing.T) {
 	a, b := s.Target.TestPorts[1], s.Target.TestPorts[2]
 	cfg := fmt.Sprintf("resource \"tplinkeasysmart_vlan_port_based_group\" \"this\" {\n  vlan  = 2\n  ports = %s\n}\n", intSet(a, b))
 	s.scenario(t, cfg, "", func(*terraform.State) error {
-		got, err := s.Client.PortBasedVLAN(context.Background())
+		got, err := s.Client().PortBasedVLAN(context.Background())
 		if err != nil {
 			return err
 		}
@@ -519,7 +519,7 @@ func TestScenarioAllowDisruptive(t *testing.T) {
 		}
 		port = s.Target.DisruptPort
 	}
-	ports, err := s.Client.Ports(context.Background())
+	ports, err := s.Client().Ports(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -561,7 +561,7 @@ func TestScenarioAllowDisruptive(t *testing.T) {
 func TestScenarioVLAN8021Q(t *testing.T) {
 	s := openForScenario(t)
 	ctx := context.Background()
-	orig, err := s.Client.VLANMode(ctx)
+	orig, err := s.Client().VLANMode(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -574,7 +574,7 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 	default:
 		t.Skipf("the switch is in VLAN mode %q, which cannot be written back", orig.Mode)
 	}
-	dot1q, err := s.Client.Dot1Q(ctx)
+	dot1q, err := s.Client().Dot1Q(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -594,7 +594,7 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 	}
 	const modeOnly, modeAndGroup = "tplinkeasysmart_vlan_mode.this", "tplinkeasysmart_vlan_mode.this, tplinkeasysmart_vlan_8021q_group.lab"
 	s.scenarioSteps(t, mode("  mode = \"802.1q\"\n")+group+pvid(20, modeAndGroup), func(*terraform.State) error {
-		got, err := s.Client.Dot1Q(ctx)
+		got, err := s.Client().Dot1Q(ctx)
 		if err != nil || !got.Enabled {
 			return fmt.Errorf("802.1Q on the switch = %+v, err %w, want it enabled", got.Enabled, err)
 		}
@@ -622,7 +622,7 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 func TestScenarioLifecycle(t *testing.T) {
 	s := openForScenario(t)
 	ctx := context.Background()
-	orig, err := s.Client.LED(ctx)
+	orig, err := s.Client().LED(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -631,7 +631,7 @@ func TestScenarioLifecycle(t *testing.T) {
 	}
 	ledIs := func(want bool) resource.TestCheckFunc {
 		return func(*terraform.State) error {
-			got, err := s.Client.LED(ctx)
+			got, err := s.Client().LED(ctx)
 			if err != nil || got != want {
 				return fmt.Errorf("LED on the switch = %t, err %w, want %t", got, err, want)
 			}
@@ -639,7 +639,7 @@ func TestScenarioLifecycle(t *testing.T) {
 		}
 	}
 	port := s.Target.TestPorts[0]
-	ports, err := s.Client.Ports(ctx)
+	ports, err := s.Client().Ports(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -661,7 +661,7 @@ func TestScenarioLifecycle(t *testing.T) {
 			{Config: s.ProviderHCL() + led(orig) + portCfg, ResourceName: "tplinkeasysmart_port.this", ImportState: true, ImportStateId: port.String(), ImportStateVerify: true, ImportStateVerifyIdentifierAttribute: "port", ImportStateVerifyIgnore: []string{"allow_disruptive"}},
 			// Drift: someone changes the switch behind Terraform's back; the plan shows it, an apply fixes it.
 			{PreConfig: func() {
-				if err := s.Client.SetLED(ctx, !orig); err != nil {
+				if err := s.Client().SetLED(ctx, !orig); err != nil {
 					t.Fatal(err)
 				}
 			}, Config: s.ProviderHCL() + led(orig) + portCfg, PlanOnly: true, ExpectNonEmptyPlan: true},
@@ -721,7 +721,7 @@ func (s *Session) writesUnchanged(n int) resource.TestCheckFunc {
 // to move it, and a move to a documentation address would aim packets at nothing.
 func TestScenarioManagementAddressUnchanged(t *testing.T) {
 	s := openForScenario(t)
-	info, err := s.Client.Info(context.Background())
+	info, err := s.Client().Info(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -745,7 +745,7 @@ func TestScenarioManagementAddressUnchanged(t *testing.T) {
 // mask that is not a prefix is refused at plan time.
 func TestScenarioManagementAddressRefusals(t *testing.T) {
 	s := openForScenario(t)
-	info, err := s.Client.Info(context.Background())
+	info, err := s.Client().Info(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

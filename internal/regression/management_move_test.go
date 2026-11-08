@@ -33,7 +33,7 @@ func ipConfigOfInfo(i model.Info) model.IPConfig {
 func (s *Session) bringBack(t *testing.T, original model.IPConfig) {
 	ctx, cancel := context.WithTimeout(context.Background(), settleTime)
 	defer cancel()
-	if info, err := s.Client.Info(ctx); err == nil && info.IP.String() == original.IP.String() {
+	if info, err := s.Client().Info(ctx); err == nil && info.IP.String() == original.IP.String() {
 		return
 	}
 	t.Logf("the switch is not at %s; moving it back from %s", original.IP, s.Target.MoveIP)
@@ -63,7 +63,7 @@ func TestScenarioManagementMove(t *testing.T) {
 		t.Skip("set " + EnvAllowMove + "=1 and TPLINK_REGRESSION_MOVE_IP to move the switch to a spare address and back")
 	}
 	ctx := context.Background()
-	info, err := s.Client.Info(ctx)
+	info, err := s.Client().Info(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 		t.Skip("set " + EnvAllowMove + "=1 and TPLINK_REGRESSION_MOVE_IP to move the switch to a spare address and back")
 	}
 	ctx := context.Background()
-	info, err := s.Client.Info(ctx)
+	info, err := s.Client().Info(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +251,7 @@ func TestScenarioManagementDHCP(t *testing.T) {
 		t.Skip("set " + EnvAllowDHCP + "=1 to turn DHCP on and back off (the router's DHCP server must be up)")
 	}
 	ctx := context.Background()
-	info, err := s.Client.Info(ctx)
+	info, err := s.Client().Info(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

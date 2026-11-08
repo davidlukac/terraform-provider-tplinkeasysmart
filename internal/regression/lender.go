@@ -12,22 +12,62 @@ import (
 	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/provider"
 )
 
+// suiteClient is a client of the suite's own that can step aside and come back. The library allows one
+// client per switch in a process (escp.ErrSwitchInUse) and, since escp-go v0.9.0, a closed client is
+// closed for good (escp.ErrClosed): it does not open again at its next call. So the suite never holds on
+// to a *escp.Client: it holds this handle, which keeps the current client and the way to dial a new one.
+// release closes the client (which gives its claim on the switch up) and forgets it, and get dials a new
+// one when there is none. With a library whose closed client reopens on use (v0.8.0) the behavior is the
+// same, because nothing is ever used after its Close.
+type suiteClient struct {
+	mu   sync.Mutex
+	dial func() (*escp.Client, error)
+	c    *escp.Client // nil while the client is stepped aside
+}
+
+// get is the current client, dialed when the client has stepped aside. It fails with the error of the
+// dial, escp.ErrSwitchInUse among them while another client of the process has the switch (with the
+// library of v0.8.0 that error comes from the first call of the client instead).
+func (h *suiteClient) get() (*escp.Client, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.c == nil {
+		c, err := h.dial()
+		if err != nil {
+			return nil, err
+		}
+		h.c = c
+	}
+	return h.c, nil
+}
+
+// release closes the client, if there is one, and forgets it, so the next get dials a new client.
+func (h *suiteClient) release() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.c != nil {
+		_ = h.c.Close() // best effort: it gives the claim up, and nothing uses the client afterwards
+		h.c = nil
+	}
+}
+
 // lender hands one switch back and forth between the provider and the suite's own clients. The
 // library allows one client per switch in a process (escp.ErrSwitchInUse), and the suite checks the
-// switch behind the provider's back with clients of its own: they step aside, which Close does by
-// releasing the claim, while the provider has the switch, and take it back, by closing the provider's
-// clients, before the suite reads or writes. A closed client opens again at its next call, so the
-// handover needs nothing else. The provider is idle whenever the suite calls takeBack (between
-// Terraform commands), and closing a client twice is harmless, so the provider's own Close of a
-// previous configuration does no harm.
+// switch behind the provider's back with clients of its own (suiteClient): they step aside, which
+// closes them and releases the claim, when the provider dials, and the switch is taken back by closing
+// the provider's clients, before the suite reads or writes. A closed client stays closed, so the
+// suite's client is not reopened: its handle dials a new one at the next use, and anything that must
+// outlive a hand-over (the readers, the safety net) asks the handle each time and keeps no client.
+// The provider is idle whenever the suite calls takeBack (between Terraform commands), and closing a
+// client twice is harmless, so the provider's own Close of a previous configuration does no harm.
 type lender struct {
 	mu    sync.Mutex
-	aside []*escp.Client // the suite's own clients, closed when the provider dials
+	aside []*suiteClient // the suite's own clients, released when the provider dials
 	lent  []*escp.Client // the clients the provider was given, closed by takeBack
 }
 
 // stepAside registers a client of the suite that must not hold the switch while the provider does.
-func (l *lender) stepAside(clients ...*escp.Client) {
+func (l *lender) stepAside(clients ...*suiteClient) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.aside = append(l.aside, clients...)
@@ -38,8 +78,8 @@ func (l *lender) stepAside(clients ...*escp.Client) {
 func (l *lender) dial(cfg escp.Config, open func(escp.Config) (*escp.Client, error)) (provider.SwitchClient, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	for _, c := range l.aside {
-		_ = c.Close() // best effort: releases the claim; the client opens again at its next call
+	for _, h := range l.aside {
+		h.release()
 	}
 	c, err := open(cfg)
 	if err != nil {
@@ -49,7 +89,8 @@ func (l *lender) dial(cfg escp.Config, open func(escp.Config) (*escp.Client, err
 	return c, nil
 }
 
-// takeBack closes the clients the provider was given, which releases their claim.
+// takeBack closes the clients the provider was given, which releases their claim; the suite's clients
+// are dialed again at their next use.
 func (l *lender) takeBack() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
