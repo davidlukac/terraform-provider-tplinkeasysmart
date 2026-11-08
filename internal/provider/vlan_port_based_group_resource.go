@@ -253,6 +253,10 @@ func (r *portVLANResource) ImportState(ctx context.Context, req resource.ImportS
 // ModifyPlan refuses, while planning, a switch that cannot be resolved.
 func (r *portVLANResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+	warnOnDestroyPlan(ctx, req, resp, destroyPlanCheck[portVLANResourceModel]{src: r.src, what: "port-based VLAN group", standing: func(ctx context.Context, m *portVLANResourceModel) standingOptIn {
+		ports, _ := portsOf(ctx, m.Ports)
+		return standingOptIn{sw: m.Switch, allow: m.AllowDisruptive, ports: ports}
+	}})
 }
 
 var _ resource.ResourceWithModifyPlan = &portVLANResource{}

@@ -215,6 +215,9 @@ func (r *vlan8021QPVIDResource) ImportState(ctx context.Context, req resource.Im
 // ModifyPlan refuses, while planning, a switch that cannot be resolved.
 func (r *vlan8021QPVIDResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+	warnOnDestroyPlan(ctx, req, resp, destroyPlanCheck[vlan8021QPVIDModel]{src: r.src, what: "PVID", standing: func(_ context.Context, m *vlan8021QPVIDModel) standingOptIn {
+		return standingOptIn{sw: m.Switch, allow: m.AllowDisruptive, ports: model.PortID(m.Port.ValueInt64()).AsSet()}
+	}})
 }
 
 var _ resource.ResourceWithModifyPlan = &vlan8021QPVIDResource{}

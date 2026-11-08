@@ -320,6 +320,11 @@ func (r *vlan8021QGroupResource) ValidateConfig(ctx context.Context, req resourc
 // ModifyPlan refuses, while planning, a switch that cannot be resolved.
 func (r *vlan8021QGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+	warnOnDestroyPlan(ctx, req, resp, destroyPlanCheck[vlan8021QGroupModel]{src: r.src, what: "802.1Q VLAN", standing: func(ctx context.Context, m *vlan8021QGroupModel) standingOptIn {
+		tagged, _ := portsOf(ctx, m.TaggedPorts)
+		untagged, _ := portsOf(ctx, m.UntaggedPorts)
+		return standingOptIn{sw: m.Switch, allow: m.AllowDisruptive, ports: tagged.Union(untagged)}
+	}})
 }
 
 var (

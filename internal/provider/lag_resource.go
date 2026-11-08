@@ -262,6 +262,10 @@ func (r *lagResource) ValidateConfig(ctx context.Context, req resource.ValidateC
 // ModifyPlan refuses, while planning, a switch that cannot be resolved.
 func (r *lagResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	checkSwitch(ctx, r.src, req.Plan, &resp.Diagnostics)
+	warnOnDestroyPlan(ctx, req, resp, destroyPlanCheck[lagResourceModel]{src: r.src, what: "LAG", standing: func(ctx context.Context, m *lagResourceModel) standingOptIn {
+		ports, _ := portsOf(ctx, m.Ports)
+		return standingOptIn{sw: m.Switch, allow: m.AllowDisruptive, ports: ports, own: model.LAGID(m.Group.ValueInt64())}
+	}})
 }
 
 var (
