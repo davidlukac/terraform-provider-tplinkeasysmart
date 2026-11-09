@@ -266,6 +266,7 @@ func TestConfigureRefusesAMalformedMACThatGotPastTheSchema(t *testing.T) {
 		"password":                  tftypes.NewValue(tftypes.String, "p"),
 		"timeout_seconds":           tftypes.NewValue(tftypes.Number, nil),
 		"allow_unverified_firmware": tftypes.NewValue(tftypes.Bool, nil),
+		"relocate_by_mac":           tftypes.NewValue(tftypes.Bool, nil),
 	})
 	raw := tftypes.NewValue(objType, map[string]tftypes.Value{
 		"host":                      tftypes.NewValue(tftypes.String, nil),
@@ -274,6 +275,7 @@ func TestConfigureRefusesAMalformedMACThatGotPastTheSchema(t *testing.T) {
 		"password":                  tftypes.NewValue(tftypes.String, nil),
 		"timeout_seconds":           tftypes.NewValue(tftypes.Number, nil),
 		"allow_unverified_firmware": tftypes.NewValue(tftypes.Bool, nil),
+		"relocate_by_mac":           tftypes.NewValue(tftypes.Bool, nil),
 		"switches":                  tftypes.NewValue(objType.AttributeTypes["switches"], map[string]tftypes.Value{"a": entry}),
 	})
 	resp := &provider.ConfigureResponse{}

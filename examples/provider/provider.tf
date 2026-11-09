@@ -39,9 +39,10 @@ provider "tplinkeasysmart" {
 
 # Name the switch by its MAC address when its IP address may change (DHCP, a move).
 # `mac` pins the identity, so a different device at `host` is never written to; without
-# `host`, or when `host` does not answer, the switch is found by a layer-2 discovery on
-# the first request (about half a second). The data source tplinkeasysmart_system_info
-# reports the value as `mac_address`.
+# `host` the switch is found by a layer-2 discovery on the first request (about half a
+# second); with `host` as well, set `relocate_by_mac = true` to look the switch up by its
+# MAC when `host` stops answering. The data source tplinkeasysmart_system_info reports
+# the value as `mac_address`.
 #
 # provider "tplinkeasysmart" {
 #   mac      = "00:00:5e:00:53:01"   # or TPLINK_EASYSMART_MAC

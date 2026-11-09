@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -614,6 +615,53 @@ func TestScenarioVLAN8021Q(t *testing.T) {
 	},
 		mode("  mode = \"802.1q\"\n")+group+pvid(origPVID, modeAndGroup),
 		mode("  mode = \"802.1q\"\n")+pvid(origPVID, modeOnly),
+		mode(originalMode),
+	)
+}
+
+// The MTU VLAN, which the other VLAN scenarios never write: every other port can only talk to the
+// uplink port, so the uplink must be the port that carries the management host (a port with a link,
+// in no LAG, and never a test port). The mode goes back to what it was in the last step.
+func TestScenarioMTUVLAN(t *testing.T) {
+	s := openForScenario(t)
+	ctx := context.Background()
+	orig, err := s.Client().VLANMode(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var originalMode string
+	switch orig.Mode {
+	case model.VLANModePortBased, model.VLANModeDot1Q:
+		originalMode = fmt.Sprintf("  mode = %q\n", string(orig.Mode))
+	case model.VLANModeMTU:
+		t.Skip("the switch is already in the MTU VLAN: nothing to switch to and back")
+	default:
+		t.Skipf("the switch is in VLAN mode %q, which cannot be written back", orig.Mode)
+	}
+	ports, err := s.Client().Ports(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uplink := model.PortID(0)
+	for _, p := range ports {
+		if p.ActualSpeed != model.SpeedLinkDown && p.LAG == 0 && !slices.Contains(s.Target.TestPorts, p.ID) {
+			uplink = p.ID
+			break
+		}
+	}
+	if uplink == 0 {
+		t.Skip("no port with a link outside a LAG and the test ports: no safe MTU VLAN uplink")
+	}
+	mode := func(body string) string {
+		return fmt.Sprintf("resource \"tplinkeasysmart_vlan_mode\" \"this\" {\n%s  allow_disruptive = true\n}\n", body)
+	}
+	s.scenarioSteps(t, mode(fmt.Sprintf("  mode            = \"mtu\"\n  mtu_uplink_port = %d\n", uplink)), func(*terraform.State) error {
+		got, err := s.Client().MTUVLAN(ctx)
+		if err != nil || !got.Enabled || got.UplinkPort != uplink {
+			return fmt.Errorf("MTU VLAN on the switch = %+v, err %w, want it enabled with uplink %d", got, err, uplink)
+		}
+		return nil
+	},
 		mode(originalMode),
 	)
 }

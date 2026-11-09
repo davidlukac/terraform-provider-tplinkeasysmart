@@ -67,7 +67,7 @@ func checkClientConfig(t *testing.T, got, want escp.Config, wantGate bool) {
 
 func clearProviderEnv(t *testing.T) {
 	t.Helper()
-	for _, k := range []string{"TPLINK_EASYSMART_HOST", "TPLINK_EASYSMART_USERNAME", "TPLINK_EASYSMART_PASSWORD", "TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE"} {
+	for _, k := range []string{"TPLINK_EASYSMART_HOST", "TPLINK_EASYSMART_USERNAME", "TPLINK_EASYSMART_PASSWORD", "TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE", "TPLINK_EASYSMART_RELOCATE_BY_MAC"} {
 		t.Setenv(k, "")
 	}
 }
@@ -253,6 +253,7 @@ func TestProviderExplainsHowToResolveAnUnknownAttribute(t *testing.T) {
 		"password":                  tftypes.NewValue(tftypes.String, "x"),
 		"timeout_seconds":           tftypes.NewValue(tftypes.Number, nil),
 		"allow_unverified_firmware": tftypes.NewValue(tftypes.Bool, nil),
+		"relocate_by_mac":           tftypes.NewValue(tftypes.Bool, nil),
 		"switches":                  tftypes.NewValue(objType.AttributeTypes["switches"], nil),
 	})
 	resp := &provider.ConfigureResponse{}

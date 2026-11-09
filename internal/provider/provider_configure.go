@@ -24,6 +24,7 @@ type switchSpec struct {
 	password        string
 	timeout         time.Duration
 	allowUnverified bool
+	relocateByMAC   bool
 }
 
 // label names the switch in diagnostics.
@@ -60,6 +61,11 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		resp.Diagnostics.AddAttributeError(pathRoot("allow_unverified_firmware"), "Invalid allow_unverified_firmware", err.Error())
 		return
 	}
+	providerRelocate, err := envBoolOr(cfg.RelocateByMAC, envRelocateByMAC)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(pathRoot("relocate_by_mac"), "Invalid relocate_by_mac", err.Error())
+		return
+	}
 	providerTimeout := timeoutOr(cfg.TimeoutSeconds, defaultTimeout)
 	// Terraform configures the provider again for every walk (plan, apply) in one process; the
 	// library allows one client per switch, so the previous ones go first.
@@ -68,11 +74,11 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	p.closeCurrent(ctx)
 	b := &registryBuilder{newClient: p.newClient, diags: &resp.Diagnostics, reg: &switchRegistry{named: map[string]SwitchClient{}}, seen: map[string]string{}}
 	if hasOwn {
-		own.timeout, own.allowUnverified = providerTimeout, providerAllow
+		own.timeout, own.allowUnverified, own.relocateByMAC = providerTimeout, providerAllow, providerRelocate
 		b.add(own)
 	}
 	for _, name := range sortedKeys(entries) {
-		b.add(entrySpec(name, entries[name], providerTimeout, providerAllow))
+		b.add(entrySpec(name, entries[name], providerTimeout, providerAllow, providerRelocate))
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -152,15 +158,19 @@ func ownSwitch(cfg providerModel, entries int, diags *diag.Diagnostics) (switchS
 
 // entrySpec is the switch of one `switches` entry: its own timeout and firmware opt-in when it
 // sets them, the provider's otherwise.
-func entrySpec(name string, e switchModel, providerTimeout time.Duration, providerAllow bool) switchSpec {
+func entrySpec(name string, e switchModel, providerTimeout time.Duration, providerAllow, providerRelocate bool) switchSpec {
 	allow := providerAllow
 	if !e.AllowUnverifiedFirmware.IsNull() {
 		allow = e.AllowUnverifiedFirmware.ValueBool()
 	}
+	relocate := providerRelocate
+	if !e.RelocateByMAC.IsNull() {
+		relocate = e.RelocateByMAC.ValueBool()
+	}
 	return switchSpec{
 		name: name, host: e.Host.ValueString(), mac: e.MAC.ValueString(),
 		username: e.Username.ValueString(), password: e.Password.ValueString(),
-		timeout: timeoutOr(e.TimeoutSeconds, providerTimeout), allowUnverified: allow,
+		timeout: timeoutOr(e.TimeoutSeconds, providerTimeout), allowUnverified: allow, relocateByMAC: relocate,
 	}
 }
 
@@ -185,11 +195,15 @@ func (b *registryBuilder) add(s switchSpec) {
 		b.diags.AddError("Invalid MAC address", fmt.Sprintf("%s: %s", label, err))
 		return
 	}
+	if s.relocateByMAC && s.mac == "" {
+		b.diags.AddError("relocate_by_mac needs mac", label+": `relocate_by_mac` finds the switch by its MAC address, so `mac` must be set.")
+		return
+	}
 	if !b.claim(label, hw, s.host) {
 		return
 	}
 	gate := firmwareWriteGate(s.allowUnverified)
-	c, err := b.newClient(escp.Config{Host: s.host, MAC: hw, Username: s.username, Password: model.Password(s.password), Timeout: s.timeout, WriteGate: gate, Logger: newTflogLogger()})
+	c, err := b.newClient(escp.Config{Host: s.host, MAC: hw, Username: s.username, Password: model.Password(s.password), Timeout: s.timeout, RelocateByMAC: s.relocateByMAC, WriteGate: gate, Logger: newTflogLogger()})
 	if err != nil {
 		b.diags.AddError("Cannot configure switch client", fmt.Sprintf("%s: %s", label, err))
 		return

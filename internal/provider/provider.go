@@ -34,6 +34,8 @@ const (
 	maxTimeoutSeconds = int64(escp.MaxTimeout / time.Second)
 
 	envAllowUnverified = "TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE"
+	// envRelocateByMAC backs relocate_by_mac for the provider's default; a switch entry still overrides it.
+	envRelocateByMAC = "TPLINK_EASYSMART_RELOCATE_BY_MAC"
 )
 
 var (
@@ -74,6 +76,8 @@ type providerModel struct {
 	Switches       types.Map    `tfsdk:"switches"`
 	// AllowUnverifiedFirmware lifts the write refusal on firmware builds this provider was not verified against.
 	AllowUnverifiedFirmware types.Bool `tfsdk:"allow_unverified_firmware"`
+	// RelocateByMAC lets a switch that has both host and mac be found by its MAC when host stops answering.
+	RelocateByMAC types.Bool `tfsdk:"relocate_by_mac"`
 }
 
 // switchModel is one entry of the `switches` map.
@@ -84,6 +88,7 @@ type switchModel struct {
 	Password                types.String `tfsdk:"password"`
 	TimeoutSeconds          types.Int64  `tfsdk:"timeout_seconds"`
 	AllowUnverifiedFirmware types.Bool   `tfsdk:"allow_unverified_firmware"`
+	RelocateByMAC           types.Bool   `tfsdk:"relocate_by_mac"`
 }
 
 func (p *tplinkProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -127,6 +132,10 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 					"but every write is refused on an unverified build, because a newer firmware may have changed the protocol. Verified builds: " + verifiedBuilds() + ". " +
 					"Falls back to TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE (`true` or `false`). Can be overridden per switch in the `switches` map.",
 			},
+			"relocate_by_mac": schema.BoolAttribute{
+				Optional:    true,
+				Description: relocateByMACDescription + " Defaults to false. Falls back to TPLINK_EASYSMART_RELOCATE_BY_MAC (`true` or `false`). Can be overridden per switch in the `switches` map.",
+			},
 			"switches": schema.MapNestedAttribute{
 				Optional: true,
 				Description: "Switches managed by this provider, by name. Select one on a resource or data source with `switch = \"<name>\"`. " +
@@ -141,6 +150,8 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 						Description: "Seconds to wait for a reply before retrying a request, 1 to 30 (the longest the library takes). Defaults to the provider-level `timeout_seconds`, then 3."},
 					"allow_unverified_firmware": schema.BoolAttribute{Optional: true,
 						Description: "Overrides the provider-level `allow_unverified_firmware` for this switch."},
+					"relocate_by_mac": schema.BoolAttribute{Optional: true,
+						Description: "Overrides the provider-level `relocate_by_mac` for this switch. " + relocateByMACDescription},
 				}},
 			},
 		},
@@ -149,9 +160,13 @@ func (p *tplinkProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 
 // macArgDescription is shared by the provider block and the `switches` entries.
 const macArgDescription = "MAC address of the switch (`aa:bb:cc:dd:ee:ff`, colons or hyphens, any case; `system_info` reports it as `mac_address`). " +
-	"It pins the identity: a device with another MAC at `host` is never written to. Without `host`, or when `host` does not answer, " +
-	"the switch is found by a layer-2 discovery on the first request, so its address may change (for example under DHCP). " +
+	"It pins the identity: a device with another MAC at `host` is never written to. Without `host` the switch is found by a layer-2 discovery on the first request, " +
+	"so its address may change (for example under DHCP); with `host` the client keeps to that address unless `relocate_by_mac` is set. " +
 	"Discovery needs the same layer-2 segment; use `host` as well when Terraform runs elsewhere."
+
+// relocateByMACDescription is what relocate_by_mac says, at the provider and in a `switches` entry.
+const relocateByMACDescription = "When a switch has both `host` and `mac` and nothing answers at `host`, look the switch up by its MAC and follow it to the address it answers from " +
+	"(a DHCP lease that changed). Off by default: the client keeps to `host`, and a switch that is not there is an error. Needs `mac`."
 
 // ValidateConfig requires every `switches` entry to name its switch by `host`, `mac` or both.
 // The provider's own switch is checked in Configure, because its values may come from the environment.

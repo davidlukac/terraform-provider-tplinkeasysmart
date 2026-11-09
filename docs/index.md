@@ -73,9 +73,10 @@ provider "tplinkeasysmart" {
 
 # Name the switch by its MAC address when its IP address may change (DHCP, a move).
 # `mac` pins the identity, so a different device at `host` is never written to; without
-# `host`, or when `host` does not answer, the switch is found by a layer-2 discovery on
-# the first request (about half a second). The data source tplinkeasysmart_system_info
-# reports the value as `mac_address`.
+# `host` the switch is found by a layer-2 discovery on the first request (about half a
+# second); with `host` as well, set `relocate_by_mac = true` to look the switch up by its
+# MAC when `host` stops answering. The data source tplinkeasysmart_system_info reports
+# the value as `mac_address`.
 #
 # provider "tplinkeasysmart" {
 #   mac      = "00:00:5e:00:53:01"   # or TPLINK_EASYSMART_MAC
@@ -95,8 +96,9 @@ provider "tplinkeasysmart" {
 
 - `allow_unverified_firmware` (Boolean) Write to switches whose firmware build this provider version was not verified against. Defaults to false: reads and imports always work, but every write is refused on an unverified build, because a newer firmware may have changed the protocol. Verified builds: 20230218, 20250710. Falls back to TPLINK_EASYSMART_ALLOW_UNVERIFIED_FIRMWARE (`true` or `false`). Can be overridden per switch in the `switches` map.
 - `host` (String) IPv4 address or hostname of the switch. Falls back to TPLINK_EASYSMART_HOST. Optional when `mac` is set.
-- `mac` (String) MAC address of the switch (`aa:bb:cc:dd:ee:ff`, colons or hyphens, any case; `system_info` reports it as `mac_address`). It pins the identity: a device with another MAC at `host` is never written to. Without `host`, or when `host` does not answer, the switch is found by a layer-2 discovery on the first request, so its address may change (for example under DHCP). Discovery needs the same layer-2 segment; use `host` as well when Terraform runs elsewhere. Falls back to TPLINK_EASYSMART_MAC.
+- `mac` (String) MAC address of the switch (`aa:bb:cc:dd:ee:ff`, colons or hyphens, any case; `system_info` reports it as `mac_address`). It pins the identity: a device with another MAC at `host` is never written to. Without `host` the switch is found by a layer-2 discovery on the first request, so its address may change (for example under DHCP); with `host` the client keeps to that address unless `relocate_by_mac` is set. Discovery needs the same layer-2 segment; use `host` as well when Terraform runs elsewhere. Falls back to TPLINK_EASYSMART_MAC.
 - `password` (String, Sensitive) Admin password. Falls back to TPLINK_EASYSMART_PASSWORD.
+- `relocate_by_mac` (Boolean) When a switch has both `host` and `mac` and nothing answers at `host`, look the switch up by its MAC and follow it to the address it answers from (a DHCP lease that changed). Off by default: the client keeps to `host`, and a switch that is not there is an error. Needs `mac`. Defaults to false. Falls back to TPLINK_EASYSMART_RELOCATE_BY_MAC (`true` or `false`). Can be overridden per switch in the `switches` map.
 - `switches` (Attributes Map) Switches managed by this provider, by name. Select one on a resource or data source with `switch = "<name>"`. With a `switches` map every resource and data source must set `switch`. It may be combined with `host` (the provider's own switch), which is then selected with `switch = "default"`; `default` cannot be a key of this map. (see [below for nested schema](#nestedatt--switches))
 - `timeout_seconds` (Number) Seconds to wait for a reply before retrying a request, 1 to 30 (the longest the library takes). Defaults to 3.
 - `username` (String) Admin user name. Falls back to TPLINK_EASYSMART_USERNAME.
@@ -113,5 +115,6 @@ Optional:
 
 - `allow_unverified_firmware` (Boolean) Overrides the provider-level `allow_unverified_firmware` for this switch.
 - `host` (String) IPv4 address or hostname of the switch. Optional when `mac` is set; at least one of the two is required.
-- `mac` (String) MAC address of the switch (`aa:bb:cc:dd:ee:ff`, colons or hyphens, any case; `system_info` reports it as `mac_address`). It pins the identity: a device with another MAC at `host` is never written to. Without `host`, or when `host` does not answer, the switch is found by a layer-2 discovery on the first request, so its address may change (for example under DHCP). Discovery needs the same layer-2 segment; use `host` as well when Terraform runs elsewhere.
+- `mac` (String) MAC address of the switch (`aa:bb:cc:dd:ee:ff`, colons or hyphens, any case; `system_info` reports it as `mac_address`). It pins the identity: a device with another MAC at `host` is never written to. Without `host` the switch is found by a layer-2 discovery on the first request, so its address may change (for example under DHCP); with `host` the client keeps to that address unless `relocate_by_mac` is set. Discovery needs the same layer-2 segment; use `host` as well when Terraform runs elsewhere.
+- `relocate_by_mac` (Boolean) Overrides the provider-level `relocate_by_mac` for this switch. When a switch has both `host` and `mac` and nothing answers at `host`, look the switch up by its MAC and follow it to the address it answers from (a DHCP lease that changed). Off by default: the client keeps to `host`, and a switch that is not there is an error. Needs `mac`.
 - `timeout_seconds` (Number) Seconds to wait for a reply before retrying a request, 1 to 30 (the longest the library takes). Defaults to the provider-level `timeout_seconds`, then 3.

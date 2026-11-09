@@ -225,4 +225,8 @@ func TestProviderBlockByMAC(t *testing.T) {
 	if !strings.Contains(both, `host     = "192.0.2.9"`) || !strings.Contains(both, `mac      = "`+s.MAC.String()+`"`) {
 		t.Errorf("a block with both: %q", both)
 	}
+	relocating := s.ProviderHCLByMACRelocating("192.0.2.9", s.MAC)
+	if !strings.Contains(relocating, "relocate_by_mac = true") || !strings.HasSuffix(relocating, "}\n") || strings.Contains(both, "relocate_by_mac") {
+		t.Errorf("only the relocating block turns relocate_by_mac on, inside the provider block: %q", relocating)
+	}
 }

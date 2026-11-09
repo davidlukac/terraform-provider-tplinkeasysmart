@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.34.0
+
+It makes the schema and the behavior of a few settings consistent before the interface is frozen at 1.0, so it **breaks** several things. (More minor versions may follow before 1.0: the version number says nothing about how close 1.0 is.) Every change has a step in the [upgrade guide](docs/guides/upgrading-to-0.34.md); none needs a state rewrite. The provider uses [github.com/davidlukac/escp-go](https://github.com/davidlukac/escp-go) v0.9.0.
+
+- **Breaking changes**, one row each (the number is the issue):
+
+  | 0.33.0 | 0.34.0 |
+  |---|---|
+  | `data.tplinkeasysmart_qos` had `mode` as a number and `mode_name` (#162) | `mode` is the name (`port-based`, `802.1p`, `dscp-802.1p`), `mode_name` is gone |
+  | `tplinkeasysmart_ports` and `tplinkeasysmart_port_statistics` named the port number `id`, and the statistics the link state `link` (#163) | `ports[].port`, and `ports[].actual_speed` in the statistics; the `id` of a LAG or VLAN element is unchanged |
+  | `tplinkeasysmart_lag` and `tplinkeasysmart_vlan_8021q_group` overwrote an existing group or VLAN on create (#164) | create is refused with an import hint when it exists (VLAN 1 always does); objects already in state are unaffected |
+  | `vlan_mtu.uplink_port` was `1` when the MTU VLAN is off, `port_mirror` reported `mirror_port = 0` when off (#165) | both are `null`; the resource attribute `mirror_port` is optional without a default and refuses 0, so remove `mirror_port = 0` |
+  | `multicast_groups` was an attribute of the `igmp_snooping` resource (#166) | removed there; use the new data source `tplinkeasysmart_igmp_snooping` |
+  | `tplinkeasysmart_loop_prevention` had no guard and wrote even the value the switch had (#167) | changing the value needs `allow_disruptive = true`, applying the same value writes nothing |
+  | `data.tplinkeasysmart_config_backup` ran on any firmware build (#168) | passes the firmware gate: refused on an unverified build unless `allow_unverified_firmware = true` |
+  | `tplinkeasysmart_vlan_mode` accepted an MTU uplink without a link (#169) | refused, even with `allow_disruptive`, unless the uplink has a link and is in no LAG |
+  | An object or data source without `switch` went to the provider's own switch or to the only named switch (#181) | with a `switches` map every object must set `switch`; `switch = "default"` is the provider's own switch (reserved, not a map key); ids are unchanged and now frozen, import with a `default:` or `<name>:` prefix |
+  | A client with `host` and `mac` looked the switch up by its MAC when `host` did not answer (library #144) | it keeps to `host` unless `relocate_by_mac = true` (new, at the provider, per `switches` entry or `TPLINK_EASYSMART_RELOCATE_BY_MAC`); needs `mac` (#191) |
+  | A silent switch cost the whole timeout and its retries on every request (#180) | the first request that gets no answer from a switch that never answered fails every later request to it at once |
+
+- **Added:** `relocate_by_mac` (provider and per entry), the data source `tplinkeasysmart_igmp_snooping`, a warning on a destroy plan when a stored `allow_disruptive` lets a removed LAG, VLAN group or PVID act on a port that has a link up (#179), the guide and the Registry index page (requirements, safety, stability) and a Stability section in the README (#182).
+- **Fix (library v0.9.0):** a write that got no reply is reported as possibly applied and is never sent twice; management writes first prove the session; `Close` is final and ends calls in flight; a second client of one switch is refused by address or by MAC; read-modify-write calls are atomic; the 20230218 compatibility row says exactly what was verified on that build. The library's changelog has the details.
+- **Internal:** the regression harness dials a new client when it takes the switch back (the library's `Close` is final) (#188).
+- **Verified on hardware:** the full regression on a TL-SG108E with firmware 20250710 on the candidate (library v0.9.0), with its disruptive scenarios (the management address moved and back, DHCP on and off, a speed change, a port taken down, a LAG, a mirror destination and a VLAN group on device ports, `allow_disruptive` writes to a device port): 86 passed, 1 failed, 1 skipped; the failure was the stale-host scenario, which relied on the old relocation default and now sets `relocate_by_mac` (and a new scenario checks that it is off by default), both passed on the switch; the MTU VLAN write, which no scenario had written before (uplink on the linked port, then back to the original mode), passed. 0 of 2,205 pings lost to the router and to the other switch; the configuration hash of the test switch was back at its baseline and every Terraform plan clean afterwards. The 11 data sources of the module and the new `igmp_snooping` data source read on both switches, and state files written by 0.33.0 refresh without changes to resources.
+
 ## 0.33.0
 
 - **Behavior changes** (no setting is added or removed; three things that were accepted before are refused or done differently now, so this is a minor version):

@@ -233,6 +233,12 @@ func (s *Session) ProviderHCLByMAC(host string, mac model.MAC) string {
 	return fmt.Sprintf("provider \"tplinkeasysmart\" {\n%s  mac      = %q\n  username = %q\n  password = %q\n}\n", hostLine, mac.String(), s.Target.Username, s.Target.Password.Reveal())
 }
 
+// ProviderHCLByMACRelocating is ProviderHCLByMAC with relocate_by_mac on: a switch named by host and
+// MAC is looked up by its MAC when nothing answers at host (the library keeps to host otherwise).
+func (s *Session) ProviderHCLByMACRelocating(host string, mac model.MAC) string {
+	return strings.Replace(s.ProviderHCLByMAC(host, mac), "}\n", "  relocate_by_mac = true\n}\n", 1)
+}
+
 // Before is the readout taken when the session opened: what every scenario must leave behind.
 func (s *Session) Before() Readout { return s.before }
 
