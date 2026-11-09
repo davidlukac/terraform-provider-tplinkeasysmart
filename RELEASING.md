@@ -11,8 +11,8 @@ How a version of the provider is cut and published. Maintainers only.
 
 ## Cutting a version
 
-1. On a feature branch: bump `var version` in `main.go`, add the `CHANGELOG.md` entry, run `make test lint docs-check validate-examples`. For a release that touches how a setting is written to the switch, also run the regression suite against the test switch (`make regression-live CONFIRM=1`, see the README; it needs hardware and is never part of CI) and attach its report to the PR.
-2. Open the PR, wait for CI, squash merge.
+1. On a feature branch: bump `var version` in `main.go`, add the `CHANGELOG.md` entry, run `make test lint docs-check validate-examples`. For a minor version with more than about ten fixes, hold an integration review before the release PR: build and test the provider against the library candidate (`make work`) and read the combined diff of the release as one change ([DC-C04](https://github.com/davidlukac/escp-go/blob/main/docs/defect-classes.md#dc-c04)). For a release that touches how a setting is written to the switch, also run the regression suite against the test switch (`make regression-live CONFIRM=1`, see the README; it needs hardware and is never part of CI) and attach its report to the PR.
+2. Open the PR, wait for CI. Before the tag is pushed, read the release's changes together, as one change ([DC-C04](https://github.com/davidlukac/escp-go/blob/main/docs/defect-classes.md#dc-c04)), and run the adversarial pass over the release's diff ([contributing/adversarial-review.md](contributing/adversarial-review.md) and Part 3 of the [library's](https://github.com/davidlukac/escp-go/blob/main/docs/adversarial-review.md)). Then squash merge.
 3. On `main`, once the release PR is merged and pulled: check that `main.go` and the `CHANGELOG.md` entry both say `X.Y.Z`, then `git tag -a vX.Y.Z -m vX.Y.Z` and push **that one tag**.
 
 ## Publishing to the Terraform Registry
