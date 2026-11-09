@@ -19,15 +19,20 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   goreleaser:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # The one job that writes: GoReleaser creates the release and uploads the assets, and
+    # `gh release edit` sets its notes.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           ref: refs/tags/${{ inputs.tag }}
           fetch-depth: 0
       - uses: ./.github/actions/setup

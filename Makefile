@@ -22,9 +22,17 @@ lint: spell
 	build/subtests ./...
 	$(DEVTOOL) golangci-lint run ./...
 
-# The workflow files (a pinned actionlint, run by hand: a workflow change is not covered by the pre-commit hook).
+# The workflow files (a pinned actionlint; the pre-commit hook runs it for a staged workflow, CI for every PR).
 actionlint:
 	$(DEVTOOL) actionlint
+
+# The module files: tidy would change nothing (this module and devtools), and every downloaded
+# dependency matches go.sum.
+modcheck:
+	GOWORK=off go mod tidy -diff
+	GOWORK=off go -C devtools mod tidy -diff
+	GOWORK=off go mod verify
+	GOWORK=off go -C devtools mod verify
 
 # Unit tests plus Terraform lifecycle tests against fakes. No hardware is touched.
 test:
@@ -100,7 +108,7 @@ regression-live:
 compat-table:
 	go test ./internal/provider -run TestReadmeCompatibilityTable -update-readme
 
-.PHONY: work unwork spell actionlint compat-table regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
+.PHONY: work unwork spell actionlint modcheck compat-table regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
 
 # --- coverage -------------------------------------------------------------
 # `make cover` runs the whole suite with the race detector, writes cover.out
