@@ -2,7 +2,7 @@
 
 ## 0.34.0
 
-The last minor version before 1.0: it makes the schema and the behavior of a few settings consistent before they are frozen, so it **breaks** several things. Every change has a step in the [upgrade guide](docs/guides/upgrading-to-0.34.md); none needs a state rewrite. The provider uses [github.com/davidlukac/escp-go](https://github.com/davidlukac/escp-go) v0.9.0.
+It makes the schema and the behavior of a few settings consistent before the interface is frozen at 1.0, so it **breaks** several things. (More minor versions may follow before 1.0: the version number says nothing about how close 1.0 is.) Every change has a step in the [upgrade guide](docs/guides/upgrading-to-0.34.md); none needs a state rewrite. The provider uses [github.com/davidlukac/escp-go](https://github.com/davidlukac/escp-go) v0.9.0.
 
 - **Breaking changes**, one row each (the number is the issue):
 
