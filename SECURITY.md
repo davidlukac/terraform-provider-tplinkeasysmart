@@ -20,6 +20,8 @@ The provider speaks the switch's own management protocol (ESCP), which has **no 
 - The provider shares its UDP reply port (`SO_REUSEPORT`) so several switches can be managed at once. Other processes on the same host that bind the port the same way can see replies; do not run it on a shared multi-user host.
 - Write guards (`allow_disruptive`) and plan-time validation protect against self-inflicted lockouts, not against an attacker on the segment.
 
+The checklists a review runs against this design are in [contributing/adversarial-review.md](contributing/adversarial-review.md) and, for the library underneath, in its [adversarial review](https://github.com/davidlukac/escp-go/blob/main/docs/adversarial-review.md) (the threat model in full, and what is and is not defended). What is reported, and how, is unchanged: privately, as above.
+
 ## In scope
 
 Bugs in this provider that leak credentials (logs, error messages, state), bypass the write guards, crash the plugin on malformed replies, or let a reply from the wrong device be accepted. Weaknesses of the vendor protocol itself are documented above and are out of scope.
