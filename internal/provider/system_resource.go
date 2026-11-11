@@ -78,6 +78,12 @@ func (r *systemResource) apply(ctx context.Context, m *systemResourceModel, add 
 	return b != nil && b.applyBound(ctx, m, add)
 }
 
+// applyBound writes the device description when it differs from the plan, reads it back and checks that
+// the management address did not change with it.
+//
+// readwrite: the read only decides whether to write, the write is the absolute hostname from the plan,
+// and the library's SetHostname keeps the other fields of the system record under its own modify guard,
+// so a stale read cannot lose a concurrent change; the read-back below checks the result.
 func (r *systemResource) applyBound(ctx context.Context, m *systemResourceModel, add func(string, string)) bool {
 	want := model.Hostname(m.Hostname.ValueString())
 	cur, err := r.client.Info(ctx)

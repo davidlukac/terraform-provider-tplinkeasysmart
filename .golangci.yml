@@ -43,7 +43,39 @@ linters:
     - forcetypeassert
     - dupword
     - errchkjson
+    # Layering (see settings.depguard and settings.forbidigo below): which package may import which.
+    - depguard
+    # Clean on this tree when enabled (2026-11); they keep it clean.
+    - gochecknoinits
+    - gocheckcompilerdirectives
+    - durationcheck
+    - makezero
+    - nilnesserr
+    - asasalint
+    - reassign
+    - mirror
+    - dogsled
+    - nosprintfhostport
+    - containedctx
+    - godoclint
+    - maintidx
+    - fatcontext
+    - gosmopolitan
+    - usetesting
+    - exptostd
+    - godox
+    - inamedparam
+    - gomoddirectives
+    - dupl
+    # Left off on purpose (measured on this tree, noise or a decided style): wrapcheck, err113 (wrapping
+    # the library's errors is the contract), paralleltest and tparallel (the tests share process-wide
+    # seams), gochecknoglobals (the few mutable seams are named and tested), mnd, goconst, lll, varnamelen,
+    # exhaustruct ("setting nothing is a setting": zero values are valid), nonamedreturns, funlen,
+    # interfacebloat (SwitchClient is wide on purpose), ireturn (the framework's constructors return
+    # interfaces), funcorder, noinlineerr, fieldalignment and shadow (govet).
   settings:
+    govet:
+      enable: [nilness, unusedwrite, useany]
     gocyclo:
       min-complexity: 15
     gocognit:
@@ -59,13 +91,66 @@ linters:
       # American English, as the Go standard library and godoc spell it.
       locale: US
     forbidigo:
-      # The ESCP library writes nowhere on its own: every message goes through the
-      # *slog.Logger the caller passes in (Config.Logger, DiscoverOptions.Logger).
+      # Types on, so that a call through an alias or an interface is seen by what it is.
+      analyze-types: true
       forbid:
+        # A provider logs through tflog (the context carries Terraform's logger); main, the tools and the
+        # regression harness are programs and may print (the exclusions below match this text).
         - pattern: ^(fmt\.Print(f|ln)?|print|println)$
-          msg: the library logs through its slog.Logger (Config.Logger), never to stdout
+          msg: a provider logs through tflog (the context carries Terraform's logger), never to stdout
         - pattern: ^log\.(Print|Fatal|Panic)(f|ln)?$
-          msg: the library logs through its slog.Logger (Config.Logger), not the log package
+          msg: a provider logs through tflog (the context carries Terraform's logger), not the log package
+        - pattern: ^os\.(Stdout|Stderr)$
+          msg: a provider logs through tflog (the context carries Terraform's logger), never to stdout
+        # The library is the only code that talks to the switch: nothing here opens or writes a socket.
+        - pattern: ^net\.(Dial\w*|Listen\w*|Dialer|ListenConfig)$
+          msg: the escp-go client is the only code that opens a connection to a switch
+        - pattern: ^.*\.(WriteToUDP|WriteMsgUDP|WriteTo)$
+          msg: the escp-go client is the only code that writes to a socket
+        # Every environment variable is read in env.go (null and unknown aware, named in one place).
+        - pattern: ^os\.(Getenv|LookupEnv|Environ)$
+          msg: read environment variables only through the helpers of internal/provider/env.go
+    depguard:
+      # Layers, as the dependencies run today: main -> internal/provider -> the escp-go client, model and
+      # safety; internal/regression -> internal/provider and the fake switch; tools stand alone. A rule
+      # applies to non-test files (`$test` is every _test.go): tests may use the fake switch and testing.
+      # list-mode lax: only what is denied is refused, so `net/netip` is allowed while `net` is not.
+      rules:
+        surface:
+          list-mode: lax
+          files:
+            - "**/internal/provider/**"
+            - "!$test"
+          allow:
+            - net/netip
+          deny:
+            - pkg: net
+              desc: the surface never opens or writes a socket; the escp-go client does (net/netip, for addresses, is allowed)
+            - pkg: syscall
+              desc: the surface does not use the operating system's socket or process calls
+        product:
+          list-mode: lax
+          files:
+            - "$all"
+            - "!$test"
+            - "!**/internal/regression/**"
+          deny:
+            - pkg: github.com/davidlukac/escp-go/escptest
+              desc: the fake switch is test support; only the regression harness (internal/regression) uses it outside tests
+            - pkg: github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/regression
+              desc: the regression harness is imported by tests only
+            - pkg: github.com/davidlukac/terraform-provider-tplinkeasysmart/tools
+              desc: the tools are programs of their own, never imported by product code
+            - pkg: testing
+              desc: only the regression harness (internal/regression) imports testing outside tests
+        tools:
+          list-mode: lax
+          files:
+            - "**/tools/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/davidlukac/terraform-provider-tplinkeasysmart/internal
+              desc: the tools are programs of their own and do not import the provider
     revive:
       rules:
         - name: exported
@@ -88,10 +173,17 @@ linters:
           disabled: true
   exclusions:
     rules:
-      # forbidigo guards the library only; the provider, the tools and main may print.
-      - path: ^(main\.go|tools/|internal/provider/|internal/regression/)
+      # main, the tools and the regression harness are programs: they may print and exit (the socket and
+      # environment rules still apply to them, except where the harness reads its own environment).
+      - path: ^(main\.go|tools/|internal/regression/)
         linters:
           - forbidigo
+        text: tflog
+      # The one file that reads the environment for the provider; the tools and the harness read their own.
+      - path: ^(internal/provider/env\.go|tools/|internal/regression/)
+        linters:
+          - forbidigo
+        text: environment variables
       - path: _test\.go
         linters:
           - gosec

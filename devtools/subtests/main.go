@@ -16,7 +16,7 @@
 // and tparallel ask for t.Parallel, which is another rule).
 //
 // This directory is the single source of the check: it is copied verbatim into the other
-// repositories by the workspace's scripts/sync-subtests, so change it here and sync.
+// repositories, so change it here only; the copies are never edited by hand.
 package main
 
 import "golang.org/x/tools/go/analysis/singlechecker"

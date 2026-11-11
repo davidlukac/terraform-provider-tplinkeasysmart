@@ -71,6 +71,8 @@ func (p *tplinkProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// library allows one client per switch, so the previous ones go first.
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	// lockwait: closeCurrent closes clients, and the library's Close returns in moments by its contract (it ends
+	// the call in flight instead of waiting for it); the context is only the logger's.
 	p.closeCurrent(ctx)
 	b := &registryBuilder{newClient: p.newClient, diags: &resp.Diagnostics, reg: &switchRegistry{named: map[string]SwitchClient{}}, seen: map[string]string{}}
 	if hasOwn {

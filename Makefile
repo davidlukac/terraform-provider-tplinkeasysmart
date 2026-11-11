@@ -20,7 +20,31 @@ spell:
 lint: spell
 	GOWORK=off go -C devtools build -o $(CURDIR)/build/subtests ./subtests
 	build/subtests ./...
+	$(MAKE) analyzers
 	$(DEVTOOL) golangci-lint run ./...
+
+# The project's own checks beyond golangci-lint (devtools/analyzers, copies of escp-go's): readwrite (a
+# function that reads a setting and then writes one) and lockwait (a blocking call while a lock is held).
+# The flags are this repository's names for what the checks look for; the sources are never edited here.
+#   receivers  only a call on a type of this module or of the library counts: the clients the resources
+#              and the regression suite are handed (SwitchClient and the small interfaces each declares),
+#              so that framework calls with the same names (state.SetAttribute, set.Ports()) are not reads
+#              or writes of the switch.
+#   readers    the SwitchClient methods that read a setting; writers: the ones that change one.
+#   guards     the provider holds no lock across a read and a write (the library serializes each call and
+#              guards its own read-modify-write), so no name opens a critical section and a function that
+#              reads and then writes says why in a `// readwrite: <reason>` comment.
+#   lockfuncs  empty: the provider takes its locks with sync.Mutex directly, there is no lock wrapper.
+ANALYZER_FLAGS = \
+	-readwrite.receivers='terraform-provider-tplinkeasysmart/internal/|escp-go\.' \
+	-readwrite.readers='^(Info|LED|Ports|PortStats|LAGs|IGMP|LoopPrevention|PortMirror|MTUVLAN|PortBasedVLAN|Dot1Q|VLANMode|QoS|Bandwidth|StormControl|System|ConfigBackup)$$' \
+	-readwrite.writers='^(Set|Delete|Enable)[A-Z]\w*$$' \
+	-readwrite.guards='^no-modify-guard-in-the-provider$$' \
+	-lockwait.lockfuncs=
+
+analyzers:
+	GOWORK=off go -C devtools build -o $(CURDIR)/build/analyzers ./analyzers
+	build/analyzers $(ANALYZER_FLAGS) ./...
 
 # The workflow files (a pinned actionlint; the pre-commit hook runs it for a staged workflow, CI for every PR).
 actionlint:
@@ -33,6 +57,13 @@ modcheck:
 	GOWORK=off go -C devtools mod tidy -diff
 	GOWORK=off go mod verify
 	GOWORK=off go -C devtools mod verify
+
+# Every fuzz target for SECONDS (default 30) each; the seed corpora run in `make test` anyway. A failing
+# input is written to the package's testdata/fuzz: commit it with the fix. Go fuzzes one target at a time, so
+# a new target is a new line. The minimize time is short because a new input is minimized before the run
+# goes on (the default is a minute).
+fuzz:
+	go test ./internal/regression -run '^$$' -fuzz '^FuzzParseEnvFile$$' -fuzztime $(or $(SECONDS),30)s -fuzzminimizetime 5s
 
 # Unit tests plus Terraform lifecycle tests against fakes. No hardware is touched.
 test:
@@ -108,7 +139,7 @@ regression-live:
 compat-table:
 	go test ./internal/provider -run TestReadmeCompatibilityTable -update-readme
 
-.PHONY: work unwork spell actionlint modcheck compat-table regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
+.PHONY: work unwork spell analyzers fuzz actionlint modcheck compat-table regression regression-live generate lint test testacc docs-check validate-examples vuln snapshot hooks pre-commit
 
 # --- coverage -------------------------------------------------------------
 # `make cover` runs the whole suite with the race detector, writes cover.out

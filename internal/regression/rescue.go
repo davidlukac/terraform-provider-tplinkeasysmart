@@ -31,6 +31,10 @@ type rescueClient interface {
 //
 // The mode goes first: switching it discards the settings of the other modes, and the mirror is
 // independent of them.
+//
+// readwrite: each setting is read and compared with the one recorded when the session opened, then
+// written back as that recorded value (never one derived from the read), and the library allows one client
+// per switch, so the session's client is the only writer in this process in between.
 func (s *Session) Rescue(ctx context.Context) ([]string, error) {
 	var done []string
 	net, err := s.rescuer()
