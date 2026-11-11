@@ -1,6 +1,6 @@
 module github.com/davidlukac/terraform-provider-tplinkeasysmart/devtools
 
-go 1.27.3
+go 1.27.4
 
 tool (
 	github.com/go-gremlins/gremlins/cmd/gremlins
