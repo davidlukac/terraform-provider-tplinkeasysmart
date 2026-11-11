@@ -59,21 +59,24 @@ type Getenv func(string) string
 // Open loads the target from the environment (and from the file named by TPLINK_REGRESSION_ENV_FILE,
 // the gitignored .test.env), prepares it and takes the first readout. Anything wrong with the
 // target fails the test before a single write.
-func Open(t testing.TB, getenv Getenv) *Session { return openWith(t, getenv, nil) }
+func Open(tb testing.TB, getenv Getenv) *Session {
+	tb.Helper()
+	return openWith(tb, getenv, nil)
+}
 
 // openWith is Open with a hook that may change the fake before the first readout (tests only).
-func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Session {
-	t.Helper()
+func openWith(tb testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Session {
+	tb.Helper()
 	env := map[string]string{}
 	if path := getenv(EnvFile); path != "" {
 		f, err := os.Open(path) //nolint:gosec // the path is the operator's own file
 		if err != nil {
-			t.Fatalf("cannot read %s: %v", EnvFile, err)
+			tb.Fatalf("cannot read %s: %v", EnvFile, err)
 		}
 		fileEnv, err := ParseEnvFile(f)
 		_ = f.Close() // read-only, nothing to flush
 		if err != nil {
-			t.Fatalf("%s: %v", path, err)
+			tb.Fatalf("%s: %v", path, err)
 		}
 		env = fileEnv
 	}
@@ -82,13 +85,13 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 	}
 	target, err := LoadTarget(env)
 	if err != nil {
-		t.Fatalf("regression target: %v", err)
+		tb.Fatalf("regression target: %v", err)
 	}
-	s := &Session{Target: target, tb: t, trace: &trace{}}
-	t.Cleanup(func() { s.trace.dumpIfFailed(t) }) // registered first, so it runs last
+	s := &Session{Target: target, tb: tb, trace: &trace{}}
+	tb.Cleanup(func() { s.trace.dumpIfFailed(tb) }) // registered first, so it runs last
 	cfg := escp.Config{Host: target.Host, Username: target.Username, Password: target.Password}
 	if !target.Real() {
-		s.Fake = startFake(t)
+		s.Fake = startFake(tb)
 		if prepare != nil {
 			prepare(s.Fake)
 		}
@@ -97,22 +100,22 @@ func openWith(t testing.TB, getenv Getenv, prepare func(*escptest.Switch)) *Sess
 	s.suite = &suiteClient{dial: func() (*escp.Client, error) { return s.dialClient(cfg) }}
 	c, err := s.suite.get()
 	if err != nil {
-		t.Fatalf("cannot dial %s: %v", target.Name, err)
+		tb.Fatalf("cannot dial %s: %v", target.Name, err)
 	}
 	s.stepAside(s.suite)
-	t.Cleanup(s.suite.release) // the run is over
+	tb.Cleanup(s.suite.release) // the run is over
 	s.rd = CoreReaders(s.suite.get)
-	waitUntilReady(t, target.Name, c, wallClock)
+	waitUntilReady(tb, target.Name, c, wallClock)
 	err = s.capture(context.Background())
 	if err == nil {
 		s.before, err = Take(context.Background(), s.rd)
 	}
 	if err != nil {
-		t.Fatalf("first readout of %s: %v", target.Name, err)
+		tb.Fatalf("first readout of %s: %v", target.Name, err)
 	}
 	s.MAC, _ = model.ParseMAC(s.before["mac"]) // the readout prints MAC.String(), which always parses
 	if err := CheckTestPorts(context.Background(), c, target); err != nil {
-		t.Fatalf("%s: %v", target.Name, err)
+		tb.Fatalf("%s: %v", target.Name, err)
 	}
 	return s
 }
@@ -159,8 +162,9 @@ func (s *Session) capture(ctx context.Context) error {
 
 // startFake starts the model of a freshly reset switch with the port shape of switch 03: the
 // uplink on port 1 and devices on 6, 7 and 8 have a link, the other ports are free.
-func startFake(t testing.TB) *escptest.Switch {
-	f := escptest.Start(t)
+func startFake(tb testing.TB) *escptest.Switch {
+	tb.Helper()
+	f := escptest.Start(tb)
 	f.EnableModel(map[model.PortID]escptest.LinkSpeed{1: escptest.Link1000Full, 6: escptest.Link1000Full, 7: escptest.Link100Full, 8: escptest.Link100Full})
 	return f
 }

@@ -54,6 +54,7 @@ func (s *Session) scenarioWithProvider(t *testing.T, providerHCL, change string,
 
 // restoredCheck fails with the differing settings named when the switch is not as it was.
 func (s *Session) restoredCheck(t *testing.T) resource.TestCheckFunc {
+	t.Helper()
 	return func(*terraform.State) error {
 		diff, err := s.Restored(context.Background())
 		if err != nil {

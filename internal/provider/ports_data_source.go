@@ -3,8 +3,6 @@ package provider
 import (
 	"context"
 
-	"github.com/davidlukac/escp-go/model"
-
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -20,18 +18,13 @@ func NewPortsDataSource() datasource.DataSource { return &portsDataSource{} }
 
 type portsDataSource struct {
 	src    switchSource
-	client portsReader  // set on the per-call copy made by bound()
+	client portLister   // set on the per-call copy made by bound()
 	sw     types.String // the switch that copy is bound to, for ids
-}
-
-// portsReader is the part of the switch API this data source reads.
-type portsReader interface {
-	Ports(ctx context.Context) ([]model.Port, error)
 }
 
 // bound returns a copy of the data source wired to the client of the named switch.
 func (d *portsDataSource) bound(add func(string, string), name types.String) *portsDataSource {
-	return bindSwitch(add, d.src, name, d, func(b *portsDataSource, c portsReader, sw types.String) { b.client, b.sw = c, sw })
+	return bindSwitch(add, d.src, name, d, func(b *portsDataSource, c portLister, sw types.String) { b.client, b.sw = c, sw })
 }
 
 type portModel struct {

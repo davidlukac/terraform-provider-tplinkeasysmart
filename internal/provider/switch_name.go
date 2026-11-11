@@ -71,8 +71,8 @@ func (n switchName) qualify(id string) string {
 
 // splitQualified separates an optional `switch:` prefix from an id (an import id, or what qualify made).
 func splitQualified(id string) (n switchName, rest string) {
-	if i := strings.Index(id, idSeparator); i >= 0 {
-		return switchName(id[:i]), id[i+len(idSeparator):]
+	if before, after, ok := strings.Cut(id, idSeparator); ok {
+		return switchName(before), after
 	}
 	return "", id
 }

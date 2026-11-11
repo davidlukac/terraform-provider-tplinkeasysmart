@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"log/slog"
+	"maps"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -29,9 +30,7 @@ func (tflogHandler) Enabled(context.Context, slog.Level) bool { return true }
 
 func (h tflogHandler) Handle(ctx context.Context, r slog.Record) error {
 	fields := make(map[string]any, len(h.fields)+r.NumAttrs())
-	for k, v := range h.fields {
-		fields[k] = v
-	}
+	maps.Copy(fields, h.fields)
 	r.Attrs(func(a slog.Attr) bool { h.addField(fields, a); return true })
 	switch {
 	case r.Level >= slog.LevelError:
@@ -50,9 +49,7 @@ func (h tflogHandler) Handle(ctx context.Context, r slog.Record) error {
 
 func (h tflogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	fields := make(map[string]any, len(h.fields)+len(attrs))
-	for k, v := range h.fields {
-		fields[k] = v
-	}
+	maps.Copy(fields, h.fields)
 	for _, a := range attrs {
 		h.addField(fields, a)
 	}

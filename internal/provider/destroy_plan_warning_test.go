@@ -124,14 +124,17 @@ func TestADestroyPlanWarnsForEveryResourceWhoseDeleteActsOnTheSwitch(t *testing.
 		warn func(t *testing.T, allow bool) []string
 	}{
 		{"port-based VLAN group", func(t *testing.T, allow bool) []string {
+			t.Helper()
 			m := portVLANResourceModel{Switch: types.StringNull(), VLAN: types.Int64Value(2), Ports: portsToSet(linked), AllowDisruptive: types.BoolValue(allow)}
 			return warningsOf(destroyPlan(t, &portVLANResource{src: reg()}, m))
 		}},
 		{"802.1Q VLAN", func(t *testing.T, allow bool) []string {
+			t.Helper()
 			m := vlan8021QGroupModel{Switch: types.StringNull(), VLAN: types.Int64Value(20), Name: types.StringValue("x"), TaggedPorts: portsToSet(0), UntaggedPorts: portsToSet(linked), AllowDisruptive: types.BoolValue(allow)}
 			return warningsOf(destroyPlan(t, &vlan8021QGroupResource{src: reg()}, m))
 		}},
 		{"PVID", func(t *testing.T, allow bool) []string {
+			t.Helper()
 			m := vlan8021QPVIDModel{Switch: types.StringNull(), Port: types.Int64Value(4), PVID: types.Int64Value(20), AllowDisruptive: types.BoolValue(allow)}
 			return warningsOf(destroyPlan(t, &vlan8021QPVIDResource{src: reg()}, m))
 		}},

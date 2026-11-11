@@ -102,7 +102,10 @@ func (l *lender) takeBack() {
 
 // runTestCase is resource.Test; the tests of the handover replace it, because resource.Test needs a
 // Terraform binary and TF_ACC.
-var runTestCase = func(t *testing.T, tc resource.TestCase) { resource.Test(t, tc) }
+var runTestCase = func(t *testing.T, tc resource.TestCase) {
+	t.Helper()
+	resource.Test(t, tc)
+}
 
 // run is resource.Test with the switch taken back before every check and before every step's own
 // preparation, and at the end, also when the test fails (resource.Test ends it with FailNow), so a

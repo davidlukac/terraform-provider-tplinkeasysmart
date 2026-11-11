@@ -43,14 +43,14 @@ var wallClock = clock{now: time.Now, sleep: time.Sleep}
 
 // waitUntilReady holds a scenario back until the switch answers reads promptly, and fails it when the
 // switch does not within the budget. What it waited is logged (visible on failure and with -v).
-func waitUntilReady(t testing.TB, name string, c settleClient, clk clock) {
-	t.Helper()
+func waitUntilReady(tb testing.TB, name string, c settleClient, clk clock) {
+	tb.Helper()
 	waited, err := settle(context.Background(), c, clk)
 	if err != nil {
-		t.Fatalf("%s is not ready for a scenario: %v", name, err)
+		tb.Fatalf("%s is not ready for a scenario: %v", name, err)
 	}
 	if waited > settleFast*settleReplies {
-		t.Logf("waited %v for %s to answer reads promptly", waited.Round(time.Second), name)
+		tb.Logf("waited %v for %s to answer reads promptly", waited.Round(time.Second), name)
 	}
 }
 

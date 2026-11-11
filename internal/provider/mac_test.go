@@ -253,7 +253,7 @@ func TestConfigureRefusesAMalformedMACThatGotPastTheSchema(t *testing.T) {
 	clearProviderEnv(t)
 	p := &tplinkProvider{newClient: func(escp.Config) (SwitchClient, error) {
 		t.Fatal("no client may be built")
-		return nil, nil
+		return nil, errNoClientBuilt
 	}}
 	schemaResp := &provider.SchemaResponse{}
 	p.Schema(context.Background(), provider.SchemaRequest{}, schemaResp)

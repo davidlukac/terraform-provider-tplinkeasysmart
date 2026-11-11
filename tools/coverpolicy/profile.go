@@ -29,7 +29,7 @@ func moduleOf(root string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("reading the module path: %w", err)
 	}
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if fields := strings.Fields(line); len(fields) == 2 && fields[0] == "module" {
 			return fields[1], nil
 		}

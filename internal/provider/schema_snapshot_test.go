@@ -213,9 +213,9 @@ func lineDiff(want, got string) string {
 	for i := range lcs {
 		lcs[i] = make([]int, len(b)+1)
 	}
-	for i := len(a) - 1; i >= 0; i-- {
+	for i, v := range slices.Backward(a) {
 		for j := len(b) - 1; j >= 0; j-- {
-			if a[i] == b[j] {
+			if v == b[j] {
 				lcs[i][j] = lcs[i+1][j+1] + 1
 			} else {
 				lcs[i][j] = max(lcs[i+1][j], lcs[i][j+1])

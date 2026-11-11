@@ -67,12 +67,24 @@ linters:
     - inamedparam
     - gomoddirectives
     - dupl
+    # The rest of the library's set (escp-go enables them; each was measured here, its findings were fixed
+    # in the same change, and now each keeps this tree clean):
+    - modernize  # the newer standard library idiom for slices, maps, strings, errors and reflect
+    - thelper  # test helpers call t.Helper and name the testing value consistently
+    - nilnil  # no return of a nil value together with a nil error
+    - iface  # two interfaces with the same method set, an interface that only wraps another
+    - sloglint  # one style of attribute per slog call
+    - godot  # a comment ends with a period
+    - testableexamples  # an example that prints has an Output comment, so it is run and checked
     # Left off on purpose (measured on this tree, noise or a decided style): wrapcheck, err113 (wrapping
     # the library's errors is the contract), paralleltest and tparallel (the tests share process-wide
     # seams), gochecknoglobals (the few mutable seams are named and tested), mnd, goconst, lll, varnamelen,
     # exhaustruct ("setting nothing is a setting": zero values are valid), nonamedreturns, funlen,
     # interfacebloat (SwitchClient is wide on purpose), ireturn (the framework's constructors return
     # interfaces), funcorder, noinlineerr, fieldalignment and shadow (govet).
+    # staticcheck's ST1000 (a package comment) is not in golangci-lint's default staticcheck set and the
+    # library leaves it off too; revive's package-comments is disabled below for the same reason. Measured
+    # here: 41 reports, one per file of the single package without a comment (internal/provider).
   settings:
     govet:
       enable: [nilness, unusedwrite, useany]
