@@ -25,7 +25,7 @@ How to use this page: as the library's page describes it. Before you write code,
 
 Each entry has the same fields, in this order, as in the library's catalog: the rule in one sentence; why (what happened); the DESIGN question; the TEST requirement; AUTOMATION; the ADVERSARIAL probe.
 
-AUTOMATION names each check by kind and name, so that a test can verify that the name exists. The kinds are `test:` (a test function), `fuzz:` (a fuzz target), `make:` (a Makefile target), `lint:` (a linter enabled in `.golangci.yml`), `analyzer:` (a directory of `devtools/`), `script:` (a path), `workflow:` (a file in `.github/workflows/`), `reading:` (it cannot be scripted; the reason follows) and `proposed:` (not built yet; the name is followed by the issue that tracks it in parentheses; #196 tracks the ones that have no issue of their own, and #195 the schema snapshot). A claim that a check exists without a name is not accepted.
+AUTOMATION names each check by kind and name, so that a test can verify that the name exists. The kinds are `test:` (a test function), `fuzz:` (a fuzz target), `make:` (a Makefile target), `lint:` (a linter enabled in `.golangci.yml`), `analyzer:` (a directory of `devtools/`, or the name an analyzer declared there carries), `script:` (a path), `workflow:` (a file in `.github/workflows/`), `reading:` (it cannot be scripted; the reason follows) and `proposed:` (not built yet; the name is followed by the issue that tracks it in parentheses; #196 tracks the ones that have no issue of their own). A claim that a check exists without a name is not accepted. `make lint` runs `devtools/catalogcheck` (`make catalogcheck`, a copy of the library's program), which fails with one line per problem when a name in this page does not resolve (a renamed test, a removed target), when a `reading:` has no reason or a `proposed:` no issue, when a `proposed:` names something that exists already (write it with its kind), when a field of an entry is missing or out of order, when an entry is not in the routing table, and when an id or a link to this page written anywhere else in the repository resolves to nothing; the ids and links into the library's page are checked for their shape only.
 
 ---
 
@@ -34,7 +34,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 | Class | In this repository |
 |---|---|
 | [DC-C01](https://github.com/davidlukac/escp-go/blob/main/docs/defect-classes.md#dc-c01) guarantees | The text of a schema description, a template or a generated page is a promise ("destroy only removes it from state"); each needs a test (see DC-P02). `make:docs-check` keeps the generated pages current but does not test what they promise. |
-| [DC-C02](https://github.com/davidlukac/escp-go/blob/main/docs/defect-classes.md#dc-c02) one source | `make:generate`, `make:docs-check`, `test:TestEveryTypeHasItsExample`, `test:TestNoExampleWithoutAType`, `test:TestExamplesPlan`, `test:TestReadmeCompatibilityTable`, `make:compat-table` (the compatibility table is built from the library's file). |
+| [DC-C02](https://github.com/davidlukac/escp-go/blob/main/docs/defect-classes.md#dc-c02) one source | `make:generate`, `make:docs-check`, `test:TestEveryTypeHasItsExample`, `test:TestNoExampleWithoutAType`, `test:TestExamplesPlan`, `test:TestReadmeCompatibilityTable`, `make:compat-table` (the compatibility table is built from the library's file), `analyzer:catalogcheck` (every name this page gives to a check resolves). |
 | [DC-C03](https://github.com/davidlukac/escp-go/blob/main/docs/defect-classes.md#dc-c03) flipped defaults | A library bump runs the whole regression suite (`make:regression`), not only the unit tests, and on a device before a release that changes how a setting is written (`make:regression-live`); a new refusal gets a row in the upgrade guide and in the changelog. The library's default flips (relocation by MAC, a final `Close`) each needed a change here (#188, #191). |
 | [DC-C04](https://github.com/davidlukac/escp-go/blob/main/docs/defect-classes.md#dc-c04) seams | The provider is built and tested against the library candidate before the library's tag is pushed (`make:work` links a local checkout). `proposed:canary(#196)` (a CI job that builds and tests the provider against the library's `main`, weekly and on library pull requests). |
 | [DC-C05](https://github.com/davidlukac/escp-go/blob/main/docs/defect-classes.md#dc-c05) tests must fail | `make:mutation-diff` for a change of at most 40 lines of non-test Go code; the tests of `internal/provider` take minutes, so mutate a larger change by hand, one file at a time; `analyzer:subtests`. A guard rule has a test for each value of its table (#170). |
@@ -103,7 +103,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** Golden ids for every way of selecting a switch; adding a switch to the configuration plans no change for existing objects; import ids round trip.
 
-**Automation.** `test:TestTheIdFormatOfEverySelectionIsFrozen`, `test:TestImportIdsCarryTheSwitchName`, `test:TestSwitchSelectionErrorsAreReportedWhilePlanning`, `test:TestChangingTheSwitchReplacesTheResource`; `proposed:TestSchemaSnapshotIsCurrent(#195)` (see DC-P05).
+**Automation.** `test:TestTheIdFormatOfEverySelectionIsFrozen`, `test:TestImportIdsCarryTheSwitchName`, `test:TestSwitchSelectionErrorsAreReportedWhilePlanning`, `test:TestChangingTheSwitchReplacesTheResource`; `test:TestSchemaSnapshotIsCurrent` (see DC-P05).
 
 **Adversarial probe.** Rename a key; add a switch; remove the default switch; the same switch under two spellings; `host` in one place and `mac` in another.
 
@@ -112,13 +112,13 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Rule.** Attribute names, types, modes, enum spellings, id formats and the shape of data-source collections are consistent across resources and data sources, described, and compared with a snapshot of the schema; removing, renaming or retyping is a break, marked as one, with a deprecation or an upgrade path (see the Stability section of the README).
 
-**Why.** The `qos` resource and data source disagreed on the type of `mode` (#162); the port number was `id` in some data sources and `port` in others (#163); six attributes had no description (#144). Nothing compares the schema of one release with the next.
+**Why.** The `qos` resource and data source disagreed on the type of `mode` (#162); the port number was `id` in some data sources and `port` in others (#163); six attributes had no description (#144). Nothing compared the schema of one release with the next until the snapshot of #195.
 
 **Design question.** What is the closest existing attribute, and does the new one have the same name, type, mode and spelling? Will this still be right with a second hardware model or a filter? List, map or set, and why?
 
 **Test requirement.** A snapshot of the schema compared in CI, where a diff is a deliberate edit with a changelog break marker; the naming and description test; enum spellings equal to the library's; volatile data (counters) only in data sources; an upgrade-guide row for every break.
 
-**Automation.** `test:TestEverySchemaAttributeHasADescriptionAndASnakeCaseName`, `make:docs-check`, `make:validate-examples`; `proposed:TestSchemaSnapshotIsCurrent(#195)` (serialize the provider schema and compare it with `internal/provider/testdata/schema_snapshot.txt`); `reading:` whether a new attribute is consistent with its neighbors needs a person.
+**Automation.** `test:TestEverySchemaAttributeHasADescriptionAndASnakeCaseName`, `make:docs-check`, `make:validate-examples`; `test:TestSchemaSnapshotIsCurrent` (serializes the provider schema and compares it with `internal/provider/testdata/schema_snapshot.txt`), `test:TestSchemaSnapshotCoversEveryResourceAndDataSource`; `reading:` whether a new attribute is consistent with its neighbors needs a person.
 
 **Adversarial probe.** Write the upgrade-guide row for the change; if you cannot say how a user migrates, it is a break. Express the same configuration against the previous and the new schema.
 
@@ -133,7 +133,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A silent fake with a counted timeout: N resources cost one timeout; a parallel apply of resources that share device state ends in the same result in every order; configuring the provider twice closes the first clients.
 
-**Automation.** `test:TestFailFastStopsAskingASwitchThatDidNotAnswer`, `test:TestFailFastNeverLatchesASwitchThatAnswered`, `test:TestReconfiguringTheProviderClosesThePreviousClients`; `proposed:TestParallelAppliesAreOrderIndependent(#196)` (a shuffled-order apply of resources that share device state); `proposed:latencyfake(#196)` (a fake with injected latency for the lifecycle tests).
+**Automation.** `test:TestFailFastStopsAskingASwitchThatDidNotAnswer`, `test:TestFailFastNeverLatchesASwitchThatAnswered`, `test:TestReconfiguringTheProviderClosesThePreviousClients`, `analyzer:lockwait` (flags a blocking call while a mutex is held; an intended wait carries `// lockwait: <reason>`), `analyzer:readwrite` (flags a function that reads a setting of the switch and then writes one; an intended case carries `// readwrite: <reason>`); `proposed:TestParallelAppliesAreOrderIndependent(#196)` (a shuffled-order apply of resources that share device state); `proposed:latencyfake(#196)` (a fake with injected latency for the lifecycle tests).
 
 **Adversarial probe.** Turn the switch off during a plan; apply twenty resources on one switch at `-parallelism=10`; interrupt an apply; change the provider configuration between two plans.
 
@@ -148,6 +148,6 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** The matrix in `CONTRIBUTING.md`, as tests; a scenario takes its ports from the target and restores the original value by configuration; `make regression` passes before a push that touches the client, the fake, the provider or a type the scenarios use; a rule that only a device showed is added to the fake as measured, and a rule that is only assumed is marked as such in a comment.
 
-**Automation.** `make:testacc`, `make:regression`, `make:regression-live` (maintainers; needs hardware); `proposed:TestEveryTypeHasARegressionScenario(#196)` (list the registered types and require a scenario name for each); `proposed:scenarioskip(#196)` (CI fails when a regression scenario was skipped).
+**Automation.** `make:testacc`, `make:regression`, `make:regression-live` (maintainers; needs hardware), `fuzz:FuzzParseEnvFile` and `make:fuzz` (the regression harness's parser of the credentials file takes arbitrary text); `proposed:TestEveryTypeHasARegressionScenario(#196)` (list the registered types and require a scenario name for each); `proposed:scenarioskip(#196)` (CI fails when a regression scenario was skipped).
 
 **Adversarial probe.** Run a scenario with the device slow and with it dropping replies; retype a value and search the scenarios for `fmt.Sprint` and `%v` of it.

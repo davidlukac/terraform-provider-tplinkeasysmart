@@ -13,9 +13,28 @@ generate:
 # American English in every tracked text file, not only the Go comments the misspell linter reads: the
 # Markdown, templates, YAML, shell and the Makefile too. The same word list as the linter (misspell, locale US,
 # pinned in devtools). The changelog quotes the past and is left as it was.
+# That word list lacks some verbs in their British -ise form (it knows most, not all), so a second pass looks
+# for the forms of the ones found missing, as stems written so that this file does not contain the words it
+# forbids: add a stem here when a British word gets through.
+SPELL_FILES = '*.go' '*.md' '*.yml' '*.yaml' '*.json' '*.sh' '*.tmpl' '*.tf' Makefile ':!:CHANGELOG.md' ':!:go.sum'
+BRITISH_VERBS = (normali|generali|speciali|capitali|canonicali|parametri|tokeni)(s|se|sed|ses|sing|sation|sations)
+
 spell:
-	@git ls-files -z -- '*.go' '*.md' '*.yml' '*.yaml' '*.json' '*.sh' '*.tmpl' '*.tf' Makefile ':!:CHANGELOG.md' ':!:go.sum' \
+	@git ls-files -z -- $(SPELL_FILES) \
 		| xargs -0 env $(DEVTOOL) misspell -locale US -error
+	@hits=$$(git ls-files -z -- $(SPELL_FILES) | xargs -0 grep -nIiEw '$(BRITISH_VERBS)' /dev/null || true); \
+		if [ -n "$$hits" ]; then echo "$$hits"; echo "British spelling: use the -ize form (American English)"; exit 1; fi
+
+# The names the defect catalog gives to its checks (a test, a make target, a linter, an analyzer, a
+# workflow) all exist: a renamed test or a removed target fails here (devtools/catalogcheck, a copy of
+# escp-go's; it exits 1 with one line per problem). The ids of the catalog are the P classes; the
+# links to the library's classes are checked for their shape only.
+.PHONY: catalogcheck
+lint: catalogcheck
+
+catalogcheck:
+	GOWORK=off go -C devtools build -o $(CURDIR)/build/catalogcheck ./catalogcheck
+	build/catalogcheck -root . -catalog contributing/defect-classes.md -ids P
 
 lint: spell
 	GOWORK=off go -C devtools build -o $(CURDIR)/build/subtests ./subtests
