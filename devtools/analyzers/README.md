@@ -58,5 +58,5 @@ that is not the client with a method of the same name is a false hit unless `-re
    every intended case.
 
 The directory is one package with no import of another directory of the module: it is copied verbatim into
-the other repositories (their `devtools` module has another path) by the workspace's sync script, so it stays
+the other repositories (their `devtools` module has another path) by a script that lives outside this repository, so it stays
 one directory, and a new analyzer is a new file in it.

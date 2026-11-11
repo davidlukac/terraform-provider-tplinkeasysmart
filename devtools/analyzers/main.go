@@ -7,8 +7,8 @@
 // another. `make lint` runs it next to the `subtests` check.
 //
 // This directory is the single source of the checks: it is one package with no import of another
-// directory of this module, so the workspace's scripts/sync-subtests can copy it verbatim into the
-// other repositories (whose devtools module has another path). Change it here, then sync.
+// directory of this module, so it can be copied verbatim into the other repositories (whose devtools
+// module has another path). Change it here only; the copies are never edited by hand.
 package main
 
 import "golang.org/x/tools/go/analysis/multichecker"
