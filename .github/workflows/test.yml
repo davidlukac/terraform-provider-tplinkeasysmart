@@ -28,16 +28,25 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # tfplugindocs needs a Terraform binary to read the provider schema.
       - uses: ./.github/actions/setup
         with:
           terraform: latest
+      # `go mod tidy -diff` fails when tidy would change go.mod or go.sum (for the module and for
+      # devtools); `go mod verify` fails when a downloaded dependency differs from go.sum.
+      - name: Module files are tidy and verified
+        run: make modcheck
       - name: Build
         run: go build -v ./...
       # The linter and govulncheck are the versions pinned in devtools/go.mod, the same ones
       # `make pre-commit` runs locally.
       - name: Lint
         run: make lint
+      # The pinned actionlint (devtools/go.mod), the same one the pre-commit hook runs.
+      - name: Workflow files are valid
+        run: make actionlint
       - name: Generated docs are up to date
         run: make docs-check
       - name: Documentation examples validate against the schemas
@@ -58,6 +67,8 @@ jobs:
         go: ["go.mod", "stable"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
         with:
           go-version: ${{ matrix.go }}
@@ -100,6 +111,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The one checkout that keeps its credentials: the badges branch is pushed below.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -144,6 +156,8 @@ jobs:
         terraform: ["1.4.*", "1.6.*", "1.8.*", "1.10.*", "1.12.*", "1.14.*", "1.16.*", "latest"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
         with:
           terraform: ${{ matrix.terraform }}
@@ -160,6 +174,8 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - id: next
         name: Find the newest pre-release newer than the latest stable
         run: |
@@ -190,6 +206,8 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
@@ -216,6 +234,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
