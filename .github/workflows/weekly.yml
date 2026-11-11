@@ -1,0 +1,37 @@
+# Weekly checks that need no commit to go wrong: a scan for vulnerabilities that were published since the
+# last push. An advisory appears without any change of ours (one in the Go standard library turned `main`
+# red after two unrelated merges), so the scan that runs on a push would not see it until the next one, and
+# Dependabot does not cover it: it updates modules and actions, not the standard library.
+#
+# The scan uses the Go version of go.mod on purpose, the version CI and the release are built with: a
+# floor that is behind a fixed release turns this red, where a scan with `stable` would pass because the
+# newest Go already has the fix. The step "Go version" prints it. `make vuln` reproduces it locally.
+name: Weekly checks
+
+on:
+  schedule:
+    - cron: "31 5 * * 2"
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  vulnerabilities:
+    name: Vulnerabilities
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No go-version input: the setup action installs the version in go.mod.
+      - uses: ./.github/actions/setup
+      - name: Go version
+        run: go version
+      - name: Known vulnerabilities
+        run: make vuln
