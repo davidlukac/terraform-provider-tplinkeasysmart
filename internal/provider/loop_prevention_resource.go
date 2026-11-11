@@ -75,6 +75,13 @@ func (r *loopPreventionResource) apply(ctx context.Context, plan *loopPrevention
 	return b != nil && b.applyBound(ctx, plan, add)
 }
 
+// applyBound writes loop prevention when the switch differs from the plan, refusing a change that was
+// not opted in to, and reads it back.
+//
+// readwrite: the singleton owns the setting and the write is the absolute value from the plan, never a
+// value derived from the read, so a read that is stale by the time of the write cannot lose another
+// writer's change to a different field; the read only decides whether to write (and which refusal to
+// word), and the read-back after the write checks what the switch kept.
 func (r *loopPreventionResource) applyBound(ctx context.Context, plan *loopPreventionModel, add func(string, string)) bool {
 	want := plan.Enabled.ValueBool()
 	have, err := r.client.LoopPrevention(ctx)

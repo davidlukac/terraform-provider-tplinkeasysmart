@@ -1,0 +1,387 @@
+# The shape of the provider's schema (kind, required/optional/computed/sensitive, defaults, plan
+# modifiers, validators, deprecation), not its descriptions. A change here is a change of the contract:
+# review it, and regenerate with
+#   go test ./internal/provider -run TestSchemaSnapshotIsCurrent -update-schema-snapshot
+
+provider
+  allow_unverified_firmware: BoolAttribute [optional]
+  host: StringAttribute [optional]
+  mac: StringAttribute [optional]
+    validators: provider.stringRule: must be a MAC address such as aa:bb:cc:dd:ee:ff
+  password: StringAttribute [optional sensitive]
+  relocate_by_mac: BoolAttribute [optional]
+  switches: MapNestedAttribute [optional]
+    validators: mapvalidator.keysAreValidator: key must satisfy all validations: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit, and not `default`
+    allow_unverified_firmware: BoolAttribute [optional]
+    host: StringAttribute [optional]
+    mac: StringAttribute [optional]
+      validators: provider.stringRule: must be a MAC address such as aa:bb:cc:dd:ee:ff
+    password: StringAttribute [required sensitive]
+    relocate_by_mac: BoolAttribute [optional]
+    timeout_seconds: Int64Attribute [optional]
+      validators: int64validator.betweenValidator: value must be between 1 and 30
+    username: StringAttribute [required]
+  timeout_seconds: Int64Attribute [optional]
+    validators: int64validator.betweenValidator: value must be between 1 and 30
+  username: StringAttribute [optional]
+
+data tplinkeasysmart_bandwidth_control
+  id: StringAttribute [computed]
+  ports: ListNestedAttribute [computed]
+    egress_kbps: Int64Attribute [computed]
+    ingress_kbps: Int64Attribute [computed]
+    port: Int64Attribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+data tplinkeasysmart_config_backup
+  content_base64: StringAttribute [computed sensitive]
+  id: StringAttribute [computed]
+  include_content: BoolAttribute [optional]
+  sha256: StringAttribute [computed]
+  size: Int64Attribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+data tplinkeasysmart_igmp_snooping
+  enabled: BoolAttribute [computed]
+  id: StringAttribute [computed]
+  multicast_groups: ListNestedAttribute [computed]
+    ip: StringAttribute [computed]
+    ports: ListAttribute [computed]
+      element type: basetypes.Int64Type
+    vlan: Int64Attribute [computed]
+  report_message_suppression: BoolAttribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+data tplinkeasysmart_lags
+  id: StringAttribute [computed]
+  lags: ListNestedAttribute [computed]
+    id: Int64Attribute [computed]
+    ports: ListAttribute [computed]
+      element type: basetypes.Int64Type
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+data tplinkeasysmart_port_mirror
+  egress_ports: ListAttribute [computed]
+    element type: basetypes.Int64Type
+  enabled: BoolAttribute [computed]
+  id: StringAttribute [computed]
+  ingress_ports: ListAttribute [computed]
+    element type: basetypes.Int64Type
+  mirror_port: Int64Attribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+data tplinkeasysmart_port_statistics
+  id: StringAttribute [computed]
+  ports: ListNestedAttribute [computed]
+    actual_speed: StringAttribute [computed]
+    enabled: BoolAttribute [computed]
+    port: Int64Attribute [computed]
+    rx_bad_packets: Int64Attribute [computed]
+    rx_good_packets: Int64Attribute [computed]
+    tx_bad_packets: Int64Attribute [computed]
+    tx_good_packets: Int64Attribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+data tplinkeasysmart_ports
+  id: StringAttribute [computed]
+  ports: ListNestedAttribute [computed]
+    actual_flow_control: BoolAttribute [computed]
+    actual_speed: StringAttribute [computed]
+    configured_flow_control: BoolAttribute [computed]
+    configured_speed: StringAttribute [computed]
+    enabled: BoolAttribute [computed]
+    lag: Int64Attribute [computed]
+    port: Int64Attribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+data tplinkeasysmart_qos
+  id: StringAttribute [computed]
+  mode: StringAttribute [computed]
+  port_priorities: ListNestedAttribute [computed]
+    port: Int64Attribute [computed]
+    priority: Int64Attribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+data tplinkeasysmart_storm_control
+  id: StringAttribute [computed]
+  ports: ListNestedAttribute [computed]
+    broadcast: BoolAttribute [computed]
+    enabled: BoolAttribute [computed]
+    multicast: BoolAttribute [computed]
+    port: Int64Attribute [computed]
+    rate_kbps: Int64Attribute [computed]
+    unknown_unicast: BoolAttribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+data tplinkeasysmart_system_info
+  auto_save: BoolAttribute [computed]
+  dhcp: BoolAttribute [computed]
+  factory_default: BoolAttribute [computed]
+  firmware_version: StringAttribute [computed]
+  gateway: StringAttribute [computed]
+  hardware_version: StringAttribute [computed]
+  hostname: StringAttribute [computed]
+  id: StringAttribute [computed]
+  ip_address: StringAttribute [computed]
+  mac_address: StringAttribute [computed]
+  model: StringAttribute [computed]
+  netmask: StringAttribute [computed]
+  port_count: Int64Attribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+data tplinkeasysmart_vlan_8021q
+  enabled: BoolAttribute [computed]
+  id: StringAttribute [computed]
+  max_vlans: Int64Attribute [computed]
+  pvids: ListNestedAttribute [computed]
+    port: Int64Attribute [computed]
+    pvid: Int64Attribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+  vlans: ListNestedAttribute [computed]
+    id: Int64Attribute [computed]
+    name: StringAttribute [computed]
+    tagged_ports: ListAttribute [computed]
+      element type: basetypes.Int64Type
+    untagged_ports: ListAttribute [computed]
+      element type: basetypes.Int64Type
+
+data tplinkeasysmart_vlan_mtu
+  enabled: BoolAttribute [computed]
+  id: StringAttribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+  uplink_port: Int64Attribute [computed]
+
+data tplinkeasysmart_vlan_port_based
+  enabled: BoolAttribute [computed]
+  id: StringAttribute [computed]
+  max_vlans: Int64Attribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+  vlans: ListNestedAttribute [computed]
+    id: Int64Attribute [computed]
+    ports: ListAttribute [computed]
+      element type: basetypes.Int64Type
+
+resource tplinkeasysmart_bandwidth_limit (schema version 0)
+  allow_disruptive: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  egress_kbps: Int64Attribute [optional computed]
+    default: int64default.staticInt64Default: value defaults to 0
+    validators: provider.rateKbps: 0 (unlimited) or a multiple of 64 up to 1000000 kbps
+  ingress_kbps: Int64Attribute [optional computed]
+    default: int64default.staticInt64Default: value defaults to 0
+    validators: provider.rateKbps: 0 (unlimited) or a multiple of 64 up to 1000000 kbps
+  port: Int64Attribute [required]
+    plan modifiers: int64planmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: int64validator.betweenValidator: value must be between 1 and 32
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_igmp_snooping (schema version 0)
+  enabled: BoolAttribute [required]
+  id: StringAttribute [computed]
+    plan modifiers: stringplanmodifier.useStateForUnknownModifier: Once set, the value of this attribute in state will not change.
+  report_message_suppression: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_lag (schema version 0)
+  allow_disruptive: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  group: Int64Attribute [required]
+    plan modifiers: int64planmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: int64validator.betweenValidator: value must be between 1 and 2
+  ports: SetAttribute [required]
+    element type: basetypes.Int64Type
+    validators: setvalidator.valueInt64sAreValidator: element value must satisfy all validations: value must be between 1 and 32
+    validators: setvalidator.sizeBetweenValidator: set must contain at least 2 elements and at most 4 elements
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_led (schema version 0)
+  enabled: BoolAttribute [required]
+  id: StringAttribute [computed]
+    plan modifiers: stringplanmodifier.useStateForUnknownModifier: Once set, the value of this attribute in state will not change.
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_loop_prevention (schema version 0)
+  allow_disruptive: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  enabled: BoolAttribute [required]
+  id: StringAttribute [computed]
+    plan modifiers: stringplanmodifier.useStateForUnknownModifier: Once set, the value of this attribute in state will not change.
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_management_ip (schema version 0)
+  allow_disruptive: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  dhcp: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  gateway: StringAttribute [optional computed]
+  id: StringAttribute [computed]
+    plan modifiers: stringplanmodifier.useStateForUnknownModifier: Once set, the value of this attribute in state will not change.
+  ip_address: StringAttribute [optional computed]
+  netmask: StringAttribute [optional computed]
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_port (schema version 0)
+  actual_speed: StringAttribute [computed]
+  allow_disruptive: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  enabled: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to true
+  flow_control: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  port: Int64Attribute [required]
+    plan modifiers: int64planmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: int64validator.betweenValidator: value must be between 1 and 32
+  speed: StringAttribute [optional computed]
+    default: stringdefault.staticStringDefault: value defaults to auto
+    validators: stringvalidator.oneOfValidator: value must be one of: ["auto" "10Mbps-half" "10Mbps-full" "100Mbps-half" "100Mbps-full" "1000Mbps-full"]
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_port_mirror (schema version 0)
+  allow_disruptive: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  egress_ports: SetAttribute [optional computed]
+    element type: basetypes.Int64Type
+    default: setdefault.staticValueDefault: value defaults to []
+    validators: setvalidator.valueInt64sAreValidator: element value must satisfy all validations: value must be between 1 and 32
+  enabled: BoolAttribute [required]
+  id: StringAttribute [computed]
+    plan modifiers: stringplanmodifier.useStateForUnknownModifier: Once set, the value of this attribute in state will not change.
+  ingress_ports: SetAttribute [optional computed]
+    element type: basetypes.Int64Type
+    default: setdefault.staticValueDefault: value defaults to []
+    validators: setvalidator.valueInt64sAreValidator: element value must satisfy all validations: value must be between 1 and 32
+  mirror_port: Int64Attribute [optional]
+    validators: int64validator.betweenValidator: value must be between 1 and 32
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_qos (schema version 0)
+  id: StringAttribute [computed]
+    plan modifiers: stringplanmodifier.useStateForUnknownModifier: Once set, the value of this attribute in state will not change.
+  mode: StringAttribute [required]
+    validators: stringvalidator.oneOfValidator: value must be one of: ["port-based" "802.1p" "dscp-802.1p"]
+  port_priorities: MapAttribute [optional computed]
+    element type: basetypes.Int64Type
+    default: mapdefault.staticValueDefault: value defaults to {}
+    validators: mapvalidator.keysAreValidator: key must satisfy all validations: a port number between 1 and 32
+    validators: mapvalidator.valueInt64sAreValidator: element value must satisfy all validations: value must be between 1 and 4
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_storm_limit (schema version 0)
+  allow_disruptive: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  broadcast: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  multicast: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  port: Int64Attribute [required]
+    plan modifiers: int64planmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: int64validator.betweenValidator: value must be between 1 and 32
+  rate_kbps: Int64Attribute [optional computed]
+    default: int64default.staticInt64Default: value defaults to 0
+    validators: provider.rateKbps: 0 (unlimited) or a multiple of 64 up to 1000000 kbps
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+  unknown_unicast: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+
+resource tplinkeasysmart_system (schema version 0)
+  hostname: StringAttribute [required]
+    validators: provider.stringRule: must be a device description: 1 to 32 letters, digits and hyphens, not starting or ending with a hyphen
+  id: StringAttribute [computed]
+    plan modifiers: stringplanmodifier.useStateForUnknownModifier: Once set, the value of this attribute in state will not change.
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_vlan_8021q_group (schema version 0)
+  allow_disruptive: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  name: StringAttribute [optional computed]
+    default: stringdefault.staticStringDefault: value defaults to 
+    validators: provider.stringRule: must be a VLAN name: up to 10 letters, digits, hyphens and underscores
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+  tagged_ports: SetAttribute [optional computed]
+    element type: basetypes.Int64Type
+    default: setdefault.staticValueDefault: value defaults to []
+    validators: setvalidator.valueInt64sAreValidator: element value must satisfy all validations: value must be between 1 and 32
+  untagged_ports: SetAttribute [optional computed]
+    element type: basetypes.Int64Type
+    default: setdefault.staticValueDefault: value defaults to []
+    validators: setvalidator.valueInt64sAreValidator: element value must satisfy all validations: value must be between 1 and 32
+  vlan: Int64Attribute [required]
+    plan modifiers: int64planmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: int64validator.betweenValidator: value must be between 1 and 4094
+
+resource tplinkeasysmart_vlan_8021q_pvid (schema version 0)
+  allow_disruptive: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  port: Int64Attribute [required]
+    plan modifiers: int64planmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: int64validator.betweenValidator: value must be between 1 and 32
+  pvid: Int64Attribute [required]
+    validators: int64validator.betweenValidator: value must be between 1 and 4094
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_vlan_mode (schema version 0)
+  allow_disruptive: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  id: StringAttribute [computed]
+    plan modifiers: stringplanmodifier.useStateForUnknownModifier: Once set, the value of this attribute in state will not change.
+  mode: StringAttribute [required]
+    validators: stringvalidator.oneOfValidator: value must be one of: ["mtu" "port-based" "802.1q"]
+  mtu_uplink_port: Int64Attribute [optional]
+    validators: int64validator.betweenValidator: value must be between 1 and 32
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+resource tplinkeasysmart_vlan_port_based_group (schema version 0)
+  allow_disruptive: BoolAttribute [optional computed]
+    default: booldefault.staticBoolDefault: value defaults to false
+  ports: SetAttribute [required]
+    element type: basetypes.Int64Type
+    validators: setvalidator.valueInt64sAreValidator: element value must satisfy all validations: value must be between 1 and 32
+    validators: setvalidator.sizeAtLeastValidator: set must contain at least 1 elements
+  switch: StringAttribute [optional]
+    plan modifiers: stringplanmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+  vlan: Int64Attribute [required]
+    plan modifiers: int64planmodifier.requiresReplaceIfModifier: If the value of this attribute changes, Terraform will destroy and recreate the resource.
+    validators: int64validator.betweenValidator: value must be between 1 and 255
