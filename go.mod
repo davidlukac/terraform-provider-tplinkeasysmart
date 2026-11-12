@@ -3,7 +3,7 @@ module github.com/davidlukac/terraform-provider-tplinkeasysmart
 go 1.27.4
 
 require (
-	github.com/davidlukac/escp-go v0.9.0
+	github.com/davidlukac/escp-go v0.10.0
 	github.com/hashicorp/terraform-plugin-docs v0.25.0
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
