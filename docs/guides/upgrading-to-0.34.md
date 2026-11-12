@@ -11,7 +11,7 @@ Version 0.34.0 makes the schema and the behavior of a few settings consistent **
 
 It also pulls in version 0.9.0 of the ESCP library, which changes how clients behave when the switch is silent, closed or shared (see "Behavior you may notice").
 
-~> **Before you upgrade** take a configuration backup (`tplinkeasysmart_config_backup`, or `scripts/backup-config.sh` if you use the maintainer's workspace) and run `terraform plan` with the **old** version so you know the plan is clean. After the upgrade the plan must show **no changes to resources** except what is listed under "Plan differences you should expect"; anything else is a bug worth reporting.
+~> **Before you upgrade** take a configuration backup (the web UI's System > System Tools > Backup Config page, or the `tplinkeasysmart_config_backup` data source with `include_content = true`, which returns the file base64 encoded and `Sensitive`; without it the data source returns only the size and the SHA-256) and run `terraform plan` with the **old** version so you know the plan is clean. After the upgrade the plan must show **no changes to resources** except what is listed under "Plan differences you should expect"; anything else is a bug worth reporting.
 
 ## Quick checklist
 
