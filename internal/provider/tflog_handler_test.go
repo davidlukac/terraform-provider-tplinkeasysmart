@@ -56,6 +56,7 @@ func TestTflogHandlerMapsLevelsMessagesAndAttributes(t *testing.T) {
 func TestTflogHandlerKeepsAttributesAndGroups(t *testing.T) {
 	entries := logged(t, newTflogLogger(), func(ctx context.Context, l *slog.Logger) {
 		client := l.With("host", "192.0.2.13").WithGroup("switch").With("mac", "aa:bb")
+		//nolint:sloglint // mixing key-value pairs and attributes is the point: the handler must take both forms
 		client.InfoContext(ctx, "write", "operation", "SetLED", slog.Group("ports", slog.Int("count", 2)), slog.Group("", slog.String("bare", "x")), slog.Attr{})
 		// slog.Logger.WithGroup skips an empty name before it reaches the handler, so ask the handler.
 		slog.New(tflogHandler{}.WithGroup("")).InfoContext(ctx, "no group", "k", "v")

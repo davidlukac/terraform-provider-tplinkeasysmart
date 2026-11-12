@@ -15,7 +15,7 @@ import (
 	"github.com/davidlukac/escp-go/safety"
 )
 
-// portLister is the part of the switch API the port guard needs.
+// portLister is the part of the switch API the port guard and the ports data source need.
 type portLister interface {
 	Ports(ctx context.Context) ([]model.Port, error)
 }
@@ -55,8 +55,7 @@ func wordPortRefusal(err error, word func(used *safety.PortUseError) error) erro
 	if err == nil {
 		return nil
 	}
-	var used *safety.PortUseError
-	if errors.As(err, &used) {
+	if used, ok := errors.AsType[*safety.PortUseError](err); ok {
 		return word(used)
 	}
 	return err

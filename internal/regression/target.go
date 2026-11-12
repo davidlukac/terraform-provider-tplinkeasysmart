@@ -117,7 +117,7 @@ func hardwareTarget(env map[string]string, name string) (Target, error) {
 			return Target{}, fmt.Errorf("%s is not set for target %s", s.key, name)
 		}
 	}
-	for _, h := range strings.Split(env[envReadOnlyHosts], ",") {
+	for h := range strings.SplitSeq(env[envReadOnlyHosts], ",") {
 		if h = strings.TrimSpace(h); h != "" && h == t.Host {
 			return Target{}, fmt.Errorf("host %s is a read-only switch and is never a target", t.Host)
 		}
@@ -198,7 +198,7 @@ func moveIP(ip, host, readOnly string) (string, error) {
 	if ip == host {
 		return "", errors.New("the spare address is the switch's own address")
 	}
-	for _, h := range strings.Split(readOnly, ",") {
+	for h := range strings.SplitSeq(readOnly, ",") {
 		if strings.TrimSpace(h) == ip {
 			return "", fmt.Errorf("%s is a read-only switch", ip)
 		}
@@ -208,7 +208,7 @@ func moveIP(ip, host, readOnly string) (string, error) {
 
 func parsePorts(s string) ([]model.PortID, error) {
 	var out []model.PortID
-	for _, f := range strings.Split(s, ",") {
+	for f := range strings.SplitSeq(s, ",") {
 		if f = strings.TrimSpace(f); f == "" {
 			continue
 		}

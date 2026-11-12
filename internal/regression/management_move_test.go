@@ -31,6 +31,7 @@ func ipConfigOfInfo(i model.Info) model.IPConfig {
 // the original address shows the switch there, it does nothing; otherwise it talks to the switch
 // at the spare address and moves it back. It runs even when the scenario failed halfway.
 func (s *Session) bringBack(t *testing.T, original model.IPConfig) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), settleTime)
 	defer cancel()
 	if info, err := s.Client().Info(ctx); err == nil && info.IP.String() == original.IP.String() {
@@ -216,6 +217,7 @@ func locateSettled(ctx context.Context, locate func(context.Context) (model.Info
 // MAC address, wherever the lease put it, and writes the static address back. It runs even when the
 // scenario failed halfway.
 func (s *Session) bringBackFromALease(t *testing.T, mac model.MAC, original model.IPConfig) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), settleTime)
 	defer cancel()
 	found, err := locateSettled(ctx, s.locateByMAC(mac), anyAnswer, locateTries, locatePause)

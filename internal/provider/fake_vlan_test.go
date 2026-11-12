@@ -2,7 +2,7 @@ package provider
 
 import (
 	"context"
-	"sort"
+	"slices"
 
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/model"
@@ -73,7 +73,7 @@ func (v *fakeVLANs) dot1q() model.Dot1Q {
 	for id := range v.vlans {
 		ids = append(ids, id)
 	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	slices.Sort(ids)
 	for _, id := range ids {
 		out.VLANs = append(out.VLANs, v.vlans[id])
 	}

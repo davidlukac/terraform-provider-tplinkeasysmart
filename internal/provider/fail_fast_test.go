@@ -20,9 +20,8 @@ func callEveryRequest(t *testing.T, c SwitchClient) map[string]error {
 	t.Helper()
 	out := map[string]error{}
 	v := reflect.ValueOf(c)
-	typ := reflect.TypeOf((*SwitchClient)(nil)).Elem()
-	for i := range typ.NumMethod() {
-		m := typ.Method(i)
+	typ := reflect.TypeFor[SwitchClient]()
+	for m := range typ.Methods() {
 		if m.Name == "Close" || m.Name == "SwitchMAC" {
 			continue
 		}
@@ -49,7 +48,7 @@ func callOne(method reflect.Value, args []reflect.Value) (err error) {
 		}
 	}()
 	res := method.Call(args)
-	err, _ = res[len(res)-1].Interface().(error)
+	err, _ = reflect.TypeAssert[error](res[len(res)-1])
 	return err
 }
 

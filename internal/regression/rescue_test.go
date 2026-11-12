@@ -3,6 +3,7 @@ package regression
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -89,7 +90,7 @@ func TestGuardRestoreFailsTheScenarioThatNeededTheNet(t *testing.T) {
 // test it was given, and a test that left the switch changed is failed by it.
 func TestGuardRestoreRunsWhenTheTestEnds(t *testing.T) {
 	s := Open(t, noEnv)
-	rec := &cleanupRecorder{errorRecorder: errorRecorder{TB: t}}
+	rec := &cleanupRecorder{TB: t}
 	s.GuardRestore(rec)
 	leaveDirty(t, s)
 	rec.runCleanups()
@@ -105,8 +106,8 @@ type cleanupRecorder struct {
 
 func (c *cleanupRecorder) Cleanup(f func()) { c.cleanups = append(c.cleanups, f) }
 func (c *cleanupRecorder) runCleanups() {
-	for i := len(c.cleanups) - 1; i >= 0; i-- {
-		c.cleanups[i]()
+	for _, v := range slices.Backward(c.cleanups) {
+		v()
 	}
 }
 

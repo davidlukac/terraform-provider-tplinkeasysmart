@@ -182,10 +182,9 @@ func (g *gatedClient) SetIPConfig(ctx context.Context, cfg model.IPConfig) error
 // methods by name, so a new Set* or Delete* method that the double does not
 // override makes it fail.
 func TestGatedTestClientCoversEveryWriteMethod(t *testing.T) {
-	ifaceType := reflect.TypeOf((*SwitchClient)(nil)).Elem()
+	ifaceType := reflect.TypeFor[SwitchClient]()
 	checked := 0
-	for i := range ifaceType.NumMethod() {
-		m := ifaceType.Method(i)
+	for m := range ifaceType.Methods() {
 		if !strings.HasPrefix(m.Name, "Set") && !strings.HasPrefix(m.Name, "Delete") && !strings.HasPrefix(m.Name, "Enable") {
 			continue
 		}
@@ -198,7 +197,7 @@ func TestGatedTestClientCoversEveryWriteMethod(t *testing.T) {
 				args = append(args, reflect.Zero(m.Type.In(a)))
 			}
 			out := reflect.ValueOf(client).MethodByName(m.Name).Call(args)
-			err, _ := out[len(out)-1].Interface().(error)
+			err, _ := reflect.TypeAssert[error](out[len(out)-1])
 			if err == nil || !strings.Contains(err.Error(), "refusing to write") {
 				t.Fatalf("%s on an unverified firmware returned %v, want a refusal", m.Name, err)
 			}

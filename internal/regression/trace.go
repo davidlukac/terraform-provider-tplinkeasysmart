@@ -43,6 +43,7 @@ func (r *trace) logger() *slog.Logger {
 // dumpIfFailed prints the trace to the test log when the test has failed, and nothing otherwise.
 // It is registered first so it runs last, after the clients are closed and the safety net has run.
 func (r *trace) dumpIfFailed(tb testing.TB) {
+	tb.Helper()
 	if !tb.Failed() {
 		return
 	}

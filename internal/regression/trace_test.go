@@ -3,6 +3,7 @@ package regression
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -22,8 +23,8 @@ func (d *deferredTB) Log(args ...any)  { d.logs = append(d.logs, fmt.Sprint(args
 
 // finish runs the cleanups last-registered first, as testing does.
 func (d *deferredTB) finish() {
-	for i := len(d.cleanups) - 1; i >= 0; i-- {
-		d.cleanups[i]()
+	for _, v := range slices.Backward(d.cleanups) {
+		v()
 	}
 }
 
