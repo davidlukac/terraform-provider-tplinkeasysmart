@@ -25,8 +25,9 @@ An annotation without a reason is itself reported.
 - `// nosleep: <reason>` on the call's line, on the line above it or in the function's doc comment. Write what
   the test needs the real clock for: a deadline behavior through a real socket, a live test against a real
   switch, a poll of a state that has no signal. Most waits have an event; the test waits for it (a channel, a
-  context, a signal from a seam, a line the library logs), and a state with no event is polled with a bound by a
-  helper that does not pause.
+  context, a signal from a seam, a line the library logs), and a state with no event is polled with a bound by
+  `awaitUntil` in `await_test.go`, the one place that pauses (one annotated `pollInterval` sleep); a second
+  sleep elsewhere is reported.
 
 ## Running one
 
