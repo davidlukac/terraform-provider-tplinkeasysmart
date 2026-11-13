@@ -45,7 +45,9 @@ lint: spell
 	@bin="$$($(DEVTOOL) -n golangci-lint)"; for os in linux windows; do echo "golangci-lint run (GOOS=$$os)"; GOOS=$$os "$$bin" run ./... || exit 1; done
 
 # The project's own checks beyond golangci-lint (devtools/analyzers, copies of escp-go's): readwrite (a
-# function that reads a setting and then writes one) and lockwait (a blocking call while a lock is held).
+# function that reads a setting and then writes one), lockwait (a blocking call while a lock is held),
+# validatecall (an exported function that takes a value with a Validate method and never calls it) and
+# nosleep (a time.Sleep, or in a test a time.After that is not a failure bound, without a `// nosleep: <reason>`).
 # The flags are this repository's names for what the checks look for; the sources are never edited here.
 #   receivers  only a call on a type of this module or of the library counts: the clients the resources
 #              and the regression suite are handed (SwitchClient and the small interfaces each declares),
@@ -56,16 +58,24 @@ lint: spell
 #              guards its own read-modify-write), so no name opens a critical section and a function that
 #              reads and then writes says why in a `// readwrite: <reason>` comment.
 #   lockfuncs  empty: the provider takes its locks with sync.Mutex directly, there is no lock wrapper.
+#   validatecall.packages  the packages of this module (the check's default matches only the library's root
+#              package). The provider validates in ValidateConfig and schema validators, and its exported
+#              functions take no library value that has a Validate method, so the check is silent here; it
+#              stays on so that a new exported function that takes one and skips Validate is reported.
+#   nosleep    has no flag and runs with the others; it is also run alone with the `live` build tag, so a file
+#              behind that tag cannot sleep unseen (today the module has no file behind it).
 ANALYZER_FLAGS = \
 	-readwrite.receivers='terraform-provider-tplinkeasysmart/internal/|escp-go\.' \
 	-readwrite.readers='^(Info|LED|Ports|PortStats|LAGs|IGMP|LoopPrevention|PortMirror|MTUVLAN|PortBasedVLAN|Dot1Q|VLANMode|QoS|Bandwidth|StormControl|System|ConfigBackup)$$' \
 	-readwrite.writers='^(Set|Delete|Enable)[A-Z]\w*$$' \
 	-readwrite.guards='^no-modify-guard-in-the-provider$$' \
-	-lockwait.lockfuncs=
+	-lockwait.lockfuncs= \
+	-validatecall.packages='^github\.com/davidlukac/terraform-provider-tplinkeasysmart(/.*)?$$'
 
 analyzers:
 	GOWORK=off go -C devtools build -o $(CURDIR)/build/analyzers ./analyzers
 	build/analyzers $(ANALYZER_FLAGS) ./...
+	GOFLAGS=-tags=live build/analyzers -nosleep ./...
 
 # The workflow files (a pinned actionlint; the pre-commit hook runs it for a staged workflow, CI for every PR).
 actionlint:
