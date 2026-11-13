@@ -205,6 +205,8 @@ func locateSettled(ctx context.Context, locate func(context.Context) (model.Info
 			select {
 			case <-ctx.Done():
 				return found, ctx.Err()
+			// nosleep: the pause between two discovery polls of a switch that is changing its address (a
+			// real device, no signal to wait on); the pause is a parameter and the unit test passes 0.
 			case <-time.After(pause):
 			}
 		}
