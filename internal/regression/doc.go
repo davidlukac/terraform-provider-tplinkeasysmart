@@ -13,6 +13,10 @@
 // compared with the state recorded at the start and written back if a failed scenario left them
 // changed (the LED is the probe most scenarios apply, so the one most often left off). The
 // scenario is failed for it; everything else is left to the readout comparison, which names it.
+// Each setting is restored on its own: one that cannot be read or written does not keep the next
+// from being put back. The net restores to the state recorded when the session opened, so a
+// setting left changed by an earlier crashed run is the baseline of this one: the operator must
+// start from the configured state.
 //
 // Every client of a session logs into a flight recorder (trace.go): the library's own log at Debug,
 // every request and reply with the operation, sequence number and TLV types and sizes, never a
