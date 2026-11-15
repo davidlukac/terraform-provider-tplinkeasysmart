@@ -13,24 +13,28 @@ import (
 // switch is in, and must not hang the run.
 const rescueTimeout = 60 * time.Second
 
-// rescueClient is what the safety net needs of a client: the two settings, read and written.
+// rescueClient is what the safety net needs of a client: the three settings, read and written.
 // *escp.Client satisfies it; the tests of the error paths use a stub.
 type rescueClient interface {
 	VLANMode(ctx context.Context) (model.VLANModeSetting, error)
 	SetVLANMode(ctx context.Context, s model.VLANModeSetting) error
 	PortMirror(ctx context.Context) (model.Mirror, error)
 	SetPortMirror(ctx context.Context, m model.Mirror) error
+	LED(ctx context.Context) (bool, error)
+	SetLED(ctx context.Context, on bool) error
 }
 
-// Rescue puts back the two settings a scenario that failed halfway can leave behind and that
-// Terraform cannot undo, because destroying a VLAN mode or a mirror only forgets it: the VLAN
-// mode and the port mirror. Each is compared with the state recorded when the session opened and
+// Rescue puts back the three settings a scenario that failed halfway can leave behind and that
+// Terraform cannot undo, because destroying a VLAN mode, a mirror or the LED only forgets it: the
+// VLAN mode, the port mirror and the LED (the harmless probe most scenarios apply, so the one a
+// failed scenario most often leaves off). Each is compared with the state recorded when the session opened and
 // written back only when it differs, so a scenario that cleaned up after itself causes no write.
 // It returns one line per setting it changed. Everything else the scenarios touch is not
 // restored here: the readout comparison (Restored) names it, and the operator decides.
 //
-// The mode goes first: switching it discards the settings of the other modes, and the mirror is
-// independent of them.
+// The mode goes first: switching it discards the settings of the other modes, and the mirror and
+// the LED are independent of them; the LED is last. A read or write that fails ends the net, with
+// the lines of the settings already put back.
 //
 // readwrite: each setting is read and compared with the one recorded when the session opened, then
 // written back as that recorded value (never one derived from the read), and the library allows one client
@@ -60,6 +64,16 @@ func (s *Session) Rescue(ctx context.Context) ([]string, error) {
 			return done, fmt.Errorf("putting the port mirror back to %+v: %w", s.mirror, err)
 		}
 		done = append(done, fmt.Sprintf("port mirror %+v, was left at %+v", s.mirror, mirror))
+	}
+	led, err := net.LED(ctx)
+	if err != nil {
+		return done, fmt.Errorf("reading the LED: %w", err)
+	}
+	if led != s.led {
+		if err := net.SetLED(ctx, s.led); err != nil {
+			return done, fmt.Errorf("putting the LED back to %t: %w", s.led, err)
+		}
+		done = append(done, fmt.Sprintf("LED %t, was left at %t", s.led, led))
 	}
 	return done, nil
 }
