@@ -64,6 +64,18 @@ data tplinkeasysmart_lags
   switch: StringAttribute [optional]
     validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
 
+data tplinkeasysmart_led
+  enabled: BoolAttribute [computed]
+  id: StringAttribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
+data tplinkeasysmart_loop_prevention
+  enabled: BoolAttribute [computed]
+  id: StringAttribute [computed]
+  switch: StringAttribute [optional]
+    validators: provider.stringRule: must be a switch name: letters, digits, hyphens and underscores, starting with a letter or digit
+
 data tplinkeasysmart_port_mirror
   egress_ports: ListAttribute [computed]
     element type: basetypes.Int64Type
