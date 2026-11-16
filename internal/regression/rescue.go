@@ -2,6 +2,7 @@ package regression
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -13,55 +14,84 @@ import (
 // switch is in, and must not hang the run.
 const rescueTimeout = 60 * time.Second
 
-// rescueClient is what the safety net needs of a client: the two settings, read and written.
+// rescueClient is what the safety net needs of a client: the three settings, read and written.
 // *escp.Client satisfies it; the tests of the error paths use a stub.
 type rescueClient interface {
 	VLANMode(ctx context.Context) (model.VLANModeSetting, error)
 	SetVLANMode(ctx context.Context, s model.VLANModeSetting) error
 	PortMirror(ctx context.Context) (model.Mirror, error)
 	SetPortMirror(ctx context.Context, m model.Mirror) error
+	LED(ctx context.Context) (bool, error)
+	SetLED(ctx context.Context, on bool) error
 }
 
-// Rescue puts back the two settings a scenario that failed halfway can leave behind and that
-// Terraform cannot undo, because destroying a VLAN mode or a mirror only forgets it: the VLAN
-// mode and the port mirror. Each is compared with the state recorded when the session opened and
-// written back only when it differs, so a scenario that cleaned up after itself causes no write.
-// It returns one line per setting it changed. Everything else the scenarios touch is not
+// Rescue puts back the three settings a scenario that failed halfway can leave behind and that
+// Terraform cannot undo, because destroying a VLAN mode, a mirror or the LED only forgets it: the
+// VLAN mode, the port mirror and the LED (the harmless probe most scenarios apply, so the one a
+// failed scenario most often leaves off). Each is compared with the state recorded when the session
+// opened and written back only when it differs, so a scenario that cleaned up after itself causes
+// no write. It returns one line per setting it changed. Everything else the scenarios touch is not
 // restored here: the readout comparison (Restored) names it, and the operator decides.
 //
-// The mode goes first: switching it discards the settings of the other modes, and the mirror is
-// independent of them.
+// The settings are independent: a restore that fails (a read, or the write) never keeps the next
+// one from running, because the net is the last chance to leave the switch as it was found. The
+// errors of every setting that failed are joined (each names its setting), and the lines of every
+// change that was made are returned with them. The one failure that stops the net is having no
+// client at all.
+//
+// The mode goes first: switching it discards the settings of the other modes, and the mirror and
+// the LED are independent of them; the LED is last.
+//
+// The net restores to the state recorded when the session opened: a setting that an earlier,
+// crashed run left changed is the baseline of this one, so the operator must start from the
+// configured state.
 //
 // readwrite: each setting is read and compared with the one recorded when the session opened, then
 // written back as that recorded value (never one derived from the read), and the library allows one client
 // per switch, so the session's client is the only writer in this process in between.
 func (s *Session) Rescue(ctx context.Context) ([]string, error) {
-	var done []string
 	net, err := s.rescuer()
 	if err != nil {
-		return done, err
+		return nil, err
 	}
-	mode, err := net.VLANMode(ctx)
-	if err != nil {
-		return done, fmt.Errorf("reading the VLAN mode: %w", err)
-	}
-	if mode != s.mode {
-		if err := net.SetVLANMode(ctx, s.mode); err != nil {
-			return done, fmt.Errorf("putting the VLAN mode back to %+v: %w", s.mode, err)
+	var done []string
+	var errs []error
+	for _, step := range []func() (string, error){
+		func() (string, error) {
+			return restoreSetting(ctx, "VLAN mode", s.mode, net.VLANMode, net.SetVLANMode)
+		},
+		func() (string, error) {
+			return restoreSetting(ctx, "port mirror", s.mirror, net.PortMirror, net.SetPortMirror)
+		},
+		func() (string, error) { return restoreSetting(ctx, "LED", s.led, net.LED, net.SetLED) },
+	} {
+		line, err := step()
+		if err != nil {
+			errs = append(errs, err)
 		}
-		done = append(done, fmt.Sprintf("VLAN mode %+v, was left at %+v", s.mode, mode))
-	}
-	mirror, err := net.PortMirror(ctx)
-	if err != nil {
-		return done, fmt.Errorf("reading the port mirror: %w", err)
-	}
-	if mirror != s.mirror {
-		if err := net.SetPortMirror(ctx, s.mirror); err != nil {
-			return done, fmt.Errorf("putting the port mirror back to %+v: %w", s.mirror, err)
+		if line != "" {
+			done = append(done, line)
 		}
-		done = append(done, fmt.Sprintf("port mirror %+v, was left at %+v", s.mirror, mirror))
 	}
-	return done, nil
+	return done, errors.Join(errs...)
+}
+
+// restoreSetting reads one setting and, when it differs from the recorded value, writes the
+// recorded value back. It returns the report line of a change that was made, or the error naming
+// the setting.
+func restoreSetting[T comparable](ctx context.Context, name string, recorded T,
+	read func(context.Context) (T, error), write func(context.Context, T) error) (string, error) {
+	current, err := read(ctx)
+	if err != nil {
+		return "", fmt.Errorf("reading the %s: %w", name, err)
+	}
+	if current == recorded {
+		return "", nil
+	}
+	if err := write(ctx, recorded); err != nil {
+		return "", fmt.Errorf("putting the %s back to %+v: %w", name, recorded, err)
+	}
+	return fmt.Sprintf("%s %+v, was left at %+v", name, recorded, current), nil
 }
 
 // GuardRestore runs Rescue when the test ends, whether it passed or failed, and fails the test

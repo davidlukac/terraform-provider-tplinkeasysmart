@@ -116,8 +116,12 @@ func (c *cleanupRecorder) runCleanups() {
 type stubRescue struct {
 	mode   model.VLANModeSetting
 	mirror model.Mirror
-	// readModeErr, setModeErr, readMirrorErr and setMirrorErr make the matching call fail.
-	readModeErr, setModeErr, readMirrorErr, setMirrorErr error
+	led    bool
+	// readModeErr, setModeErr, readMirrorErr, setMirrorErr, readLEDErr and setLEDErr make the
+	// matching call fail.
+	readModeErr, setModeErr, readMirrorErr, setMirrorErr, readLEDErr, setLEDErr error
+	// ledWrites counts the writes of the LED, for the case that must see none.
+	ledWrites int
 }
 
 func (c *stubRescue) VLANMode(context.Context) (model.VLANModeSetting, error) {
@@ -137,6 +141,15 @@ func (c *stubRescue) SetPortMirror(_ context.Context, m model.Mirror) error {
 		c.mirror = m
 	}
 	return c.setMirrorErr
+}
+
+func (c *stubRescue) LED(context.Context) (bool, error) { return c.led, c.readLEDErr }
+func (c *stubRescue) SetLED(_ context.Context, on bool) error {
+	c.ledWrites++
+	if c.setLEDErr == nil {
+		c.led = on
+	}
+	return c.setLEDErr
 }
 
 func TestRescueReportsWhatItCannotDo(t *testing.T) {

@@ -36,10 +36,11 @@ type Session struct {
 	// MAC is the MAC address the target reports about itself.
 	MAC    model.MAC
 	before Readout
-	// mode and mirror are the two settings the safety net puts back (see Rescue), as they were
-	// when the session opened.
+	// mode, mirror and led are the three settings the safety net puts back (see Rescue), as they
+	// were when the session opened.
 	mode   model.VLANModeSetting
 	mirror model.Mirror
+	led    bool
 	// suite is the session's own client: it steps aside while the provider has the switch and is
 	// dialed again at its next use (see suiteClient), so nothing keeps a *escp.Client of it; ask Client.
 	suite *suiteClient
@@ -145,7 +146,7 @@ func (s *Session) rescuer() (rescueClient, error) {
 	return c, nil
 }
 
-// capture records the VLAN mode and the port mirror, as typed values the safety net can write back.
+// capture records the VLAN mode, the port mirror and the LED, as typed values the safety net can write back.
 func (s *Session) capture(ctx context.Context) error {
 	net, err := s.rescuer()
 	if err != nil {
@@ -156,6 +157,9 @@ func (s *Session) capture(ctx context.Context) error {
 	}
 	if s.mirror, err = net.PortMirror(ctx); err != nil {
 		return fmt.Errorf("reading the port mirror: %w", err)
+	}
+	if s.led, err = net.LED(ctx); err != nil {
+		return fmt.Errorf("reading the LED: %w", err)
 	}
 	return nil
 }
