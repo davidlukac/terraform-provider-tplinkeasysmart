@@ -122,6 +122,8 @@ type stubRescue struct {
 	readModeErr, setModeErr, readMirrorErr, setMirrorErr, readLEDErr, setLEDErr error
 	// ledWrites counts the writes of the LED, for the case that must see none.
 	ledWrites int
+	// igmpLoopStub holds the other two settings (see rescue_igmp_loop_test.go).
+	igmpLoopStub
 }
 
 func (c *stubRescue) VLANMode(context.Context) (model.VLANModeSetting, error) {

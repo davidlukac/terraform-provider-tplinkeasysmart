@@ -14,7 +14,7 @@ import (
 // switch is in, and must not hang the run.
 const rescueTimeout = 60 * time.Second
 
-// rescueClient is what the safety net needs of a client: the three settings, read and written.
+// rescueClient is what the safety net needs of a client: the five settings, read and written.
 // *escp.Client satisfies it; the tests of the error paths use a stub.
 type rescueClient interface {
 	VLANMode(ctx context.Context) (model.VLANModeSetting, error)
@@ -23,15 +23,21 @@ type rescueClient interface {
 	SetPortMirror(ctx context.Context, m model.Mirror) error
 	LED(ctx context.Context) (bool, error)
 	SetLED(ctx context.Context, on bool) error
+	IGMP(ctx context.Context) (model.IGMP, error)
+	SetIGMP(ctx context.Context, cfg model.IGMPConfig) error
+	LoopPrevention(ctx context.Context) (bool, error)
+	SetLoopPrevention(ctx context.Context, on bool) error
 }
 
-// Rescue puts back the three settings a scenario that failed halfway can leave behind and that
-// Terraform cannot undo, because destroying a VLAN mode, a mirror or the LED only forgets it: the
-// VLAN mode, the port mirror and the LED (the harmless probe most scenarios apply, so the one a
-// failed scenario most often leaves off). Each is compared with the state recorded when the session
-// opened and written back only when it differs, so a scenario that cleaned up after itself causes
-// no write. It returns one line per setting it changed. Everything else the scenarios touch is not
-// restored here: the readout comparison (Restored) names it, and the operator decides.
+// Rescue puts back the five settings a scenario that failed halfway can leave behind and that
+// Terraform cannot undo, because destroying a VLAN mode, a mirror, the LED, IGMP snooping or loop
+// prevention only forgets it: the VLAN mode, the port mirror, the LED (the harmless probe most
+// scenarios apply, so the one a failed scenario most often leaves off), IGMP snooping (snooping
+// and report suppression) and loop prevention. Each is compared with the state recorded when the
+// session opened and written back only when it differs, so a scenario that cleaned up after itself
+// causes no write. It returns one line per setting it changed. The multicast groups the switch has
+// learned are runtime data: they are neither compared nor written. Everything else the scenarios
+// touch is not restored here: the readout comparison (Restored) names it, and the operator decides.
 //
 // The settings are independent: a restore that fails (a read, or the write) never keeps the next
 // one from running, because the net is the last chance to leave the switch as it was found. The
@@ -39,8 +45,9 @@ type rescueClient interface {
 // change that was made are returned with them. The one failure that stops the net is having no
 // client at all.
 //
-// The mode goes first: switching it discards the settings of the other modes, and the mirror and
-// the LED are independent of them; the LED is last.
+// The mode goes first: switching it discards the settings of the other modes, and the other four
+// settings are independent of them. The order is the mode, the mirror, the LED, IGMP snooping,
+// loop prevention.
 //
 // The net restores to the state recorded when the session opened: a setting that an earlier,
 // crashed run left changed is the baseline of this one, so the operator must start from the
@@ -64,6 +71,12 @@ func (s *Session) Rescue(ctx context.Context) ([]string, error) {
 			return restoreSetting(ctx, "port mirror", s.mirror, net.PortMirror, net.SetPortMirror)
 		},
 		func() (string, error) { return restoreSetting(ctx, "LED", s.led, net.LED, net.SetLED) },
+		func() (string, error) {
+			return restoreSetting(ctx, "IGMP snooping", s.igmp, igmpConfigOf(net), net.SetIGMP)
+		},
+		func() (string, error) {
+			return restoreSetting(ctx, "loop prevention", s.loop, net.LoopPrevention, net.SetLoopPrevention)
+		},
 	} {
 		line, err := step()
 		if err != nil {
@@ -74,6 +87,16 @@ func (s *Session) Rescue(ctx context.Context) ([]string, error) {
 		}
 	}
 	return done, errors.Join(errs...)
+}
+
+// igmpConfigOf reads IGMP snooping as what SetIGMP writes: the two values the net compares and
+// restores. The learned groups of the reading are runtime data and are left out, so a switch whose
+// groups changed during the scenario is not reported as changed.
+func igmpConfigOf(net rescueClient) func(context.Context) (model.IGMPConfig, error) {
+	return func(ctx context.Context) (model.IGMPConfig, error) {
+		v, err := net.IGMP(ctx)
+		return model.IGMPConfig{Enabled: v.Enabled, ReportSuppression: v.ReportSuppression}, err
+	}
 }
 
 // restoreSetting reads one setting and, when it differs from the recorded value, writes the
