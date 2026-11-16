@@ -127,7 +127,7 @@ Write support exists only where it cannot cut management access. Per-port and pe
 | `vlan_8021q_group` | The VLAN is deleted, under the guard (VLAN 1 holds every port including the uplink, so deleting it needs `allow_disruptive`). |
 | `vlan_8021q_pvid` | The port's PVID is set back to 1 (a PVID without its resource would be a dangling default). |
 
-**Data sources** (read-only): `system_info`, `ports`, `port_statistics`, `lags`, `port_mirror`, `qos`, `igmp_snooping` (with the learned multicast groups), `bandwidth_control`, `storm_control`, `vlan_mtu`, `vlan_port_based`, `vlan_8021q`, and `config_backup` (the configuration file, optional and sensitive).
+**Data sources** (read-only): `system_info`, `ports`, `port_statistics`, `lags`, `port_mirror`, `qos`, `igmp_snooping` (with the learned multicast groups), `bandwidth_control`, `storm_control`, `vlan_mtu`, `vlan_port_based`, `vlan_8021q`, `led`, `loop_prevention` (the same two settings as their resources, to read a value before managing it), and `config_backup` (the configuration file, optional and sensitive).
 
 Deliberately **not** writable: user account, config restore, reboot, factory reset and firmware upgrade. These are the changes that can lock you out of a device that has no console. The full reference for every resource and data source is in [`docs/`](docs/index.md) and on the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart/latest/docs).
 

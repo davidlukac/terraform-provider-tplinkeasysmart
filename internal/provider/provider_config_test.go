@@ -301,8 +301,8 @@ func TestNewBuildsTheProductionProvider(t *testing.T) {
 	if got := len(p.Resources(context.Background())); got != 15 {
 		t.Fatalf("expected 15 resources, got %d", got)
 	}
-	if got := len(p.DataSources(context.Background())); got != 13 {
-		t.Fatalf("expected 13 data sources, got %d", got)
+	if got := len(p.DataSources(context.Background())); got != 15 {
+		t.Fatalf("expected 15 data sources, got %d", got)
 	}
 }
 
