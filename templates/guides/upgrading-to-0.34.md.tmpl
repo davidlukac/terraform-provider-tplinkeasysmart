@@ -63,7 +63,7 @@ If your switch has a DHCP lease that changes and you named it with both, set `re
 
 ## Behavior you may notice
 
-- **A switch that does not answer is asked once.** After the first request to a switch that gets no answer (while nothing has answered), every request that starts after it fails at once with the same error instead of costing the full timeout again. Each switch has its own latch, and it lasts for one walk of Terraform (a plan, an apply).
+- **A switch that does not answer is asked once.** After the first request to a switch that gets no answer (while nothing has answered), every request that starts after it fails at once with the same error instead of costing the full timeout again. A request that is already waiting when the first one fails is not refused, so the first parallel wave of a run still pays the timeout (tracked in #222). Each switch has its own latch, and it lasts for one walk of Terraform (a plan, an apply).
 - **A write that got no reply says so.** The error now says the write *may have been applied*; read the setting back before you apply again. Management-class writes (addresses, VLANs, LAGs, mirror, port settings) first prove the session with one extra read and are never sent twice.
 - **One client per switch.** Two clients of one switch in one process are refused at the second one's first call, whether they name the switch by address or by MAC. The provider already built one per switch; this only matters for tools that use the library next to it.
 - **A destroy plan warns** when an `allow_disruptive = true` kept in state would let a removed LAG, VLAN group or PVID act on a port that has a link up (`lifecycle { prevent_destroy = true }` blocks it).
