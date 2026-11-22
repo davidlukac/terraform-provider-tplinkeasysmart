@@ -1,0 +1,25 @@
+# The dead-code check (`make deadcode`): code that only a test uses.
+#
+# The repository's own `unused` linter (.golangci.yml) runs with tests on, so a function, a field or an
+# option that only a test calls counts as used and is never reported. This configuration runs `unused`
+# alone with the tests left out, so that what is reported is code the production build carries and
+# nothing in the production build needs. `make deadcode` runs it with and without the `live` build tag.
+# It is a separate file so that the main configuration keeps its tests on.
+#
+# internal/regression is left out: it is the regression harness, a package whose non-test code is driven by
+# its own tests (the scenarios) and by the `live` build, so that "only a test uses it" is what it is for.
+# The rule is a path rule for that directory and for the one linter of this file; no other path is excluded by this file.
+version: "2"
+
+run:
+  tests: false
+
+linters:
+  default: none
+  enable:
+    - unused
+  exclusions:
+    rules:
+      - path: ^internal/regression/
+        linters:
+          - unused

@@ -30,7 +30,6 @@ func NewStormLimitResource() resource.Resource { return &stormLimitResource{} }
 type stormLimitResource struct {
 	src    switchSource
 	client stormLimitClient // set on the per-call copy made by bound()
-	sw     types.String     // the switch that copy is bound to, for ids
 }
 
 // stormLimitClient is the part of the switch API this resource needs.
@@ -42,7 +41,7 @@ type stormLimitClient interface {
 
 // bound returns a copy of the resource wired to the client of the named switch.
 func (r *stormLimitResource) bound(add func(string, string), name types.String) *stormLimitResource {
-	return bindSwitch(add, r.src, name, r, func(b *stormLimitResource, c stormLimitClient, sw types.String) { b.client, b.sw = c, sw })
+	return bindSwitch(add, r.src, name, r, func(b *stormLimitResource, c stormLimitClient, _ types.String) { b.client = c })
 }
 
 type stormLimitModel struct {

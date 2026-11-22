@@ -77,6 +77,28 @@ analyzers:
 	build/analyzers $(ANALYZER_FLAGS) ./...
 	GOFLAGS=-tags=live build/analyzers -nosleep ./...
 
+# Code that only a test uses. `make lint` runs `unused` with the tests on (.golangci.yml), so a function a test
+# calls counts as used and ships in the production build for nothing. This runs `unused` alone with the tests
+# left out (.golangci-deadcode.yml: `run.tests: false`), with and without the `live` build tag, and fails on any
+# finding; internal/regression, the harness, is left out by a path rule of that file. A prerequisite of `lint`.
+# `make deadcodefixtures` holds the configuration to a fixture module (devtools/deadcodefixtures: a function
+# only a test calls must be reported, one in the harness directory must not), so that a configuration weakened
+# is noticed; it is a prerequisite of `lint` too. devtools/lintcheck is a copy made by hand of escp-go's, which is
+# its one source: a change to it is made there first. The fixture holds the linter set, `tests: false` and that the
+# path rule reaches internal/regression and does not reach internal/provider or the module root. The pin of the `lint:`
+# prerequisites and of the `deadcode` recipe is a proposed check (devtools/recipecheck, #196): until it is built a
+# change to the `lint:` line or to those recipes is read at review; `catalogcheck` only checks that the targets exist.
+.PHONY: deadcode deadcodefixtures
+lint: deadcode deadcodefixtures
+
+deadcode:
+	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...
+	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...
+
+deadcodefixtures:
+	GOWORK=off go -C devtools build -o $(CURDIR)/build/lintcheck ./lintcheck
+	build/lintcheck -root . -lint "$$($(DEVTOOL) -n golangci-lint)" -config .golangci-deadcode.yml -fixtures devtools/deadcodefixtures -linters ""
+
 # The workflow files (a pinned actionlint; the pre-commit hook runs it for a staged workflow, CI for every PR).
 actionlint:
 	$(DEVTOOL) actionlint
@@ -133,7 +155,7 @@ work:
 	@test -d "$(ESCP_DIR)" || { echo "$(ESCP_DIR) is not the escp-go checkout (set ESCP_DIR)"; exit 1; }
 	@rm -f go.work go.work.sum
 	go work init . $(ESCP_DIR)
-	@echo "workspace on: go build, go test and scripts/tf.sh now use $(ESCP_DIR); make unwork to stop"
+	@echo "workspace on: go build and go test, and so every build of the provider binary, now use $(ESCP_DIR); make unwork to stop"
 
 unwork:
 	rm -f go.work go.work.sum

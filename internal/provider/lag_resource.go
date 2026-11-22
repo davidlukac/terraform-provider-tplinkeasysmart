@@ -37,8 +37,7 @@ func NewLAGResource() resource.Resource { return &lagResource{} }
 
 type lagResource struct {
 	src    switchSource
-	client lagClient    // set on the per-call copy made by bound()
-	sw     types.String // the switch that copy is bound to, for ids
+	client lagClient // set on the per-call copy made by bound()
 }
 
 // lagClient is the part of the switch API this resource needs.
@@ -50,7 +49,7 @@ type lagClient interface {
 
 // bound returns a copy of the resource wired to the client of the named switch.
 func (r *lagResource) bound(add func(string, string), name types.String) *lagResource {
-	return bindSwitch(add, r.src, name, r, func(b *lagResource, c lagClient, sw types.String) { b.client, b.sw = c, sw })
+	return bindSwitch(add, r.src, name, r, func(b *lagResource, c lagClient, _ types.String) { b.client = c })
 }
 
 type lagResourceModel struct {
