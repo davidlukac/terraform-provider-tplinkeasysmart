@@ -151,7 +151,7 @@ work:
 	@test -d "$(ESCP_DIR)" || { echo "$(ESCP_DIR) is not the escp-go checkout (set ESCP_DIR)"; exit 1; }
 	@rm -f go.work go.work.sum
 	go work init . $(ESCP_DIR)
-	@echo "workspace on: go build, go test and scripts/tf.sh now use $(ESCP_DIR); make unwork to stop"
+	@echo "workspace on: go build and go test, and so every build of the provider binary, now use $(ESCP_DIR); make unwork to stop"
 
 unwork:
 	rm -f go.work go.work.sum

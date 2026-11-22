@@ -12,7 +12,7 @@ Tags: **[C]** client change (the [escp-go](https://github.com/davidlukac/escp-go
 - [ ] Work on a branch (`feat/`, `fix/`, `docs/`, `test/`, `chore/`). Nothing goes to `main` directly.
 - [ ] Decide the kind of change, because it drives the version: a new setting or resource is `feat` (minor); a bug fix is `fix` (patch); a change that only touches tests, docs, CI or internals is `test:`/`docs:`/`ci:`/`refactor:`/`chore:` and does not release by itself.
 - [ ] **[R]** Can the change cut management access or break traffic? Then it needs a guard and an `allow_disruptive` argument, and it is designed with the safety notes in the README (*Safety by design*) in mind. Settings that can lock you out of the switch (credentials, reboot, factory reset, config restore, firmware) are deliberately not writable.
-- [ ] **A change that needs a library change** (a new setting, a changed write) is two cycles: first a pull request and a release in the [escp-go](https://github.com/davidlukac/escp-go) repository, then this one, which requires that release in `go.mod` (`go get github.com/davidlukac/escp-go@vX.Y.Z`; never a pseudo-version on `main`). To develop both at once, `make work` links this checkout to `../escp-go` (a local `go.work`, not committed; `make unwork` removes it) and so does the `go build` that produces the binary `scripts/tf.sh` runs. The pre-commit hook ignores the workspace, so a commit is checked against the released version, as CI will.
+- [ ] **A change that needs a library change** (a new setting, a changed write) is two cycles: first a pull request and a release in the [escp-go](https://github.com/davidlukac/escp-go) repository, then this one, which requires that release in `go.mod` (`go get github.com/davidlukac/escp-go@vX.Y.Z`; never a pseudo-version on `main`). To develop both at once, `make work` links this checkout to `../escp-go` (a local `go.work`, not committed; `make unwork` removes it) and so does any `go build` of the provider binary you run against a switch or a Terraform configuration of your own. The pre-commit hook ignores the workspace, so a commit is checked against the released version, as CI will.
 
 ## 1. Code
 
@@ -34,6 +34,7 @@ Tags: **[C]** client change (the [escp-go](https://github.com/davidlukac/escp-go
 - [ ] **[R]** Import is supported with a documented id (qualified with the switch name for `switches`); `Read` normalizes into the form the configuration uses; drift shows in the plan ([DC-P02](contributing/defect-classes.md#dc-p02)).
 - [ ] **[R]** Destroy semantics are decided and documented: singletons and per-port settings only forget; groups remove their group under the same guard. Restoring a value is always an explicit configuration; create over an existing object is refused ([DC-P02](contributing/defect-classes.md#dc-p02)).
 - [ ] **[R][D]** Errors name the attribute (`AddAttributeError`), the cause and the way out. Credentials are `Sensitive` and never logged.
+- **Programs under `tools/`** are never imported by product code. `tools/coverpolicy` and `tools/mutationreport` serve `make cover` and CI. `tools/configbackup` saves a switch's configuration file through the same client library and has no caller in this repository: it is a maintenance tool used from outside (a script that takes a backup before a change), so it stays.
 
 ## 2. Tests
 
