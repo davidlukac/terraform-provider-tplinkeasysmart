@@ -3,7 +3,7 @@
 A module of its own that holds one function only a test calls (`testonly.go`), one that production code
 calls and one exported function nothing calls (`used.go`), and, in `internal/regression/`, a function only
 a test calls in the directory that the dead-code configuration leaves out. `make deadcodefixtures` (part of
-`make lint`, run by `scripts/deadcode-fixtures.sh`) runs the dead-code configuration, `.golangci-deadcode.yml`,
+`make lint`, run by `devtools/lintcheck`) runs the dead-code configuration, `.golangci-deadcode.yml`,
 over a copy of the module, next to a copy of the configuration (the paths of its exclusion are relative to
 the directory of the file, so the module is checked at the same relative names as the real files), and
 compares what the linter reports with [expected.txt](expected.txt): `onlyATest` must be reported and nothing

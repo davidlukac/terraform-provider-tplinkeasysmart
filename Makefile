@@ -83,7 +83,8 @@ analyzers:
 # finding; internal/regression, the harness, is left out by a path rule of that file. A prerequisite of `lint`.
 # `make deadcodefixtures` holds the configuration to a fixture module (devtools/deadcodefixtures: a function
 # only a test calls must be reported, one in the harness directory must not), so that a configuration weakened
-# is noticed; it is a prerequisite of `lint` too. Unlike escp-go this repository has no recipe check
+# is noticed; it is a prerequisite of `lint` too. devtools/lintcheck is a copy made by hand of escp-go's, which is
+# its one source: a change to it is made there first. Unlike escp-go this repository has no recipe check
 # (devtools/recipecheck) that pins the prerequisites, only the catalog check (`catalogcheck`) that the targets exist.
 .PHONY: deadcode deadcodefixtures
 lint: deadcode deadcodefixtures
@@ -93,7 +94,8 @@ deadcode:
 	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...
 
 deadcodefixtures:
-	scripts/deadcode-fixtures.sh "$$($(DEVTOOL) -n golangci-lint)"
+	GOWORK=off go -C devtools build -o $(CURDIR)/build/lintcheck ./lintcheck
+	build/lintcheck -root . -lint "$$($(DEVTOOL) -n golangci-lint)" -config .golangci-deadcode.yml -fixtures devtools/deadcodefixtures -linters ""
 
 # The workflow files (a pinned actionlint; the pre-commit hook runs it for a staged workflow, CI for every PR).
 actionlint:
