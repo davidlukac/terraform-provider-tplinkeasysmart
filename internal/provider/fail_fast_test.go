@@ -55,6 +55,7 @@ func callOne(method reflect.Value, args []reflect.Value) (err error) {
 // A switch that does not answer is asked once: the first request takes the timeout, and every
 // later request of every kind fails at once with that error, and sends nothing.
 func TestFailFastStopsAskingASwitchThatDidNotAnswer(t *testing.T) {
+	failIfStuck(t, hangBound)
 	sw := escptest.Start(t)
 	sw.Mute()
 	c, err := escp.Dial(escp.Config{Host: "127.0.0.1", Username: escptest.Username, Password: model.Password(escptest.Password), Timeout: 60 * time.Millisecond,
@@ -84,6 +85,7 @@ func TestFailFastStopsAskingASwitchThatDidNotAnswer(t *testing.T) {
 // A switch that answered once is never latched: a single request it does not answer says nothing
 // about the next one (some firmware leaves some reads unanswered).
 func TestFailFastNeverLatchesASwitchThatAnswered(t *testing.T) {
+	failIfStuck(t, hangBound)
 	fc := newFaulty(&fakeClient{})
 	fast := failFast(fc)
 	if _, err := fast.LED(context.Background()); err != nil {
@@ -99,6 +101,7 @@ func TestFailFastNeverLatchesASwitchThatAnswered(t *testing.T) {
 // Every kind of outcome is classified: answers (and refusals) count as answers, silence and a switch
 // that cannot be found latch while nothing answered, anything else (a canceled call) neither.
 func TestFailFastClassifiesWhatARequestEnds(t *testing.T) {
+	failIfStuck(t, hangBound)
 	for _, tt := range []struct {
 		name         string
 		err          error
@@ -124,6 +127,7 @@ func TestFailFastClassifiesWhatARequestEnds(t *testing.T) {
 
 // Without a failure the wrapper passes every request through: none is refused by the latch.
 func TestFailFastPassesEveryRequestThrough(t *testing.T) {
+	failIfStuck(t, hangBound)
 	for name, err := range callEveryRequest(t, failFast(newFaulty(&fakeClient{}))) {
 		if err != nil && strings.Contains(err.Error(), "did not answer earlier") {
 			t.Errorf("%s was refused by the latch although nothing failed: %v", name, err)
