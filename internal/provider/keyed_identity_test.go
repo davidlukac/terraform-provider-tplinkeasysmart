@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -120,5 +121,35 @@ func TestSystemInfoKeepsTheMACAddressAsItsIdOnEverySwitch(t *testing.T) {
 				)}},
 			})
 		})
+	}
+}
+
+// The switch prefix of an import id names the switch the object is read from. A prefix that no switch has
+// is refused with the switch error and never read from another switch, and an id without a prefix does not
+// mean any named switch: beside a `switches` map the provider asks which one is meant.
+func TestKeyedResourcesRefuseAnImportWithAnUnknownOrMissingSwitchPrefix(t *testing.T) {
+	cases := []struct {
+		name     string
+		importID func(k keyedResource) string
+		wantErr  string
+	}{
+		{"an unknown prefix", func(k keyedResource) string { return "sw09:" + k.keyVal }, `unknown switch "sw09"`},
+		{"no prefix", func(k keyedResource) string { return k.keyVal }, `(?s)must say\s+which switch it is for`},
+	}
+	for _, k := range keyedResources() {
+		for _, tc := range cases {
+			t.Run(k.name+"/"+tc.name, func(t *testing.T) {
+				clearProviderEnv(t)
+				addr := "tplinkeasysmart_" + k.name + ".r"
+				this, other := k.fake(), k.fake()
+				resource.UnitTest(t, resource.TestCase{
+					ProtoV6ProviderFactories: multiFactories(map[string]SwitchClient{"10.0.0.1": other, "10.0.0.2": this}, nil),
+					Steps: []resource.TestStep{
+						{Config: k.config(true)},
+						{ResourceName: addr, ImportState: true, ImportStateId: tc.importID(k), ExpectError: regexp.MustCompile(tc.wantErr)},
+					},
+				})
+			})
+		}
 	}
 }
