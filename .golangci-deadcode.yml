@@ -8,7 +8,7 @@
 #
 # internal/regression is left out: it is the regression harness, a package whose non-test code is driven by
 # its own tests (the scenarios) and by the `live` build, so that "only a test uses it" is what it is for.
-# The rule is a path rule for that directory and for the one linter of this file; nothing else is excluded.
+# The rule is a path rule for that directory and for the one linter of this file; no other path is excluded by this file.
 version: "2"
 
 run:
