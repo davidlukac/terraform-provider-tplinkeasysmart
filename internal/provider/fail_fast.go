@@ -21,33 +21,42 @@ import (
 // The latch admits one request at a time (the library serializes the requests of a client, so no
 // throughput is lost) and decides after the admission, when the request is about to be sent: a
 // request that queued behind the first one is checked only when its turn comes, which is after the
-// first one has failed (#222). Waiting honors the context of the request. Nothing is held across
-// the request but the admission itself, a channel of capacity one, which is released when the
-// request ends, whatever way it ends.
+// first one has failed (#222). The outcome of a request is recorded before the next one is admitted.
+// Waiting honors the context of the request. Nothing is held across the request but the admission
+// itself, a channel of capacity one, which is released when the request ends, whatever way it ends.
+//
+// The admission is not re-entrant: a method of the wrapped client that calls another method of the
+// wrapped client while it holds the admission waits for itself until its context ends. A wrapped
+// method calls the client underneath, never another wrapped method.
 //
 // The latch lives as long as the client, which is one provider configuration: the next run of
-// Terraform asks again.
+// Terraform asks again. The zero value is ready to use.
 type failFastLatch struct {
-	slot     chan struct{} // the admission: a request holds the one slot while it is sent
+	once     sync.Once
+	slot     chan struct{} // the admission: a request holds the one slot while it is sent; see admission
 	mu       sync.Mutex    // guards the fields below; never held while waiting or sending
 	answered bool          // some request got an answer
 	err      error         // the first request that got none, while nothing was answered
 }
 
-func newFailFastLatch() *failFastLatch {
-	return &failFastLatch{slot: make(chan struct{}, 1)}
+// admission is the channel of the admission, made on first use so that the zero latch works.
+func (l *failFastLatch) admission() chan struct{} {
+	l.once.Do(func() { l.slot = make(chan struct{}, 1) })
+	return l.slot
 }
 
 // acquire admits the request: it waits for its turn (and gives up with the error of the context),
 // then refuses the request when the switch did not answer before. A nil error means the caller
 // holds the admission and must call release when the request has ended; with an error it holds
-// nothing.
+// nothing. A context that is canceled before the call never takes the slot, whether or not it is
+// free; a wait that is canceled just as the slot frees may still take it (the select picks one of
+// two ready cases), and the request then ends with the error of the context in the client.
 func (l *failFastLatch) acquire(ctx context.Context) error {
-	if err := ctx.Err(); err != nil { // a canceled call never takes the slot, whether or not it is free
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	select {
-	case l.slot <- struct{}{}:
+	case l.admission() <- struct{}{}:
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -58,8 +67,14 @@ func (l *failFastLatch) acquire(ctx context.Context) error {
 	return nil
 }
 
-// release hands the admission to the next request.
-func (l *failFastLatch) release() { <-l.slot }
+// release hands the admission to the next request. It never blocks: releasing an admission that is
+// not held does nothing, so a mistake in the pairing cannot hang a run.
+func (l *failFastLatch) release() {
+	select {
+	case <-l.admission():
+	default:
+	}
+}
 
 // refused is the error of a request that is not sent because the switch did not answer before.
 func (l *failFastLatch) refused() error {
@@ -87,9 +102,11 @@ func (l *failFastLatch) record(err error) {
 	}
 }
 
-// failFast returns c with the latch in front of every request; Close and SwitchMAC pass through.
+// failFast returns c with the latch in front of every request; Close and SwitchMAC pass through
+// (they send nothing, so they are not admitted: Close is never held up by the requests that wait).
+// The wrapped methods are not re-entrant (see failFastLatch).
 func failFast(c SwitchClient) SwitchClient {
-	return latchedClient{SwitchClient: c, latch: newFailFastLatch()}
+	return latchedClient{SwitchClient: c, latch: &failFastLatch{}}
 }
 
 type latchedClient struct {
@@ -110,6 +127,8 @@ func do0(ctx context.Context, l *failFastLatch, f func() error) error {
 	return err
 }
 
+// do1 is do0 for a request that returns a value; the same rule holds: f calls the client
+// underneath and never another wrapped method, or the call waits for itself.
 func do1[T any](ctx context.Context, l *failFastLatch, f func() (T, error)) (T, error) {
 	if err := l.acquire(ctx); err != nil {
 		var zero T

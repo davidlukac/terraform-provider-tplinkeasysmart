@@ -63,6 +63,7 @@ func clientOf(t *testing.T, reg *switchRegistry, name string) SwitchClient {
 // kind (the configuration read included) fails at once with the documented error and sends
 // nothing, for the provider's own switch and for a switch of the `switches` map alike.
 func TestTheRegistryLatchesASilentSwitch(t *testing.T) {
+	failIfStuck(t, hangBound)
 	for _, tt := range []struct {
 		name  string
 		spec  switchSpec
@@ -99,6 +100,7 @@ func TestTheRegistryLatchesASilentSwitch(t *testing.T) {
 // A switch that answered is never latched: a request it does not answer afterwards is asked again,
 // and the next one too.
 func TestTheRegistryNeverLatchesASwitchThatAnswered(t *testing.T) {
+	failIfStuck(t, hangBound)
 	sw := escptest.Start(t)
 	c := clientOf(t, wiringSwitches{"192.0.2.1": sw}.build(t, switchSpec{host: "192.0.2.1"}), defaultSwitchName)
 	if _, err := c.LED(context.Background()); err != nil {
@@ -119,6 +121,7 @@ func TestTheRegistryNeverLatchesASwitchThatAnswered(t *testing.T) {
 // One latch per switch: a silent switch does not latch a responsive one, and the responsive one
 // keeps answering while the silent one is not asked again.
 func TestASilentSwitchDoesNotLatchAResponsiveOne(t *testing.T) {
+	failIfStuck(t, hangBound)
 	silent, live := escptest.Start(t), escptest.Start(t)
 	silent.Mute()
 	reg := wiringSwitches{"192.0.2.1": silent, "192.0.2.2": live}.build(t,
@@ -144,6 +147,7 @@ func TestASilentSwitchDoesNotLatchAResponsiveOne(t *testing.T) {
 // switch that told its firmware is not latched by what it leaves unanswered afterwards (the gate
 // outside the latch, in the other order, would never be seen by it).
 func TestTheFirmwareReadOfTheBackupGateCountsAsAnAnswer(t *testing.T) {
+	failIfStuck(t, hangBound)
 	sw := escptest.Start(t)
 	sw.SetFirmware(unverifiedFirmware)
 	c := clientOf(t, wiringSwitches{"192.0.2.1": sw}.build(t, switchSpec{host: "192.0.2.1"}), defaultSwitchName)
@@ -169,6 +173,7 @@ func TestTheFirmwareReadOfTheBackupGateCountsAsAnAnswer(t *testing.T) {
 // A latched switch refuses the configuration read before anything is sent, by the gate's wording
 // (it could not read the firmware) and with the latched error underneath.
 func TestALatchedSwitchRefusesTheConfigurationReadAtTheGate(t *testing.T) {
+	failIfStuck(t, hangBound)
 	sw := escptest.Start(t)
 	sw.Mute()
 	c := clientOf(t, wiringSwitches{"192.0.2.1": sw}.build(t, switchSpec{host: "192.0.2.1"}), defaultSwitchName)
@@ -237,6 +242,7 @@ func configureRegistry(t *testing.T, dial func(escp.Config) (SwitchClient, error
 // refused at once, for the provider's own switch and for each switch of the map, each with a latch
 // of its own.
 func TestConfigureLatchesEachSilentSwitchOnItsOwn(t *testing.T) {
+	failIfStuck(t, hangBound)
 	own, a, b := escptest.Start(t), escptest.Start(t), escptest.Start(t)
 	own.Mute()
 	a.Mute()

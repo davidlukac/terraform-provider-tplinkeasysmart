@@ -42,6 +42,7 @@ func silentFactories(t *testing.T, sw *escptest.Switch) map[string]func() (tfpro
 // per data source, and the walk ends with the latch's error. The count of datagrams is the bound;
 // there is no clock in the assertion.
 func TestAccParallelDataSourcesOnASilentSwitchAreAskedOnce(t *testing.T) {
+	failIfStuck(t, hangBound)
 	const sources = 12
 	want := datagramsOfOneRequest(t, readInfo) // the data source starts with the Info read
 
