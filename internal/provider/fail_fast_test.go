@@ -113,7 +113,7 @@ func TestFailFastClassifiesWhatARequestEnds(t *testing.T) {
 		{"a canceled call", context.Canceled, false, false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			l := &failFastLatch{}
+			l := newFailFastLatch()
 			l.record(tt.err)
 			if l.answered != tt.wantAnswered || (l.err != nil) != tt.wantLatched {
 				t.Fatalf("answered=%v latched=%v, want %v and %v", l.answered, l.err != nil, tt.wantAnswered, tt.wantLatched)
