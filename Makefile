@@ -84,8 +84,8 @@ analyzers:
 # `make deadcodefixtures` holds the configuration to a fixture module (devtools/deadcodefixtures: a function
 # only a test calls must be reported, one in the harness directory must not), so that a configuration weakened
 # is noticed; it is a prerequisite of `lint` too. devtools/lintcheck is a copy made by hand of escp-go's, which is
-# its one source: a change to it is made there first. The fixture holds the linter set, `tests: false` and the
-# path rule (it reaches internal/regression and internal/provider, as the fixture has them). The pin of the `lint:`
+# its one source: a change to it is made there first. The fixture holds the linter set, `tests: false` and that the
+# path rule reaches internal/regression and does not reach internal/provider or the module root. The pin of the `lint:`
 # prerequisites and of the `deadcode` recipe is a proposed check (devtools/recipecheck, #196): until it is built a
 # change to the `lint:` line or to those recipes is read at review; `catalogcheck` only checks that the targets exist.
 .PHONY: deadcode deadcodefixtures

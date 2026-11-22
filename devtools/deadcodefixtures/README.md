@@ -15,11 +15,13 @@ of the file, so the module is checked at the same relative names as the real fil
 linter reports with [expected.txt](expected.txt): `onlyATest` and `onlyAProviderTest` must be reported and
 nothing else.
 
-What it holds: the linter set (`unused` alone), `tests: false`, and that the path rule reaches the harness
-directory and the provider directory and no other. A configuration weakened in one of these ways (`run.tests:
-true`, another linter instead of `unused`, no linter at all, a path rule that is dropped, broader or that adds
-the provider directory) leaves a finding missing or unexpected and fails the target (DC-C05, issue #218). It
-does not hold the rest of the file or the `Makefile` recipes. The ordinary `unused` run of the repository would
-not report `onlyATest`: it has the tests on.
+What it holds: the linter set (`unused` alone), `tests: false`, and that the path rule reaches
+`internal/regression` and does not reach `internal/provider` or the module root. A configuration weakened in
+one of these ways (`run.tests: true`, another linter instead of `unused`, no linter at all, a path rule that is
+dropped, that points elsewhere or that also covers the provider directory or the module root) leaves a finding
+missing or unexpected and fails the target (DC-C05, issue #218). It does not hold that the rule stops at every
+other directory (a rule widened to a directory the fixture does not have is not noticed), the rest of the file
+or the `Makefile` recipes. The ordinary `unused` run of the repository would not report `onlyATest`: it has the
+tests on.
 
 The fixtures only have to compile: they are never run.
