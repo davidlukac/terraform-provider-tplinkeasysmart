@@ -13,9 +13,12 @@ import (
 // A switch that does not answer costs the whole timeout, with its retries, on every request, and
 // the requests of one switch are serialized: a refresh of fifteen resources against a switch that
 // is off takes minutes before the plan fails. failFast puts a latch in front of a client: when the
-// first request that anything of this client sends gets no answer, every later request fails at once
-// with that error, and says so. A switch that has answered once is never latched (a single read it
-// does not answer, as some firmware does for some settings, says nothing about the next).
+// first request that anything of this client sends gets no answer, every request that starts after
+// it fails at once with that error, and says so. A request that is already waiting for its turn when
+// the first one fails has passed the check and is not refused (the check happens before the request
+// is queued, #222), so the first parallel wave of a run still pays the timeout. A switch that has
+// answered once is never latched (a single read it does not answer, as some firmware does for some
+// settings, says nothing about the next).
 //
 // The latch lives as long as the client, which is one provider configuration: the next run of
 // Terraform asks again.

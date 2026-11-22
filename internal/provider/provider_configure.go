@@ -210,12 +210,25 @@ func (b *registryBuilder) add(s switchSpec) {
 		b.diags.AddError("Cannot configure switch client", fmt.Sprintf("%s: %s", label, err))
 		return
 	}
-	c = withBackupGate(c, firmwareGate(s.allowUnverified, "read the configuration file"))
+	c = guardedClient(c, s.allowUnverified)
 	if s.name == "" {
 		b.reg.def = c
 		return
 	}
 	b.reg.named[s.name] = c
+}
+
+// guardedClient is what the registry hands out for a client the library built: the fail-fast latch
+// (DC-P06) next to the transport, and the firmware gate of the configuration read in front of it.
+// The order matters. The gate reads the firmware through the client it wraps, so with the latch
+// inside, the gate's own read is a request the latch sees: an answer to it counts as an answer (a
+// switch that told its firmware is never latched afterwards), and a latched switch refuses the
+// gate's read, so the gate refuses the configuration read and nothing is sent. With the gate inside,
+// its reads would bypass the latch: a switch that answered the firmware read could still be latched
+// by the configuration read that follows it. The gate is outermost, so it still sees every
+// configuration read first.
+func guardedClient(c SwitchClient, allowUnverified bool) SwitchClient {
+	return withBackupGate(failFast(c), firmwareGate(allowUnverified, "read the configuration file"))
 }
 
 // claim records the host and the MAC address of a switch and refuses one that another switch has.
