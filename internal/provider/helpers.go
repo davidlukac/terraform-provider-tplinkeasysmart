@@ -26,23 +26,6 @@ const (
 	summaryInvalidImportID = "Invalid import id"
 )
 
-// clientFrom extracts the narrow client interface T a resource or data source
-// needs from the provider data (the zero value before the provider is
-// configured). Every consumer asks for its own interface, never the whole
-// switch API.
-func clientFrom[T any](data any, diags *diag.Diagnostics) T {
-	var zero T
-	if data == nil {
-		return zero
-	}
-	c, ok := data.(T)
-	if !ok {
-		diags.AddError("Unexpected provider data", fmt.Sprintf("got %T", data))
-		return zero
-	}
-	return c
-}
-
 // applyPlan is the shared body of Create and Update: decode the plan, apply it
 // to the switch, and store the resulting (read-back) state. apply reports
 // problems through its add function and returns false to leave the state untouched.

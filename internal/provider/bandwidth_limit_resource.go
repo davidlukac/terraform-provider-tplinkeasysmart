@@ -28,7 +28,6 @@ func NewBandwidthLimitResource() resource.Resource { return &bandwidthLimitResou
 type bandwidthLimitResource struct {
 	src    switchSource
 	client bandwidthLimitClient // set on the per-call copy made by bound()
-	sw     types.String         // the switch that copy is bound to, for ids
 }
 
 // bandwidthLimitClient is the part of the switch API this resource needs.
@@ -40,7 +39,7 @@ type bandwidthLimitClient interface {
 
 // bound returns a copy of the resource wired to the client of the named switch.
 func (r *bandwidthLimitResource) bound(add func(string, string), name types.String) *bandwidthLimitResource {
-	return bindSwitch(add, r.src, name, r, func(b *bandwidthLimitResource, c bandwidthLimitClient, sw types.String) { b.client, b.sw = c, sw })
+	return bindSwitch(add, r.src, name, r, func(b *bandwidthLimitResource, c bandwidthLimitClient, _ types.String) { b.client = c })
 }
 
 type bandwidthLimitModel struct {

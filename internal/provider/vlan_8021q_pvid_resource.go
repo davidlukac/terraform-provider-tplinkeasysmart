@@ -29,7 +29,6 @@ func NewVLAN8021QPVIDResource() resource.Resource { return &vlan8021QPVIDResourc
 type vlan8021QPVIDResource struct {
 	src    switchSource
 	client vlan8021QPVIDClient // set on the per-call copy made by bound()
-	sw     types.String        // the switch that copy is bound to, for ids
 }
 
 // vlan8021QPVIDClient is the part of the switch API this resource needs.
@@ -41,7 +40,7 @@ type vlan8021QPVIDClient interface {
 
 // bound returns a copy of the resource wired to the client of the named switch.
 func (r *vlan8021QPVIDResource) bound(add func(string, string), name types.String) *vlan8021QPVIDResource {
-	return bindSwitch(add, r.src, name, r, func(b *vlan8021QPVIDResource, c vlan8021QPVIDClient, sw types.String) { b.client, b.sw = c, sw })
+	return bindSwitch(add, r.src, name, r, func(b *vlan8021QPVIDResource, c vlan8021QPVIDClient, _ types.String) { b.client = c })
 }
 
 type vlan8021QPVIDModel struct {

@@ -29,7 +29,6 @@ func NewVLAN8021QGroupResource() resource.Resource { return &vlan8021QGroupResou
 type vlan8021QGroupResource struct {
 	src    switchSource
 	client vlan8021QGroupClient // set on the per-call copy made by bound()
-	sw     types.String         // the switch that copy is bound to, for ids
 }
 
 // vlan8021QGroupClient is the part of the switch API this resource needs.
@@ -42,7 +41,7 @@ type vlan8021QGroupClient interface {
 
 // bound returns a copy of the resource wired to the client of the named switch.
 func (r *vlan8021QGroupResource) bound(add func(string, string), name types.String) *vlan8021QGroupResource {
-	return bindSwitch(add, r.src, name, r, func(b *vlan8021QGroupResource, c vlan8021QGroupClient, sw types.String) { b.client, b.sw = c, sw })
+	return bindSwitch(add, r.src, name, r, func(b *vlan8021QGroupResource, c vlan8021QGroupClient, _ types.String) { b.client = c })
 }
 
 type vlan8021QGroupModel struct {

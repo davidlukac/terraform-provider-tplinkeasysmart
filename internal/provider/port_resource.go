@@ -31,8 +31,7 @@ func NewPortResource() resource.Resource { return &portResource{} }
 
 type portResource struct {
 	src    switchSource
-	client portClient   // set on the per-call copy made by bound()
-	sw     types.String // the switch that copy is bound to, for ids
+	client portClient // set on the per-call copy made by bound()
 }
 
 // portClient is the part of the switch API this resource needs.
@@ -43,7 +42,7 @@ type portClient interface {
 
 // bound returns a copy of the resource wired to the client of the named switch.
 func (r *portResource) bound(add func(string, string), name types.String) *portResource {
-	return bindSwitch(add, r.src, name, r, func(b *portResource, c portClient, sw types.String) { b.client, b.sw = c, sw })
+	return bindSwitch(add, r.src, name, r, func(b *portResource, c portClient, _ types.String) { b.client = c })
 }
 
 type portResourceModel struct {

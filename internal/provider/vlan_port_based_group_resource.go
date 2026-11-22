@@ -32,7 +32,6 @@ func NewVLANPortBasedGroupResource() resource.Resource { return &portVLANResourc
 type portVLANResource struct {
 	src    switchSource
 	client portVLANClient // set on the per-call copy made by bound()
-	sw     types.String   // the switch that copy is bound to, for ids
 }
 
 // portVLANClient is the part of the switch API this resource needs.
@@ -44,7 +43,7 @@ type portVLANClient interface {
 
 // bound returns a copy of the resource wired to the client of the named switch.
 func (r *portVLANResource) bound(add func(string, string), name types.String) *portVLANResource {
-	return bindSwitch(add, r.src, name, r, func(b *portVLANResource, c portVLANClient, sw types.String) { b.client, b.sw = c, sw })
+	return bindSwitch(add, r.src, name, r, func(b *portVLANResource, c portVLANClient, _ types.String) { b.client = c })
 }
 
 type portVLANResourceModel struct {

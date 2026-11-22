@@ -21,7 +21,6 @@ func NewSystemInfoDataSource() datasource.DataSource { return &systemInfoDataSou
 type systemInfoDataSource struct {
 	src    switchSource
 	client systemInfoReader // set on the per-call copy made by bound()
-	sw     types.String     // the switch that copy is bound to, for ids
 }
 
 // systemInfoReader is the part of the switch API this data source reads.
@@ -32,7 +31,7 @@ type systemInfoReader interface {
 
 // bound returns a copy of the data source wired to the client of the named switch.
 func (d *systemInfoDataSource) bound(add func(string, string), name types.String) *systemInfoDataSource {
-	return bindSwitch(add, d.src, name, d, func(b *systemInfoDataSource, c systemInfoReader, sw types.String) { b.client, b.sw = c, sw })
+	return bindSwitch(add, d.src, name, d, func(b *systemInfoDataSource, c systemInfoReader, _ types.String) { b.client = c })
 }
 
 type systemInfoModel struct {
