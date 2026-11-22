@@ -1,0 +1,5 @@
+# The findings `.golangci-deadcode.yml` must report on this module, one per line: `file: linter: text`, sorted.
+# `make deadcodefixtures` runs the configuration over a copy of the module and compares: every line here must
+# be reported and nothing else may be. The line numbers are not part of it. internal/regression/harness.go has
+# a function only a test calls and is not listed: the configuration leaves that directory out.
+testonly.go: unused: func onlyATest is unused

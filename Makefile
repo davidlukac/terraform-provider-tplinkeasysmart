@@ -77,6 +77,24 @@ analyzers:
 	build/analyzers $(ANALYZER_FLAGS) ./...
 	GOFLAGS=-tags=live build/analyzers -nosleep ./...
 
+# Code that only a test uses. `make lint` runs `unused` with the tests on (.golangci.yml), so a function a test
+# calls counts as used and ships in the production build for nothing. This runs `unused` alone with the tests
+# left out (.golangci-deadcode.yml: `run.tests: false`), with and without the `live` build tag, and fails on any
+# finding; internal/regression, the harness, is left out by a path rule of that file. A prerequisite of `lint`.
+# `make deadcodefixtures` holds the configuration to a fixture module (devtools/deadcodefixtures: a function
+# only a test calls must be reported, one in the harness directory must not), so that a configuration weakened
+# is noticed; it is a prerequisite of `lint` too. Unlike escp-go this repository has no recipe check
+# (devtools/recipecheck) that pins the prerequisites, only the catalog check (`catalogcheck`) that the targets exist.
+.PHONY: deadcode deadcodefixtures
+lint: deadcode deadcodefixtures
+
+deadcode:
+	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...
+	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...
+
+deadcodefixtures:
+	scripts/deadcode-fixtures.sh "$$($(DEVTOOL) -n golangci-lint)"
+
 # The workflow files (a pinned actionlint; the pre-commit hook runs it for a staged workflow, CI for every PR).
 actionlint:
 	$(DEVTOOL) actionlint
