@@ -20,7 +20,7 @@ import (
 // disruptivePorts returns the device ports the run may disturb, or skips the scenario.
 func (s *Session) disruptivePorts(t *testing.T) []model.PortID {
 	t.Helper()
-	if len(s.Target.DisruptivePorts) == 0 {
+	if !s.Target.CanDisrupt() {
 		t.Skip("set TPLINK_REGRESSION_DISRUPTIVE_PORTS to the device ports this scenario may disturb")
 	}
 	return s.Target.DisruptivePorts
@@ -92,16 +92,11 @@ func TestScenarioDisruptiveLAG(t *testing.T) {
 	s := openForScenario(t)
 	var a, b model.PortID
 	var group model.LAGID
-	for _, x := range s.disruptivePorts(t) {
-		for _, y := range s.disruptivePorts(t) {
-			px, py := s.portOf(t, x), s.portOf(t, y)
-			if x < y && px.ActualSpeed == py.ActualSpeed && px.ActualSpeed != model.SpeedLinkDown && px.ConfiguredSpeed == py.ConfiguredSpeed &&
-				(x >= 5) == (y >= 5) && x != 1 {
-				a, b, group = x, y, 1
-				if x >= 5 {
-					group = 2
-				}
-			}
+	s.disruptivePorts(t) // skips when the run named none
+	for _, pair := range s.Target.DisruptiveLAGPairs() {
+		pa, pb := s.portOf(t, pair.A), s.portOf(t, pair.B)
+		if pa.ActualSpeed == pb.ActualSpeed && pa.ActualSpeed != model.SpeedLinkDown && pa.ConfiguredSpeed == pb.ConfiguredSpeed {
+			a, b, group = pair.A, pair.B, pair.Group
 		}
 	}
 	if group == 0 {

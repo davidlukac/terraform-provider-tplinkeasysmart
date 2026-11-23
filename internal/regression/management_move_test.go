@@ -60,7 +60,7 @@ func TestScenarioManagementMove(t *testing.T) {
 	if s.Fake != nil {
 		t.Skip("the move needs hardware: the fake answers on loopback, where the client refuses to move a switch")
 	}
-	if s.Target.MoveIP == "" {
+	if !s.Target.CanMoveManagement() {
 		t.Skip("set " + EnvAllowMove + "=1 and TPLINK_REGRESSION_MOVE_IP to move the switch to a spare address and back")
 	}
 	ctx := context.Background()
@@ -121,7 +121,7 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 	if s.Fake != nil {
 		t.Skip("the move needs hardware: the fake answers on loopback, where the client refuses to move a switch")
 	}
-	if s.Target.MoveIP == "" {
+	if !s.Target.CanMoveManagement() {
 		t.Skip("set " + EnvAllowMove + "=1 and TPLINK_REGRESSION_MOVE_IP to move the switch to a spare address and back")
 	}
 	ctx := context.Background()
@@ -251,7 +251,7 @@ func TestScenarioManagementDHCP(t *testing.T) {
 	if s.Fake != nil {
 		t.Skip("the lease needs hardware and a DHCP server; the provider and library tests cover it on the fake")
 	}
-	if !s.Target.DHCP {
+	if !s.Target.CanUseDHCP() {
 		t.Skip("set " + EnvAllowDHCP + "=1 to turn DHCP on and back off (the router's DHCP server must be up)")
 	}
 	ctx := context.Background()

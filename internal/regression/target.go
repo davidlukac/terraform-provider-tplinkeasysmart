@@ -162,8 +162,7 @@ func loadOptIns(t *Target, env map[string]string) error {
 		}
 	}
 	t.DHCP = env[EnvAllowDHCP] == "1"
-	// the device ports are the protected ports other than the management port, which is listed first
-	devices := t.ProtectedPorts[min(1, len(t.ProtectedPorts)):]
+	devices := t.DevicePorts()
 	if v := env[envDisruptPort]; v != "" {
 		ports, err := parsePorts(v)
 		if err != nil || len(ports) != 1 {
