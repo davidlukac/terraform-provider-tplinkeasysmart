@@ -117,6 +117,21 @@ modcheck:
 # goes on (the default is a minute).
 fuzz:
 	go test ./internal/regression -run '^$$' -fuzz '^FuzzParseEnvFile$$' -fuzztime $(or $(SECONDS),30)s -fuzzminimizetime 5s
+	go test ./tools/mergereadiness -run '^$$' -fuzz '^FuzzJudge$$' -fuzztime $(or $(SECONDS),30)s -fuzzminimizetime 5s
+
+# Records GitHub's own rendering of the descriptions in tools/mergereadiness/testdata/oracle
+# (NN-name.md -> NN-name.html), the ground truth the tests of the "Merge readiness" check compare the
+# parser with (it must report at least as many unticked boxes as the renderer shows). A copy of the target
+# of the same name in escp-go's Makefile. It needs `gh auth` and the network, posts nothing (the markdown
+# endpoint only renders), and is not run in CI: run it when a description is added or GitHub's renderer
+# changes, and commit the HTML that changed. The renderer puts a random hash in the ids of a footnote; it
+# is cut, so that a re-recording is identical.
+.PHONY: oracle-refresh
+oracle-refresh:
+	@for f in tools/mergereadiness/testdata/oracle/*.md; do \
+		gh api -X POST /markdown -F text=@"$$f" -f mode=gfm > "$${f%.md}.html.tmp" || exit 1; \
+		sed -E 's/-[0-9a-f]{32}"/"/g' "$${f%.md}.html.tmp" > "$${f%.md}.html"; rm -f "$${f%.md}.html.tmp"; \
+	done
 
 # Unit tests plus Terraform lifecycle tests against fakes. No hardware is touched.
 test:
