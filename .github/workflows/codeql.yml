@@ -45,7 +45,7 @@ jobs:
         with:
           persist-credentials: false
       - if: matrix.language == 'go'
-        uses: ./.github/actions/setup
+        uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)
       - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: ${{ matrix.language }}

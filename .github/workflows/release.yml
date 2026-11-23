@@ -35,7 +35,7 @@ jobs:
           persist-credentials: false
           ref: refs/tags/${{ inputs.tag }}
           fetch-depth: 0
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)
       - name: Import GPG key
         id: import_gpg
         uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0

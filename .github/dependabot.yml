@@ -1,9 +1,14 @@
 version: 2
+# Every entry waits a week after a release before it proposes it (`cooldown`, zizmor's
+# dependabot-cooldown rule): a compromised release is usually pulled within days, and a week is also
+# time for a regression to be found. Security updates ignore the cooldown.
 updates:
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "build(deps)"
     groups:
@@ -14,6 +19,8 @@ updates:
     directory: /devtools
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "build(deps)"
     groups:
@@ -26,9 +33,20 @@ updates:
       - /.github/actions/setup
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "ci(deps)"
     groups:
       actions:
         patterns:
           - "*"
+  # The pinned zizmor (devtools/zizmor/requirements.txt): the version and its hashes.
+  - package-ecosystem: pip
+    directory: /devtools/zizmor
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci(deps)"

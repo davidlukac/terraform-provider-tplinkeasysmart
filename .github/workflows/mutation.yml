@@ -58,7 +58,7 @@ jobs:
         run: |
           lines=$(git diff --numstat "origin/${BASE_REF}...HEAD" -- '*.go' ':(exclude)*_test.go' | awk '$1 != "-" {n += $1} END {print n + 0}')
           echo "lines=$lines" >> "$GITHUB_OUTPUT"
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)
         if: fromJSON(steps.size.outputs.lines) <= fromJSON(env.LINE_LIMIT)
         with:
           go-version: stable
@@ -92,7 +92,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)
         with:
           go-version: stable
       - name: Mutate every covered operator

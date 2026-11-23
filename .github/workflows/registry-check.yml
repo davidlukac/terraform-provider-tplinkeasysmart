@@ -1,10 +1,14 @@
 # Installs a release the way a user does, with Terraform and with OpenTofu, in an empty directory,
 # and checks that both registries serve the release signing key (`terraform init` and `tofu init`
-# print the key ID of a signed install). It runs after the Release workflow, by hand for any
-# version, and weekly for the latest release, which also warns when the signing key is close to its
-# expiry. It reports and never blocks a release: the registries ingest at their own pace (the
-# Terraform Registry in minutes, the OpenTofu registry by a scheduled sync that took hours to
-# publish the key), so a run right after a release waits and retries for an hour.
+# print the key ID of a signed install). It runs by hand for any version (after a release, start
+# it with the command below) and weekly for the latest release, which also warns when the signing
+# key is close to its expiry. It reports and never blocks a release: the registries ingest at their
+# own pace (the Terraform Registry in minutes, the OpenTofu registry by a scheduled sync that took
+# hours to publish the key), so a run by hand waits and retries for an hour.
+#
+# It does not start itself when the Release workflow ends (a `workflow_run` trigger): zizmor
+# reports that trigger as dangerous in any workflow (`make zizmor`, CONTRIBUTING.md), and the gate
+# allows no finding but the `self-repository` ones.
 #
 #   gh workflow run registry-check.yml -f version=0.34.0      (empty: the latest release)
 name: Registry check
@@ -15,9 +19,6 @@ on:
       version:
         description: "Version to check, for example 0.34.0 (empty: the latest release)"
         required: false
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
   schedule:
     - cron: "23 6 * * 1"
 
@@ -37,7 +38,6 @@ env:
 jobs:
   check:
     name: ${{ matrix.tool }} install
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
@@ -47,7 +47,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       TOOL: ${{ matrix.tool }}
-      # After a release: up to 12 looks, five minutes apart. The weekly run looks once.
+      # By hand, after a release: up to 12 looks, five minutes apart. The weekly run looks once.
       ATTEMPTS: ${{ github.event_name == 'schedule' && 1 || 12 }}
     steps:
       - if: matrix.tool == 'terraform'
