@@ -6,6 +6,9 @@
 # The scan uses the Go version of go.mod on purpose, the version CI and the release are built with: a
 # floor that is behind a fixed release turns this red, where a scan with `stable` would pass because the
 # newest Go already has the fix. The step "Go version" prints it. `make vuln` reproduces it locally.
+#
+# The same schedule runs the workflow security check of test.yml (zizmor, `make zizmor` locally): its online
+# audits can change with nothing of ours changing.
 name: Weekly checks
 
 on:
@@ -30,8 +33,36 @@ jobs:
         with:
           persist-credentials: false
       # No go-version input: the setup action installs the version in go.mod.
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)
       - name: Go version
         run: go version
       - name: Known vulnerabilities
         run: make vuln
+
+  # The same pinned zizmor and the same steps as the `zizmor` job of test.yml. Its online audits (an action
+  # with a known vulnerability, a pinned SHA that is not in the action's history) can change with nothing of
+  # ours changing, so a run of the week that sees none of our commits can still find something.
+  zizmor:
+    name: Workflow security (zizmor)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The audit is run by a Go program of this repository (tools/zizmorrun, started by scripts/zizmor.sh), built
+      # with the go tool from the go.mod of the checked-out tree. That tree is the one audited, so these files, go.mod,
+      # go.work, vendor/ and this step are part of what the gate runs on: a change to any of them changes the gate.
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Install the pinned zizmor
+        run: |
+          python3 -m venv "$RUNNER_TEMP/zizmor"
+          "$RUNNER_TEMP/zizmor/bin/pip" install --require-hashes --quiet -r devtools/zizmor/requirements.txt
+          echo "$RUNNER_TEMP/zizmor/bin" >> "$GITHUB_PATH"
+      - name: Audit the workflows
+        run: make zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}

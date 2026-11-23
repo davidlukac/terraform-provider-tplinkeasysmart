@@ -1,0 +1,3 @@
+go test fuzz v1
+int(1)
+[]byte("[{\"id\\u0065nt\":\"self-repository\",\"\\u0069dent\":\"template-injection\"}]")

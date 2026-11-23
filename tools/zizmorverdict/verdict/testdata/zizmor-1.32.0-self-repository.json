@@ -1,0 +1,1696 @@
+[
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/codeql.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "analyze"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 46,
+              "column": 8
+            },
+            "end_point": {
+              "row": 47,
+              "column": 132
+            },
+            "offset_span": {
+              "start": 1413,
+              "end": 1573
+            }
+          },
+          "feature": "if: matrix.language == 'go'\n        uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/codeql.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "analyze"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 47,
+              "column": 14
+            },
+            "end_point": {
+              "row": 47,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 1455,
+              "end": 1478
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/codeql.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/fuzz.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "fuzz"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 25,
+              "column": 8
+            },
+            "end_point": {
+              "row": 25,
+              "column": 132
+            },
+            "offset_span": {
+              "start": 728,
+              "end": 852
+            }
+          },
+          "feature": "uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/fuzz.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "fuzz"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 25,
+              "column": 14
+            },
+            "end_point": {
+              "row": 25,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 734,
+              "end": 757
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/fuzz.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/mutation.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "changed"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 2
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 60,
+              "column": 8
+            },
+            "end_point": {
+              "row": 64,
+              "column": 27
+            },
+            "offset_span": {
+              "start": 2326,
+              "end": 2596
+            }
+          },
+          "feature": "uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)\n        if: fromJSON(steps.size.outputs.lines) <= fromJSON(env.LINE_LIMIT)\n        with:\n          go-version: stable\n          terraform: latest",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/mutation.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "changed"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 2
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 60,
+              "column": 14
+            },
+            "end_point": {
+              "row": 60,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 2332,
+              "end": 2355
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/mutation.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/mutation.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "fast-packages"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 94,
+              "column": 8
+            },
+            "end_point": {
+              "row": 96,
+              "column": 28
+            },
+            "offset_span": {
+              "start": 3831,
+              "end": 3998
+            }
+          },
+          "feature": "uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)\n        with:\n          go-version: stable",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/mutation.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "fast-packages"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 94,
+              "column": 14
+            },
+            "end_point": {
+              "row": 94,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 3837,
+              "end": 3860
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/mutation.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/release.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "goreleaser"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 37,
+              "column": 8
+            },
+            "end_point": {
+              "row": 37,
+              "column": 132
+            },
+            "offset_span": {
+              "start": 1119,
+              "end": 1243
+            }
+          },
+          "feature": "uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/release.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "goreleaser"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 37,
+              "column": 14
+            },
+            "end_point": {
+              "row": 37,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 1125,
+              "end": 1148
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/release.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "build"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 37,
+              "column": 8
+            },
+            "end_point": {
+              "row": 41,
+              "column": 90
+            },
+            "offset_span": {
+              "start": 1505,
+              "end": 1860
+            }
+          },
+          "feature": "uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)\n        with:\n          terraform: latest\n      # `go mod tidy -diff` fails when tidy would change go.mod or go.sum (for the module and for\n      # devtools); `go mod verify` fails when a downloaded dependency differs from go.sum.",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)",
+            "# `go mod tidy -diff` fails when tidy would change go.mod or go.sum (for the module and for",
+            "# devtools); `go mod verify` fails when a downloaded dependency differs from go.sum."
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "build"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 37,
+              "column": 14
+            },
+            "end_point": {
+              "row": 37,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 1511,
+              "end": 1534
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/test.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "unit"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 114,
+              "column": 8
+            },
+            "end_point": {
+              "row": 119,
+              "column": 74
+            },
+            "offset_span": {
+              "start": 5106,
+              "end": 5464
+            }
+          },
+          "feature": "uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)\n        with:\n          go-version: ${{ matrix.go }}\n          terraform: latest\n      # Race detector, whole module, and the coverage policy: every statement\n      # covered unless its function says `// coverage: ignore - <reason>`.",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)",
+            "# Race detector, whole module, and the coverage policy: every statement",
+            "# covered unless its function says `// coverage: ignore - <reason>`."
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "unit"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 114,
+              "column": 14
+            },
+            "end_point": {
+              "row": 114,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 5112,
+              "end": 5135
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/test.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "coverage-badge"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 160,
+              "column": 8
+            },
+            "end_point": {
+              "row": 160,
+              "column": 132
+            },
+            "offset_span": {
+              "start": 6971,
+              "end": 7095
+            }
+          },
+          "feature": "uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "coverage-badge"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 160,
+              "column": 14
+            },
+            "end_point": {
+              "row": 160,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 6977,
+              "end": 7000
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/test.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "acceptance"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 205,
+              "column": 8
+            },
+            "end_point": {
+              "row": 207,
+              "column": 44
+            },
+            "offset_span": {
+              "start": 9287,
+              "end": 9470
+            }
+          },
+          "feature": "uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)\n        with:\n          terraform: ${{ matrix.terraform }}",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "acceptance"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 205,
+              "column": 14
+            },
+            "end_point": {
+              "row": 205,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 9293,
+              "end": 9316
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/test.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "terraform-next"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 2
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 237,
+              "column": 8
+            },
+            "end_point": {
+              "row": 240,
+              "column": 54
+            },
+            "offset_span": {
+              "start": 10830,
+              "end": 11068
+            }
+          },
+          "feature": "if: steps.next.outputs.version != ''\n        uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)\n        with:\n          terraform: ${{ steps.next.outputs.version }}",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "terraform-next"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 2
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 238,
+              "column": 14
+            },
+            "end_point": {
+              "row": 238,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 10881,
+              "end": 10904
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/test.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "opentofu"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 255,
+              "column": 8
+            },
+            "end_point": {
+              "row": 255,
+              "column": 132
+            },
+            "offset_span": {
+              "start": 11571,
+              "end": 11695
+            }
+          },
+          "feature": "uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "opentofu"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 255,
+              "column": 14
+            },
+            "end_point": {
+              "row": 255,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 11577,
+              "end": 11600
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/test.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "release-dry-run"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 283,
+              "column": 8
+            },
+            "end_point": {
+              "row": 283,
+              "column": 132
+            },
+            "offset_span": {
+              "start": 12875,
+              "end": 12999
+            }
+          },
+          "feature": "uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "release-dry-run"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 283,
+              "column": 14
+            },
+            "end_point": {
+              "row": 283,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 12881,
+              "end": 12904
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/test.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  },
+  {
+    "ident": "self-repository",
+    "desc": "use GitHub's dedicated self-repository syntax",
+    "url": "https://docs.zizmor.sh/audits/#self-repository",
+    "determinations": {
+      "confidence": "High",
+      "severity": "Low",
+      "persona": "Regular"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/weekly.yml"
+            }
+          },
+          "annotation": "this step",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "vulnerabilities"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              }
+            ]
+          },
+          "feature_kind": "Normal",
+          "kind": "Related"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 35,
+              "column": 8
+            },
+            "end_point": {
+              "row": 35,
+              "column": 132
+            },
+            "offset_span": {
+              "start": 1426,
+              "end": 1550
+            }
+          },
+          "feature": "uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      },
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/weekly.yml"
+            }
+          },
+          "annotation": "use '$/...' instead of './...'",
+          "route": {
+            "route": [
+              {
+                "Key": "jobs"
+              },
+              {
+                "Key": "vulnerabilities"
+              },
+              {
+                "Key": "steps"
+              },
+              {
+                "Index": 1
+              },
+              {
+                "Key": "uses"
+              }
+            ]
+          },
+          "feature_kind": {
+            "Subfeature": {
+              "after": 0,
+              "fragment": {
+                "Raw": "./.github/actions/setup"
+              }
+            }
+          },
+          "kind": "Primary"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 35,
+              "column": 14
+            },
+            "end_point": {
+              "row": 35,
+              "column": 37
+            },
+            "offset_span": {
+              "start": 1432,
+              "end": 1455
+            }
+          },
+          "feature": "./.github/actions/setup",
+          "comments": [
+            "# zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)"
+          ]
+        }
+      }
+    ],
+    "ignored": true,
+    "fixes": [
+      {
+        "title": "rewrite './...' to '$/...'",
+        "key": {
+          "Local": {
+            "verbatim_path": "./.github/workflows/weekly.yml"
+          }
+        },
+        "disposition": "unsafe"
+      }
+    ]
+  }
+]

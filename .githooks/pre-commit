@@ -2,7 +2,8 @@
 # Pre-commit: the CI checks, locally, before the commit exists.
 #   gofmt, go vet (also -tags live), golangci-lint, then tests with -race and the
 #   coverage policy (`make pre-commit`). Skipped when nothing that affects the Go
-#   build or tests is staged. Enable once per clone with `make hooks`.
+#   build or tests is staged. A staged workflow file is checked with actionlint (pinned in
+#   devtools/go.mod) whatever else is staged. Enable once per clone with `make hooks`.
 #
 # Do not bypass with --no-verify: a red hook is the same red CI would show.
 set -eu
@@ -10,6 +11,18 @@ cd "$(git rev-parse --show-toplevel)"
 
 staged="$(git diff --cached --name-only --diff-filter=ACMR)"
 [ -n "$staged" ] || exit 0
+
+# Workflow files: actionlint, the pinned version (devtools/go.mod), whatever else is staged: a commit that
+# touches only a workflow would otherwise skip every check below. zizmor (`make zizmor`) is CI's and not part
+# of the hook; `make lint` runs the proof that its options hold.
+if printf '%s\n' "$staged" | grep -q '^\.github/'; then
+  command -v go >/dev/null 2>&1 || {
+    echo "pre-commit: 'go' is required but not on PATH" >&2
+    exit 1
+  }
+  echo "pre-commit: make actionlint"
+  make actionlint
+fi
 
 # Prose and configuration are American English too, and a commit that touches only those (a guide, a
 # workflow) would otherwise skip every check below: spell them first, it takes a second.
@@ -30,11 +43,6 @@ for tool in go terraform; do
     exit 1
   }
 done
-
-# Workflow files get actionlint when it is installed (CI-only otherwise).
-if printf '%s\n' "$staged" | grep -q '^\.github/' && command -v actionlint >/dev/null 2>&1; then
-  actionlint
-fi
 
 echo "pre-commit: make pre-commit (gofmt, vet, lint, tests with -race and the coverage policy)"
 exec make pre-commit
