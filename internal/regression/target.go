@@ -16,9 +16,9 @@ import (
 const (
 	// TargetFake is the in-process fake switch (the default).
 	TargetFake = "fake"
-	// TargetSW03 is switch 03, the only real switch the suite may write to.
+	// TargetSW03 is the label of the only real switch the suite may write to.
 	TargetSW03 = "sw03"
-	// targetSW01 is named only to be refused.
+	// targetSW01 is the label of a switch that must never be written; it is named only to be refused.
 	targetSW01 = "sw01"
 )
 
@@ -40,10 +40,10 @@ const (
 	// server must be up: the switch takes whatever address it gives, and is found again by its MAC.
 	EnvAllowDHCP = "TPLINK_REGRESSION_ALLOW_DHCP"
 	// envDisruptPort opts in to the allow_disruptive scenario writing to this device port (a brief
-	// link drop). It must be a protected port other than the first, which is the uplink.
+	// link drop). It must be a protected port other than the first, which is the management port.
 	envDisruptPort = "TPLINK_REGRESSION_DISRUPT_DEVICE_PORT"
 	// envDisruptivePorts opts in to the disruptive scenarios (real changes behind allow_disruptive on
-	// ports that carry a device). The ports must be protected ports other than the uplink.
+	// ports that carry a device). The ports must be protected ports other than the management port.
 	envDisruptivePorts = "TPLINK_REGRESSION_DISRUPTIVE_PORTS"
 )
 
@@ -55,7 +55,8 @@ type Target struct {
 	Password model.Password
 	// TestPorts are the ports a scenario may change: free, link-down, in no LAG.
 	TestPorts []model.PortID
-	// ProtectedPorts (the uplink and the ports with devices) are named only by guard-refusal scenarios.
+	// ProtectedPorts (the management port, listed first, and the ports that carry a device) are named
+	// only by guard-refusal scenarios.
 	ProtectedPorts []model.PortID
 	// MoveIP is the spare address the management-move scenario may use; empty unless the run opted in.
 	MoveIP string
@@ -64,7 +65,7 @@ type Target struct {
 	// DisruptPort is the device port the allow_disruptive scenario may write to; zero unless the run opted in.
 	DisruptPort model.PortID
 	// DisruptivePorts are the device ports the disruptive scenarios may change for real (a link
-	// drop, a LAG, a VLAN, a mirror destination); empty unless the run opted in. Never the uplink.
+	// drop, a LAG, a VLAN, a mirror destination); empty unless the run opted in. Never the management port.
 	DisruptivePorts []model.PortID
 }
 
@@ -90,10 +91,10 @@ func ParseEnvFile(r io.Reader) (map[string]string, error) {
 	return out, sc.Err()
 }
 
-// LoadTarget builds the target from env. The fake needs nothing. Anything else must be switch 03
-// and must name its host, credentials and ports; switch 01 is refused by name and by address
-// (the addresses in TPLINK_REGRESSION_READONLY_HOSTS, comma separated), and a port may not be
-// both a test port and a protected one.
+// LoadTarget builds the target from env. The fake needs nothing. Anything else must be the one real
+// target label and must name its host, credentials and ports; the label of a switch that must
+// never be written is refused by name, a host listed in TPLINK_REGRESSION_READONLY_HOSTS (comma
+// separated) is refused by address, and a port may not be both a test port and a protected one.
 func LoadTarget(env map[string]string) (Target, error) {
 	switch name := env[EnvTarget]; name {
 	case "", TargetFake:
@@ -161,7 +162,7 @@ func loadOptIns(t *Target, env map[string]string) error {
 		}
 	}
 	t.DHCP = env[EnvAllowDHCP] == "1"
-	// the device ports are the protected ports other than the uplink, which is listed first
+	// the device ports are the protected ports other than the management port, which is listed first
 	devices := t.ProtectedPorts[min(1, len(t.ProtectedPorts)):]
 	if v := env[envDisruptPort]; v != "" {
 		ports, err := parsePorts(v)

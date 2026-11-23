@@ -17,7 +17,7 @@ import (
 
 // The scenarios run through a real Terraform binary against the target chosen by the environment
 // (the fake by default). Run them with `make regression` (TF_ACC=1); `make regression-live`
-// aims them at switch 03. Each scenario changes a setting, checks it by reading the switch
+// aims them at the real test switch. Each scenario changes a setting, checks it by reading the switch
 // directly (not through the provider), and puts the original value back with an explicit
 // configuration, because destroying a resource only forgets it. The last check of every
 // scenario is the readout of the whole switch against the one taken before the first scenario.
@@ -312,7 +312,7 @@ func TestScenarioStormLimit(t *testing.T) {
 }
 
 // The switch keeps either an ingress limit or storm control on a port, and turns the other off without a word
-// (probed on switch 03): the library refuses the second one, the apply fails with the reason and nothing is
+// (probed on a real switch): the library refuses the second one, the apply fails with the reason and nothing is
 // written, and a change from one to the other works when the applies are ordered with depends_on, in both
 // directions. Everything is put back by configuration at the end.
 func TestScenarioIngressLimitAndStormControlExclude(t *testing.T) {
@@ -472,7 +472,7 @@ func TestScenarioPortBasedVLANGroup(t *testing.T) {
 	})
 }
 
-// Guard refusals: writes to the ports that carry the uplink or a device are refused before
+// Guard refusals: writes to the ports that carry management traffic or a device are refused before
 // anything is sent. Each refusal is a step of its own, and at the end the switch must not have
 // received a single write (the fake counts them; on hardware the readout must be identical).
 func TestScenarioGuardRefusals(t *testing.T) {
@@ -556,7 +556,7 @@ func TestScenarioAllowDisruptive(t *testing.T) {
 	})
 }
 
-// VLAN mode, an 802.1Q VLAN on two test ports and a PVID. Nothing here touches the uplink or the
+// VLAN mode, an 802.1Q VLAN on two test ports and a PVID. Nothing here touches the management port or the
 // management VLAN: VLAN 1 keeps every port untagged. Restoring takes four steps because removing a
 // PVID resource only forgets it (its value is put back by configuration first), a VLAN cannot be
 // deleted while a port still has it as PVID, and the mode goes back last.
@@ -766,7 +766,7 @@ func (s *Session) writesUnchanged(n int) resource.TestCheckFunc {
 
 // The management address is managed with the address the switch already has: nothing is written,
 // the resource imports, and the plan is clean. Moving the switch is not part of this scenario
-// (see the live move in the sw03 target): the fake answers on loopback, where the client refuses
+// (see the live move on a real target): the fake answers on loopback, where the client refuses
 // to move it, and a move to a documentation address would aim packets at nothing.
 func TestScenarioManagementAddressUnchanged(t *testing.T) {
 	s := openForScenario(t)

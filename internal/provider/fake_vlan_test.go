@@ -125,7 +125,7 @@ func (f *fakeClient) SetVLANMode(_ context.Context, s model.VLANModeSetting) err
 func (f *fakeClient) SetDot1QVLAN(_ context.Context, vlan model.Dot1QVLAN) error {
 	return f.vlanWrite(func(v *fakeVLANs) error {
 		if _, exists := v.vlans[vlan.ID]; !exists && len(v.vlans) >= v.tableSize() {
-			return &escp.RejectedError{Code: 7505} // what switch 03 answered to the 33rd VLAN
+			return &escp.RejectedError{Code: 7505} // what a real switch answered to the 33rd VLAN
 		}
 		v.vlans[vlan.ID] = vlan
 		return nil

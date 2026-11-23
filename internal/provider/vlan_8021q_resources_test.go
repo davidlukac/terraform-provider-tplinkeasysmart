@@ -228,7 +228,7 @@ func TestAccVLAN8021QGroupLifecycleOnFreePorts(t *testing.T) {
 }
 
 // The switch holds 32 VLANs, VLAN 1 among them, and refuses the next one with code 7505 (probed on
-// switch 03). The resource says so before it writes anything.
+// a real switch). The resource says so before it writes anything.
 func TestAccVLAN8021QGroupRefusesANewVLANWhenTheTableIsFull(t *testing.T) {
 	f := newVLANFake("802.1q")
 	f.vlanState().maxVLANs = 2 // VLAN 1 and the one added below

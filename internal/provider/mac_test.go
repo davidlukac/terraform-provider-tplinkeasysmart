@@ -19,7 +19,7 @@ import (
 	"github.com/davidlukac/escp-go/model"
 )
 
-// Switch 03's MAC, written the three ways a person may write it. The first is the canonical form.
+// A switch's MAC, written the three ways a person may write it. The first is the canonical form.
 const (
 	macColon  = "00:00:5e:00:53:01"
 	macHyphen = "00-00-5E-00-53-01"

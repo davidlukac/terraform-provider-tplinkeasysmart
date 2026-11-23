@@ -49,7 +49,7 @@ func (s *Session) bringBack(t *testing.T, original model.IPConfig) {
 	}
 }
 
-// Moving the management address through the provider: switch 03 goes to the spare address and
+// Moving the management address through the provider: the real switch goes to the spare address and
 // back, only when the run opted in (TPLINK_REGRESSION_ALLOW_MANAGEMENT_MOVE=1 and a spare address
 // that nothing uses; it is not probed before the move). The provider block reads its host from a
 // file the checks rewrite, because the provider process of the next Terraform command must dial
@@ -174,7 +174,7 @@ func TestScenarioManagementMoveFoundByMAC(t *testing.T) {
 }
 
 // A discovery right after the switch changed its address can come back empty or still show the old
-// address (seen on switch 03 twice: the neighbor caches and the switch's own table are catching
+// address (seen on a real switch twice: the neighbor caches and the switch's own table are catching
 // up), so a look-up that must see a new state asks again for a few seconds. This is the tolerance of
 // the check, not of the product: the provider's own look-up repeats once and its apply read the
 // switch back fine each time.

@@ -173,8 +173,9 @@ func (s *Session) capture(ctx context.Context) error {
 	return nil
 }
 
-// startFake starts the model of a freshly reset switch with the port shape of switch 03: the
-// uplink on port 1 and devices on 6, 7 and 8 have a link, the other ports are free.
+// startFake starts the model of a freshly reset switch with the default port shape of a real
+// target: the management port (1) and three device ports (6, 7 and 8) have a link, the other
+// ports are free.
 func startFake(tb testing.TB) *escptest.Switch {
 	tb.Helper()
 	f := escptest.Start(tb)
