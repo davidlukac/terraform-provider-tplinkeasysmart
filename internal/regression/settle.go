@@ -13,7 +13,7 @@ import (
 // A switch that has just had its device ports taken down and up (the disruptive scenarios) stays slow
 // for a while: its management CPU answers discovery but not reads, for ten seconds or more, and the
 // scenario that follows fails on a read that timed out although nothing is wrong with the code under
-// test (seen twice on switch 03, in the MAC-addressed scenarios that run right after the disruptive
+// test (seen twice on a real switch, in the MAC-addressed scenarios that run right after the disruptive
 // ones). A scenario therefore starts only when the switch answers reads promptly again.
 const (
 	// settleReplies is how many reads in a row must be answered promptly.

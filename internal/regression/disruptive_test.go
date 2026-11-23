@@ -14,7 +14,7 @@ import (
 // a speed change, a port taken down, a link aggregation group, a mirror destination and a
 // port-based VLAN group. They are the changes the guards exist to stop, so they run on the fake
 // always and on hardware only when the run opts in with TPLINK_REGRESSION_DISRUPTIVE_PORTS (the
-// device ports they may disturb; never the uplink). Each ends with the readout of the whole
+// device ports they may disturb; never the management port). Each ends with the readout of the whole
 // switch identical to the first one, restored by explicit configuration.
 
 // disruptivePorts returns the device ports the run may disturb, or skips the scenario.
@@ -141,7 +141,7 @@ func TestScenarioDisruptiveMirrorDestination(t *testing.T) {
 }
 
 // A port-based VLAN group that takes a device port out of VLAN 1: the device is cut off from the
-// uplink until the group is removed, which puts the port back (membership is exclusive).
+// network until the group is removed, which puts the port back (membership is exclusive).
 func TestScenarioDisruptiveVLANGroup(t *testing.T) {
 	s := openForScenario(t)
 	vlan, err := s.Client().PortBasedVLAN(context.Background())

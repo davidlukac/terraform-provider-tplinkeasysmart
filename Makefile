@@ -192,7 +192,7 @@ snapshot:
 
 # The regression suite (internal/regression) through a real Terraform binary against the stateful
 # fake switch: nothing to configure, runs in CI. `make regression-live` aims the same scenarios at
-# switch 03 and needs the gitignored .test.env (see .test.env.example); it refuses without it.
+# the one real switch named in the gitignored .test.env (see .test.env.example) and refuses to run without it.
 regression:
 	TF_ACC=1 go test -count=1 -race ./internal/regression/...
 

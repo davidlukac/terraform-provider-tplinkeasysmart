@@ -130,7 +130,7 @@ func (f *fakeClient) EnableDHCP(context.Context) error {
 	return nil
 }
 
-// newStaticFake returns a fake switch with a static address, as switch 03 has.
+// newStaticFake returns a fake switch with a static address, as a real switch may have.
 func newStaticFake(ip, mask, gateway string) *fakeClient {
 	f := &fakeClient{}
 	e := f.extra()
