@@ -22,3 +22,19 @@ Full list: [`CONTRIBUTING.md`](../CONTRIBUTING.md) (client, resource and data so
 - [ ] A client change is made in the [escp-go](https://github.com/davidlukac/escp-go) library first (released, then required in `go.mod`); its documentation and `PROTOCOL.md` are updated there
 - [ ] Hardware and firmware verified on are stated (or "not verified live")
 - [ ] No credentials, MAC addresses or real addresses in code, tests or docs
+
+## Merge readiness
+
+<!-- Kept by the maintainer's assistant and its agents. The maintainer merges only when this pull request is not a draft and every box below is checked. -->
+<!-- Optional for outside contributors: delete this whole section, and the "Merge readiness" check skips the pull request. Keep it the last section of the description: the check reads a box after it as unticked. -->
+
+- [ ] CI is green on the head commit
+- [ ] Local checks done (format, vet, lint, tests with `-race`, coverage policy)
+- [ ] Review done (light, deep or adversarial)
+- [ ] Review findings fixed and pushed
+- [ ] No agent is still working on this pull request
+- [ ] **Ready for the maintainer to merge** (set last, by the assistant only)
+
+### Pending work
+
+- [ ] <task> (<agent role>)
