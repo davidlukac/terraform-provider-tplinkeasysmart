@@ -24,8 +24,22 @@ var templateBoxes = []string{
 	"<task> (<agent role>)",
 }
 
-// readTemplate is the real template of the repository.
-func readTemplate(t *testing.T) string {
+// templateVariant is the template as a checkout of the repository can give it: with LF line endings, or
+// with CRLF ones (a clone on Windows with autocrlf).
+type templateVariant struct {
+	name string
+	text string
+}
+
+// templateText is the text of the template the tests work on: the line endings of the file as checked out
+// are made LF, so that the tests, which cut the template at a line, hold on a checkout of either kind. The
+// program under test reads CRLF itself; this is only about the cuts of the tests.
+func templateText(data []byte) string {
+	return strings.ReplaceAll(string(data), "\r\n", "\n")
+}
+
+// readTemplateFile is the bytes of the real template of the repository, as the checkout has them.
+func readTemplateFile(t *testing.T) []byte {
 	t.Helper()
 	if _, err := os.Stat(filepath.Join("..", "..", "go.mod")); err != nil {
 		t.Fatalf("the module root is not two levels above the package: %v", err)
@@ -34,7 +48,25 @@ func readTemplate(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("the pull request template cannot be read: %v", err)
 	}
-	return string(data)
+	return data
+}
+
+// readTemplate is the real template of the repository, with LF line endings.
+func readTemplate(t *testing.T) string {
+	t.Helper()
+	return templateText(readTemplateFile(t))
+}
+
+// readTemplateVariants is the real template as an LF checkout and as a CRLF checkout give it, each read the
+// way the tests read it: the guarantee that the tests hold on a CRLF checkout is these two cases.
+func readTemplateVariants(t *testing.T) []templateVariant {
+	t.Helper()
+	lf := []byte(readTemplate(t))
+	crlf := []byte(strings.ReplaceAll(string(lf), "\n", "\r\n"))
+	return []templateVariant{
+		{"LF checkout", templateText(lf)},
+		{"CRLF checkout", templateText(crlf)},
+	}
 }
 
 // The job reads the description of a pull request that uses the template: the template must be a
@@ -42,7 +74,13 @@ func readTemplate(t *testing.T) string {
 // Renaming the heading or changing a box to a form the program does not read would otherwise turn the
 // check green for every pull request.
 func TestTheTemplateHoldsOneSectionThatTheCheckReads(t *testing.T) {
-	template := readTemplate(t)
+	for _, v := range readTemplateVariants(t) {
+		t.Run(v.name, func(t *testing.T) { checkTheTemplateHoldsOneSection(t, v.text) })
+	}
+}
+
+func checkTheTemplateHoldsOneSection(t *testing.T, template string) {
+	t.Helper()
 	found := structuredPass(splitLines(template))
 
 	t.Run("exactly one section", func(t *testing.T) {
@@ -97,7 +135,13 @@ func TestTheTemplateHoldsOneSectionThatTheCheckReads(t *testing.T) {
 // What the job prints for a pull request that keeps the template as it is, and for one that ticked every
 // box: the two ends of the life of a description.
 func TestTheVerdictOnTheTemplateIsRedUntilEveryBoxIsTicked(t *testing.T) {
-	template := readTemplate(t)
+	for _, v := range readTemplateVariants(t) {
+		t.Run(v.name, func(t *testing.T) { checkTheVerdictOnTheTemplate(t, v.text) })
+	}
+}
+
+func checkTheVerdictOnTheTemplate(t *testing.T, template string) {
+	t.Helper()
 	head, section, found := strings.Cut(template, "\n## Merge readiness\n")
 	if !found {
 		t.Fatal("the template has no line \"## Merge readiness\"")
