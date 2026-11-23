@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/davidlukac/escp-go"
@@ -14,9 +15,10 @@ import (
 // the requests of one switch are serialized: a refresh of fifteen resources against a switch that
 // is off takes minutes before the plan fails. failFast puts a latch in front of a client: when the
 // first request that anything of this client sends gets no answer, every other request to that
-// switch of the same run, one that is already waiting for its turn included, fails at once with
-// that error, and says so. A switch that has answered once is never latched (a single read it does
-// not answer, as some firmware does for some settings, says nothing about the next).
+// switch of the same run, one that is already waiting for its turn included, fails at once with an
+// error that says the request was not sent and what kind of failure came first (see notSentError).
+// A switch that has answered once is never latched (a single read it does not answer, as some
+// firmware does for some settings, says nothing about the next).
 //
 // The latch admits one request at a time (the library serializes the requests of a client, so no
 // throughput is lost) and decides after the admission, when the request is about to be sent: a
@@ -36,8 +38,45 @@ type failFastLatch struct {
 	slot     chan struct{} // the admission: a request holds the one slot while it is sent; see admission
 	mu       sync.Mutex    // guards the fields below; never held while waiting or sending
 	answered bool          // some request got an answer
-	err      error         // the first request that got none, while nothing was answered
+	silence  *silence      // the first request that got no answer, while nothing was answered
 }
+
+// A requestKind says what the first request that got no answer was, in the words of a refusal. The
+// latch knows two kinds, the reads and the writes, because they take different wrappers (do1, do0).
+type requestKind string
+
+const (
+	readRequest  requestKind = "a read"
+	writeRequest requestKind = "a write"
+)
+
+// silence is what the latch keeps of the first request that got no answer: the kind of request and
+// the kinds of failure it matched (escp.ErrNoReply, escp.ErrNotFound, or both), never its error.
+// The error of a request that was sent says what the library knows of it, and for a write that is
+// that it may have been applied; a request that was not sent must not say that or match it.
+type silence struct {
+	request requestKind
+	kinds   []error
+}
+
+// notSentError is the error of a request that the latch did not send. It matches the kinds of
+// failure of the first request that got no answer, so errors.Is for escp.ErrNoReply and
+// escp.ErrNotFound keeps working, and nothing else of it: not escp.ErrWriteUnconfirmed, whatever
+// the first request was. Its text names the kind of that request (a read or a write), so that the
+// user can find the error of the request that was sent in the same output.
+type notSentError struct{ first *silence }
+
+func (r *notSentError) Error() string {
+	texts := make([]string, len(r.first.kinds))
+	for i, k := range r.first.kinds {
+		texts[i] = k.Error()
+	}
+	return fmt.Sprintf("the switch did not answer earlier in this run, so this request was not sent (the first request without an answer was %s): %s",
+		r.first.request, strings.Join(texts, "; "))
+}
+
+// Unwrap returns the kinds of failure of the first request, never that request's own error.
+func (r *notSentError) Unwrap() []error { return r.first.kinds }
 
 // admission is the channel of the admission, made on first use so that the zero latch works.
 func (l *failFastLatch) admission() chan struct{} {
@@ -80,26 +119,36 @@ func (l *failFastLatch) release() {
 func (l *failFastLatch) refused() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.err == nil {
+	if l.silence == nil {
 		return nil
 	}
-	return fmt.Errorf("the switch did not answer earlier in this run, so this request was not sent: %w", l.err)
+	return &notSentError{first: l.silence}
 }
 
 // record learns from the outcome of a request: an answer, a refusal or another device's reply are
 // answers; silence and a switch that cannot be found are what the latch is for (while nothing was
 // answered); anything else (a canceled call, an invalid argument) says nothing about the switch.
-func (l *failFastLatch) record(err error) {
+func (l *failFastLatch) record(err error, request requestKind) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	switch {
-	case err == nil || errors.Is(err, escp.ErrRejected) || errors.Is(err, escp.ErrWrongSwitch):
+	if err == nil || errors.Is(err, escp.ErrRejected) || errors.Is(err, escp.ErrWrongSwitch) {
 		l.answered = true
-	case errors.Is(err, escp.ErrNoReply) || errors.Is(err, escp.ErrNotFound):
-		if !l.answered && l.err == nil {
-			l.err = err
+		return
+	}
+	if kinds := silentKinds(err); len(kinds) > 0 && !l.answered && l.silence == nil {
+		l.silence = &silence{request: request, kinds: kinds}
+	}
+}
+
+// silentKinds returns the kinds of silence err matches, in a fixed order: none for any other error.
+func silentKinds(err error) []error {
+	var kinds []error
+	for _, kind := range []error{escp.ErrNoReply, escp.ErrNotFound} {
+		if errors.Is(err, kind) {
+			kinds = append(kinds, kind)
 		}
 	}
+	return kinds
 }
 
 // failFast returns c with the latch in front of every request; Close and SwitchMAC pass through
@@ -123,7 +172,7 @@ func do0(ctx context.Context, l *failFastLatch, f func() error) error {
 	}
 	defer l.release()
 	err := f()
-	l.record(err)
+	l.record(err, writeRequest)
 	return err
 }
 
@@ -136,7 +185,7 @@ func do1[T any](ctx context.Context, l *failFastLatch, f func() (T, error)) (T, 
 	}
 	defer l.release()
 	v, err := f()
-	l.record(err)
+	l.record(err, readRequest)
 	return v, err
 }
 

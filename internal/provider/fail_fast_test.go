@@ -92,7 +92,7 @@ func TestFailFastNeverLatchesASwitchThatAnswered(t *testing.T) {
 		t.Fatal(err)
 	}
 	noReply := errors.Join(escp.ErrNoReply, errors.New("one read"))
-	mustAs[latchedClient](t, fast).latch.record(noReply)
+	mustAs[latchedClient](t, fast).latch.record(noReply, readRequest)
 	if _, err := fast.LED(context.Background()); err != nil {
 		t.Fatalf("a switch that has answered must not be latched: %v", err)
 	}
@@ -117,9 +117,9 @@ func TestFailFastClassifiesWhatARequestEnds(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &failFastLatch{}
-			l.record(tt.err)
-			if l.answered != tt.wantAnswered || (l.err != nil) != tt.wantLatched {
-				t.Fatalf("answered=%v latched=%v, want %v and %v", l.answered, l.err != nil, tt.wantAnswered, tt.wantLatched)
+			l.record(tt.err, readRequest)
+			if l.answered != tt.wantAnswered || (l.silence != nil) != tt.wantLatched {
+				t.Fatalf("answered=%v latched=%v, want %v and %v", l.answered, l.silence != nil, tt.wantAnswered, tt.wantLatched)
 			}
 		})
 	}
