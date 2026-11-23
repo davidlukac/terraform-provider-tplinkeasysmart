@@ -139,8 +139,9 @@ zizmor:
 # a deliberate finding next to each of these inputs of the audited tree: a configuration file, an ignore
 # file, an extra inline suppression, a file zizmor cannot load, a link; and a stub zizmor records the command
 # line and the environment (tools/zizmorprobe, a Go program, offline). It needs the pinned zizmor: without it
-# the check says so and passes, and the `zizmor` jobs of CI, which install it, set ZIZMOR_REQUIRED so that it
-# cannot be skipped there. A prerequisite of `lint`.
+# the check says so and passes, and the `zizmor` job of test.yml, which installs it, sets ZIZMOR_REQUIRED so that
+# it cannot be skipped there (the job of weekly.yml runs `make zizmor` only; CONTRIBUTING.md says what each job
+# runs). A prerequisite of `lint`.
 .PHONY: zizmorcheck
 lint: zizmorcheck
 

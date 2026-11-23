@@ -21,8 +21,8 @@
 // Windows.
 //
 // The program needs zizmor on the PATH, the pinned version (`make zizmor` prints how to install it). Without
-// it the probes that need it say so and pass, unless ZIZMOR_REQUIRED is set, as it is in the CI jobs that install
-// zizmor. ZIZMOR_SELF_REPOSITORY_FINDINGS is the number the Makefile holds.
+// it the probes that need it say so and pass, unless ZIZMOR_REQUIRED is set, as it is in the `zizmor` job of
+// test.yml. ZIZMOR_SELF_REPOSITORY_FINDINGS is the number the Makefile holds.
 package probe
 
 import (

@@ -39,9 +39,11 @@ jobs:
       - name: Known vulnerabilities
         run: make vuln
 
-  # The same pinned zizmor and the same steps as the `zizmor` job of test.yml. Its online audits (an action
-  # with a known vulnerability, a pinned SHA that is not in the action's history) can change with nothing of
-  # ours changing, so a run of the week that sees none of our commits can still find something.
+  # The same pinned zizmor and the same audit step (`make zizmor`) as the `zizmor` job of test.yml, and no more:
+  # the proof that the options hold (`make zizmorcheck`, with ZIZMOR_REQUIRED) is a step of test.yml only, since
+  # its probes do not change with the clock. The online audits (an action with a known vulnerability, a pinned
+  # SHA that is not in the action's history) can change with nothing of ours changing, so a run of the week that
+  # sees none of our commits can still find something.
   zizmor:
     name: Workflow security (zizmor)
     runs-on: ubuntu-24.04

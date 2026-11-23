@@ -28,9 +28,9 @@
 //     the gate runs on: a change to any of them changes the gate, and CONTRIBUTING.md lists what is read at review.
 //
 // The proxy variables of zizmor's HTTP client (HTTPS_PROXY, https_proxy and ALL_PROXY) are not cleared. They come from
-// the machine or from an `env:` of a workflow, which is read at review (devtools/recipecheck compares the `env:`
-// lines of the two zizmor steps: a tripwire for an edit of those lines and no more). They change only the route the
-// requests take and not what is audited, and clearing them would break a run behind a proxy.
+// the machine or from an `env:` of a workflow, which is read at review (nothing in this repository pins the `env:`
+// lines of the zizmor steps, #196). They change only the route the requests take and not what is audited, and
+// clearing them would break a run behind a proxy.
 //
 // Options that are not passed keep their default: --persona, --min-severity and --min-confidence have no
 // environment variable and no configuration file to change them (--no-config); --fix, --lsp, --completions,
