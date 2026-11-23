@@ -131,8 +131,9 @@ func TestTheAmbiguousListIsCountedPastAHundred(t *testing.T) {
 	}
 }
 
-// A scan that backtracked would take minutes on these; the bound is far above what a linear scan needs
-// and far below what a quadratic one takes.
+// A scan that backtracked would take minutes on these; the bound is far above what a linear scan needs.
+// It does not cover the lookup of many titled headings (about half a second at 1 MiB, see doc.go): no input
+// here has many lines titled "Merge readiness", and the bound would not catch that case.
 func TestHostileLinesAreReadInMomentsWhateverTheyHold(t *testing.T) {
 	const bound = 5 * time.Second
 	big := 65000

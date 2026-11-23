@@ -15,9 +15,10 @@
 //
 // The description is untrusted input and is read as text: no regular expression is applied to it, and
 // every scan is a loop over the characters. The time is not claimed to be linear in every case: the
-// notes that name a title which is not read as a heading look each line titled "Merge readiness" up in
-// the list of headings found, so on a description made of many such lines the time is quadratic (1 MiB of
-// them took about half a second when measured). The limit of 1 MiB bounds it. The command reads the
+// notes that name a title which is not read as a heading look every line titled "Merge readiness" up in
+// the list of headings found, so on a description made of many lines that are read as headings of that
+// title the time is quadratic (1 MiB of them took about half a second when measured; lines of that title
+// that are not headings take linear time). The limit of 1 MiB bounds it. The command reads the
 // description from the file named by -body-file, at most 1 MiB. A test sets the environment variable
 // PR_BODY and shows that the program does not read it; that is all the tests show, and the program makes
 // no wider promise about the environment.
