@@ -17,8 +17,9 @@ import (
 // first request that anything of this client sends gets no answer, every other request to that
 // switch of the same run, one that is already waiting for its turn included, fails at once with an
 // error that says the request was not sent and what kind of failure came first (see notSentError).
-// A switch that has answered once is never latched (a single read it does not answer, as some
-// firmware does for some settings, says nothing about the next).
+// A switch that has answered a request this latch saw is not latched afterwards (a single read it
+// does not answer, as some firmware does for some settings, says nothing about the next). What the
+// client asks inside a write is not seen by the latch (README, "Safety by design").
 //
 // The latch admits one request at a time (the library serializes the requests of a client, so no
 // throughput is lost) and decides after the admission, when the request is about to be sent: a
