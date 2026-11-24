@@ -16,7 +16,7 @@ Version 0.35.0 has no breaking change: no attribute of a resource or a data sour
 ## Behavior you may notice
 
 - **A switch that does not answer is asked once.** The 0.34.0 notes said this, but it was not active in that version: each request to a silent switch cost the full timeout with its retries. It is active from 0.35.0: after the first request to a switch that gets no answer, every other request to that switch in the same run, one that is already waiting for its turn included, fails at once with an error that says it was not sent. What the first request and the refused ones report, and how long the latch lasts, is in "Safety by design" of the [README](https://github.com/davidlukac/terraform-provider-tplinkeasysmart#safety-by-design).
-- **The library** is version 0.11.0 (0.34.0 had 0.9.0). The provider checked each behavior change of the library's 0.10.0, 0.10.1 and 0.11.0 against its own code and found none that changes what a configuration or a state does; an interrupted `management_ip` apply can end with another error text. Programs that embed the library read its changelog.
+- **The library** is version 0.11.0 (0.34.0 had 0.9.0). The provider checked each behavior change of the library's 0.10.0, 0.10.1 and 0.11.0 against its own code and found none that changes what a configuration or a state does, apart from two error texts: the text of an interrupted `management_ip` apply can differ, and a plan-time error for a device description or a VLAN name that is longer than 40 bytes quotes its first 40 bytes and the size (`... (62 bytes)`) instead of the whole value. Programs that embed the library read its changelog.
 
 ## If something goes wrong
 
