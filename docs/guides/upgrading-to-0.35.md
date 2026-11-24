@@ -7,7 +7,7 @@ description: |-
 
 # Upgrading to 0.35.0
 
-Version 0.35.0 has no breaking change: no attribute of a resource or a data source is renamed, removed or retyped, and no id changes (the reference pages of every resource and every data source that 0.34.0 had are the same). Pin `version = "~> 0.35"`, run `terraform init -upgrade` and `terraform plan`.
+Version 0.35.0 has no breaking change: no attribute of a resource or a data source is renamed, removed or retyped, and no id changes (the reference pages of every resource and every data source that 0.34.0 had are the same). Pin `version = "~> 0.35.0"`, run `terraform init -upgrade` and `terraform plan`.
 
 ## New
 

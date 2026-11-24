@@ -16,7 +16,7 @@ It also pulls in version 0.9.0 of the ESCP library, which changes how clients be
 ## Quick checklist
 
 1. `terraform plan` on 0.33.x is clean.
-2. Pin `version = "~> 0.34"` and `terraform init -upgrade`.
+2. Pin `version = "~> 0.34.0"` and `terraform init -upgrade`.
 3. Run `terraform validate`; fix the attribute names it reports (data sources: tables below).
 4. Using a `switches` map? Add `switch = "<name>"` to **every** resource and data source (`switch = "default"` for the provider's own switch). See "Several switches".
 5. Using `host` **and** `mac` and relying on the MAC to find the switch when its address changes? Set `relocate_by_mac = true`.
