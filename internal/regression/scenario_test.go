@@ -402,19 +402,19 @@ func intSet(ports ...model.PortID) string {
 
 func TestScenarioLAG(t *testing.T) {
 	s := openForScenario(t)
-	a, b := s.Target.TestPorts[1], s.Target.TestPorts[2] // two ports of LAG 1 (ports 1-4)
-	cfg := fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"this\" {\n  group = 1\n  ports = %s\n}\n", intSet(a, b))
+	a, b := s.Target.LAGTestPorts()
+	cfg := fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"this\" {\n  group = %d\n  ports = %s\n}\n", ScenarioLAGGroup, intSet(a, b))
 	s.scenario(t, cfg, "", func(*terraform.State) error {
 		got, err := s.Client().LAGs(context.Background())
 		if err != nil {
 			return err
 		}
 		for _, l := range got {
-			if l.ID == 1 && l.Ports == model.MustPortSet(a, b) {
+			if l.ID == ScenarioLAGGroup && l.Ports == model.MustPortSet(a, b) {
 				return nil
 			}
 		}
-		return fmt.Errorf("LAG 1 not %v on the switch: %v", model.MustPortSet(a, b), got)
+		return fmt.Errorf("LAG %d not %v on the switch: %v", ScenarioLAGGroup, model.MustPortSet(a, b), got)
 	})
 }
 
@@ -423,11 +423,11 @@ func TestScenarioLAG(t *testing.T) {
 // configuration afterwards, because removing a port resource from a configuration only forgets it.
 func TestScenarioLAGRefusedByTheSwitch(t *testing.T) {
 	s := openForScenario(t)
-	a, b := s.Target.TestPorts[1], s.Target.TestPorts[2]
+	a, b := s.Target.LAGTestPorts()
 	ports := func(speedA model.Speed) string {
 		return fmt.Sprintf("resource \"tplinkeasysmart_port\" \"a\" {\n  port  = %d\n  speed = %q\n}\nresource \"tplinkeasysmart_port\" \"b\" {\n  port  = %d\n  speed = \"auto\"\n}\n", a, string(speedA), b)
 	}
-	lag := fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"this\" {\n  group      = 1\n  ports      = %s\n  depends_on = [tplinkeasysmart_port.a, tplinkeasysmart_port.b]\n}\n", intSet(a, b))
+	lag := fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"this\" {\n  group      = %d\n  ports      = %s\n  depends_on = [tplinkeasysmart_port.a, tplinkeasysmart_port.b]\n}\n", ScenarioLAGGroup, intSet(a, b))
 	s.test(t, resource.TestCase{
 		ProtoV6ProviderFactories: s.Factories(),
 		Steps: []resource.TestStep{
@@ -478,7 +478,7 @@ func TestScenarioPortBasedVLANGroup(t *testing.T) {
 func TestScenarioGuardRefusals(t *testing.T) {
 	s := openForScenario(t)
 	prot := s.Target.ProtectedPorts
-	if len(prot) < 4 {
+	if !s.Target.HasGuardPorts() {
 		t.Skip("needs four protected ports (the uplink and three device ports)")
 	}
 	up, d1, d2, d3 := prot[0], prot[1], prot[2], prot[3]
@@ -488,7 +488,7 @@ func TestScenarioGuardRefusals(t *testing.T) {
 		"disabling the uplink":            fmt.Sprintf("resource \"tplinkeasysmart_port\" \"x\" {\n  port    = %d\n  enabled = false\n  speed   = \"auto\"\n}\n", up),
 		"bandwidth of a device":           fmt.Sprintf("resource \"tplinkeasysmart_bandwidth_limit\" \"x\" {\n  port         = %d\n  ingress_kbps = 10240\n}\n", d3),
 		"storm control":                   fmt.Sprintf("resource \"tplinkeasysmart_storm_limit\" \"x\" {\n  port      = %d\n  broadcast = true\n  rate_kbps = 1024\n}\n", d2),
-		"a LAG with the uplink":           fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"x\" {\n  group = 1\n  ports = %s\n}\n", intSet(up, s.Target.TestPorts[0])),
+		"a LAG with the uplink":           fmt.Sprintf("resource \"tplinkeasysmart_lag\" \"x\" {\n  group = %d\n  ports = %s\n}\n", ScenarioLAGGroup, intSet(s.Target.UplinkLAGPorts())),
 		"a VLAN group with a device port": fmt.Sprintf("resource \"tplinkeasysmart_vlan_port_based_group\" \"x\" {\n  vlan  = 2\n  ports = %s\n}\n", intSet(d1)),
 	}
 	var writes int
@@ -516,7 +516,7 @@ func TestScenarioAllowDisruptive(t *testing.T) {
 	s := openForScenario(t)
 	port := s.Target.ProtectedPorts[1]
 	if s.Target.Real() {
-		if s.Target.DisruptPort == 0 {
+		if !s.Target.CanDisruptDevicePort() {
 			t.Skip("writes to a device port: set TPLINK_REGRESSION_DISRUPT_DEVICE_PORT to one of the device ports to run")
 		}
 		port = s.Target.DisruptPort
