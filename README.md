@@ -52,7 +52,7 @@ The Easy Smart line (TL-SG105E, TL-SG108E, TL-SG1016DE and friends) is cheap, qu
 
 ## Quick start
 
-> **Status:** pre-1.0. Install from the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart) with `terraform init`; releases are signed. Until 1.0 a minor version may change behavior, so pin it (`~> 0.26`) and read the [changelog](CHANGELOG.md) before upgrading.
+> **Status:** pre-1.0. Install from the [Terraform Registry](https://registry.terraform.io/providers/davidlukac/tplinkeasysmart) with `terraform init`; releases are signed. Until 1.0 a minor version may change behavior, so pin it (`~> 0.35.0`) and read the [changelog](CHANGELOG.md) before upgrading.
 
 New to it, or trying a different model? Start with **only** the read-only data sources (`system_info`, `ports`): they confirm the login and the protocol on your switch and firmware without a single write.
 
@@ -61,7 +61,7 @@ terraform {
   required_providers {
     tplinkeasysmart = {
       source  = "davidlukac/tplinkeasysmart"
-      version = "~> 0.26"
+      version = "~> 0.35.0"
     }
   }
 }
